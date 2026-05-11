@@ -25,38 +25,50 @@ function run(room) {
 
             // Pickup dropped energy or withdraw from link if available without moving
             let target = null;
-            if (!creep.heap.resourceMap) {
-                creep.heap.resourceMap = new Map();
-            }
-
-            const structures = global.State.structuresByRoom.get(room.name);
-            const links = structures?.get(STRUCTURE_LINK) || [];
-            const containers = structures?.get(STRUCTURE_CONTAINER) || [];
-            const dropped = global.State.droppedByRoom.get(room.name) || [];
-
-            // Simple iteration to avoid array.find() O(N*M) loop anti-pattern
-            for (let i = 0; i < dropped.length; i++) {
-                if (creep.pos.isNearTo(dropped[i].pos)) {
-                    target = dropped[i];
-                    break;
+            if (creep.heap.targetId) {
+                target = Game.getObjectById(creep.heap.targetId);
+                // Invalidate if missing or empty
+                if (!target ||
+                    (target.resourceType && target.amount === 0) ||
+                    (target.store && target.store.getUsedCapacity(RESOURCE_ENERGY) === 0)) {
+                    target = null;
+                    creep.heap.targetId = null;
                 }
             }
 
             if (!target) {
-                for (let i = 0; i < links.length; i++) {
-                    if (creep.pos.isNearTo(links[i].pos)) {
-                        target = links[i];
+                const structures = global.State.structuresByRoom.get(room.name);
+                const links = structures?.get(STRUCTURE_LINK) || [];
+                const containers = structures?.get(STRUCTURE_CONTAINER) || [];
+                const dropped = global.State.droppedByRoom.get(room.name) || [];
+
+                for (let i = 0; i < dropped.length; i++) {
+                    if (creep.pos.isNearTo(dropped[i].pos)) {
+                        target = dropped[i];
                         break;
                     }
                 }
-            }
 
-            if (!target) {
-                for (let i = 0; i < containers.length; i++) {
-                    if (creep.pos.isNearTo(containers[i].pos)) {
-                        target = containers[i];
-                        break;
+                if (!target) {
+                    for (let i = 0; i < links.length; i++) {
+                        if (creep.pos.isNearTo(links[i].pos)) {
+                            target = links[i];
+                            break;
+                        }
                     }
+                }
+
+                if (!target) {
+                    for (let i = 0; i < containers.length; i++) {
+                        if (creep.pos.isNearTo(containers[i].pos)) {
+                            target = containers[i];
+                            break;
+                        }
+                    }
+                }
+
+                if (target) {
+                    creep.heap.targetId = target.id;
                 }
             }
 

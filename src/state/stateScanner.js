@@ -1,4 +1,6 @@
 /* global EVENT_OBJECT_DESTROYED */
+const Scanner = require('./Scanner');
+
 module.exports = function stateScanner() {
     if (!global.State) {
         global.State = {
