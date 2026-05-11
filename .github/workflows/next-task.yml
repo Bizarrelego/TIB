@@ -23,24 +23,35 @@ jobs:
 
       - name: Get Next Task
         id: plan-next
-        uses: google-github-actions/run-gemini-cli@v0
-        env:
-          GEMINI_CLI_TRUST_WORKSPACE: true
-        with:
-          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
-          gemini_model: "gemini-3.1-flash-lite"
-          gemini_debug: false 
-          prompt: ${{ env.PROMPT_TEXT }}
+        run: |
+          # Safely package the prompt into JSON
+          PAYLOAD=$(jq -n --arg text "$PROMPT_TEXT" '{contents: [{parts: [{"text": $text}]}]}')
+          
+          # Direct API Call
+          API_RES=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
+            -H 'Content-Type: application/json' \
+            -d "$PAYLOAD")
+            
+          # Extract the text
+          CLEAN_TEXT=$(echo "$API_RES" | jq -r '.candidates[0].content.parts[0].text // empty')
+          
+          if [[ -z "$CLEAN_TEXT" ]]; then
+            echo "::error::Gemini API Failed. Raw Response: $API_RES"
+            exit 1
+          fi
+          
+          # Safely export to GitHub outputs
+          delimiter="$(openssl rand -hex 8)"
+          {
+            echo "gemini_response<<${delimiter}"
+            echo "$CLEAN_TEXT"
+            echo "${delimiter}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Trigger Jules
         env:
           GEMINI_RESPONSE: ${{ steps.plan-next.outputs.gemini_response }}
         run: |
-          if [[ -z "$GEMINI_RESPONSE" ]]; then
-            echo "::error::Gemini returned an empty response. Check the 'Get Next Task' logs."
-            exit 1
-          fi
-          
           PAYLOAD=$(jq -n --arg prompt "$GEMINI_RESPONSE" '{
             prompt: $prompt,
             sourceContext: {

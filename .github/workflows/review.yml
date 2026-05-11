@@ -28,14 +28,26 @@ jobs:
 
       - name: Architect Review
         id: gemini-check
-        uses: google-github-actions/run-gemini-cli@v0
-        env:
-          GEMINI_CLI_TRUST_WORKSPACE: true
-        with:
-          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
-          gemini_model: "gemini-3.1-flash-lite"
-          gemini_debug: false
-          prompt: ${{ env.REVIEW_TEXT }}
+        run: |
+          PAYLOAD=$(jq -n --arg text "$REVIEW_TEXT" '{contents: [{parts: [{"text": $text}]}]}')
+          
+          API_RES=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
+            -H 'Content-Type: application/json' \
+            -d "$PAYLOAD")
+            
+          CLEAN_TEXT=$(echo "$API_RES" | jq -r '.candidates[0].content.parts[0].text // empty')
+          
+          if [[ -z "$CLEAN_TEXT" ]]; then
+            echo "::error::Gemini API Failed. Raw Response: $API_RES"
+            exit 1
+          fi
+          
+          delimiter="$(openssl rand -hex 8)"
+          {
+            echo "gemini_response<<${delimiter}"
+            echo "$CLEAN_TEXT"
+            echo "${delimiter}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Auto-Merge
         if: contains(steps.gemini-check.outputs.gemini_response, 'LGTM')
