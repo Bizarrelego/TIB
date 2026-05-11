@@ -24,8 +24,10 @@ function run(room) {
             }
 
             // Pickup dropped energy or withdraw from link if available without moving
-            const target = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 1)[0] ||
-                           creep.pos.findInRange(FIND_STRUCTURES, 1, {filter: s => s.structureType === STRUCTURE_LINK || s.structureType === STRUCTURE_CONTAINER})[0];
+            const structures = global.State.structuresByRoom.get(room.name);
+            const target = global.State.droppedByRoom.get(room.name)?.find(r => r.pos.isNearTo(creep)) ||
+                           structures?.get(STRUCTURE_LINK)?.find(s => s.pos.isNearTo(creep)) ||
+                           structures?.get(STRUCTURE_CONTAINER)?.find(s => s.pos.isNearTo(creep));
 
             if (target && creep.store.getFreeCapacity() > 0) {
                 if (target.resourceType) creep.pickup(target);

@@ -9,7 +9,8 @@ module.exports = function stateScanner() {
             hostilesByRoom: new Map(),
             mineralsByRoom: new Map(),
             roomTerrain: new Map(),
-            controllersByRoom: new Map()
+            controllersByRoom: new Map(),
+            droppedByRoom: new Map()
         };
     } else {
         global.State.creepsByRoom.clear();
@@ -20,6 +21,7 @@ module.exports = function stateScanner() {
         global.State.hostilesByRoom.clear();
         global.State.mineralsByRoom.clear();
         global.State.controllersByRoom.clear();
+        global.State.droppedByRoom.clear();
         // roomTerrain is persistent per global reset, no need to clear it every tick,
         // but since we rebuild it for all visible rooms below anyway, we can clear it,
         // or just rely on global.Cache for actual persistence. Let's put it in global.Cache instead.
@@ -83,6 +85,9 @@ module.exports = function stateScanner() {
         if (room.controller) {
             global.State.controllersByRoom.set(room.name, room.controller);
         }
+
+        const dropped = room.find(FIND_DROPPED_RESOURCES);
+        global.State.droppedByRoom.set(room.name, dropped);
     }
 
     // Reap global.Cache.creeps
