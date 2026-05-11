@@ -21,6 +21,12 @@ module.exports = {
             const targetX = spawn.pos.x + offset.x;
             const targetY = spawn.pos.y + offset.y;
 
+            const structures = room.lookForAt(LOOK_STRUCTURES, targetX, targetY);
+            if (structures && structures.length > 0) continue;
+
+            const sites = room.lookForAt(LOOK_CONSTRUCTION_SITES, targetX, targetY);
+            if (sites && sites.length > 0) continue;
+
             room.createConstructionSite(targetX, targetY, STRUCTURE_EXTENSION);
         }
     }
