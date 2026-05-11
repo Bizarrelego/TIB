@@ -22,7 +22,12 @@ jobs:
           {
             echo "PROMPT_TEXT<<${delimiter}"
             echo "Determine the exact next priority for the Screeps bot."
-            echo "Write a comprehensive prompt for an AI coding agent (Jules) to execute this priority. The prompt must tell Jules exactly what feature to build, which directories to use, and explicitly instruct Jules to strictly obey AGENTS.md."
+            echo "Write a comprehensive prompt for an AI coding agent (Jules) to execute this priority."
+            echo "**CRITICAL FILE I/O CONSTRAINTS:**"
+            echo "1. You must provide Jules with a strict 'File Manifest' divided into two sections: Files to READ for context, and Files to EDIT."
+            echo "2. Instruct Jules: Read the contextual files first to understand existing variables, imports, and architectures."
+            echo "3. Instruct Jules: DO NOT run unbounded search commands (like grep across the whole repo). Stick strictly to reading and editing the files defined in your manifest."
+            echo "4. Instruct Jules: DO NOT rewrite entire files. Use precise insertions and diffs to modify existing logic."
             echo "--- RECENT BOT UPDATES (COMPLETED TASKS) ---"
             git log -n 10 --oneline --no-merges || echo "No history found."
             echo ""
@@ -62,7 +67,17 @@ jobs:
         env:
           GEMINI_RESPONSE: ${{ steps.plan-next.outputs.gemini_response }}
         run: |
-          PAYLOAD=$(jq -n --arg prompt "$GEMINI_RESPONSE" '{
+          # Pre-seed the context by combining Gemini's task with the AGENTS.md constraints
+          AGENTS_DATA=$(cat AGENTS.md 2>/dev/null || echo "[AGENTS.md missing]")
+          FULL_PROMPT=$(cat <<EOF
+          ${GEMINI_RESPONSE}
+          
+          --- SYSTEM CONSTRAINTS (AGENTS.md) ---
+          ${AGENTS_DATA}
+          EOF
+          )
+          
+          PAYLOAD=$(jq -n --arg prompt "$FULL_PROMPT" '{
             prompt: $prompt,
             sourceContext: {
               source: "sources/github/${{ github.repository }}",
@@ -73,7 +88,7 @@ jobs:
             automationMode: "AUTO_CREATE_PR"
           }')
           
-          curl -X POST https://jules.googleapis.com/v1alpha/sessions \
+          curl -s -X POST https://jules.googleapis.com/v1alpha/sessions \
           -H "Content-Type: application/json" \
           -H "X-Goog-Api-Key: ${{ secrets.JULES_TOKEN }}" \
           -d "$PAYLOAD"

@@ -1,6 +1,7 @@
 # TIB Bot Architecture & Coding Standards (Tigga-Style)
 
 ## 1. Core CPU & Execution Principles
+- **Strict Token Limits (Modularity)**: No single file may exceed 150 lines of code. If a manager requires more logic, you must fragment it into localized sub-modules within its respective directory. Never rewrite an entire file just to change a few lines.
 - **Strict JavaScript Exclusivity**: You must strictly write .js files. Do not create, write, or import .ts (TypeScript) files. The CI pipeline and native Screeps engine do not have a TypeScript compiler. Writing TypeScript will cause a fatal server crash.
 - **Zero Native Polling**: Never use `room.find()`, `room.lookAt()`, or `room.lookForAt()` inside tick loops. Query pre-scanned maps in `global.State`.
 - **Event-Driven Updates (0-CPU Radar)**: Rely on `room.getEventLog()` to detect attacks, destroyed structures, or completed builds instead of array iteration.
