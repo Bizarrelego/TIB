@@ -41,7 +41,7 @@ function run(room) {
                 {
                     plainCost: 2,
                     swampCost: 2, // Prefer roads or open plains equally for road planning
-                    roomCallback: function(roomName) {
+                    roomCallback: function() {
                         return new PathFinder.CostMatrix(); // Very basic matrix for now
                     }
                 }

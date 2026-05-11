@@ -1,4 +1,5 @@
-const { determineDefcon, DEFCON } = require('../constants/defcon');
+/* global HEAL, RANGED_ATTACK, ATTACK, DISMANTLE, STRUCTURE_TOWER, STRUCTURE_ROAD, RESOURCE_ENERGY */
+const { determineDefcon } = require('../constants/defcon');
 
 function getDistance(pos1, pos2) {
     return Math.max(Math.abs(pos1.x - pos2.x), Math.abs(pos1.y - pos2.y));
@@ -30,7 +31,7 @@ function run(room) {
         const towers = structuresMap.get(STRUCTURE_TOWER) || [];
         if (towers.length === 0) return;
 
-        const defcon = determineDefcon(room.name);
+        determineDefcon(room.name);
 
         let targetHostile = null;
         let targetHeal = null;
