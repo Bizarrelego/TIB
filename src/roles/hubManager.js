@@ -7,84 +7,43 @@ function run(room) {
     const hubManagers = roomCreeps.get('hubManager');
     if (!hubManagers || hubManagers.length === 0) return;
 
-    const structuresMap = global.State.structuresByRoom.get(room.name);
-    if (!structuresMap) return;
-
-    const links = structuresMap.get(STRUCTURE_LINK) || [];
-    const storages = structuresMap.get(STRUCTURE_STORAGE) || [];
-
-    if (links.length === 0 || storages.length === 0) return;
-
-    const storage = storages[0];
-
-    // Identify Hub Link
-    let hubLink = null;
-    for (let i = 0; i < links.length; i++) {
-        if (links[i].pos.isNearTo(storage)) {
-            hubLink = links[i];
-            break;
-        }
-    }
-
-    if (!hubLink) return;
-
     for (let i = 0; i < hubManagers.length; i++) {
         const creep = hubManagers[i];
 
         try {
             if (creep.fatigue > 0) continue; // Fatigue gating
 
-            // Determine parkPos: needs to be near both Storage and Hub Link
-            if (!creep.heap.parkPos) {
-                // Find a tile adjacent to both hubLink and storage
-                let foundPos = null;
-                for (let dx = -1; dx <= 1; dx++) {
-                    for (let dy = -1; dy <= 1; dy++) {
-                        if (dx === 0 && dy === 0) continue;
-                        const targetX = hubLink.pos.x + dx;
-                        const targetY = hubLink.pos.y + dy;
-
-                        // Check if this tile is near the storage
-                        if (Math.abs(storage.pos.x - targetX) <= 1 && Math.abs(storage.pos.y - targetY) <= 1) {
-                            // Verify it's walkable
-                            const terrain = global.State.roomTerrain ? global.State.roomTerrain.get(room.name) : Game.map.getRoomTerrain(room.name);
-                            if (terrain && terrain.get(targetX, targetY) !== TERRAIN_MASK_WALL) {
-                                foundPos = { x: targetX, y: targetY, roomName: room.name };
-                                break;
-                            }
-                        }
+            // 1. Move to optimized park position
+            if (creep.heap.parkPos) {
+                if (creep.pos.x !== creep.heap.parkPos.x || creep.pos.y !== creep.heap.parkPos.y) {
+                    movement.moveTo(creep, new RoomPosition(creep.heap.parkPos.x, creep.heap.parkPos.y, creep.heap.parkPos.roomName));
+                    
+                    // Allow intent maximization if adjacent enough during travel
+                    if (!creep.pos.isNearTo(creep.heap.parkPos.x, creep.heap.parkPos.y)) {
+                        continue;
                     }
-                    if (foundPos) break;
-                }
-                if (foundPos) {
-                    creep.heap.parkPos = foundPos;
-                } else {
-                    creep.heap.parkPos = { x: hubLink.pos.x, y: hubLink.pos.y, roomName: room.name }; // Fallback
                 }
             }
 
-            // Move to position
-            if (creep.pos.x !== creep.heap.parkPos.x || creep.pos.y !== creep.heap.parkPos.y) {
-                 movement.moveTo(creep, new RoomPosition(creep.heap.parkPos.x, creep.heap.parkPos.y, creep.heap.parkPos.roomName));
-            }
+            // 2. Execute Assigned Sub-tick Intents
+            if (creep.heap.state === 'fill_link' || creep.heap.state === 'empty_link') {
+                const srcId = creep.heap.sourceId;
+                const tgtId = creep.heap.targetId;
 
-            // At hub position (or adjacent during move), do transfer/withdraw logic
-            if (creep.pos.isNearTo(hubLink) && creep.pos.isNearTo(storage)) {
                 if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
-                    // We are empty, withdraw from hub link
-                    if (hubLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                        creep.withdraw(hubLink, RESOURCE_ENERGY);
+                    const src = Game.getObjectById(srcId);
+                    if (src && creep.pos.isNearTo(src)) {
+                        creep.withdraw(src, RESOURCE_ENERGY);
                     }
                 } else {
-                    // We have energy, transfer to storage
-                    if (storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                        creep.transfer(storage, RESOURCE_ENERGY);
+                    const tgt = Game.getObjectById(tgtId);
+                    if (tgt && creep.pos.isNearTo(tgt)) {
+                        creep.transfer(tgt, RESOURCE_ENERGY);
                     }
                 }
             }
-
         } catch (e) {
-            console.log(`[hubManager Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
+            console.log(`[hubManager Role Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
         }
     }
 }
