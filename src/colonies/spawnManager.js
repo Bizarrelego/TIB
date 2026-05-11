@@ -18,14 +18,20 @@ module.exports = {
 
         const capacity = room.energyCapacityAvailable;
 
-        // RCL 5 Logic: hubManager
+        // RCL 5 Logic: hubManager & upgrader
         if (room.controller.level >= 5) {
             if (spawnLedger.isLinkNetworkPresent(room)) {
                 let hubManagerCount = 0;
+                let upgraderCount = 0;
                 if (roomCreeps) {
                     const hubManagers = roomCreeps.get('hubManager');
                     if (hubManagers) {
                         hubManagerCount = hubManagers.length;
+                    }
+
+                    const upgraders = roomCreeps.get('upgrader');
+                    if (upgraders) {
+                        upgraderCount = upgraders.length;
                     }
                 }
 
@@ -42,6 +48,22 @@ module.exports = {
                             spawnLedger.deduct(cost);
                         }
                         return; // Prioritize hubManager over other logistics
+                    }
+                }
+
+                if (upgraderCount < 1) {
+                    // Static upgrader body
+                    const body = [WORK, WORK, WORK, WORK, WORK, WORK, WORK, WORK, CARRY, CARRY, MOVE];
+                    const cost = 950;
+                    if (spawnLedger.canSpawn(cost)) {
+                        const result = spawn.spawnCreep(body, 'upgrader_' + Game.time, {
+                            memory: { role: 'upgrader', colony: room.name }
+                        });
+
+                        if (result === OK) {
+                            spawnLedger.deduct(cost);
+                        }
+                        return; // Prioritize upgrader over other logistics
                     }
                 }
             }
