@@ -1,0 +1,5 @@
+{
+  "instructions": "Follow TIB/architecture/arch.html and MASTER_PLAN.md. Prioritize O(1) lookups and heap-based memory proxies. Never use JSON.parse in loops.",
+  "environment": "nodejs",
+  "verification_command": "npm test"
+}
