@@ -1,4 +1,4 @@
-/* global ATTACK, RANGED_ATTACK, HEAL, DISMANTLE */
+/* global DISMANTLE */
 
 const DEFCON = {
     NORMAL: 5,
