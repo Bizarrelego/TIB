@@ -1,3 +1,5 @@
+const movement = require('../utils/movement');
+
 module.exports = {
     run: function(room) {
         const roomCreeps = global.State.creepsByRoom.get(room.name);
@@ -27,7 +29,7 @@ module.exports = {
                         const target = Game.getObjectById(targetId);
                         if (target) {
                             if (creep.harvest(target) === ERR_NOT_IN_RANGE) {
-                                creep.moveTo(target);
+                                movement.moveTo(creep, target);
                             }
                         } else {
                             // Target invalid, reset
@@ -61,18 +63,18 @@ module.exports = {
                         if (target) {
                             const result = creep.transfer(target, RESOURCE_ENERGY);
                             if (result === ERR_NOT_IN_RANGE) {
-                                creep.moveTo(target);
+                                movement.moveTo(creep, target);
                             }
                         } else {
                             // Target to build
                             const sites = global.State.sitesByRoom.get(room.name);
                             if (sites && sites.length > 0) {
                                 if (creep.build(sites[0]) === ERR_NOT_IN_RANGE) {
-                                    creep.moveTo(sites[0]);
+                                    movement.moveTo(creep, sites[0]);
                                 }
                             } else if (room.controller) {
                                 if (creep.upgradeController(room.controller) === ERR_NOT_IN_RANGE) {
-                                    creep.moveTo(room.controller);
+                                    movement.moveTo(creep, room.controller);
                                 }
                             }
                         }
@@ -80,11 +82,11 @@ module.exports = {
                         const sites = global.State.sitesByRoom.get(room.name);
                         if (sites && sites.length > 0) {
                             if (creep.build(sites[0]) === ERR_NOT_IN_RANGE) {
-                                creep.moveTo(sites[0]);
+                                movement.moveTo(creep, sites[0]);
                             }
                         } else if (room.controller) {
                             if (creep.upgradeController(room.controller) === ERR_NOT_IN_RANGE) {
-                                creep.moveTo(room.controller);
+                                movement.moveTo(creep, room.controller);
                             }
                         }
                     }
