@@ -10,7 +10,7 @@ jobs:
       - name: Get Next Task
         uses: google-github-actions/run-gemini-cli@v0
         with:
-          api_key: ${{ secrets.GEMINI_API_KEY }}
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           prompt: "Current progress: SpawnManager and Economy are functional. Based on arch.html, what is the next priority? Output a command for Jules."
       - name: Trigger Jules
         run: |

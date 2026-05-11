@@ -10,7 +10,7 @@ jobs:
       - name: Architect Review
         uses: google-github-actions/run-gemini-cli@v0
         with:
-          api_key: ${{ secrets.GEMINI_API_KEY }}
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           prompt: "Analyze the diff in this PR. Ensure it uses global.State for O(1) lookups and does not violate the architecture in TIB/architecture/arch.html. If approved, say 'LGTM'."
       - name: Auto-Merge
         if: contains(steps.gemini-check.outputs.response, 'LGTM')
