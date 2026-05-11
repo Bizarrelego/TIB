@@ -33,7 +33,7 @@ jobs:
       - name: Reject on Test Failure
         if: steps.run-tests.outcome == 'failure'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           gh pr review ${{ github.event.pull_request.number }} --request-changes -F - <<EOF
           Code failed static analysis and linting. Fix the exact syntax errors below before requesting architectural review:
@@ -89,7 +89,7 @@ jobs:
       - name: Request Architectural Changes
         if: "!contains(steps.gemini-check.outputs.gemini_response, 'LGTM')"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           CRITIQUE: ${{ steps.gemini-check.outputs.gemini_response }}
         run: gh pr review ${{ github.event.pull_request.number }} --request-changes --body "$CRITIQUE"
 
@@ -97,4 +97,4 @@ jobs:
         if: contains(steps.gemini-check.outputs.gemini_response, 'LGTM')
         run: gh pr merge ${{ github.event.pull_request.number }} --auto --merge
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
