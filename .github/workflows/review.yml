@@ -2,21 +2,51 @@ name: TIB Auto-Review
 on:
   pull_request:
     branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
-  gemini-check:
+  test-and-review:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Syntax & Lint Tests
+        id: run-tests
+        run: npm run test
+        continue-on-error: true
+
+      - name: Reject on Test Failure
+        if: steps.run-tests.outcome == 'failure'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr review ${{ github.event.pull_request.number }} --request-changes --body "Code failed static analysis and linting. Fix the following syntax errors before requesting architectural review."
+          exit 1 # Kills the workflow before hitting the Gemini API
+
       - name: Build Review Context
+        # Only runs if tests passed
         run: |
           git diff origin/main > pr_diff.txt || true
           delimiter="$(openssl rand -hex 8)"
           {
             echo "REVIEW_TEXT<<${delimiter}"
-            echo "Analyze the code changes in the diff below. Ensure the new code uses global.State for O(1) lookups and does not violate the architecture. If approved, reply EXACTLY with 'LGTM'."
+            echo "Analyze the code changes in the diff below against the provided constraints."
+            echo "If the code passes ALL constraints, reply EXACTLY with 'LGTM'."
+            echo "If the code fails, reply with a detailed markdown list of what is wrong, exactly which files violate the rules, and how to fix the code to match the Tigga-style constraints."
             echo "--- AGENTS.md ---"
             cat AGENTS.md 2>/dev/null || echo "[WARNING: AGENTS.md NOT FOUND]"
             echo ""
@@ -48,6 +78,13 @@ jobs:
             echo "$CLEAN_TEXT"
             echo "${delimiter}"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Request Architectural Changes
+        if: "!contains(steps.gemini-check.outputs.gemini_response, 'LGTM')"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CRITIQUE: ${{ steps.gemini-check.outputs.gemini_response }}
+        run: gh pr review ${{ github.event.pull_request.number }} --request-changes --body "$CRITIQUE"
 
       - name: Auto-Merge
         if: contains(steps.gemini-check.outputs.gemini_response, 'LGTM')
