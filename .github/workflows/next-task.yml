@@ -2,22 +2,32 @@ name: Strategy Loop
 on:
   push:
     branches: [main]
+
+# Kills duplicate runs instantly
+concurrency:
+  group: strategy-loop
+  cancel-in-progress: true
+
 jobs:
   plan-next:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 15 # Fetch history to read past tasks
       
       - name: Build Prompt Context
         run: |
           delimiter="$(openssl rand -hex 8)"
           {
             echo "PROMPT_TEXT<<${delimiter}"
-            echo "Based on the current progress and agent rules below, determine the exact next priority for the Screeps bot."
+            echo "Determine the exact next priority for the Screeps bot."
             echo "Write a comprehensive prompt for an AI coding agent (Jules) to execute this priority. The prompt must tell Jules exactly what feature to build, which directories to use, and explicitly instruct Jules to strictly obey AGENTS.md."
-            echo "**CRITICAL INSTRUCTION FOR JULES:** You must explicitly instruct Jules that its final action in the PR must be to update PROGRESS.md to document the new features it just built."
-            echo "--- CURRENT PROGRESS ---"
-            cat PROGRESS.md || echo "No PROGRESS.md found."
+            echo "--- RECENT BOT UPDATES (COMPLETED TASKS) ---"
+            git log -n 10 --oneline --no-merges || echo "No history found."
+            echo ""
+            echo "--- CURRENT BOT FILES ---"
+            ls -R src/ || echo "No src directory yet"
             echo ""
             echo "--- AGENTS.md ---"
             cat AGENTS.md 2>/dev/null || echo "[WARNING: AGENTS.md NOT FOUND]"
@@ -28,15 +38,12 @@ jobs:
       - name: Get Next Task
         id: plan-next
         run: |
-          # Safely package the prompt into JSON
           PAYLOAD=$(jq -n --arg text "$PROMPT_TEXT" '{contents: [{parts: [{"text": $text}]}]}')
           
-          # Direct API Call
           API_RES=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
             -H 'Content-Type: application/json' \
             -d "$PAYLOAD")
             
-          # Extract the text
           CLEAN_TEXT=$(echo "$API_RES" | jq -r '.candidates[0].content.parts[0].text // empty')
           
           if [[ -z "$CLEAN_TEXT" ]]; then
@@ -44,7 +51,6 @@ jobs:
             exit 1
           fi
           
-          # Safely export to GitHub outputs
           delimiter="$(openssl rand -hex 8)"
           {
             echo "gemini_response<<${delimiter}"
@@ -59,7 +65,7 @@ jobs:
           PAYLOAD=$(jq -n --arg prompt "$GEMINI_RESPONSE" '{
             prompt: $prompt,
             sourceContext: {
-              source: "sources/github/Bizarrelego/TIB",
+              source: "sources/github/${{ github.repository }}",
               githubRepoContext: {
                 startingBranch: "main"
               }
