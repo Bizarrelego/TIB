@@ -1,64 +1,35 @@
 const movement = require('../utils/movement');
-const LinkManager = require('../managers/LinkManager');
 
+// Upgraders must be static. Move once, then stay forever.
 function run(room) {
-    const roomCreeps = global.State.creepsByRoom.get(room.name);
-    if (!roomCreeps) return;
+    const upgraders = global.State.creepsByRoom.get(room.name)?.get('upgrader') || [];
+    const controller = global.State.controllersByRoom.get(room.name);
 
-    const upgraders = roomCreeps.get('upgrader');
-    if (!upgraders) return;
+    if (!controller) return;
 
-    for (let i = 0; i < upgraders.length; i++) {
-        const creep = upgraders[i];
-
+    for (const creep of upgraders) {
         try {
-            if (creep.fatigue > 0) continue; // Fatigue gating
+            if (creep.fatigue > 0) continue;
 
-            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                if (room.controller) {
-                    if (creep.upgradeController(room.controller) === ERR_NOT_IN_RANGE) {
-                        movement.moveTo(creep, room.controller);
-                    }
-                }
+            // Ensure we are parked on the static spot.
+            // Do NOT use movement if already in range of controller.
+            if (creep.pos.getRangeTo(controller) > 3) {
+                movement.moveTo(creep, controller);
+                continue;
             }
 
-            if (creep.store.getFreeCapacity() > 0) {
-                const controllerLink = LinkManager.getControllerLink(room.name);
+            // Static logic: Only work if energy is present (delivered by Haulers)
+            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                creep.upgradeController(controller);
+            }
 
-                if (controllerLink) {
-                    if (creep.pos.isNearTo(controllerLink)) {
-                        creep.withdraw(controllerLink, RESOURCE_ENERGY);
-                    } else {
-                        movement.moveTo(creep, controllerLink);
-                    }
-                } else {
-                    // Fallback to container or dropped energy
-                    const structuresMap = global.State.structuresByRoom.get(room.name);
-                    let target = null;
-                    if (structuresMap) {
-                        const containers = structuresMap.get(STRUCTURE_CONTAINER) || [];
-                        for (let j = 0; j < containers.length; j++) {
-                            if (containers[j].store.getUsedCapacity(RESOURCE_ENERGY) > 0 && containers[j].pos.inRangeTo(room.controller, 3)) {
-                                target = containers[j];
-                                break;
-                            }
-                        }
-                    }
+            // Pickup dropped energy or withdraw from link if available without moving
+            const target = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 1)[0] ||
+                           creep.pos.findInRange(FIND_STRUCTURES, 1, {filter: s => s.structureType === STRUCTURE_LINK || s.structureType === STRUCTURE_CONTAINER})[0];
 
-                    if (target) {
-                        if (creep.pos.isNearTo(target)) {
-                            creep.withdraw(target, RESOURCE_ENERGY);
-                        } else {
-                            movement.moveTo(creep, target);
-                        }
-                    } else {
-                        // Avoid room.find per constraints.
-                        // Wait for controller link or just move to controller
-                        if (room.controller) {
-                            movement.moveTo(creep, room.controller);
-                        }
-                    }
-                }
+            if (target && creep.store.getFreeCapacity() > 0) {
+                if (target.resourceType) creep.pickup(target);
+                else creep.withdraw(target, RESOURCE_ENERGY);
             }
         } catch (e) {
             console.log(`[Upgrader Role Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
