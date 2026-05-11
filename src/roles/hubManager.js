@@ -32,7 +32,6 @@ function run(room) {
         const creep = hubManagers[i];
 
         try {
-            creep.heap = creep.heap || {};
             if (creep.fatigue > 0) continue; // Fatigue gating
 
             // Determine parkPos: needs to be near both Storage and Hub Link
@@ -47,10 +46,9 @@ function run(room) {
 
                         // Check if this tile is near the storage
                         if (Math.abs(storage.pos.x - targetX) <= 1 && Math.abs(storage.pos.y - targetY) <= 1) {
-                            // Verify it's walkable (for simplicity here, we assume if it's near both it's our designated spot;
-                            // a robust check would verify terrain/structures, but planner puts it in an open spot).
-                            const terrain = Game.map.getRoomTerrain(room.name);
-                            if (terrain.get(targetX, targetY) !== TERRAIN_MASK_WALL) {
+                            // Verify it's walkable
+                            const terrain = global.State.roomTerrain ? global.State.roomTerrain.get(room.name) : Game.map.getRoomTerrain(room.name);
+                            if (terrain && terrain.get(targetX, targetY) !== TERRAIN_MASK_WALL) {
                                 foundPos = { x: targetX, y: targetY, roomName: room.name };
                                 break;
                             }
@@ -68,19 +66,20 @@ function run(room) {
             // Move to position
             if (creep.pos.x !== creep.heap.parkPos.x || creep.pos.y !== creep.heap.parkPos.y) {
                  movement.moveTo(creep, new RoomPosition(creep.heap.parkPos.x, creep.heap.parkPos.y, creep.heap.parkPos.roomName));
-                 continue;
             }
 
-            // At hub position, do transfer/withdraw logic
-            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
-                // We are empty, withdraw from hub link
-                if (hubLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                    creep.withdraw(hubLink, RESOURCE_ENERGY);
-                }
-            } else {
-                // We have energy, transfer to storage
-                if (storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                    creep.transfer(storage, RESOURCE_ENERGY);
+            // At hub position (or adjacent during move), do transfer/withdraw logic
+            if (creep.pos.isNearTo(hubLink) && creep.pos.isNearTo(storage)) {
+                if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+                    // We are empty, withdraw from hub link
+                    if (hubLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                        creep.withdraw(hubLink, RESOURCE_ENERGY);
+                    }
+                } else {
+                    // We have energy, transfer to storage
+                    if (storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                        creep.transfer(storage, RESOURCE_ENERGY);
+                    }
                 }
             }
 

@@ -72,7 +72,7 @@ module.exports = {
                         if (!hubLinkFound) {
                             // Find a spot near storage
                             let placed = false;
-                            const terrain = Game.map.getRoomTerrain(room.name);
+                            const terrain = global.State.roomTerrain.get(room.name);
                             for (let dx = -1; dx <= 1; dx++) {
                                 for (let dy = -1; dy <= 1; dy++) {
                                     if (dx === 0 && dy === 0) continue;
@@ -138,7 +138,7 @@ module.exports = {
 
                         if (!sourceLinkFound) {
                             let placed = false;
-                            const terrain = Game.map.getRoomTerrain(room.name);
+                            const terrain = global.State.roomTerrain.get(room.name);
                             for (let dx = -2; dx <= 2; dx++) {
                                 for (let dy = -2; dy <= 2; dy++) {
                                     if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) continue; // Leave immediate tiles for miner
