@@ -1,5 +1,6 @@
 const SpawnLedger = require('./spawnLedger');
 const spawnManager = require('./spawnManager');
+const economy = require('./economy');
 
 module.exports = function colonyManager() {
     for (const room of Object.values(Game.rooms)) {
@@ -7,6 +8,7 @@ module.exports = function colonyManager() {
             try {
                 const spawnLedger = new SpawnLedger(room);
                 spawnManager.run(room, spawnLedger);
+                economy.run(room);
             } catch (e) {
                 console.log(`[ColonyManager Error] Room ${room.name}: ${e.stack}`);
             }

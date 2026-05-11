@@ -1,4 +1,14 @@
 module.exports = function stateScanner() {
+    if (!global.State) {
+        global.State = {
+            creepsByRoom: new Map(),
+            spawnsByRoom: new Map()
+        };
+    } else {
+        global.State.creepsByRoom.clear();
+        global.State.spawnsByRoom.clear();
+    }
+
     // Reap global.Cache.creeps
     for (const name of global.Cache.creeps.keys()) {
         if (!Game.creeps[name]) {
@@ -10,12 +20,44 @@ module.exports = function stateScanner() {
     const creepNames = Object.keys(Game.creeps);
     for (let i = 0; i < creepNames.length; i++) {
         const name = creepNames[i];
+        const creep = Game.creeps[name];
         let memory = global.Cache.creeps.get(name);
         if (!memory) {
             memory = {};
             global.Cache.creeps.set(name, memory);
         }
-        memory._creep = Game.creeps[name];
+        memory._creep = creep;
+        creep.heap = memory; // Establish heap proxy
+
+        const roomName = creep.room.name;
+        const role = creep.memory.role || 'unassigned';
+
+        let roomCreeps = global.State.creepsByRoom.get(roomName);
+        if (!roomCreeps) {
+            roomCreeps = new Map();
+            global.State.creepsByRoom.set(roomName, roomCreeps);
+        }
+
+        let roleCreeps = roomCreeps.get(role);
+        if (!roleCreeps) {
+            roleCreeps = [];
+            roomCreeps.set(role, roleCreeps);
+        }
+        roleCreeps.push(creep);
+    }
+
+    // Update global.State.spawnsByRoom
+    const spawnNames = Object.keys(Game.spawns);
+    for (let i = 0; i < spawnNames.length; i++) {
+        const spawn = Game.spawns[spawnNames[i]];
+        const roomName = spawn.room.name;
+
+        let roomSpawns = global.State.spawnsByRoom.get(roomName);
+        if (!roomSpawns) {
+            roomSpawns = [];
+            global.State.spawnsByRoom.set(roomName, roomSpawns);
+        }
+        roomSpawns.push(spawn);
     }
 
     // Reap global.Cache.structures
