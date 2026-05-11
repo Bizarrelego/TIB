@@ -13,15 +13,17 @@ jobs:
       - name: Build Review Context
         run: |
           git diff origin/main > pr_diff.txt
-          echo "REVIEW_TEXT<<EOF" >> $GITHUB_ENV
-          echo "Analyze the code changes in the diff below. Ensure the new code uses global.State for O(1) lookups and does not violate the architecture. If approved, reply EXACTLY with 'LGTM'." >> $GITHUB_ENV
-          echo "--- AGENTS.md ---" >> $GITHUB_ENV
-          cat AGENTS.md >> $GITHUB_ENV
-          echo "--- arch.html ---" >> $GITHUB_ENV
-          cat architecture/arch.html >> $GITHUB_ENV
-          echo "--- PR DIFF ---" >> $GITHUB_ENV
-          cat pr_diff.txt >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+          {
+            echo "REVIEW_TEXT<<EOF"
+            echo "Analyze the code changes in the diff below. Ensure the new code uses global.State for O(1) lookups and does not violate the architecture. If approved, reply EXACTLY with 'LGTM'."
+            echo "--- AGENTS.md ---"
+            cat AGENTS.md || echo "[WARNING: AGENTS.md NOT FOUND]"
+            echo "--- arch.html ---"
+            cat architecture/arch.html || echo "[WARNING: arch.html NOT FOUND]"
+            echo "--- PR DIFF ---"
+            cat pr_diff.txt || echo "[WARNING: pr_diff.txt NOT FOUND]"
+            echo "EOF"
+          } >> $GITHUB_ENV
 
       - name: Architect Review
         id: gemini-check

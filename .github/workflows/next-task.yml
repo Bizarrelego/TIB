@@ -10,14 +10,16 @@ jobs:
       
       - name: Build Prompt Context
         run: |
-          echo "PROMPT_TEXT<<EOF" >> $GITHUB_ENV
-          echo "Current progress: SpawnManager and Economy are functional." >> $GITHUB_ENV
-          echo "Based on the following architecture and agent rules, what is the next priority for RCL 3? Output ONLY a command for Jules." >> $GITHUB_ENV
-          echo "--- AGENTS.md ---" >> $GITHUB_ENV
-          cat AGENTS.md >> $GITHUB_ENV
-          echo "--- arch.html ---" >> $GITHUB_ENV
-          cat architecture/arch.html >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+          {
+            echo "PROMPT_TEXT<<EOF"
+            echo "Current progress: SpawnManager and Economy are functional."
+            echo "Based on the following architecture and agent rules, what is the next priority for RCL 3? Output ONLY a command for Jules."
+            echo "--- AGENTS.md ---"
+            cat AGENTS.md || echo "[WARNING: AGENTS.md NOT FOUND]"
+            echo "--- arch.html ---"
+            cat architecture/arch.html || echo "[WARNING: arch.html NOT FOUND]"
+            echo "EOF"
+          } >> $GITHUB_ENV
 
       - name: Get Next Task
         id: plan-next
