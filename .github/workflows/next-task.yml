@@ -37,14 +37,21 @@ jobs:
 
       - name: Trigger Jules
         env:
-          GEMINI_RESPONSE: ${{ steps.plan-next.outputs.gemini_response }}
+          RAW_OUTPUT: ${{ steps.plan-next.outputs.response }}
         run: |
-          if [[ -z "$GEMINI_RESPONSE" ]]; then
+          if [[ -z "$RAW_OUTPUT" ]]; then
             echo "::error::Gemini returned an empty response. Check the 'Get Next Task' logs for safety blocks."
             exit 1
           fi
           
-          PAYLOAD=$(jq -n --arg prompt "$GEMINI_RESPONSE" '{
+          # Extract the actual command if the CLI dumped raw JSON due to terminal warnings
+          if echo "$RAW_OUTPUT" | grep -q '"response":'; then
+            CLEAN_PROMPT=$(echo "$RAW_OUTPUT" | sed -n '/^{/,$p' | jq -r '.response')
+          else
+            CLEAN_PROMPT="$RAW_OUTPUT"
+          fi
+          
+          PAYLOAD=$(jq -n --arg prompt "$CLEAN_PROMPT" '{
             prompt: $prompt,
             sourceContext: {
               source: "sources/github/Bizarrelego/TIB",

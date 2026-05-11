@@ -40,7 +40,7 @@ jobs:
           prompt: ${{ env.REVIEW_TEXT }}
 
       - name: Auto-Merge
-        if: contains(steps.gemini-check.outputs.gemini_response, 'LGTM')
+        if: contains(steps.gemini-check.outputs.response, 'LGTM')
         run: gh pr merge ${{ github.event.pull_request.number }} --auto --merge
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
