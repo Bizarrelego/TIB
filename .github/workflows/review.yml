@@ -14,15 +14,20 @@ jobs:
         run: |
           git diff origin/main > pr_diff.txt || true
           delimiter="$(openssl rand -hex 8)"
-          echo "REVIEW_TEXT<<$delimiter" >> "$GITHUB_ENV"
-          echo "Analyze the code changes in the diff below. Ensure the new code uses global.State for O(1) lookups and does not violate the architecture. If approved, reply EXACTLY with 'LGTM'." >> "$GITHUB_ENV"
-          echo "--- AGENTS.md ---" >> "$GITHUB_ENV"
-          cat AGENTS.md >> "$GITHUB_ENV" || echo "[WARNING: AGENTS.md NOT FOUND]" >> "$GITHUB_ENV"
-          echo "--- arch.html ---" >> "$GITHUB_ENV"
-          cat architecture/arch.html >> "$GITHUB_ENV" || echo "[WARNING: arch.html NOT FOUND]" >> "$GITHUB_ENV"
-          echo "--- PR DIFF ---" >> "$GITHUB_ENV"
-          cat pr_diff.txt >> "$GITHUB_ENV" || echo "[WARNING: pr_diff.txt NOT FOUND]" >> "$GITHUB_ENV"
-          echo "$delimiter" >> "$GITHUB_ENV"
+          {
+            echo "REVIEW_TEXT<<${delimiter}"
+            echo "Analyze the code changes in the diff below. Ensure the new code uses global.State for O(1) lookups and does not violate the architecture. If approved, reply EXACTLY with 'LGTM'."
+            echo "--- AGENTS.md ---"
+            cat AGENTS.md 2>/dev/null || echo "[WARNING: AGENTS.md NOT FOUND]"
+            echo ""
+            echo "--- arch.html ---"
+            cat architecture/arch.html 2>/dev/null || echo "[WARNING: arch.html NOT FOUND]"
+            echo ""
+            echo "--- PR DIFF ---"
+            cat pr_diff.txt 2>/dev/null || echo "[WARNING: pr_diff.txt NOT FOUND]"
+            echo ""
+            echo "${delimiter}"
+          } >> "$GITHUB_ENV"
 
       - name: Architect Review
         id: gemini-check

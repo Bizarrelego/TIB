@@ -11,14 +11,18 @@ jobs:
       - name: Build Prompt Context
         run: |
           delimiter="$(openssl rand -hex 8)"
-          echo "PROMPT_TEXT<<$delimiter" >> "$GITHUB_ENV"
-          echo "Current progress: SpawnManager and Economy are functional." >> "$GITHUB_ENV"
-          echo "Based on the following architecture and agent rules, what is the next priority for RCL 3? Output ONLY a command for Jules." >> "$GITHUB_ENV"
-          echo "--- AGENTS.md ---" >> "$GITHUB_ENV"
-          cat AGENTS.md >> "$GITHUB_ENV" || echo "[WARNING: AGENTS.md NOT FOUND]" >> "$GITHUB_ENV"
-          echo "--- arch.html ---" >> "$GITHUB_ENV"
-          cat architecture/arch.html >> "$GITHUB_ENV" || echo "[WARNING: arch.html NOT FOUND]" >> "$GITHUB_ENV"
-          echo "$delimiter" >> "$GITHUB_ENV"
+          {
+            echo "PROMPT_TEXT<<${delimiter}"
+            echo "Current progress: SpawnManager and Economy are functional."
+            echo "Based on the following architecture and agent rules, what is the next priority for RCL 3? Output ONLY a command for Jules."
+            echo "--- AGENTS.md ---"
+            cat AGENTS.md 2>/dev/null || echo "[WARNING: AGENTS.md NOT FOUND]"
+            echo ""
+            echo "--- arch.html ---"
+            cat architecture/arch.html 2>/dev/null || echo "[WARNING: arch.html NOT FOUND]"
+            echo ""
+            echo "${delimiter}"
+          } >> "$GITHUB_ENV"
 
       - name: Get Next Task
         id: plan-next
