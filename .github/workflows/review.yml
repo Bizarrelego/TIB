@@ -32,16 +32,24 @@ jobs:
 
       - name: Reject on Test Failure
         if: steps.run-tests.outcome == 'failure'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          gh pr comment ${{ github.event.pull_request.number }} -F - <<EOF
+          BODY_TEXT=$(cat <<EOF
           @jules Code failed static analysis and linting. Fix the exact syntax errors below before requesting architectural review:
           
           \`\`\`text
           $(cat lint_output.txt)
           \`\`\`
           EOF
+          )
+          
+          PAYLOAD=$(jq -n --arg body "$BODY_TEXT" '{body: $body}')
+          
+          curl -s -X POST \
+            -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+            -d "$PAYLOAD"
+            
           exit 1
 
       - name: Build Review Context
@@ -89,9 +97,15 @@ jobs:
       - name: Request Architectural Changes
         if: "!contains(steps.gemini-check.outputs.gemini_response, 'LGTM')"
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           CRITIQUE: ${{ steps.gemini-check.outputs.gemini_response }}
-        run: gh pr comment ${{ github.event.pull_request.number }} --body "@jules $CRITIQUE"
+        run: |
+          PAYLOAD=$(jq -n --arg body "@jules $CRITIQUE" '{body: $body}')
+          
+          curl -s -X POST \
+            -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+            -d "$PAYLOAD"
 
       - name: Auto-Merge
         if: contains(steps.gemini-check.outputs.gemini_response, 'LGTM')
