@@ -4,6 +4,7 @@ const stateScanner = require('./state/stateScanner');
 const colonyManager = require('./colonies/colonyManager');
 const operationsManager = require('./operations/operationsManager');
 const trafficManager = require('./traffic/trafficManager');
+const TowerManager = require('./managers/TowerManager');
 
 module.exports.loop = function () {
     // Cascading switch statement for hard CPU throttling based on Game.cpu.bucket
@@ -65,6 +66,17 @@ module.exports.loop = function () {
         trafficManager.run();
     } catch (e) {
         console.log(`[Phase 5 Error] Traffic Control: ${e.stack}`);
+    }
+
+    // Tower Manager Loop
+    for (const room of Object.values(Game.rooms)) {
+        if (room.controller && room.controller.my === true) {
+            try {
+                TowerManager.run(room);
+            } catch (e) {
+                console.log(`[TowerManager Loop Error] Room ${room.name}: ${e.stack}`);
+            }
+        }
     }
 
     // Phase 6: Intents & Sleep

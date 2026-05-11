@@ -4,7 +4,23 @@ function getDistance(pos1, pos2) {
     return Math.max(Math.abs(pos1.x - pos2.x), Math.abs(pos1.y - pos2.y));
 }
 
+function getDangerScore(creep) {
+    let score = 0;
+    if (!creep.body) return 10; // Assume base danger if body is not visible
+
+    for (let i = 0; i < creep.body.length; i++) {
+        const type = creep.body[i].type;
+        if (type === HEAL) score += 4;
+        else if (type === RANGED_ATTACK) score += 3;
+        else if (type === ATTACK) score += 2;
+        else if (type === DISMANTLE) score += 1;
+    }
+    return score;
+}
+
 function run(room) {
+    if (Game.cpu.bucket < 500) return; // Cascading CPU Throttling: gating tower operations
+
     try {
         if (!global.State || !global.State.structuresByRoom) return;
 
@@ -23,26 +39,31 @@ function run(room) {
         // 1. Hostiles Priority
         const hostiles = global.State.hostilesByRoom ? (global.State.hostilesByRoom.get(room.name) || []) : [];
         if (hostiles.length > 0) {
-            // Find closest hostile to the first tower (or center) to batch intents
+            // Find highest danger hostile, tie-breaking by closest distance to the first tower
             const referencePos = towers[0].pos;
+            let maxDanger = -1;
             let minDistance = Infinity;
+
             for (let i = 0; i < hostiles.length; i++) {
                 const hostile = hostiles[i];
+                const danger = getDangerScore(hostile);
                 const dist = getDistance(referencePos, hostile.pos);
-                if (dist < minDistance) {
+
+                if (danger > maxDanger || (danger === maxDanger && dist < minDistance)) {
+                    maxDanger = danger;
                     minDistance = dist;
                     targetHostile = hostile;
                 }
             }
         }
 
-        // 2. Heals Priority
+        // 2. Heals Priority - Target damaged friendly creeps
         if (!targetHostile) {
             const creepsMap = global.State.creepsByRoom ? global.State.creepsByRoom.get(room.name) : null;
             if (creepsMap) {
-                // Flatten all roles and find injured
+                // Find the most injured friendly creep
                 let minHpRatio = 1;
-                for (const [role, creeps] of creepsMap.entries()) {
+                for (const creeps of creepsMap.values()) {
                     for (let i = 0; i < creeps.length; i++) {
                         const creep = creeps[i];
                         if (creep.hits < creep.hitsMax) {
@@ -57,12 +78,12 @@ function run(room) {
             }
         }
 
-        // 3. Roads Priority (Cascading CPU Throttling: Skip if bucket < 1000)
+        // 3. Roads Priority - Only repair critical structures (roads) below 10% HP (Cascading CPU Throttling: Skip if bucket < 1000)
         if (!targetHostile && !targetHeal && Game.cpu.bucket >= 1000) {
             const roads = structuresMap.get(STRUCTURE_ROAD) || [];
             for (let i = 0; i < roads.length; i++) {
                 const road = roads[i];
-                if (road.hits < road.hitsMax * 0.10) { // 10% HP threshold
+                if (road.hits < road.hitsMax * 0.1) { // Strictly below 10% HP
                     targetRoad = road;
                     break;
                 }
