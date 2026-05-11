@@ -1,0 +1,13 @@
+{
+    "plugins": ["screeps"],
+    "env": {
+        "screeps/screeps": true,
+        "es2021": true,
+        "node": true
+    },
+    "extends": "eslint:recommended",
+    "rules": {
+        "no-undef": "error",
+        "no-unused-vars": "warn"
+    }
+}

@@ -9,6 +9,6 @@
   },
   "devDependencies": {
     "eslint": "^8.0.0",
-    "mocha": "^10.0.0"
+	"eslint-plugin-screeps": "^1.0.1"
   }
 }
