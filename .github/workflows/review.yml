@@ -9,6 +9,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Architect Review
         uses: google-github-actions/run-gemini-cli@v0
+        env:
+          GEMINI_CLI_TRUST_WORKSPACE: true
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           prompt: "Analyze the diff in this PR. Ensure it uses global.State for O(1) lookups and does not violate the architecture in TIB/architecture/arch.html. If approved, say 'LGTM'."
