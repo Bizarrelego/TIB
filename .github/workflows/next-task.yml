@@ -32,12 +32,18 @@ jobs:
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           gemini_model: "gemini-3.1-flash-lite"
+          gemini_debug: true
           prompt: ${{ env.PROMPT_TEXT }}
 
       - name: Trigger Jules
         env:
           GEMINI_RESPONSE: ${{ steps.plan-next.outputs.gemini_response }}
         run: |
+          if [[ -z "$GEMINI_RESPONSE" ]]; then
+            echo "::error::Gemini returned an empty response. Check the 'Get Next Task' logs for safety blocks."
+            exit 1
+          fi
+          
           PAYLOAD=$(jq -n --arg prompt "$GEMINI_RESPONSE" '{
             prompt: $prompt,
             sourceContext: {
