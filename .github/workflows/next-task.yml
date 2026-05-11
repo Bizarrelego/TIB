@@ -14,7 +14,8 @@ jobs:
           {
             echo "PROMPT_TEXT<<${delimiter}"
             echo "Current progress: SpawnManager and Economy are functional."
-            echo "Based on the following agent rules, what is the next priority for RCL 3? Output ONLY a command for Jules."
+            echo "Based on the following agent rules, determine the next priority for RCL 3."
+            echo "Write a comprehensive prompt for an AI coding agent (Jules) to execute this priority. The prompt must tell Jules exactly what feature to build, suggest which directories to put the new modules in, and explicitly instruct Jules to read and strictly obey AGENTS.md and architecture/arch.html before writing any code."
             echo "--- AGENTS.md ---"
             cat AGENTS.md 2>/dev/null || echo "[WARNING: AGENTS.md NOT FOUND]"
             echo ""
