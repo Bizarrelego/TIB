@@ -24,6 +24,14 @@ jobs:
       - name: Install Dependencies
         # Changed from npm ci to npm install
         run: npm install
+        
+      - name: Enforce JS Strictness
+        run: |
+          TS_FILES=$(find src/ -type f -name "*.ts")
+          if [ ! -z "$TS_FILES" ]; then
+            echo "::error::TypeScript files are strictly forbidden in this repository. Convert all logic to vanilla JavaScript."
+            exit 1
+          fi
 
       - name: Run Syntax & Lint Tests
         id: run-tests
