@@ -1,28 +1,39 @@
 module.exports = function stateScanner() {
-    // Clear dynamic maps each tick
-    global.Cache.creeps.clear();
-    global.Cache.structures.clear();
-
-    // Iterate Game.creeps once
-    const creepNames = Object.keys(Game.creeps);
-    for (let i = 0; i < creepNames.length; i++) {
-        const creep = Game.creeps[creepNames[i]];
-        // Assuming we categorize by role or some other state later, for now just store by name
-        global.Cache.creeps.set(creep.name, creep);
+    // Reap global.Cache.creeps
+    for (const name of global.Cache.creeps.keys()) {
+        if (!Game.creeps[name]) {
+            global.Cache.creeps.delete(name);
+        }
     }
 
-    // Iterate Game.structures once
+    // Update global.Cache.creeps
+    const creepNames = Object.keys(Game.creeps);
+    for (let i = 0; i < creepNames.length; i++) {
+        const name = creepNames[i];
+        let memory = global.Cache.creeps.get(name);
+        if (!memory) {
+            memory = {};
+            global.Cache.creeps.set(name, memory);
+        }
+        memory._creep = Game.creeps[name];
+    }
+
+    // Reap global.Cache.structures
+    for (const id of global.Cache.structures.keys()) {
+        if (!Game.structures[id]) {
+            global.Cache.structures.delete(id);
+        }
+    }
+
+    // Update global.Cache.structures
     const structureIds = Object.keys(Game.structures);
     for (let i = 0; i < structureIds.length; i++) {
-        const structure = Game.structures[structureIds[i]];
-        global.Cache.structures.set(structure.id, structure);
-
-        // Example: grouping by room could be done here as well
-        /*
-        if (!global.Cache.rooms.has(structure.room.name)) {
-            global.Cache.rooms.set(structure.room.name, { structures: new Map() });
+        const id = structureIds[i];
+        let memory = global.Cache.structures.get(id);
+        if (!memory) {
+            memory = {};
+            global.Cache.structures.set(id, memory);
         }
-        global.Cache.rooms.get(structure.room.name).structures.set(structure.id, structure);
-        */
+        memory._structure = Game.structures[id];
     }
 };
