@@ -19,10 +19,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          
+          # Removed cache: 'npm'
+
       - name: Install Dependencies
-        run: npm ci
+        # Changed from npm ci to npm install
+        run: npm install
 
       - name: Run Syntax & Lint Tests
         id: run-tests
