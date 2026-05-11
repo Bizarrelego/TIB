@@ -7,6 +7,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Build Prompt Context
+        run: |
+          echo "PROMPT_TEXT<<EOF" >> $GITHUB_ENV
+          echo "Current progress: SpawnManager and Economy are functional." >> $GITHUB_ENV
+          echo "Based on the following architecture and agent rules, what is the next priority for RCL 3? Output ONLY a command for Jules." >> $GITHUB_ENV
+          echo "--- AGENTS.md ---" >> $GITHUB_ENV
+          cat AGENTS.md >> $GITHUB_ENV
+          echo "--- arch.html ---" >> $GITHUB_ENV
+          cat architecture/arch.html >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
       - name: Get Next Task
         id: plan-next
         uses: google-github-actions/run-gemini-cli@v0
@@ -14,7 +26,9 @@ jobs:
           GEMINI_CLI_TRUST_WORKSPACE: true
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
-          prompt: "Read arch.html and AGENTS.md. Current progress: SpawnManager and Economy are functional. What is the next priority for RCL 3? Output a command for Jules."
+          gemini_model: "gemini-3.1-flash-lite"
+          prompt: ${{ env.PROMPT_TEXT }}
+
       - name: Trigger Jules
         run: |
           curl -X POST https://jules.googleapis.com/v1alpha/sessions \

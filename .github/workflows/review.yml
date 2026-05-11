@@ -10,8 +10,18 @@ jobs:
         with:
           fetch-depth: 0 
 
-      - name: Generate Diff
-        run: git diff origin/main > pr_diff.txt
+      - name: Build Review Context
+        run: |
+          git diff origin/main > pr_diff.txt
+          echo "REVIEW_TEXT<<EOF" >> $GITHUB_ENV
+          echo "Analyze the code changes in the diff below. Ensure the new code uses global.State for O(1) lookups and does not violate the architecture. If approved, reply EXACTLY with 'LGTM'." >> $GITHUB_ENV
+          echo "--- AGENTS.md ---" >> $GITHUB_ENV
+          cat AGENTS.md >> $GITHUB_ENV
+          echo "--- arch.html ---" >> $GITHUB_ENV
+          cat architecture/arch.html >> $GITHUB_ENV
+          echo "--- PR DIFF ---" >> $GITHUB_ENV
+          cat pr_diff.txt >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
       - name: Architect Review
         id: gemini-check
@@ -20,7 +30,8 @@ jobs:
           GEMINI_CLI_TRUST_WORKSPACE: true
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
-          prompt: "Read architecture/arch.html, AGENTS.md, and pr_diff.txt. Analyze the code changes in pr_diff.txt. Ensure the new code uses global.State for O(1) lookups and does not violate the architecture. If approved, reply EXACTLY with 'LGTM'."
+          gemini_model: "gemini-3.1-flash-lite"
+          prompt: ${{ env.REVIEW_TEXT }}
 
       - name: Auto-Merge
         if: contains(steps.gemini-check.outputs.response, 'LGTM')
