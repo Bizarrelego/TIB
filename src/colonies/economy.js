@@ -12,7 +12,7 @@ module.exports = {
                     // Harvest mode
                     let targetId = creep.heap.targetId;
                     if (!targetId) {
-                        const sources = room.find(FIND_SOURCES);
+                        const sources = global.State.sourcesByRoom.get(room.name) || [];
                         if (sources.length > 0) {
                             // Find nearest source
                             const nearestSource = creep.pos.findClosestByRange(sources);
@@ -35,8 +35,25 @@ module.exports = {
                         }
                     }
                 } else {
-                    // Upgrade mode
-                    if (room.controller) {
+                    // Spawn refill & Upgrade mode
+                    if (room.energyAvailable < room.energyCapacityAvailable) {
+                        const spawns = global.State.spawnsByRoom.get(room.name) || [];
+                        const spawn = spawns.length > 0 ? spawns[0] : null;
+                        if (spawn) {
+                            const result = creep.transfer(spawn, RESOURCE_ENERGY);
+                            if (result === ERR_NOT_IN_RANGE) {
+                                creep.moveTo(spawn);
+                            } else if (result === ERR_FULL && room.controller) {
+                                if (creep.upgradeController(room.controller) === ERR_NOT_IN_RANGE) {
+                                    creep.moveTo(room.controller);
+                                }
+                            }
+                        } else if (room.controller) {
+                            if (creep.upgradeController(room.controller) === ERR_NOT_IN_RANGE) {
+                                creep.moveTo(room.controller);
+                            }
+                        }
+                    } else if (room.controller) {
                         if (creep.upgradeController(room.controller) === ERR_NOT_IN_RANGE) {
                             creep.moveTo(room.controller);
                         }

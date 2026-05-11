@@ -2,11 +2,41 @@ module.exports = function stateScanner() {
     if (!global.State) {
         global.State = {
             creepsByRoom: new Map(),
-            spawnsByRoom: new Map()
+            spawnsByRoom: new Map(),
+            sourcesByRoom: new Map()
         };
     } else {
         global.State.creepsByRoom.clear();
         global.State.spawnsByRoom.clear();
+        global.State.sourcesByRoom.clear();
+    }
+
+    // O(1) Source Caching
+    if (!global.Cache.rooms) {
+        global.Cache.rooms = new Map();
+    }
+    const rooms = Object.values(Game.rooms);
+    for (let i = 0; i < rooms.length; i++) {
+        const room = rooms[i];
+        let roomCache = global.Cache.rooms.get(room.name);
+        if (!roomCache) {
+            roomCache = {};
+            global.Cache.rooms.set(room.name, roomCache);
+        }
+
+        if (!roomCache.sourceIds) {
+            const sources = room.find(FIND_SOURCES);
+            roomCache.sourceIds = sources.map(s => s.id);
+        }
+
+        const roomSources = [];
+        for (let j = 0; j < roomCache.sourceIds.length; j++) {
+            const source = Game.getObjectById(roomCache.sourceIds[j]);
+            if (source) {
+                roomSources.push(source);
+            }
+        }
+        global.State.sourcesByRoom.set(room.name, roomSources);
     }
 
     // Reap global.Cache.creeps
