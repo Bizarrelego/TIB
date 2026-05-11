@@ -1,4 +1,4 @@
-/* global HEAL, RANGED_ATTACK, ATTACK, DISMANTLE, STRUCTURE_TOWER, STRUCTURE_ROAD, RESOURCE_ENERGY */
+/* global DISMANTLE */
 const { determineDefcon } = require('../constants/defcon');
 
 function getDistance(pos1, pos2) {
