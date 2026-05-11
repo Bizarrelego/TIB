@@ -6,16 +6,7 @@ const Scanner = {
 
         // Initialize if empty using Set for O(1)
         if (!cache.hostileIds) {
-            if (!cache.initializedHostiles) {
-                cache.hostileIds = new Set();
-                const hostiles = room.find(FIND_HOSTILE_CREEPS);
-                for (let i = 0; i < hostiles.length; i++) {
-                    cache.hostileIds.add(hostiles[i].id);
-                }
-                cache.initializedHostiles = true;
-            } else {
-                cache.hostileIds = new Set();
-            }
+            cache.hostileIds = new Set();
         }
 
         for (let i = 0; i < log.length; i++) {
@@ -37,16 +28,7 @@ const Scanner = {
         const cache = global.Cache.rooms.get(room.name);
 
         if (!cache.droppedIds) {
-            if (!cache.initializedDropped) {
-                cache.droppedIds = new Set();
-                const dropped = room.find(FIND_DROPPED_RESOURCES);
-                for (let i = 0; i < dropped.length; i++) {
-                    cache.droppedIds.add(dropped[i].id);
-                }
-                cache.initializedDropped = true;
-            } else {
-                cache.droppedIds = new Set();
-            }
+            cache.droppedIds = new Set();
         }
 
         for (let i = 0; i < log.length; i++) {

@@ -51,31 +51,27 @@ module.exports = function stateScanner() {
             global.Cache.rooms.set(room.name, roomCache);
         }
 
-        if (!roomCache.sourceIds) {
-            const sources = room.find(FIND_SOURCES);
-            roomCache.sourceIds = sources.map(s => s.id);
-        }
-
+        // O(1) Source and Mineral Caching
+        // Removed room.find() logic. Initial discovery must be handled elsewhere or gated if strictly needed.
+        // Assuming global.Cache.rooms[room.name] is seeded by intel/events.
         const roomSources = [];
-        for (let j = 0; j < roomCache.sourceIds.length; j++) {
-            const source = Game.getObjectById(roomCache.sourceIds[j]);
-            if (source) {
-                roomSources.push(source);
+        if (roomCache.sourceIds) {
+            for (let j = 0; j < roomCache.sourceIds.length; j++) {
+                const source = Game.getObjectById(roomCache.sourceIds[j]);
+                if (source) {
+                    roomSources.push(source);
+                }
             }
         }
         global.State.sourcesByRoom.set(room.name, roomSources);
 
-        // O(1) Mineral Caching
-        if (!roomCache.mineralIds) {
-            const minerals = room.find(FIND_MINERALS);
-            roomCache.mineralIds = minerals.map(m => m.id);
-        }
-
         const roomMinerals = [];
-        for (let j = 0; j < roomCache.mineralIds.length; j++) {
-            const mineral = Game.getObjectById(roomCache.mineralIds[j]);
-            if (mineral) {
-                roomMinerals.push(mineral);
+        if (roomCache.mineralIds) {
+            for (let j = 0; j < roomCache.mineralIds.length; j++) {
+                const mineral = Game.getObjectById(roomCache.mineralIds[j]);
+                if (mineral) {
+                    roomMinerals.push(mineral);
+                }
             }
         }
         global.State.mineralsByRoom.set(room.name, roomMinerals);
