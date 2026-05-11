@@ -14,12 +14,9 @@ jobs:
           {
             echo "PROMPT_TEXT<<${delimiter}"
             echo "Current progress: SpawnManager and Economy are functional."
-            echo "Based on the following architecture and agent rules, what is the next priority for RCL 3? Output ONLY a command for Jules."
+            echo "Based on the following agent rules, what is the next priority for RCL 3? Output ONLY a command for Jules."
             echo "--- AGENTS.md ---"
             cat AGENTS.md 2>/dev/null || echo "[WARNING: AGENTS.md NOT FOUND]"
-            echo ""
-            echo "--- arch.html ---"
-            cat architecture/arch.html 2>/dev/null || echo "[WARNING: arch.html NOT FOUND]"
             echo ""
             echo "${delimiter}"
           } >> "$GITHUB_ENV"
