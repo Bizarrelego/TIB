@@ -35,27 +35,57 @@ module.exports = {
                         }
                     }
                 } else {
-                    // Spawn refill & Upgrade mode
+                    // Spawn refill, Build & Upgrade mode
                     if (room.energyAvailable < room.energyCapacityAvailable) {
-                        const spawns = global.State.spawnsByRoom.get(room.name) || [];
-                        const spawn = spawns.length > 0 ? spawns[0] : null;
-                        if (spawn) {
-                            const result = creep.transfer(spawn, RESOURCE_ENERGY);
+                        const structures = global.State.structuresByRoom.get(room.name);
+                        let target = null;
+                        if (structures) {
+                            const spawns = structures.get(STRUCTURE_SPAWN) || [];
+                            for (let i = 0; i < spawns.length; i++) {
+                                if (spawns[i].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                                    target = spawns[i];
+                                    break;
+                                }
+                            }
+                            if (!target) {
+                                const extensions = structures.get(STRUCTURE_EXTENSION) || [];
+                                for (let i = 0; i < extensions.length; i++) {
+                                    if (extensions[i].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                                        target = extensions[i];
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (target) {
+                            const result = creep.transfer(target, RESOURCE_ENERGY);
                             if (result === ERR_NOT_IN_RANGE) {
-                                creep.moveTo(spawn);
-                            } else if (result === ERR_FULL && room.controller) {
+                                creep.moveTo(target);
+                            }
+                        } else {
+                            // Target to build
+                            const sites = global.State.sitesByRoom.get(room.name);
+                            if (sites && sites.length > 0) {
+                                if (creep.build(sites[0]) === ERR_NOT_IN_RANGE) {
+                                    creep.moveTo(sites[0]);
+                                }
+                            } else if (room.controller) {
                                 if (creep.upgradeController(room.controller) === ERR_NOT_IN_RANGE) {
                                     creep.moveTo(room.controller);
                                 }
+                            }
+                        }
+                    } else {
+                        const sites = global.State.sitesByRoom.get(room.name);
+                        if (sites && sites.length > 0) {
+                            if (creep.build(sites[0]) === ERR_NOT_IN_RANGE) {
+                                creep.moveTo(sites[0]);
                             }
                         } else if (room.controller) {
                             if (creep.upgradeController(room.controller) === ERR_NOT_IN_RANGE) {
                                 creep.moveTo(room.controller);
                             }
-                        }
-                    } else if (room.controller) {
-                        if (creep.upgradeController(room.controller) === ERR_NOT_IN_RANGE) {
-                            creep.moveTo(room.controller);
                         }
                     }
                 }

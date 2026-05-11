@@ -3,12 +3,16 @@ module.exports = function stateScanner() {
         global.State = {
             creepsByRoom: new Map(),
             spawnsByRoom: new Map(),
-            sourcesByRoom: new Map()
+            sourcesByRoom: new Map(),
+            structuresByRoom: new Map(),
+            sitesByRoom: new Map()
         };
     } else {
         global.State.creepsByRoom.clear();
         global.State.spawnsByRoom.clear();
         global.State.sourcesByRoom.clear();
+        global.State.structuresByRoom.clear();
+        global.State.sitesByRoom.clear();
     }
 
     // O(1) Source Caching
@@ -107,5 +111,33 @@ module.exports = function stateScanner() {
             global.Cache.structures.set(id, memory);
         }
         memory._structure = Game.structures[id];
+
+        const struct = Game.structures[id];
+        if (struct.room) {
+            let roomStructs = global.State.structuresByRoom.get(struct.room.name);
+            if (!roomStructs) {
+                roomStructs = new Map();
+                global.State.structuresByRoom.set(struct.room.name, roomStructs);
+            }
+            let typeStructs = roomStructs.get(struct.structureType);
+            if (!typeStructs) {
+                typeStructs = [];
+                roomStructs.set(struct.structureType, typeStructs);
+            }
+            typeStructs.push(struct);
+        }
+    }
+
+    const sites = Object.values(Game.constructionSites);
+    for (let i = 0; i < sites.length; i++) {
+        const site = sites[i];
+        if (site.room) {
+            let roomSites = global.State.sitesByRoom.get(site.room.name);
+            if (!roomSites) {
+                roomSites = [];
+                global.State.sitesByRoom.set(site.room.name, roomSites);
+            }
+            roomSites.push(site);
+        }
     }
 };
