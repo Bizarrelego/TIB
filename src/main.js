@@ -1,3 +1,4 @@
+const installMemoryProxy = require('./os/memoryProxy');
 const cacheInit = require('./os/cache');
 const stateScanner = require('./state/stateScanner');
 const colonyManager = require('./colonies/colonyManager');
@@ -26,6 +27,7 @@ module.exports.loop = function () {
 
     // Phase 1: OS Init & Cache
     try {
+        installMemoryProxy();
         cacheInit();
     } catch (e) {
         console.log(`[Phase 1 Error] OS Init: ${e.stack}`);
@@ -60,7 +62,7 @@ module.exports.loop = function () {
 
     // Phase 5: Traffic Control
     try {
-        trafficManager();
+        trafficManager.run();
     } catch (e) {
         console.log(`[Phase 5 Error] Traffic Control: ${e.stack}`);
     }
