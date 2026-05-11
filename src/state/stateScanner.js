@@ -7,7 +7,8 @@ module.exports = function stateScanner() {
             structuresByRoom: new Map(),
             sitesByRoom: new Map(),
             hostilesByRoom: new Map(),
-            mineralsByRoom: new Map()
+            mineralsByRoom: new Map(),
+            roomTerrain: new Map()
         };
     } else {
         global.State.creepsByRoom.clear();
@@ -17,6 +18,13 @@ module.exports = function stateScanner() {
         global.State.sitesByRoom.clear();
         global.State.hostilesByRoom.clear();
         global.State.mineralsByRoom.clear();
+        // roomTerrain is persistent per global reset, no need to clear it every tick,
+        // but since we rebuild it for all visible rooms below anyway, we can clear it,
+        // or just rely on global.Cache for actual persistence. Let's put it in global.Cache instead.
+    }
+
+    if (!global.Cache.roomTerrain) {
+        global.Cache.roomTerrain = new Map();
     }
 
     // O(1) Source Caching
@@ -26,6 +34,11 @@ module.exports = function stateScanner() {
     const rooms = Object.values(Game.rooms);
     for (let i = 0; i < rooms.length; i++) {
         const room = rooms[i];
+
+        if (!global.Cache.roomTerrain.has(room.name)) {
+            global.Cache.roomTerrain.set(room.name, Game.map.getRoomTerrain(room.name));
+        }
+        global.State.roomTerrain.set(room.name, global.Cache.roomTerrain.get(room.name));
         let roomCache = global.Cache.rooms.get(room.name);
         if (!roomCache) {
             roomCache = {};

@@ -18,6 +18,35 @@ module.exports = {
 
         const capacity = room.energyCapacityAvailable;
 
+        // RCL 5 Logic: hubManager
+        if (room.controller.level >= 5) {
+            if (spawnLedger.isLinkNetworkPresent(room)) {
+                let hubManagerCount = 0;
+                if (roomCreeps) {
+                    const hubManagers = roomCreeps.get('hubManager');
+                    if (hubManagers) {
+                        hubManagerCount = hubManagers.length;
+                    }
+                }
+
+                if (hubManagerCount < 1) {
+                    // Optimized body for hub transfer: 800 capacity
+                    const body = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE];
+                    const cost = (16 * BODYPART_COST[CARRY]) + BODYPART_COST[MOVE]; // 16 * 50 + 50 = 850
+                    if (spawnLedger.canSpawn(cost)) {
+                        const result = spawn.spawnCreep(body, 'hubManager_' + Game.time, {
+                            memory: { role: 'hubManager', colony: room.name }
+                        });
+
+                        if (result === OK) {
+                            spawnLedger.deduct(cost);
+                        }
+                        return; // Prioritize hubManager over other logistics
+                    }
+                }
+            }
+        }
+
         // RCL 4 Logic: fastFiller
         if (room.controller.level >= 4) {
             let storageExists = false;
