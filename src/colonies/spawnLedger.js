@@ -11,6 +11,17 @@ class SpawnLedger {
         this.availableEnergy -= cost;
     }
 
+    requestSpawn(spawn, body, name, opts, cost) {
+        if (!spawn.spawning) {
+            const result = spawn.spawnCreep(body, name, opts);
+            if (result === OK) {
+                this.deduct(cost);
+            }
+            return result;
+        }
+        return ERR_BUSY;
+    }
+
     isLinkNetworkPresent(room) {
         const structuresMap = global.State.structuresByRoom.get(room.name);
         if (structuresMap) {
