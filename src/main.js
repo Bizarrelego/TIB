@@ -5,6 +5,7 @@ const colonyManager = require('./colonies/colonyManager');
 const operationsManager = require('./operations/operationsManager');
 const trafficManager = require('./traffic/trafficManager');
 const TowerManager = require('./managers/TowerManager');
+const RoadManager = require('./managers/RoadManager');
 
 module.exports.loop = function () {
     // Cascading switch statement for hard CPU throttling based on Game.cpu.bucket
@@ -75,6 +76,17 @@ module.exports.loop = function () {
                 TowerManager.run(room);
             } catch (e) {
                 console.log(`[TowerManager Loop Error] Room ${room.name}: ${e.stack}`);
+            }
+        }
+    }
+
+    // Road Manager Loop
+    for (const room of Object.values(Game.rooms)) {
+        if (room.controller && room.controller.my === true) {
+            try {
+                RoadManager.run(room);
+            } catch (e) {
+                console.log(`[RoadManager Loop Error] Room ${room.name}: ${e.stack}`);
             }
         }
     }
