@@ -1,3 +1,4 @@
+/* global EVENT_OBJECT_DESTROYED */
 module.exports = function stateScanner() {
     if (!global.State) {
         global.State = {
@@ -78,16 +79,61 @@ module.exports = function stateScanner() {
         }
         global.State.mineralsByRoom.set(room.name, roomMinerals);
 
-        // O(1) Hostile Caching
-        const hostiles = room.find(FIND_HOSTILE_CREEPS);
-        global.State.hostilesByRoom.set(room.name, hostiles);
-
         if (room.controller) {
             global.State.controllersByRoom.set(room.name, room.controller);
         }
 
-        const dropped = room.find(FIND_DROPPED_RESOURCES);
-        global.State.droppedByRoom.set(room.name, dropped);
+        // Initialize persistent caches if they don't exist
+        if (!global.Cache.rooms.get(room.name).hostileIds) {
+            global.Cache.rooms.get(room.name).hostileIds = room.find(FIND_HOSTILE_CREEPS).map(c => c.id);
+        }
+        if (!global.Cache.rooms.get(room.name).droppedIds) {
+            global.Cache.rooms.get(room.name).droppedIds = room.find(FIND_DROPPED_RESOURCES).map(r => r.id);
+        }
+
+        // Process Event Log to update caches incrementally (Zero Native Polling)
+        const eventLog = room.getEventLog();
+        for (let j = 0; j < eventLog.length; j++) {
+            const event = eventLog[j];
+            if (event.event === EVENT_OBJECT_DESTROYED) {
+                // If it was a hostile, remove from cache. We can't know the type, so remove from both if present.
+                const id = event.objectId;
+                const hostileIds = global.Cache.rooms.get(room.name).hostileIds;
+                const hIdx = hostileIds.indexOf(id);
+                if (hIdx !== -1) hostileIds.splice(hIdx, 1);
+
+                const droppedIds = global.Cache.rooms.get(room.name).droppedIds;
+                const dIdx = droppedIds.indexOf(id);
+                if (dIdx !== -1) droppedIds.splice(dIdx, 1);
+            }
+        }
+
+        // We also need to map from ids to objects
+        const roomHostiles = [];
+        const hostileIds = global.Cache.rooms.get(room.name).hostileIds;
+        for (let j = 0; j < hostileIds.length; j++) {
+            const h = Game.getObjectById(hostileIds[j]);
+            if (h) {
+                roomHostiles.push(h);
+            } else {
+                hostileIds.splice(j, 1);
+                j--;
+            }
+        }
+        global.State.hostilesByRoom.set(room.name, roomHostiles);
+
+        const roomDropped = [];
+        const droppedIds = global.Cache.rooms.get(room.name).droppedIds;
+        for (let j = 0; j < droppedIds.length; j++) {
+            const d = Game.getObjectById(droppedIds[j]);
+            if (d) {
+                roomDropped.push(d);
+            } else {
+                droppedIds.splice(j, 1);
+                j--;
+            }
+        }
+        global.State.droppedByRoom.set(room.name, roomDropped);
     }
 
     // Reap global.Cache.creeps

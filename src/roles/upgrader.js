@@ -24,10 +24,41 @@ function run(room) {
             }
 
             // Pickup dropped energy or withdraw from link if available without moving
+            let target = null;
+            if (!creep.heap.resourceMap) {
+                creep.heap.resourceMap = new Map();
+            }
+
             const structures = global.State.structuresByRoom.get(room.name);
-            const target = global.State.droppedByRoom.get(room.name)?.find(r => r.pos.isNearTo(creep)) ||
-                           structures?.get(STRUCTURE_LINK)?.find(s => s.pos.isNearTo(creep)) ||
-                           structures?.get(STRUCTURE_CONTAINER)?.find(s => s.pos.isNearTo(creep));
+            const links = structures?.get(STRUCTURE_LINK) || [];
+            const containers = structures?.get(STRUCTURE_CONTAINER) || [];
+            const dropped = global.State.droppedByRoom.get(room.name) || [];
+
+            // Simple iteration to avoid array.find() O(N*M) loop anti-pattern
+            for (let i = 0; i < dropped.length; i++) {
+                if (creep.pos.isNearTo(dropped[i].pos)) {
+                    target = dropped[i];
+                    break;
+                }
+            }
+
+            if (!target) {
+                for (let i = 0; i < links.length; i++) {
+                    if (creep.pos.isNearTo(links[i].pos)) {
+                        target = links[i];
+                        break;
+                    }
+                }
+            }
+
+            if (!target) {
+                for (let i = 0; i < containers.length; i++) {
+                    if (creep.pos.isNearTo(containers[i].pos)) {
+                        target = containers[i];
+                        break;
+                    }
+                }
+            }
 
             if (target && creep.store.getFreeCapacity() > 0) {
                 if (target.resourceType) creep.pickup(target);
