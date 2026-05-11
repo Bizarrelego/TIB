@@ -1,3 +1,5 @@
+const planner = require('./planner');
+
 module.exports = {
     run: function(room, spawnLedger) {
         // Retrieve spawn via O(1) lookup
@@ -15,6 +17,67 @@ module.exports = {
         const roomCreeps = global.State.creepsByRoom.get(room.name);
 
         const capacity = room.energyCapacityAvailable;
+
+        // RCL 4 Logic: fastFiller
+        if (room.controller.level >= 4) {
+            let storageExists = false;
+            let storageCloseToCompletion = false;
+
+            const structures = global.State.structuresByRoom.get(room.name);
+            if (structures) {
+                const storages = structures.get(STRUCTURE_STORAGE) || [];
+                if (storages.length > 0) {
+                    storageExists = true;
+                }
+            }
+
+            if (!storageExists) {
+                const sites = global.State.sitesByRoom.get(room.name);
+                if (sites) {
+                    for (let i = 0; i < sites.length; i++) {
+                        if (sites[i].structureType === STRUCTURE_STORAGE) {
+                            const buildPower = planner.getBuildPower(room.name);
+                            if (sites[i].progress >= sites[i].progressTotal - buildPower) {
+                                storageCloseToCompletion = true;
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (storageExists || storageCloseToCompletion) {
+                let fastFillerCount = 0;
+                if (roomCreeps) {
+                    const fastFillers = roomCreeps.get('fastFiller');
+                    if (fastFillers) {
+                        fastFillerCount = fastFillers.length;
+                    }
+                }
+
+                if (fastFillerCount < 2) { // Target amount of fastFillers
+                    // Calculate 1:1 CARRY:MOVE body up to room.energyCapacityAvailable
+                    let body = [];
+                    let cost = 0;
+                    const pairCost = BODYPART_COST[CARRY] + BODYPART_COST[MOVE];
+                    while (cost + pairCost <= capacity && body.length < 50) {
+                        body.push(CARRY, MOVE);
+                        cost += pairCost;
+                    }
+
+                    if (body.length > 0 && spawnLedger.canSpawn(cost)) {
+                        const result = spawn.spawnCreep(body, 'fastFiller_' + Game.time, {
+                            memory: { role: 'fastFiller', colony: room.name }
+                        });
+
+                        if (result === OK) {
+                            spawnLedger.deduct(cost);
+                        }
+                        return; // Prioritize fastFillers
+                    }
+                }
+            }
+        }
 
         if (capacity < 500) {
             // RCL 1 Logic (< 500 Capacity)

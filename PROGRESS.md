@@ -6,3 +6,4 @@
 - Road Planning: Functional
 
 # Pending Priorities
+- RCL 4 (Storage & Infrastructure) - Completed

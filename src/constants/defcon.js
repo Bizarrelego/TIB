@@ -1,3 +1,5 @@
+/* global DISMANTLE */
+
 const DEFCON = {
     NORMAL: 5,
     CAUTION: 4,

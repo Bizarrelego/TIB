@@ -1,4 +1,26 @@
 module.exports = {
+    getBuildPower: function(roomName) {
+        let buildPower = 0;
+        const roomCreeps = global.State.creepsByRoom.get(roomName);
+        if (roomCreeps) {
+            const workers = roomCreeps.get('worker');
+            if (workers) {
+                for (let w = 0; w < workers.length; w++) {
+                    const worker = workers[w];
+                    if (worker.body) {
+                        for (let b = 0; b < worker.body.length; b++) {
+                            if (worker.body[b].type === WORK) {
+                                buildPower += BUILD_POWER;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (buildPower === 0) buildPower = BUILD_POWER; // Default
+        return buildPower;
+    },
+
     run: function(room) {
         try {
             if (Game.time % 100 !== 0) return;
