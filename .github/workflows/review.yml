@@ -13,6 +13,7 @@ permissions:
 jobs:
   test-and-review:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -42,16 +43,8 @@ jobs:
       - name: Reject on Test Failure
         if: steps.run-tests.outcome == 'failure'
         run: |
-          BODY_TEXT=$(cat <<EOF
-          @jules Code failed static analysis and linting. Fix the exact syntax errors below before requesting architectural review:
-          
-          \`\`\`text
-          $(cat lint_output.txt)
-          \`\`\`
-          EOF
-          )
-          
-          PAYLOAD=$(jq -n --arg body "$BODY_TEXT" '{body: $body}')
+          # Read file safely into jq, bypassing Bash string interpolation bugs
+          PAYLOAD=$(jq -Rs --arg prefix "@jules Code failed static analysis and linting. Fix the exact syntax errors below before requesting architectural review:\n\n\`\`\`text\n" --arg suffix "\n\`\`\`" '{body: ($prefix + . + $suffix)}' lint_output.txt)
           
           curl -s -X POST \
             -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
@@ -67,9 +60,14 @@ jobs:
           delimiter="$(openssl rand -hex 8)"
           {
             echo "REVIEW_TEXT<<${delimiter}"
-            echo "Analyze the code changes in the diff below against the provided constraints."
-            echo "If the code passes ALL constraints, reply EXACTLY with 'LGTM'."
-            echo "If the code fails, reply with a detailed markdown list of what is wrong, exactly which files violate the rules, and how to fix the code to match the Tigga-style constraints."
+            echo "You are a ruthless, expert Screeps architect enforcing Tigga-style efficiency."
+            echo "Analyze the code changes in the diff below against the AGENTS.md constraints."
+            echo "CRITICAL CHECKS:"
+            echo "- Are there ANY room.find() or room.lookAt() calls? (Auto-reject)"
+            echo "- Is state being read from global.State instead of native arrays?"
+            echo "- Are they using standard {} objects instead of Map() for dictionaries? (Auto-reject)"
+            echo "If the code passes ALL constraints, reply EXACTLY with 'LGTM'. Do not add any other text."
+            echo "If the code fails, reply with a detailed markdown list of what is wrong, exactly which files violate the rules, and provide the corrected code snippet."
             echo "--- AGENTS.md ---"
             cat AGENTS.md 2>/dev/null || echo "[WARNING: AGENTS.md NOT FOUND]"
             echo ""
