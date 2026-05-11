@@ -89,9 +89,9 @@ jobs:
       - name: Request Architectural Changes
         if: "!contains(steps.gemini-check.outputs.gemini_response, 'LGTM')"
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
           CRITIQUE: ${{ steps.gemini-check.outputs.gemini_response }}
-        run: gh pr review ${{ github.event.pull_request.number }} --request-changes --body "$CRITIQUE"
+        run: gh pr review ${{ github.event.pull_request.number }} --request-changes --body "@jules $CRITIQUE"
 
       - name: Auto-Merge
         if: contains(steps.gemini-check.outputs.gemini_response, 'LGTM')
