@@ -6,7 +6,8 @@ module.exports = function stateScanner() {
             sourcesByRoom: new Map(),
             structuresByRoom: new Map(),
             sitesByRoom: new Map(),
-            hostilesByRoom: new Map()
+            hostilesByRoom: new Map(),
+            mineralsByRoom: new Map()
         };
     } else {
         global.State.creepsByRoom.clear();
@@ -15,6 +16,7 @@ module.exports = function stateScanner() {
         global.State.structuresByRoom.clear();
         global.State.sitesByRoom.clear();
         global.State.hostilesByRoom.clear();
+        global.State.mineralsByRoom.clear();
     }
 
     // O(1) Source Caching
@@ -43,6 +45,21 @@ module.exports = function stateScanner() {
             }
         }
         global.State.sourcesByRoom.set(room.name, roomSources);
+
+        // O(1) Mineral Caching
+        if (!roomCache.mineralIds) {
+            const minerals = room.find(FIND_MINERALS);
+            roomCache.mineralIds = minerals.map(m => m.id);
+        }
+
+        const roomMinerals = [];
+        for (let j = 0; j < roomCache.mineralIds.length; j++) {
+            const mineral = Game.getObjectById(roomCache.mineralIds[j]);
+            if (mineral) {
+                roomMinerals.push(mineral);
+            }
+        }
+        global.State.mineralsByRoom.set(room.name, roomMinerals);
 
         // O(1) Hostile Caching
         const hostiles = room.find(FIND_HOSTILE_CREEPS);
