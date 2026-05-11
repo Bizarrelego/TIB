@@ -1,17 +1,24 @@
 # TIB Bot Architecture & Coding Standards
 
-## Core Principles
-- **O(1) Priority**: Never use `room.find()` or `room.lookAt()` inside loops. Use the pre-scanned maps in `global.State`.
-- **CPU Throttling**: All modules must respect the `Game.cpu.bucket` thresholds defined in `main.js`.
-- **Memory Management**: Use the `heap` proxy for all non-essential data. Only store `role` and `colony` in permanent `Memory`.
-- **Movement**: Never use `creep.moveTo()`. Always use the `movement.moveTo()` wrapper in `src/utils/`.
+## 1. Core CPU & Execution Principles
+- **Zero Native Polling**: Never use `room.find()`, `room.lookAt()`, or `room.lookForAt()` inside tick loops. You must only query the pre-scanned maps in `global.State`.
+- **Event-Driven Updates**: Rely on `room.getEventLog()` to update state (e.g., detecting attacks or destroyed structures) rather than iterating arrays.
+- **Fatigue Gating**: If a creep has `fatigue > 0`, immediately return and skip all logic for that tick.
+- **Source Sleep**: If a source is empty, set a `wakeTick` in the creep's heap and skip execution until the regeneration tick.
+- **Intent Maximization**: Stack non-conflicting intents (e.g., `move()`, `transfer()`, `rangedHeal()`) in the same tick.
 
-## Room Phases
-1. **RCL 1**: Focus on 15 generic workers to brute-force the controller.
-2. **RCL 2**: Transition to 2 Harvesters and 4 Haulers. Use static harvesting (harvesters drop energy on the ground).
-3. **RCL 3+**: Implement tower defense and road networking.
+## 2. Memory & State Management
+- **Heap Exclusivity**: Write temporary data to `creep.heap` (via `memoryProxy.js`). The native `creep.memory` must ONLY contain `role` and `colony`.
+- **V8 Map Optimization**: Use `Map()` for all large dictionaries and lookups, never plain `{}` objects.
+- **Error Boundaries**: Every Manager function must be wrapped in an isolated `try/catch` block to prevent global crashes.
 
-## Implementation Rules
-- Haulers must prioritize Spawns and Extensions. If full, they must drop energy at the Controller for workers.
-- Harvesters must be assigned to a specific Source ID and stay there.
-- Use the `VirtualLedger` in `trafficManager.js` to track resource intents and prevent wasted CPU on failed withdraws.
+## 3. Logistics & Movement
+- **Sub-Tick Ledger**: You must use `VirtualLedger` in `trafficManager.js` to register all resource transfers, drops, and pickups to prevent API execution waste.
+- **Top-Down Assignment**: Creeps must never scan for jobs. Managers assess the room state and assign targets directly to creeps.
+- **Spawn Validation**: Managers must check `SpawnLedger.canSpawn()` to ensure sub-tick energy availability before queueing a spawn.
+- **Movement Wrapper**: Native `creep.moveTo()` is banned. Always use `movement.moveTo()` in `src/utils/`.
+
+## 4. Phase Milestones (RCL)
+- **RCL 1 (Bootstrap)**: Brute-force the controller. Spawn up to 15 generic `[WORK, CARRY, MOVE]` workers. Do not build roads.
+- **RCL 2 (Core Infrastructure)**: Transition to Harvesters (stationary, dropping energy) and Haulers. Haulers prioritize Spawns/Extensions, then drop overflow near the Controller.
+- **RCL 3 (Defense)**: Implement Tower logic (Hostiles > Heal > Roads at 10% HP).

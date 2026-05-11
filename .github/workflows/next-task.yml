@@ -8,14 +8,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Get Next Task
+        id: plan-next
         uses: google-github-actions/run-gemini-cli@v0
         env:
           GEMINI_CLI_TRUST_WORKSPACE: true
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
-          prompt: "Current progress: SpawnManager and Economy are functional. Based on arch.html, what is the next priority? Output a command for Jules."
+          prompt: "Read arch.html and AGENTS.md. Current progress: SpawnManager and Economy are functional. What is the next priority for RCL 3? Output a command for Jules."
       - name: Trigger Jules
         run: |
-          curl -X POST https://api.jules.ai/v1/runs \
-          -H "Authorization: Bearer ${{ secrets.JULES_TOKEN }}" \
-          -d "{\"prompt\": \"${{ steps.plan-next.outputs.response }}\"}"
+          curl -X POST https://jules.googleapis.com/v1alpha/sessions \
+          -H "Content-Type: application/json" \
+          -H "X-Goog-Api-Key: ${{ secrets.JULES_TOKEN }}" \
+          -d '{
+            "prompt": "${{ steps.plan-next.outputs.response }}",
+            "sourceContext": {
+              "source": "sources/github/YOUR_GITHUB_USERNAME/TIB",
+              "githubRepoContext": {
+                "startingBranch": "main"
+              }
+            },
+            "automationMode": "AUTO_CREATE_PR"
+          }'

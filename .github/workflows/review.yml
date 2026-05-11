@@ -7,15 +7,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 
+
+      - name: Generate Diff
+        run: git diff origin/main > pr_diff.txt
+
       - name: Architect Review
+        id: gemini-check
         uses: google-github-actions/run-gemini-cli@v0
         env:
           GEMINI_CLI_TRUST_WORKSPACE: true
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
-          prompt: "Analyze the diff in this PR. Ensure it uses global.State for O(1) lookups and does not violate the architecture in TIB/architecture/arch.html. If approved, say 'LGTM'."
+          prompt: "Read architecture/arch.html, AGENTS.md, and pr_diff.txt. Analyze the code changes in pr_diff.txt. Ensure the new code uses global.State for O(1) lookups and does not violate the architecture. If approved, reply EXACTLY with 'LGTM'."
+
       - name: Auto-Merge
         if: contains(steps.gemini-check.outputs.response, 'LGTM')
-        run: gh pr merge --auto --merge
+        run: gh pr merge ${{ github.event.pull_request.number }} --auto --merge
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
