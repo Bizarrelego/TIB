@@ -36,7 +36,7 @@ jobs:
 
       - name: Trigger Jules
         env:
-          GEMINI_RESPONSE: ${{ steps.plan-next.outputs.response }}
+          GEMINI_RESPONSE: ${{ steps.plan-next.outputs.gemini_response }}
         run: |
           PAYLOAD=$(jq -n --arg prompt "$GEMINI_RESPONSE" '{
             prompt: $prompt,
