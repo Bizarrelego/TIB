@@ -2,7 +2,7 @@
 - SpawnManager: Functional
 - Economy: Functional
 - Haulers/Harvesters: Functional
+- RCL 3 Tower Defense: Functional
 
 # Pending Priorities
-- RCL 3 Tower Defense
 - Road Planning
