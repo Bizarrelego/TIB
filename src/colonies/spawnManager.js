@@ -1,3 +1,5 @@
+const planner = require('./planner');
+
 module.exports = {
     run: function(room, spawnLedger) {
         // Retrieve spawn via O(1) lookup
@@ -34,26 +36,7 @@ module.exports = {
                 if (sites) {
                     for (let i = 0; i < sites.length; i++) {
                         if (sites[i].structureType === STRUCTURE_STORAGE) {
-                            // Calculate dynamic build power
-                            let buildPower = 0;
-                            if (roomCreeps) {
-                                const workers = roomCreeps.get('worker');
-                                if (workers) {
-                                    for (let w = 0; w < workers.length; w++) {
-                                        const worker = workers[w];
-                                        if (worker.body) {
-                                            for (let b = 0; b < worker.body.length; b++) {
-                                                if (worker.body[b].type === WORK) {
-                                                    buildPower += BUILD_POWER;
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            // Default to some build power if 0
-                            if (buildPower === 0) buildPower = BUILD_POWER;
-
+                            const buildPower = planner.getBuildPower(room.name);
                             if (sites[i].progress >= sites[i].progressTotal - buildPower) {
                                 storageCloseToCompletion = true;
                             }

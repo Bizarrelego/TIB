@@ -6,6 +6,7 @@ const harvester = require('./harvester');
 const hauler = require('./hauler');
 const StorageManager = require('../managers/StorageManager');
 const fastFiller = require('../roles/fastFiller');
+const fastFillerManager = require('../managers/FastFillerManager');
 
 module.exports = function colonyManager() {
     for (const room of Object.values(Game.rooms)) {
@@ -18,6 +19,7 @@ module.exports = function colonyManager() {
                 harvester.run(room);
                 hauler.run(room);
                 StorageManager.run(room);
+                fastFillerManager.run(room);
                 fastFiller.run(room);
             } catch (e) {
                 console.log(`[ColonyManager Error] Room ${room.name}: ${e.stack}`);
