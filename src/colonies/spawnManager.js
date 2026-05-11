@@ -38,16 +38,11 @@ module.exports = {
         } else {
             // RCL 2 Logic (>= 500 Capacity)
             let harvesterCount = 0;
-            let haulerCount = 0;
 
             if (roomCreeps) {
                 const harvesters = roomCreeps.get('harvester');
                 if (harvesters) {
                     harvesterCount = harvesters.length;
-                }
-                const haulers = roomCreeps.get('hauler');
-                if (haulers) {
-                    haulerCount = haulers.length;
                 }
             }
 
@@ -55,17 +50,6 @@ module.exports = {
             if (harvesterCount < 2 && spawnLedger.canSpawn(500)) {
                 const result = spawn.spawnCreep([WORK, WORK, WORK, WORK, CARRY, MOVE], 'harvester_' + Game.time, {
                     memory: { role: 'harvester', colony: room.name }
-                });
-
-                if (result === OK) {
-                    spawnLedger.deduct(500);
-                }
-                return; // Stop checking haulers if we just spawned a harvester or are prioritizing it
-            }
-
-            if (haulerCount < 4 && spawnLedger.canSpawn(500)) {
-                const result = spawn.spawnCreep([CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE], 'hauler_' + Game.time, {
-                    memory: { role: 'hauler', colony: room.name }
                 });
 
                 if (result === OK) {
