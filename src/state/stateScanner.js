@@ -5,7 +5,8 @@ module.exports = function stateScanner() {
             spawnsByRoom: new Map(),
             sourcesByRoom: new Map(),
             structuresByRoom: new Map(),
-            sitesByRoom: new Map()
+            sitesByRoom: new Map(),
+            hostilesByRoom: new Map()
         };
     } else {
         global.State.creepsByRoom.clear();
@@ -13,6 +14,7 @@ module.exports = function stateScanner() {
         global.State.sourcesByRoom.clear();
         global.State.structuresByRoom.clear();
         global.State.sitesByRoom.clear();
+        global.State.hostilesByRoom.clear();
     }
 
     // O(1) Source Caching
@@ -41,6 +43,10 @@ module.exports = function stateScanner() {
             }
         }
         global.State.sourcesByRoom.set(room.name, roomSources);
+
+        // O(1) Hostile Caching
+        const hostiles = room.find(FIND_HOSTILE_CREEPS);
+        global.State.hostilesByRoom.set(room.name, hostiles);
     }
 
     // Reap global.Cache.creeps
