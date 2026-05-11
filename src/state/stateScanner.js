@@ -82,6 +82,16 @@ module.exports = function stateScanner() {
 
         global.State.hostilesByRoom.set(room.name, Scanner.updateHostiles(room));
         global.State.droppedByRoom.set(room.name, Scanner.updateDropped(room));
+
+        // LinkManager caching
+        if (!global.State.linksByRoom) {
+            global.State.linksByRoom = new Map();
+        }
+        let roomLinks = global.State.linksByRoom.get(room.name);
+        if (!roomLinks) {
+            roomLinks = {};
+            global.State.linksByRoom.set(room.name, roomLinks);
+        }
     }
 
     // Reap global.Cache.creeps
@@ -166,6 +176,13 @@ module.exports = function stateScanner() {
                 roomStructs.set(struct.structureType, typeStructs);
             }
             typeStructs.push(struct);
+
+            if (struct.structureType === STRUCTURE_LINK) {
+                const roomLinks = global.State.linksByRoom.get(struct.room.name);
+                if (roomLinks && struct.room.controller && struct.pos.inRangeTo(struct.room.controller, 3)) {
+                    roomLinks.controllerLink = struct;
+                }
+            }
         }
     }
 

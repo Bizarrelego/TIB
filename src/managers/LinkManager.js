@@ -72,22 +72,9 @@ function run(room) {
 }
 
 function getControllerLink(roomName) {
-    const structuresMap = global.State.structuresByRoom.get(roomName);
-    if (!structuresMap) return null;
-
-    const links = structuresMap.get(STRUCTURE_LINK) || [];
-    const controller = Game.rooms[roomName] ? Game.rooms[roomName].controller : null;
-
-    if (!controller) return null;
-
-    for (let i = 0; i < links.length; i++) {
-        const link = links[i];
-        if (link.pos.inRangeTo(controller, 3)) {
-            return link;
-        }
-    }
-
-    return null;
+    if (!global.State.linksByRoom) return null;
+    const roomLinks = global.State.linksByRoom.get(roomName);
+    return roomLinks ? roomLinks.controllerLink : null;
 }
 
 module.exports = { run, getControllerLink };

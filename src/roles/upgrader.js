@@ -11,10 +11,16 @@ function run(room) {
         try {
             if (creep.fatigue > 0) continue;
 
+            if (!creep.heap.rangeToController) {
+                creep.heap.rangeToController = creep.pos.getRangeTo(controller);
+            }
+
             // Ensure we are parked on the static spot.
             // Do NOT use movement if already in range of controller.
-            if (creep.pos.getRangeTo(controller) > 3) {
+            if (creep.heap.rangeToController > 3) {
                 movement.moveTo(creep, controller);
+                // Update range cache only while moving
+                creep.heap.rangeToController = creep.pos.getRangeTo(controller);
                 continue;
             }
 
