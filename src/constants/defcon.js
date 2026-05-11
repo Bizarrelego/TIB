@@ -1,3 +1,5 @@
+/* global ATTACK, RANGED_ATTACK, HEAL, DISMANTLE */
+
 const DEFCON = {
     NORMAL: 5,
     CAUTION: 4,
