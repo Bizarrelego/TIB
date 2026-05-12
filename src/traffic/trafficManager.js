@@ -43,6 +43,7 @@ const TrafficManager = {
             }
         };
 
+        /* global Profiler */
         if (typeof Profiler !== 'undefined' && Profiler.wrap) {
             Profiler.wrap('TrafficManager', runLogic);
         } else {
@@ -126,8 +127,6 @@ const TrafficManager = {
     },
 
     resolveDeadlocks() {
-        const visited = new Set();
-        const recursionStack = new Set();
         const dependencyGraph = new Map();
 
         const targetPositions = new Map();
