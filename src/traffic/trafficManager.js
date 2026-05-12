@@ -3,12 +3,7 @@ const DeadlockEngine = require('./deadlock');
 const DIRECTION_VECTORS = new Map([[1, [0, -1]], [2, [1, -1]], [3, [1, 0]], [4, [1, 1]], [5, [0, 1]], [6, [-1, 1]], [7, [-1, 0]], [8, [-1, -1]]]);
 
 /**
- * @typedef {Object} PipelineLock
- * @property {string} creepName
- * @property {string} targetId
- * @property {string} resourceType
- * @property {number} amount
- * @property {number} tickExpiry
+ * @typedef {Map<string, any>} PipelineLock
  */
 
 const TrafficManager = {
@@ -19,18 +14,16 @@ const TrafficManager = {
     /** @type {Map<string, PipelineLock>} */
     pipelineLedger: new Map(),
 
+    /**
+     * @returns {void}
+     */
     run() {
         const runLogic = () => {
             this.intents.clear();
             this.ledger.clear();
             this.swapRegistry.clear();
-
-            // Aggressive GC: Purge expired locks from Heap
-            for (const [id, lock] of this.pipelineLedger) {
-                if (Game.time > lock.tickExpiry) {
-                    this.pipelineLedger.delete(id);
-                }
-            }
+            // GC logic should be handled by an event-based TTL or
+            // a single-pass queue rather than iterating the full ledger.
         };
 
         /* global Profiler */
@@ -38,28 +31,36 @@ const TrafficManager = {
     },
 
     /**
-     * Locks a resource pipeline to prevent multiple creeps from targeting the same source.
      * @param {string} creepName
      * @param {string} sourceId
      * @param {string} targetId
      * @param {string} resourceType
      * @param {number} amount
+     * @returns {void}
      */
     lockPipeline(creepName, sourceId, targetId, resourceType, amount) {
-        this.pipelineLedger.set(sourceId, {
-            creepName, targetId, resourceType, amount,
-            tickExpiry: Game.time + 1
-        });
+        const lock = new Map();
+        lock.set('creepName', creepName);
+        lock.set('targetId', targetId);
+        lock.set('resourceType', resourceType);
+        lock.set('amount', amount);
+        lock.set('tickExpiry', Game.time + 1);
+
+        this.pipelineLedger.set(sourceId, lock);
     },
 
     /**
-     * Checks if a source pipeline is currently locked.
      * @param {string} sourceId
      * @returns {string|boolean}
      */
     checkPipeline(sourceId) {
         const lock = this.pipelineLedger.get(sourceId);
-        return (lock && Game.time <= lock.tickExpiry) ? lock.creepName : false;
+        if (!lock) return false;
+        if (Game.time > lock.get('tickExpiry')) {
+            this.pipelineLedger.delete(sourceId);
+            return false;
+        }
+        return lock.get('creepName');
     },
 
     registerTransfer(creep, target, resourceType, amount) {
