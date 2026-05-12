@@ -42,10 +42,11 @@ module.exports = function discoveryManager() {
         const room = Game.rooms[roomName];
 
         if (state.scannedRooms.has(roomName)) {
-            state.eventCache.set(roomName, room.getEventLog());
-
             // Only run the heavy native polling if the room isn't already initialized in State
             if (!state.structuresByRoom.has(roomName)) {
+                // Cache event log to establish baseline during init. Should not be polled here after init.
+                state.eventCache.set(roomName, room.getEventLog());
+
                 // Populate structuresByRoom and structureCache
                 const roomStructures = new Map();
                 const structures = room.find(FIND_STRUCTURES);
