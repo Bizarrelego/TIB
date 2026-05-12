@@ -129,11 +129,13 @@ jobs:
           echo "${delimiter}" >> "$GITHUB_OUTPUT"
 
       - name: Submit GitHub PR Comment
+        env:
+          # Map outputs to env vars to prevent syntax shattering on Bash evaluation
+          FEEDBACK: ${{ steps.gemini-check.outputs.feedback }}
         run: |
-          (
-            echo "@jules"
-            echo "${{ steps.gemini-check.outputs.feedback }}"
-          ) > formatted_review.txt
+          echo "@jules" > formatted_review.txt
+          echo "" >> formatted_review.txt
+          echo "$FEEDBACK" >> formatted_review.txt
           
           PAYLOAD=$(jq -Rs '{body: .}' formatted_review.txt)
           
