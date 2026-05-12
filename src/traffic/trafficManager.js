@@ -3,7 +3,12 @@ const DeadlockEngine = require('./deadlock');
 const DIRECTION_VECTORS = new Map([[1, [0, -1]], [2, [1, -1]], [3, [1, 0]], [4, [1, 1]], [5, [0, 1]], [6, [-1, 1]], [7, [-1, 0]], [8, [-1, -1]]]);
 
 /**
- * @typedef {Map<string, any>} PipelineLock
+ * @typedef {Object} PipelineLock
+ * @property {string} creepName
+ * @property {string} targetId
+ * @property {string} resourceType
+ * @property {number} amount
+ * @property {number} tickExpiry
  */
 
 const TrafficManager = {
@@ -22,8 +27,11 @@ const TrafficManager = {
             this.intents.clear();
             this.ledger.clear();
             this.swapRegistry.clear();
-            // GC logic should be handled by an event-based TTL or
-            // a single-pass queue rather than iterating the full ledger.
+            for (const [id, lock] of this.pipelineLedger) {
+                if (Game.time > lock.tickExpiry) {
+                    this.pipelineLedger.delete(id);
+                }
+            }
         };
 
         /* global Profiler */
@@ -39,14 +47,13 @@ const TrafficManager = {
      * @returns {void}
      */
     lockPipeline(creepName, sourceId, targetId, resourceType, amount) {
-        const lock = new Map();
-        lock.set('creepName', creepName);
-        lock.set('targetId', targetId);
-        lock.set('resourceType', resourceType);
-        lock.set('amount', amount);
-        lock.set('tickExpiry', Game.time + 1);
-
-        this.pipelineLedger.set(sourceId, lock);
+        this.pipelineLedger.set(sourceId, {
+            creepName,
+            targetId,
+            resourceType,
+            amount,
+            tickExpiry: Game.time + 1
+        });
     },
 
     /**
@@ -56,11 +63,11 @@ const TrafficManager = {
     checkPipeline(sourceId) {
         const lock = this.pipelineLedger.get(sourceId);
         if (!lock) return false;
-        if (Game.time > lock.get('tickExpiry')) {
+        if (Game.time > lock.tickExpiry) {
             this.pipelineLedger.delete(sourceId);
             return false;
         }
-        return lock.get('creepName');
+        return lock.creepName;
     },
 
     registerTransfer(creep, target, resourceType, amount) {
