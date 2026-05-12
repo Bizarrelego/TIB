@@ -89,7 +89,7 @@ module.exports = function stateScanner() {
         }
         let roomLinks = global.State.linksByRoom.get(room.name);
         if (!roomLinks) {
-            roomLinks = {};
+            roomLinks = new Map();
             global.State.linksByRoom.set(room.name, roomLinks);
         }
     }
@@ -180,7 +180,7 @@ module.exports = function stateScanner() {
             if (struct.structureType === STRUCTURE_LINK) {
                 const roomLinks = global.State.linksByRoom.get(struct.room.name);
                 if (roomLinks && struct.room.controller && struct.pos.inRangeTo(struct.room.controller, 3)) {
-                    roomLinks.controllerLink = struct;
+                    roomLinks.set('controllerLink', struct);
                 }
             }
         }
