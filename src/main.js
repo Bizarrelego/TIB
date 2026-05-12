@@ -1,17 +1,22 @@
-const installMemoryProxy = require('./os/memoryProxy');
-const cacheInit = require('./os/cache');
+const discoveryManager = require('./state/discoveryManager');
 const stateScanner = require('./state/stateScanner');
 const colonyManager = require('./colonies/colonyManager');
 const operationsManager = require('./operations/operationsManager');
 const trafficManager = require('./traffic/trafficManager');
-const TowerManager = require('./managers/TowerManager');
-const RoadManager = require('./managers/RoadManager');
 
 module.exports.loop = function () {
-    // Cascading switch statement for hard CPU throttling based on Game.cpu.bucket
-    let skipOperations = false;
-    let skipColonies = false;
+    // Phase 1: Discovery Manager (Raw Engine API execution & global.State Bootstrapping)
+    try {
+        if (discoveryManager) discoveryManager();
+    } catch (e) {
+        console.log(`[Phase 1 Error] Discovery Manager: ${e.stack}`);
+        return; // Fatal OS crash
+    }
+
+    // Cascading CPU Throttling based on Game.cpu.bucket
     let skipState = false;
+    let skipColonies = false;
+    let skipOperations = false;
 
     switch (true) {
         case Game.cpu.bucket < 100:
@@ -27,27 +32,19 @@ module.exports.loop = function () {
             break;
     }
 
-    // Phase 1: OS Init & Cache
-    try {
-        installMemoryProxy();
-        cacheInit();
-    } catch (e) {
-        console.log(`[Phase 1 Error] OS Init: ${e.stack}`);
-    }
-
-    // Phase 2: Global State
+    // Phase 2: State Scanner (Event-driven map updaters)
     if (!skipState) {
         try {
-            stateScanner();
+            if (stateScanner) stateScanner();
         } catch (e) {
-            console.log(`[Phase 2 Error] Global State: ${e.stack}`);
+            console.log(`[Phase 2 Error] Global State Scanner: ${e.stack}`);
         }
     }
 
     // Phase 3: Colonies
     if (!skipColonies) {
         try {
-            colonyManager();
+            if (colonyManager) colonyManager();
         } catch (e) {
             console.log(`[Phase 3 Error] Colonies: ${e.stack}`);
         }
@@ -56,7 +53,7 @@ module.exports.loop = function () {
     // Phase 4: Operations
     if (!skipOperations) {
         try {
-            operationsManager();
+            if (operationsManager) operationsManager();
         } catch (e) {
             console.log(`[Phase 4 Error] Operations: ${e.stack}`);
         }
@@ -64,36 +61,16 @@ module.exports.loop = function () {
 
     // Phase 5: Traffic Control
     try {
-        trafficManager.run();
+        if (trafficManager && trafficManager.run) trafficManager.run();
     } catch (e) {
         console.log(`[Phase 5 Error] Traffic Control: ${e.stack}`);
     }
 
-    // Tower Manager Loop
-    for (const room of Object.values(Game.rooms)) {
-        if (room.controller && room.controller.my === true) {
-            try {
-                TowerManager.run(room);
-            } catch (e) {
-                console.log(`[TowerManager Loop Error] Room ${room.name}: ${e.stack}`);
-            }
-        }
-    }
-
-    // Road Manager Loop
-    for (const room of Object.values(Game.rooms)) {
-        if (room.controller && room.controller.my === true) {
-            try {
-                RoadManager.run(room);
-            } catch (e) {
-                console.log(`[RoadManager Loop Error] Room ${room.name}: ${e.stack}`);
-            }
-        }
-    }
-
     // Phase 6: Intents & Sleep
     try {
-        // Execute deferred intents and sleep idle creeps
+        if (trafficManager && trafficManager.executeIntents) {
+            trafficManager.executeIntents();
+        }
     } catch (e) {
         console.log(`[Phase 6 Error] Intents & Sleep: ${e.stack}`);
     }
