@@ -90,7 +90,7 @@ function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsE
             if (controllerNeedsEnergy && hubLinkState.free > 0) {
                 const amount = Math.min(creepState.used, hubLinkState.free);
                 if (TrafficManager.registerTransfer(creep, hubLink, RESOURCE_ENERGY, amount) === OK) {
-                    TrafficManager.lockPipeline(creep.name, creep.id, hubLink.id, RESOURCE_ENERGY, amount);
+                    TrafficManager.lockPipeline(creep.name, creep.id, hubLink.id, RESOURCE_ENERGY, amount, 'TRANSFER');
                     actionRegistered = true;
                 }
             }
@@ -98,7 +98,7 @@ function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsE
             else if (terminal && terminalState.free > 0 && storageState.used > 100000 && !controllerNeedsEnergy && hubLinkState.used === 0) {
                  const amount = Math.min(creepState.used, terminalState.free);
                  if (TrafficManager.registerTransfer(creep, terminal, RESOURCE_ENERGY, amount) === OK) {
-                     TrafficManager.lockPipeline(creep.name, creep.id, terminal.id, RESOURCE_ENERGY, amount);
+                     TrafficManager.lockPipeline(creep.name, creep.id, terminal.id, RESOURCE_ENERGY, amount, 'TRANSFER');
                      actionRegistered = true;
                  }
             }
@@ -106,7 +106,7 @@ function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsE
             else if (storageState.free > 0) {
                 const amount = Math.min(creepState.used, storageState.free);
                 if (TrafficManager.registerTransfer(creep, storage, RESOURCE_ENERGY, amount) === OK) {
-                    TrafficManager.lockPipeline(creep.name, creep.id, storage.id, RESOURCE_ENERGY, amount);
+                    TrafficManager.lockPipeline(creep.name, creep.id, storage.id, RESOURCE_ENERGY, amount, 'TRANSFER');
                     actionRegistered = true;
                 }
             }
@@ -116,7 +116,7 @@ function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsE
             if (!controllerNeedsEnergy && hubLinkState.used > 0) {
                 const amount = Math.min(creepState.free, hubLinkState.used);
                 if (TrafficManager.registerWithdraw(creep, hubLink, RESOURCE_ENERGY, amount) === OK) {
-                    TrafficManager.lockPipeline(creep.name, creep.id, hubLink.id, RESOURCE_ENERGY, amount);
+                    TrafficManager.lockPipeline(creep.name, creep.id, hubLink.id, RESOURCE_ENERGY, amount, 'WITHDRAW');
                     actionRegistered = true;
                 }
             }
@@ -124,7 +124,7 @@ function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsE
             else if (controllerNeedsEnergy && hubLinkState.free > 0 && storageState.used > 0) {
                 const amount = Math.min(creepState.free, storageState.used);
                 if (TrafficManager.registerWithdraw(creep, storage, RESOURCE_ENERGY, amount) === OK) {
-                    TrafficManager.lockPipeline(creep.name, creep.id, storage.id, RESOURCE_ENERGY, amount);
+                    TrafficManager.lockPipeline(creep.name, creep.id, storage.id, RESOURCE_ENERGY, amount, 'WITHDRAW');
                     actionRegistered = true;
                 }
             }
@@ -132,7 +132,7 @@ function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsE
             else if (terminal && terminalState.free > 0 && storageState.used > 100000 && !controllerNeedsEnergy && hubLinkState.used === 0) {
                 const amount = Math.min(creepState.free, storageState.used);
                 if (TrafficManager.registerWithdraw(creep, storage, RESOURCE_ENERGY, amount) === OK) {
-                    TrafficManager.lockPipeline(creep.name, creep.id, storage.id, RESOURCE_ENERGY, amount);
+                    TrafficManager.lockPipeline(creep.name, creep.id, storage.id, RESOURCE_ENERGY, amount, 'WITHDRAW');
                     actionRegistered = true;
                 }
             }
