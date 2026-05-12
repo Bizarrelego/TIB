@@ -51,14 +51,11 @@ const DeadlockEngine = {
         let lowestPriorityCreep = null;
 
         for (const creepName of cycle) {
-            let priority = ROLE_PRIORITIES.default;
+            let priority = ROLE_PRIORITIES.get('default');
             const liveCreep = global.State && global.State.creepLookup ? global.State.creepLookup.get(creepName) : null;
 
             if (liveCreep && liveCreep.memory && liveCreep.memory.role) {
-                priority = ROLE_PRIORITIES[liveCreep.memory.role];
-                if (priority === undefined) {
-                    priority = ROLE_PRIORITIES.default;
-                }
+                priority = ROLE_PRIORITIES.get(liveCreep.memory.role) ?? ROLE_PRIORITIES.get('default');
             }
 
             if (priority < lowestPriority) {
