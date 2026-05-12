@@ -83,68 +83,41 @@ const TrafficManager = {
     },
 
     getVirtualState(target, resourceType) {
-        if (!global.State || !global.State.ledger) return { used: 0, free: 0 };
+        const ledger = global.State.ledger;
+        if (!ledger) return { used: 0, free: 0 };
 
-        const capacityKey = `${target.id}_cap_${resourceType}`;
-        const usedKey = `${target.id}_used_${resourceType}`;
-
-        if (!global.State.ledger.has(usedKey)) {
-            let used = 0;
-            let cap = 0;
-            if (target.store) {
-                used = target.store[resourceType] || 0;
-                cap = target.store.getCapacity ? target.store.getCapacity(resourceType) || 0 : 0;
-            } else if (target.energy !== undefined) {
-                used = target.energy || 0;
-                cap = target.energyCapacity || 0;
-            }
-            global.State.ledger.set(usedKey, used);
-            global.State.ledger.set(capacityKey, cap);
-        }
-
-        const currentUsed = global.State.ledger.get(usedKey);
-        const currentCap = global.State.ledger.get(capacityKey);
-
-        return {
-            used: currentUsed,
-            free: currentCap - currentUsed
-        };
+        const state = ledger.get(target.id) || { used: target.store ? target.store.getUsedCapacity(resourceType) : 0, cap: target.store ? target.store.getCapacity(resourceType) : 0 };
+        return { used: state.used, free: state.cap - state.used };
     },
 
     registerTransfer(creep, target, resourceType, amount) {
-        if (!global.State || !global.State.ledger) return ERR_FULL;
+        const ledger = global.State.ledger;
+        if (!ledger) return ERR_FULL;
 
-        const state = this.getVirtualState(target, resourceType);
-        if (state.free < amount) {
-            return ERR_FULL;
-        }
+        const targetState = this.getVirtualState(target, resourceType);
+        if (targetState.free < amount) return ERR_FULL;
 
-        const usedKey = `${target.id}_used_${resourceType}`;
-        global.State.ledger.set(usedKey, state.used + amount);
+        ledger.set(target.id, { used: targetState.used + amount, cap: targetState.cap });
 
-        const creepUsedKey = `${creep.id}_used_${resourceType}`;
         const creepState = this.getVirtualState(creep, resourceType);
-        global.State.ledger.set(creepUsedKey, creepState.used - amount);
+        ledger.set(creep.id, { used: creepState.used - amount, cap: creepState.cap });
 
-        return creep.transfer(target, resourceType, amount);
+        return OK;
     },
 
     registerWithdraw(creep, target, resourceType, amount) {
-        if (!global.State || !global.State.ledger) return ERR_NOT_ENOUGH_RESOURCES;
+        const ledger = global.State.ledger;
+        if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
 
-        const state = this.getVirtualState(target, resourceType);
-        if (state.used < amount) {
-            return ERR_NOT_ENOUGH_RESOURCES;
-        }
+        const targetState = this.getVirtualState(target, resourceType);
+        if (targetState.used < amount) return ERR_NOT_ENOUGH_RESOURCES;
 
-        const usedKey = `${target.id}_used_${resourceType}`;
-        global.State.ledger.set(usedKey, state.used - amount);
+        ledger.set(target.id, { used: targetState.used - amount, cap: targetState.cap });
 
-        const creepUsedKey = `${creep.id}_used_${resourceType}`;
         const creepState = this.getVirtualState(creep, resourceType);
-        global.State.ledger.set(creepUsedKey, creepState.used + amount);
+        ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
 
-        return creep.withdraw(target, resourceType, amount);
+        return OK;
     },
 
     /**
