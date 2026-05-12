@@ -1,7 +1,7 @@
 const eventBus = require('../os/eventBus');
 
 /**
- * @typedef {Object} HubHeap
+ * @typedef {Object} HubState
  * @property {RoomPosition|null} parkPos
  * @property {string} state
  */
@@ -54,12 +54,7 @@ function run(room) {
         const controllerState = controllerLink ? TrafficManager.getVirtualState(controllerLink, RESOURCE_ENERGY) : null;
         const controllerNeedsEnergy = controllerState && controllerState.used < 400;
 
-        const hubManagersMap = new Map();
-        for (let i = 0; i < hubManagers.length; i++) {
-            hubManagersMap.set(hubManagers[i].id, hubManagers[i]);
-        }
-
-        process(room, hubManagersMap, hubLink, storage, terminal, controllerNeedsEnergy, TrafficManager);
+        process(room, hubManagers, hubLink, storage, terminal, controllerNeedsEnergy, TrafficManager);
     } catch (e) {
         console.log(`[HubManager Manager Error] Room ${room.name}: ${e.stack}`);
     }
@@ -67,7 +62,7 @@ function run(room) {
 
 /**
  * @param {Room} room
- * @param {Map<string, Creep>} hubManagers
+ * @param {Creep[]} hubManagers
  * @param {StructureLink} hubLink
  * @param {StructureStorage} storage
  * @param {StructureTerminal} terminal
@@ -76,17 +71,22 @@ function run(room) {
  * @returns {void}
  */
 function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsEnergy, TrafficManager) {
-    // Corrected: Use Map iteration for O(N) efficiency
-    for (const [id, creep] of hubManagers) {
+    if (!global.Heap) global.Heap = {};
+    if (!global.Heap.hubManagers) global.Heap.hubManagers = new Map();
+
+    for (let i = 0; i < hubManagers.length; i++) {
+        const creep = hubManagers[i];
+        const id = creep.id;
+
+        if (creep.fatigue > 0) continue;
         if (TrafficManager.checkPipeline(id)) continue;
 
-        // Corrected: Rehydrate from global.State on initialization
         if (!global.Heap.hubManagers.has(id)) {
-            const pos = global.State.intel?.get(room.name)?.hubPos;
+            const pos = global.State.intel?.get(room.name)?.hubPos || null;
             global.Heap.hubManagers.set(id, { parkPos: pos, state: 'IDLE' });
         }
 
-        const heap = global.Heap.hubManagers.get(id);
+        const heap = /** @type {HubState} */ (global.Heap.hubManagers.get(id));
 
         const creepState = TrafficManager.getVirtualState(creep, RESOURCE_ENERGY);
         const hubLinkState = TrafficManager.getVirtualState(hubLink, RESOURCE_ENERGY);

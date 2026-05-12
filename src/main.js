@@ -10,8 +10,6 @@ module.exports.loop = function () {
     if (!global.Cache) {
         CacheRegistry.init();
     }
-    if (!global.Heap) global.Heap = {};
-    if (!global.Heap.hubManagers) global.Heap.hubManagers = new Map();
 
     // Phase 1: Discovery Manager (Raw Engine API execution & global.State Bootstrapping)
     try {
