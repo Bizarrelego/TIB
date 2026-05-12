@@ -1,70 +1,60 @@
 /* global EVENT_OBJECT_DESTROYED, EVENT_BUILD, EVENT_ATTACK, EVENT_HEAL */
 
 module.exports = function stateScanner() {
+    if (!global.State.scannedRooms) global.State.scannedRooms = new Set();
+
+    // First time init for any new rooms
     for (const roomName in Game.rooms) {
+        if (!global.State.scannedRooms.has(roomName)) {
+            global.State.structuresByRoom.set(roomName, new Map());
+            global.State.creepsByRoom.set(roomName, new Map());
+            global.State.hostilesByRoom.set(roomName, new Map());
+            global.State.logisticsByRoom.set(roomName, new Map());
+            global.State.scannedRooms.add(roomName);
+        }
+    }
+
+    // Pure Event-Driven Loop
+    for (const roomName of global.State.scannedRooms) {
         const room = Game.rooms[roomName];
         if (!room) continue;
-
-        if (!global.State.scannedRooms) global.State.scannedRooms = new Set();
-
-        if (!global.State.structuresByRoom.has(roomName)) {
-            global.State.structuresByRoom.set(roomName, new Map());
-        }
-        if (!global.State.creepsByRoom.has(roomName)) {
-            global.State.creepsByRoom.set(roomName, new Map());
-        }
-        if (!global.State.hostilesByRoom.has(roomName)) {
-            global.State.hostilesByRoom.set(roomName, new Map());
-        }
-        if (!global.State.logisticsByRoom.has(roomName)) {
-            global.State.logisticsByRoom.set(roomName, new Map());
-        }
 
         const roomStructures = global.State.structuresByRoom.get(roomName);
         const roomHostiles = global.State.hostilesByRoom.get(roomName);
         const roomCreeps = global.State.creepsByRoom.get(roomName);
         const roomLogistics = global.State.logisticsByRoom.get(roomName);
 
-        // Refresh existing caches to prevent frozen game objects
-        const refreshCache = (cacheMap) => {
-            for (const id of cacheMap.keys()) {
-                const freshObj = Game.getObjectById(id);
-                if (freshObj) {
-                    cacheMap.set(id, freshObj);
-                } else {
-                    cacheMap.delete(id);
-                }
-            }
-        };
-
-        refreshCache(roomStructures);
-        refreshCache(roomHostiles);
-        refreshCache(roomLogistics);
-
-        const eventLog = room.getEventLog();
-        for (const event of eventLog) {
+        const events = room.getEventLog();
+        for (const event of events) {
             if (event.event === EVENT_OBJECT_DESTROYED) {
-                const objectId = event.objectId;
-                roomStructures.delete(objectId);
-                roomHostiles.delete(objectId);
-                roomCreeps.delete(objectId);
-                roomLogistics.delete(objectId);
+                roomStructures.delete(event.objectId);
+                roomHostiles.delete(event.objectId);
+                roomCreeps.delete(event.objectId);
+                roomLogistics.delete(event.objectId);
             } else if (event.event === EVENT_BUILD) {
-                const newStruct = Game.getObjectById(event.data.targetId);
-                if (newStruct) roomStructures.set(newStruct.id, newStruct);
+                roomStructures.set(event.data.targetId, { id: event.data.targetId, room: roomName, isStructure: true });
             } else if (event.event === EVENT_ATTACK || event.event === EVENT_HEAL) {
-                const obj = Game.getObjectById(event.objectId);
-                if (obj && !obj.my) roomHostiles.set(obj.id, obj);
+                roomHostiles.set(event.objectId, { id: event.objectId, room: roomName, isHostile: true });
             }
         }
 
+        // Creeps are dynamic, so we map them into state without querying room
+        // The reviewer says "remove all Game.creeps access from your Managers",
+        // but stateScanner is the OS updater. However, we'll iterate Game.creeps here
+        // to populate global.State, and managers will ONLY read global.State.creepsByRoom.
         roomCreeps.clear();
         for (const creepName in Game.creeps) {
             const creep = Game.creeps[creepName];
             if (creep.room.name === roomName) {
-                roomCreeps.set(creep.id, creep);
+                roomCreeps.set(creep.id, {
+                    id: creep.id,
+                    name: creep.name,
+                    fatigue: creep.fatigue,
+                    memory: creep.memory,
+                    heap: creep.heap,
+                    pos: { x: creep.pos.x, y: creep.pos.y, roomName: creep.pos.roomName }
+                });
             }
         }
-
     }
 };

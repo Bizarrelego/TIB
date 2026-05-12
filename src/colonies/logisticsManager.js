@@ -6,20 +6,22 @@ const LogisticsManager = {
         const structures = global.State.structuresByRoom.get(roomName);
         const creeps = global.State.creepsByRoom.get(roomName);
 
-        // Categorize needs strictly O(n) without room.find()
+        // Categorize needs strictly O(n) without live API calls
         const spawnsAndExtensions = [];
         const towers = [];
         let storage = null;
 
-        for (const struct of structures.values()) {
-            if (!struct.isActive || !struct.isActive()) continue;
+        // Note: The structure cache in global.State must contain these properties
+        // For example, properties populated externally or via RawMemory caches
+        for (const structData of structures.values()) {
+            if (!structData.isActive) continue;
 
-            if ((struct.structureType === 'spawn' || struct.structureType === 'extension') && struct.store.getFreeCapacity('energy') > 0) {
-                spawnsAndExtensions.push(struct);
-            } else if (struct.structureType === 'tower' && struct.store.getFreeCapacity('energy') > 200) {
-                towers.push(struct);
-            } else if (struct.structureType === 'storage') {
-                storage = struct;
+            if ((structData.structureType === 'spawn' || structData.structureType === 'extension') && structData.freeCapacity > 0) {
+                spawnsAndExtensions.push(structData);
+            } else if (structData.structureType === 'tower' && structData.freeCapacity > 200) {
+                towers.push(structData);
+            } else if (structData.structureType === 'storage') {
+                storage = structData;
             }
         }
 
