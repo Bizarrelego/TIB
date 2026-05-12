@@ -23,19 +23,23 @@ const TrafficManager = {
      * @returns {void}
      */
     run() {
-        const runLogic = () => {
-            this.intents.clear();
-            this.ledger.clear();
-            this.swapRegistry.clear();
-            for (const [id, lock] of this.pipelineLedger) {
-                if (Game.time > lock.tickExpiry) {
-                    this.pipelineLedger.delete(id);
+        try {
+            const runLogic = () => {
+                this.intents.clear();
+                this.ledger.clear();
+                this.swapRegistry.clear();
+                for (const [id, lock] of this.pipelineLedger) {
+                    if (Game.time > lock.tickExpiry) {
+                        this.pipelineLedger.delete(id);
+                    }
                 }
-            }
-        };
+            };
 
-        /* global Profiler */
-        typeof Profiler !== 'undefined' ? Profiler.wrap('TrafficManager', runLogic) : runLogic();
+            /* global Profiler */
+            typeof Profiler !== 'undefined' ? Profiler.wrap('TrafficManager', runLogic) : runLogic();
+        } catch (e) {
+            console.log(`TrafficManager CRITICAL: ${e.stack}`);
+        }
     },
 
     /**
@@ -63,10 +67,6 @@ const TrafficManager = {
     checkPipeline(sourceId) {
         const lock = this.pipelineLedger.get(sourceId);
         if (!lock) return false;
-        if (Game.time > lock.tickExpiry) {
-            this.pipelineLedger.delete(sourceId);
-            return false;
-        }
         return lock.creepName;
     },
 
