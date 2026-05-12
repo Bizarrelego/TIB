@@ -1,29 +1,17 @@
 const eventBus = require('../os/eventBus');
 
-function findParkPos(hubLink, storage, room) {
-    const terrain = global.State.roomTerrain.get(room.name);
-    for (let dx = -1; dx <= 1; dx++) {
-        for (let dy = -1; dy <= 1; dy++) {
-            if (dx === 0 && dy === 0) continue;
-            const tx = hubLink.pos.x + dx;
-            const ty = hubLink.pos.y + dy;
-            
-            // Check if adjacent to storage and walkable
-            if (Math.abs(storage.pos.x - tx) <= 1 && Math.abs(storage.pos.y - ty) <= 1) {
-                if (terrain && terrain.get(tx, ty) !== TERRAIN_MASK_WALL) {
-                    return { x: tx, y: ty, roomName: room.name };
-                }
-            }
-        }
-    }
-    return { x: hubLink.pos.x, y: hubLink.pos.y, roomName: room.name };
-}
+/**
+ * @typedef {Object} HubHeap
+ * @property {RoomPosition|null} parkPos
+ * @property {string} state
+ */
 
+/**
+ * @param {Room} room
+ * @returns {void}
+ */
 function run(room) {
     try {
-        if (!global.Heap) global.Heap = {};
-        if (!global.Heap.hubManagers) global.Heap.hubManagers = new Map();
-
         const roomCreeps = global.State.creepsByRoom.get(room.name);
         if (!roomCreeps) return;
 
@@ -72,21 +60,25 @@ function run(room) {
     }
 }
 
+/**
+ * @param {Room} room
+ * @param {Creep[]} hubManagers
+ * @param {StructureLink} hubLink
+ * @param {StructureStorage} storage
+ * @param {StructureTerminal} terminal
+ * @param {boolean} controllerNeedsEnergy
+ * @param {Object} TrafficManager
+ */
 function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsEnergy, TrafficManager) {
-    for (let i = 0; i < hubManagers.length; i++) {
-        const creep = hubManagers[i];
-
+    for (const creep of hubManagers) {
         if (creep.fatigue > 0) continue;
         if (TrafficManager.checkPipeline(creep.id)) continue;
 
         if (!global.Heap.hubManagers.has(creep.id)) {
-            global.Heap.hubManagers.set(creep.id, { parkPos: null });
+            global.Heap.hubManagers.set(creep.id, { parkPos: global.State.intel?.get(room.name)?.hubPos, state: 'IDLE' });
         }
         const heap = global.Heap.hubManagers.get(creep.id);
-
-        if (!heap.parkPos) {
-            heap.parkPos = findParkPos(hubLink, storage, room);
-        }
+        creep.heap = heap;
 
         const creepState = TrafficManager.getVirtualState(creep, RESOURCE_ENERGY);
         const hubLinkState = TrafficManager.getVirtualState(hubLink, RESOURCE_ENERGY);
