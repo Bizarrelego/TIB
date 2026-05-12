@@ -90,6 +90,7 @@ function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsE
             if (controllerNeedsEnergy && hubLinkState.free > 0) {
                 const amount = Math.min(creepState.used, hubLinkState.free);
                 if (TrafficManager.registerTransfer(creep, hubLink, RESOURCE_ENERGY, amount) === OK) {
+                    TrafficManager.lockPipeline(creep.name, creep.id, hubLink.id, RESOURCE_ENERGY, amount);
                     actionRegistered = true;
                 }
             }
@@ -97,6 +98,7 @@ function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsE
             else if (terminal && terminalState.free > 0 && storageState.used > 100000 && !controllerNeedsEnergy && hubLinkState.used === 0) {
                  const amount = Math.min(creepState.used, terminalState.free);
                  if (TrafficManager.registerTransfer(creep, terminal, RESOURCE_ENERGY, amount) === OK) {
+                     TrafficManager.lockPipeline(creep.name, creep.id, terminal.id, RESOURCE_ENERGY, amount);
                      actionRegistered = true;
                  }
             }
@@ -104,6 +106,7 @@ function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsE
             else if (storageState.free > 0) {
                 const amount = Math.min(creepState.used, storageState.free);
                 if (TrafficManager.registerTransfer(creep, storage, RESOURCE_ENERGY, amount) === OK) {
+                    TrafficManager.lockPipeline(creep.name, creep.id, storage.id, RESOURCE_ENERGY, amount);
                     actionRegistered = true;
                 }
             }
@@ -113,6 +116,7 @@ function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsE
             if (!controllerNeedsEnergy && hubLinkState.used > 0) {
                 const amount = Math.min(creepState.free, hubLinkState.used);
                 if (TrafficManager.registerWithdraw(creep, hubLink, RESOURCE_ENERGY, amount) === OK) {
+                    TrafficManager.lockPipeline(creep.name, creep.id, hubLink.id, RESOURCE_ENERGY, amount);
                     actionRegistered = true;
                 }
             }
@@ -120,6 +124,7 @@ function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsE
             else if (controllerNeedsEnergy && hubLinkState.free > 0 && storageState.used > 0) {
                 const amount = Math.min(creepState.free, storageState.used);
                 if (TrafficManager.registerWithdraw(creep, storage, RESOURCE_ENERGY, amount) === OK) {
+                    TrafficManager.lockPipeline(creep.name, creep.id, storage.id, RESOURCE_ENERGY, amount);
                     actionRegistered = true;
                 }
             }
@@ -127,6 +132,7 @@ function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsE
             else if (terminal && terminalState.free > 0 && storageState.used > 100000 && !controllerNeedsEnergy && hubLinkState.used === 0) {
                 const amount = Math.min(creepState.free, storageState.used);
                 if (TrafficManager.registerWithdraw(creep, storage, RESOURCE_ENERGY, amount) === OK) {
+                    TrafficManager.lockPipeline(creep.name, creep.id, storage.id, RESOURCE_ENERGY, amount);
                     actionRegistered = true;
                 }
             }
@@ -136,6 +142,45 @@ function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsE
         if (creepState.used === 0 && !actionRegistered) {
             creep.heap.state = 'SLEEP';
         }
+
+        if (actionRegistered) {
+            executeTransfer(creep);
+        }
+    }
+}
+
+/**
+ * Executes the cached transfer/withdraw intent based on Sub-Tick Ledger values.
+ * Follows Fatigue Gating and zero-redundancy execution principles.
+ * @param {object} creep The hubManager creep.
+ * @returns {void}
+ */
+function executeTransfer(creep) {
+    if (!creep || creep.fatigue > 0) return;
+
+    try {
+        const TrafficManager = require('../traffic/trafficManager');
+        const lock = TrafficManager.checkPipeline(creep.id);
+
+        // Ensure no conflicting movement intents exist
+        if (lock !== creep.name || (global.State.trafficIntents && global.State.trafficIntents.has(creep.name))) {
+            return;
+        }
+
+        const intent = global.State.pipelineLedger.get(creep.id);
+        if (!intent || !intent.targetId) return;
+
+        const target = Game.getObjectById(intent.targetId);
+        if (!target) return;
+
+        // If the creep has energy, the intent must be a transfer. Otherwise it's a withdraw.
+        if (creep.store && creep.store.getUsedCapacity() > 0) {
+            creep.transfer(target, intent.resourceType);
+        } else {
+            creep.withdraw(target, intent.resourceType);
+        }
+    } catch (e) {
+        console.error(`[HubManager] Execute Error on ${creep.name}: ${e.stack}`);
     }
 }
 
