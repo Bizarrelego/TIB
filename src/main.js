@@ -1,4 +1,4 @@
-const { cacheInit, CacheRegistry } = require('./os/cache');
+const { CacheRegistry } = require('./os/cache');
 const discoveryManager = require('./state/discoveryManager');
 const stateScanner = require('./state/stateScanner');
 const colonyManager = require('./colonies/colonyManager');
@@ -7,15 +7,8 @@ const trafficManager = require('./traffic/trafficManager');
 
 module.exports.loop = function () {
     // Initialize OS cache
-    cacheInit();
-
-    // Heap Rehydration Protocol
-    if (!global.Cache.get('isInitialized')) {
-        const startCpu = Game.cpu.getUsed();
-        CacheRegistry.runAll();
-        const elapsed = Game.cpu.getUsed() - startCpu;
-        console.log(`[Profiler] Heap Rehydration Protocol executed in ${elapsed.toFixed(3)} ms.`);
-        global.Cache.set('isInitialized', true);
+    if (!global.Cache) {
+        CacheRegistry.init();
     }
 
     // Phase 1: Discovery Manager (Raw Engine API execution & global.State Bootstrapping)

@@ -1,7 +1,14 @@
 /* global EVENT_OBJECT_DESTROYED, EVENT_ATTACK, EVENT_HEAL */
+const { CacheRegistry } = require('../os/cache');
 
 module.exports = function stateScanner() {
     if (!global.State || !global.State.scannedRooms) return;
+
+    // Event-Driven Hydration: Synchronize global.Cache
+    if (global.State.getSegment) {
+        CacheRegistry.hydrate('creeps', global.State.getSegment(1) || {});
+        CacheRegistry.hydrate('structures', global.State.getSegment(0) || {});
+    }
 
     // Pure Event-Driven Consumer Loop
     for (const roomName of global.State.scannedRooms) {
