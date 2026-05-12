@@ -11,7 +11,10 @@ module.exports.loop = function () {
 
     // Heap Rehydration Protocol
     if (!global.isInitialized) {
+        const startCpu = Game.cpu.getUsed();
         CacheRegistry.runAll();
+        const elapsed = Game.cpu.getUsed() - startCpu;
+        console.log(`[Profiler] Heap Rehydration Protocol executed in ${elapsed.toFixed(3)} ms.`);
         global.isInitialized = true;
     }
 

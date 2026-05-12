@@ -1,42 +1,25 @@
-class CacheRegistryClass {
-    constructor() {
-        this.callbacks = new Map();
-    }
-
-    register(key, rehydrationFn) {
-        this.callbacks.set(key, rehydrationFn);
-    }
-
+const CacheRegistry = new class {
+    constructor() { this.callbacks = new Map(); }
+    register(key, fn) { this.callbacks.set(key, fn); }
     runAll() {
         for (const [key, fn] of this.callbacks) {
-            try {
-                fn();
-            } catch (e) {
-                console.log(`[CacheRegistry Error] Failed to rehydrate ${key}: ${e.stack}`);
-            }
+            try { fn(); } catch (e) { console.log(`[CacheRegistry] ${key} failed: ${e.stack}`); }
         }
     }
-}
-
-const CacheRegistry = new CacheRegistryClass();
+};
 
 function cacheInit() {
-    if (!global.Cache) {
-        // Enforcing Map() for all dictionaries
-        global.Cache = new Map();
-        global.Cache.set('structures', new Map());
-        global.Cache.set('creeps', new Map());
-        global.Cache.set('sources', new Map());
-    }
-
-    if (!global.MemoryParsed) {
-        global.MemoryParsed = new Map();
-    } else {
-        RawMemory._parsed = global.MemoryParsed;
+    try {
+        if (!global.Cache) {
+            global.Cache = new Map([
+                ['structures', new Map()],
+                ['creeps', new Map()],
+                ['sources', new Map()]
+            ]);
+        }
+    } catch (e) {
+        console.log(`[Critical] Cache initialization failed: ${e.stack}`);
     }
 }
 
-module.exports = {
-    cacheInit,
-    CacheRegistry
-};
+module.exports = { cacheInit, CacheRegistry };
