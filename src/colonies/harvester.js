@@ -14,7 +14,6 @@ module.exports = {
                 if (!targetId) {
                     const sources = global.State.sourcesByRoom.get(room.name) || [];
                     if (sources.length > 0) {
-                        // Ensure one harvester per source.
                         const assignedSources = new Set();
                         for (const h of harvesters) {
                             if (h.heap && h.heap.targetId) {
@@ -27,7 +26,16 @@ module.exports = {
                             targetId = unminedSource.id;
                             creep.heap.targetId = targetId;
                         } else {
-                            const nearestSource = creep.pos.findClosestByRange(sources);
+                            let nearestSource = null;
+                            let minDistance = Infinity;
+                            for (let i = 0; i < sources.length; i++) {
+                                const dist = Math.max(Math.abs(creep.pos.x - sources[i].pos.x), Math.abs(creep.pos.y - sources[i].pos.y));
+                                if (dist < minDistance) {
+                                    minDistance = dist;
+                                    nearestSource = sources[i];
+                                }
+                            }
+
                             if (nearestSource) {
                                 targetId = nearestSource.id;
                                 creep.heap.targetId = targetId;
@@ -42,13 +50,11 @@ module.exports = {
                         if (creep.harvest(target) === ERR_NOT_IN_RANGE) {
                             movement.moveTo(creep, target);
                         } else {
-                            // Already in range and harvesting. Check if full.
                             if (creep.store.getFreeCapacity() === 0) {
                                 creep.drop(RESOURCE_ENERGY);
                             }
                         }
                     } else {
-                        // Target invalid, reset
                         creep.heap.targetId = null;
                     }
                 }
