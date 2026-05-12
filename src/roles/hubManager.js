@@ -13,22 +13,29 @@ function run(room) {
         try {
             if (creep.fatigue > 0) continue; // Fatigue gating
 
+            // Compatibility for both Map and standard object heap
+            const heapIsMap = creep.heap instanceof Map;
+            const parkPos = heapIsMap ? creep.heap.get('parkPos') : creep.heap.parkPos;
+            const state = heapIsMap ? creep.heap.get('state') : creep.heap.state;
+            const sourceId = heapIsMap ? creep.heap.get('sourceId') : creep.heap.sourceId;
+            const targetId = heapIsMap ? creep.heap.get('targetId') : creep.heap.targetId;
+
             // 1. Move to optimized park position
-            if (creep.heap.parkPos) {
-                if (creep.pos.x !== creep.heap.parkPos.x || creep.pos.y !== creep.heap.parkPos.y) {
-                    movement.moveTo(creep, new RoomPosition(creep.heap.parkPos.x, creep.heap.parkPos.y, creep.heap.parkPos.roomName));
+            if (parkPos) {
+                if (creep.pos.x !== parkPos.x || creep.pos.y !== parkPos.y) {
+                    movement.moveTo(creep, new RoomPosition(parkPos.x, parkPos.y, parkPos.roomName));
                     
                     // Allow intent maximization if adjacent enough during travel
-                    if (!creep.pos.isNearTo(creep.heap.parkPos.x, creep.heap.parkPos.y)) {
+                    if (!creep.pos.isNearTo(parkPos.x, parkPos.y)) {
                         continue;
                     }
                 }
             }
 
             // 2. Execute Assigned Sub-tick Intents
-            if (creep.heap.state === 'fill_link' || creep.heap.state === 'empty_link') {
-                const srcId = creep.heap.sourceId;
-                const tgtId = creep.heap.targetId;
+            if (state === 'fill_link' || state === 'empty_link') {
+                const srcId = sourceId;
+                const tgtId = targetId;
 
                 if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
                     const src = Game.getObjectById(srcId);

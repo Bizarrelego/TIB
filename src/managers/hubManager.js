@@ -7,7 +7,7 @@ function findParkPos(hubLink, storage, room) {
             if (dx === 0 && dy === 0) continue;
             const tx = hubLink.pos.x + dx;
             const ty = hubLink.pos.y + dy;
-            
+
             // Check if adjacent to storage and walkable
             if (Math.abs(storage.pos.x - tx) <= 1 && Math.abs(storage.pos.y - ty) <= 1) {
                 if (terrain && terrain.get(tx, ty) !== TERRAIN_MASK_WALL) {
@@ -69,80 +69,88 @@ function run(room) {
     }
 }
 
+/**
+ * Processes assigned hub managers using standard persistent heap objects.
+ * @param {Room} room - The current room context.
+ * @param {Creep[]} hubManagers - An array of hub manager creeps.
+ * @param {StructureLink} hubLink - The link structure to fill/empty.
+ * @param {StructureStorage} storage - The central storage structure.
+ * @param {StructureTerminal} terminal - The terminal structure for trade.
+ * @param {boolean} controllerNeedsEnergy - State indicator.
+ * @param {import('../traffic/trafficManager')} TrafficManager - Global TrafficManager.
+ */
 function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsEnergy, TrafficManager) {
-    for (let i = 0; i < hubManagers.length; i++) {
-        const creep = hubManagers[i];
-        creep.heap = creep.heap || {};
+    try {
+        for (let i = 0; i < hubManagers.length; i++) {
+            const creep = hubManagers[i];
+            if (creep.fatigue > 0 || TrafficManager.checkPipeline(creep.id)) continue;
 
-        if (!creep.heap.parkPos) {
-            creep.heap.parkPos = findParkPos(hubLink, storage, room);
+            // Enforce Map() usage for O(1) heap lookups
+            if (!(creep.heap instanceof Map)) {
+                creep.heap = new Map();
+            }
+
+            if (!creep.heap.has('parkPos')) {
+                creep.heap.set('parkPos', findParkPos(hubLink, storage, room));
+            }
+
+            const creepState = TrafficManager.getVirtualState(creep, RESOURCE_ENERGY);
+            const hubLinkState = TrafficManager.getVirtualState(hubLink, RESOURCE_ENERGY);
+            const storageState = TrafficManager.getVirtualState(storage, RESOURCE_ENERGY);
+            const terminalState = terminal ? TrafficManager.getVirtualState(terminal, RESOURCE_ENERGY) : null;
+
+            let actionRegistered = false;
+
+            if (creepState.used > 0) {
+                if (controllerNeedsEnergy && hubLinkState.free > 0) {
+                    const amount = Math.min(creepState.used, hubLinkState.free);
+                    if (TrafficManager.registerTransfer(creep, hubLink, RESOURCE_ENERGY, amount) === OK) {
+                        TrafficManager.lockPipeline(creep.name, creep.id, hubLink.id, RESOURCE_ENERGY, amount, 'TRANSFER');
+                        actionRegistered = true;
+                    }
+                } else if (terminal && terminalState.free > 0 && storageState.used > 100000 && !controllerNeedsEnergy && hubLinkState.used === 0) {
+                    const amount = Math.min(creepState.used, terminalState.free);
+                    if (TrafficManager.registerTransfer(creep, terminal, RESOURCE_ENERGY, amount) === OK) {
+                        TrafficManager.lockPipeline(creep.name, creep.id, terminal.id, RESOURCE_ENERGY, amount, 'TRANSFER');
+                        actionRegistered = true;
+                    }
+                } else if (storageState.free > 0) {
+                    const amount = Math.min(creepState.used, storageState.free);
+                    if (TrafficManager.registerTransfer(creep, storage, RESOURCE_ENERGY, amount) === OK) {
+                        TrafficManager.lockPipeline(creep.name, creep.id, storage.id, RESOURCE_ENERGY, amount, 'TRANSFER');
+                        actionRegistered = true;
+                    }
+                }
+                creep.heap.set('state', actionRegistered ? 'SLEEP' : 'transfer');
+            } else if (creepState.free > 0) {
+                if (!controllerNeedsEnergy && hubLinkState.used > 0) {
+                    const amount = Math.min(creepState.free, hubLinkState.used);
+                    if (TrafficManager.registerWithdraw(creep, hubLink, RESOURCE_ENERGY, amount) === OK) {
+                        TrafficManager.lockPipeline(creep.name, creep.id, hubLink.id, RESOURCE_ENERGY, amount, 'WITHDRAW');
+                        actionRegistered = true;
+                    }
+                } else if (controllerNeedsEnergy && hubLinkState.free > 0 && storageState.used > 0) {
+                    const amount = Math.min(creepState.free, storageState.used);
+                    if (TrafficManager.registerWithdraw(creep, storage, RESOURCE_ENERGY, amount) === OK) {
+                        TrafficManager.lockPipeline(creep.name, creep.id, storage.id, RESOURCE_ENERGY, amount, 'WITHDRAW');
+                        actionRegistered = true;
+                    }
+                } else if (terminal && terminalState.free > 0 && storageState.used > 100000 && !controllerNeedsEnergy && hubLinkState.used === 0) {
+                    const amount = Math.min(creepState.free, storageState.used);
+                    if (TrafficManager.registerWithdraw(creep, storage, RESOURCE_ENERGY, amount) === OK) {
+                        TrafficManager.lockPipeline(creep.name, creep.id, storage.id, RESOURCE_ENERGY, amount, 'WITHDRAW');
+                        actionRegistered = true;
+                    }
+                }
+                creep.heap.set('state', actionRegistered ? 'SLEEP' : 'withdraw');
+            }
+
+            if (creepState.used === 0 && !actionRegistered) {
+                creep.heap.set('state', 'SLEEP');
+            }
         }
-
-        const creepState = TrafficManager.getVirtualState(creep, RESOURCE_ENERGY);
-        const hubLinkState = TrafficManager.getVirtualState(hubLink, RESOURCE_ENERGY);
-        const storageState = TrafficManager.getVirtualState(storage, RESOURCE_ENERGY);
-        const terminalState = terminal ? TrafficManager.getVirtualState(terminal, RESOURCE_ENERGY) : null;
-
-        let actionRegistered = false;
-
-        if (creepState.used > 0) {
-            // Priority 1: Fill Link for Controller
-            if (controllerNeedsEnergy && hubLinkState.free > 0) {
-                const amount = Math.min(creepState.used, hubLinkState.free);
-                if (TrafficManager.registerTransfer(creep, hubLink, RESOURCE_ENERGY, amount) === OK) {
-                    TrafficManager.lockPipeline(creep.name, creep.id, hubLink.id, RESOURCE_ENERGY, amount, 'TRANSFER');
-                    actionRegistered = true;
-                }
-            }
-            // Priority 2: Dump to Terminal (if overflow conditions met)
-            else if (terminal && terminalState.free > 0 && storageState.used > 100000 && !controllerNeedsEnergy && hubLinkState.used === 0) {
-                 const amount = Math.min(creepState.used, terminalState.free);
-                 if (TrafficManager.registerTransfer(creep, terminal, RESOURCE_ENERGY, amount) === OK) {
-                     TrafficManager.lockPipeline(creep.name, creep.id, terminal.id, RESOURCE_ENERGY, amount, 'TRANSFER');
-                     actionRegistered = true;
-                 }
-            }
-            // Priority 3: Dump to Storage
-            else if (storageState.free > 0) {
-                const amount = Math.min(creepState.used, storageState.free);
-                if (TrafficManager.registerTransfer(creep, storage, RESOURCE_ENERGY, amount) === OK) {
-                    TrafficManager.lockPipeline(creep.name, creep.id, storage.id, RESOURCE_ENERGY, amount, 'TRANSFER');
-                    actionRegistered = true;
-                }
-            }
-            creep.heap.state = 'transfer';
-        } else if (creepState.free > 0) {
-            // Priority 1: Empty Link (if controller doesn't need energy)
-            if (!controllerNeedsEnergy && hubLinkState.used > 0) {
-                const amount = Math.min(creepState.free, hubLinkState.used);
-                if (TrafficManager.registerWithdraw(creep, hubLink, RESOURCE_ENERGY, amount) === OK) {
-                    TrafficManager.lockPipeline(creep.name, creep.id, hubLink.id, RESOURCE_ENERGY, amount, 'WITHDRAW');
-                    actionRegistered = true;
-                }
-            }
-            // Priority 2: Pull from Storage to fill link
-            else if (controllerNeedsEnergy && hubLinkState.free > 0 && storageState.used > 0) {
-                const amount = Math.min(creepState.free, storageState.used);
-                if (TrafficManager.registerWithdraw(creep, storage, RESOURCE_ENERGY, amount) === OK) {
-                    TrafficManager.lockPipeline(creep.name, creep.id, storage.id, RESOURCE_ENERGY, amount, 'WITHDRAW');
-                    actionRegistered = true;
-                }
-            }
-            // Priority 3: Pull from Storage to fill Terminal
-            else if (terminal && terminalState.free > 0 && storageState.used > 100000 && !controllerNeedsEnergy && hubLinkState.used === 0) {
-                const amount = Math.min(creepState.free, storageState.used);
-                if (TrafficManager.registerWithdraw(creep, storage, RESOURCE_ENERGY, amount) === OK) {
-                    TrafficManager.lockPipeline(creep.name, creep.id, storage.id, RESOURCE_ENERGY, amount, 'WITHDRAW');
-                    actionRegistered = true;
-                }
-            }
-            creep.heap.state = 'withdraw';
-        }
-
-        if (creepState.used === 0 && !actionRegistered) {
-            creep.heap.state = 'SLEEP';
-        }
-
+    } catch (e) {
+        console.log(`[HubManager Process Error] Room ${room.name}: ${e.stack}`);
     }
 }
 
