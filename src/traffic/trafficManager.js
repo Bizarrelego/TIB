@@ -30,9 +30,6 @@ const TrafficManager = {
      */
     run() {
         try {
-            // Fatigue Gating: Global check for creep exhaustion
-            if (global.State && global.State.globalFatigue > 0) return;
-
             this.init();
 
             // Clean volatile entries only
@@ -105,7 +102,15 @@ const TrafficManager = {
         return creep.transfer(target, resourceType, amount);
     },
 
+    /**
+     * @param {object} creep
+     * @param {number} direction
+     */
     registerMove(creep, direction) {
+        // Fatigue Gating: Ensure only the specific creep is gated.
+        // The TrafficManager should only process creeps that are capable of moving.
+        if (!creep || creep.fatigue > 0) return;
+
         if (global.State && global.State.trafficIntents) {
             global.State.trafficIntents.set(creep.name, { direction, priority: creep.heap.priority || 0 });
         }
