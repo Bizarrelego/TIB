@@ -2,54 +2,84 @@ const DeadlockEngine = require('./deadlock');
 
 const DIRECTION_VECTORS = new Map([[1, [0, -1]], [2, [1, -1]], [3, [1, 0]], [4, [1, 1]], [5, [0, 1]], [6, [-1, 1]], [7, [-1, 0]], [8, [-1, -1]]]);
 
+/**
+ * @typedef {Object} PipelineLock
+ * @property {string} creepName
+ * @property {string} targetId
+ * @property {string} resourceType
+ * @property {number} amount
+ * @property {number} tickExpiry
+ */
+
 const TrafficManager = {
     intents: new Map(),
     ledger: new Map(),
     swapRegistry: new Map(),
+
+    /** @type {Map<string, PipelineLock>} */
     pipelineLedger: new Map(),
 
     run() {
-        this.intents.clear();
-        this.ledger.clear();
-        this.swapRegistry.clear();
+        // Hydrate from Memory proxy on global reset
+        if (this.pipelineLedger.size === 0 && typeof Memory !== 'undefined' && Memory.pipelineLedger) {
+            for (const key in Memory.pipelineLedger) {
+                this.pipelineLedger.set(key, Memory.pipelineLedger[key]);
+            }
+        }
 
-        // Fatigue Gating / Cascading CPU Throttling
-        // Skip ledger cleanup if processing high-latency pathing or system is overloaded
-        if (typeof Game !== 'undefined' && Game.cpu && Game.cpu.bucket >= 500) {
-            this.pipelineLedger.clear();
+        const runLogic = () => {
+            this.intents.clear();
+            this.ledger.clear();
+            this.swapRegistry.clear();
+
+            // Efficient cleanup of expired locks (Aggressive GC)
+            for (const [id, lock] of this.pipelineLedger) {
+                if (typeof Game !== 'undefined' && Game.time > lock.tickExpiry) {
+                    this.pipelineLedger.delete(id);
+                    if (typeof Memory !== 'undefined' && Memory.pipelineLedger) {
+                        delete Memory.pipelineLedger[id];
+                    }
+                }
+            }
+        };
+
+        if (typeof Profiler !== 'undefined' && Profiler.wrap) {
+            Profiler.wrap('TrafficManager', runLogic);
+        } else {
+            runLogic();
         }
     },
 
     /**
      * Locks a resource pipeline to prevent multiple creeps from targeting the same source.
-     * @param {string} creepName - The name of the creep locking the pipeline.
-     * @param {string} sourceId - The ID of the source being locked.
-     * @param {string} targetId - The ID of the target.
-     * @param {string} resourceType - The resource type.
-     * @param {number} amount - The amount of resource.
+     * @param {string} creepName
+     * @param {string} sourceId
+     * @param {string} targetId
+     * @param {string} resourceType
+     * @param {number} amount
      */
     lockPipeline(creepName, sourceId, targetId, resourceType, amount) {
-        this.pipelineLedger.set(sourceId, {
-            creepName,
-            sourceId,
-            targetId,
-            resourceType,
-            amount,
-            tickExpiry: Game.time + 1
-        });
+        const lock = {
+            creepName, targetId, resourceType, amount,
+            tickExpiry: typeof Game !== 'undefined' ? Game.time + 1 : 1
+        };
+
+        // Proxy to RawMemory/Memory segment as per "Memory Segmentation" rules
+        this.pipelineLedger.set(sourceId, lock);
+        if (typeof Memory !== 'undefined') {
+            Memory.pipelineLedger = Memory.pipelineLedger || {};
+            Memory.pipelineLedger[sourceId] = lock;
+        }
     },
 
     /**
      * Checks if a source pipeline is currently locked.
-     * @param {string} sourceId - The ID of the source.
-     * @returns {string|boolean} - The name of the locking creep, or false if not locked.
+     * @param {string} sourceId
+     * @returns {string|boolean}
      */
     checkPipeline(sourceId) {
         const lock = this.pipelineLedger.get(sourceId);
-        if (lock && Game.time <= lock.tickExpiry) {
-            return lock.creepName;
-        }
-        return false;
+        return (lock && typeof Game !== 'undefined' && Game.time <= lock.tickExpiry) ? lock.creepName : false;
     },
 
     registerTransfer(creep, target, resourceType, amount) {
