@@ -5,19 +5,24 @@ const colonyManager = require('./colonies/colonyManager');
 const operationsManager = require('./operations/operationsManager');
 const trafficManager = require('./traffic/trafficManager');
 
+const initOS = () => {
+    if (installMemoryProxy) installMemoryProxy();
+    if (cacheInit) cacheInit();
+
+    if (!global.State) {
+        global.State = {
+            structuresByRoom: new Map(),
+            creepsByRoom: new Map(),
+            hostilesByRoom: new Map(),
+            logisticsByRoom: new Map()
+        };
+    }
+};
+
 module.exports.loop = function () {
     // Phase 1: OS Init & Cache
     try {
-        if (installMemoryProxy) installMemoryProxy();
-        if (cacheInit) cacheInit();
-        if (!global.State) {
-            global.State = {};
-            global.State.structuresByRoom = new Map();
-            global.State.creepsByRoom = new Map();
-            global.State.hostilesByRoom = new Map();
-            global.State.logisticsByRoom = new Map();
-        }
-
+        initOS();
     } catch (e) {
         console.log(`[Phase 1 Error] OS Init: ${e.stack}`);
         return; // Fatal OS crash

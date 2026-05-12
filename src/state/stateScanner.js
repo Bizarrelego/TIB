@@ -1,4 +1,4 @@
-/* global EVENT_OBJECT_DESTROYED, EVENT_BUILD, EVENT_ATTACK, EVENT_HEAL, FIND_RUINS */
+/* global EVENT_OBJECT_DESTROYED, EVENT_BUILD, EVENT_ATTACK, EVENT_HEAL */
 
 module.exports = function stateScanner() {
     for (const roomName in Game.rooms) {
@@ -66,23 +66,5 @@ module.exports = function stateScanner() {
             }
         }
 
-        // Initial cache population exactly once per room
-        if (!global.State.scannedRooms.has(roomName)) {
-            const structures = room.find(FIND_STRUCTURES);
-            for (const struct of structures) {
-                roomStructures.set(struct.id, struct);
-            }
-
-            const droppedEnergy = room.find(FIND_DROPPED_RESOURCES);
-            for (const drop of droppedEnergy) roomLogistics.set(drop.id, drop);
-
-            const tombstones = room.find(FIND_TOMBSTONES);
-            for (const tomb of tombstones) roomLogistics.set(tomb.id, tomb);
-
-            const ruins = room.find(FIND_RUINS);
-            for (const ruin of ruins) roomLogistics.set(ruin.id, ruin);
-
-            global.State.scannedRooms.add(roomName);
-        }
     }
 };

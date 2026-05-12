@@ -41,13 +41,16 @@ const LogisticsManager = {
 
         // Top-Down Assignment: Assign targets directly to heap
         // FastFillers prioritized for Spawns/Extensions
+        // We use index-based traversal instead of .shift() for better performance
+        let spawnIndex = 0;
+        let towerIndex = 0;
         for (const filler of fastFillers) {
-            if (spawnsAndExtensions.length > 0) {
-                const target = spawnsAndExtensions.shift();
+            if (spawnIndex < spawnsAndExtensions.length) {
+                const target = spawnsAndExtensions[spawnIndex++];
                 filler.heap.targetId = target.id;
                 filler.heap.task = 'fill_spawn';
-            } else if (towers.length > 0) {
-                const target = towers.shift();
+            } else if (towerIndex < towers.length) {
+                const target = towers[towerIndex++];
                 filler.heap.targetId = target.id;
                 filler.heap.task = 'fill_tower';
             }
