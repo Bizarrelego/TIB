@@ -17,10 +17,20 @@ const TrafficManager = {
      */
     init() {
         if (!global.State) global.State = {};
-        global.State.trafficIntents = global.State.trafficIntents || new Map();
-        global.State.ledger = global.State.ledger || new Map();
-        global.State.swapRegistry = global.State.swapRegistry || new Map();
-        global.State.pipelineLedger = global.State.pipelineLedger || new Map();
+        if (!(global.State.trafficIntents instanceof Map)) global.State.trafficIntents = new Map();
+        if (!(global.State.ledger instanceof Map)) global.State.ledger = new Map();
+        if (!(global.State.swapRegistry instanceof Map)) global.State.swapRegistry = new Map();
+        if (!(global.State.pipelineLedger instanceof Map)) global.State.pipelineLedger = new Map();
+    },
+
+    /**
+     * Initializes pipeline ledger as a Map if not present.
+     * @returns {void}
+     */
+    initializeLedger() {
+        if (!(global.State.pipelineLedger instanceof Map)) {
+            global.State.pipelineLedger = new Map();
+        }
     },
 
     /**
@@ -56,15 +66,17 @@ const TrafficManager = {
      * @param {string} targetId
      * @param {string} resourceType
      * @param {number} amount
+     * @param {string} type - 'TRANSFER' or 'WITHDRAW'
      * @returns {void}
      */
-    lockPipeline(creepName, sourceId, targetId, resourceType, amount) {
+    lockPipeline(creepName, sourceId, targetId, resourceType, amount, type) {
         if (global.State && global.State.pipelineLedger) {
             global.State.pipelineLedger.set(sourceId, {
                 creepName,
                 targetId,
                 resourceType,
                 amount,
+                type,
                 tickExpiry: Game.time + 1
             });
         }
@@ -141,8 +153,49 @@ const TrafficManager = {
         }
     },
 
+    /**
+     * Executes pipeline ledger intents.
+     * @param {object} creep - The target creep.
+     * @param {Object} intent - The ledger intent data.
+     * @param {string} intent.type - 'TRANSFER' or 'WITHDRAW'.
+     * @param {string} intent.targetId - ID of target.
+     * @param {string} intent.resourceType - Resource constant.
+     * @returns {void}
+     */
+    flushIntent(creep, intent) {
+        if (!creep || creep.fatigue > 0 || !intent) return;
+
+        try {
+            // Ensure no conflicting movement intents exist
+            if (global.State.trafficIntents && global.State.trafficIntents.has(creep.name)) {
+                return;
+            }
+
+            const target = Game.getObjectById(intent.targetId);
+            if (!target) return;
+
+            // Use intent.type instead of re-scanning creep.store
+            intent.type === 'TRANSFER'
+                ? creep.transfer(target, intent.resourceType)
+                : creep.withdraw(target, intent.resourceType);
+        } catch (e) {
+            console.error(`[TrafficManager] FlushIntent Error on ${creep.name}: ${e.stack}`);
+        }
+    },
+
     executeIntents() {
         try {
+            // Process pipeline ledger first
+            if (global.State && global.State.pipelineLedger) {
+                for (const [creepId, intent] of global.State.pipelineLedger.entries()) {
+                    const liveCreep = Game.getObjectById(creepId);
+                    if (liveCreep) {
+                        this.flushIntent(liveCreep, intent);
+                    }
+                    global.State.pipelineLedger.delete(creepId);
+                }
+            }
+
             if (!global.State || !global.State.trafficIntents) return;
 
             this.resolveDeadlocks();
