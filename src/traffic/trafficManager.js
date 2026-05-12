@@ -24,10 +24,15 @@ const TrafficManager = {
      */
     run() {
         try {
+            // The logic to clear intents, ledgers, and swap registries must happen every tick
+            this.intents.clear();
+            this.ledger.clear();
+            this.swapRegistry.clear();
+
+            // Aggressive Tick Slicing: Only clean expired locks once every 10 ticks
+            if (Game.time % 10 !== 0) return;
+
             const runLogic = () => {
-                this.intents.clear();
-                this.ledger.clear();
-                this.swapRegistry.clear();
                 for (const [id, lock] of this.pipelineLedger) {
                     if (Game.time > lock.tickExpiry) {
                         this.pipelineLedger.delete(id);
