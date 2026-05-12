@@ -77,7 +77,7 @@ function run(room) {
  * @param {StructureStorage} storage - The central storage structure.
  * @param {StructureTerminal} terminal - The terminal structure for trade.
  * @param {boolean} controllerNeedsEnergy - State indicator if controller link requires energy.
- * @param {Object} TrafficManager - The global TrafficManager instance.
+ * @param {import('../traffic/trafficManager')} TrafficManager - The global TrafficManager instance.
  * @returns {void}
  */
 function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsEnergy, TrafficManager) {
@@ -87,10 +87,12 @@ function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsE
 
             if (creep.fatigue > 0 || TrafficManager.checkPipeline(creep.id)) continue;
 
-            creep.heap = creep.heap || {};
+            if (!(creep.heap instanceof Map)) {
+                creep.heap = new Map();
+            }
 
-            if (!creep.heap.parkPos) {
-                creep.heap.parkPos = findParkPos(hubLink, storage, room);
+            if (!creep.heap.has('parkPos')) {
+                creep.heap.set('parkPos', findParkPos(hubLink, storage, room));
             }
 
             const creepState = TrafficManager.getVirtualState(creep, RESOURCE_ENERGY);
@@ -125,7 +127,7 @@ function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsE
                         actionRegistered = true;
                     }
                 }
-                creep.heap.state = actionRegistered ? 'SLEEP' : 'transfer';
+                creep.heap.set('state', actionRegistered ? 'SLEEP' : 'transfer');
             } else if (creepState.free > 0) {
                 // Priority 1: Empty Link (if controller doesn't need energy)
                 if (!controllerNeedsEnergy && hubLinkState.used > 0) {
@@ -151,11 +153,11 @@ function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsE
                         actionRegistered = true;
                     }
                 }
-                creep.heap.state = actionRegistered ? 'SLEEP' : 'withdraw';
+                creep.heap.set('state', actionRegistered ? 'SLEEP' : 'withdraw');
             }
 
             if (creepState.used === 0 && !actionRegistered) {
-                creep.heap.state = 'SLEEP';
+                creep.heap.set('state', 'SLEEP');
             }
 
         }
