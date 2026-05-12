@@ -3,8 +3,8 @@ const LogisticsManager = {
         const room = Game.rooms[roomName];
         if (!room || !global.State.structuresByRoom.has(roomName)) return;
 
-        const structures = global.State.structuresByRoom.get(roomName);
-        const creeps = global.State.creepsByRoom.get(roomName);
+        const structures = global.State.structuresByRoom.get(roomName) || new Map();
+        const creeps = global.State.creepsByRoom.get(roomName) || new Map();
 
         // Categorize needs strictly O(n) without live API calls
         const spawnsAndExtensions = [];

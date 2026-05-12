@@ -1,21 +1,17 @@
-const installMemoryProxy = require('./os/memoryProxy');
-const cacheInit = require('./os/cache');
 const stateScanner = require('./state/stateScanner');
 const colonyManager = require('./colonies/colonyManager');
 const operationsManager = require('./operations/operationsManager');
 const trafficManager = require('./traffic/trafficManager');
 
 const initOS = () => {
-    if (installMemoryProxy) installMemoryProxy();
-    if (cacheInit) cacheInit();
-
     if (!global.State) {
         global.State = {
             structuresByRoom: new Map(),
             creepsByRoom: new Map(),
             hostilesByRoom: new Map(),
             logisticsByRoom: new Map(),
-            creepLookup: new Map() // O(1) creep index
+            creepLookup: new Map(),
+            scannedRooms: new Set()
         };
     }
 };

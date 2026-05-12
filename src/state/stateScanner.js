@@ -1,19 +1,6 @@
 /* global EVENT_OBJECT_DESTROYED, EVENT_BUILD, EVENT_ATTACK, EVENT_HEAL */
 
 module.exports = function stateScanner() {
-    if (!global.State.scannedRooms) global.State.scannedRooms = new Set();
-
-    // First time init for any new rooms
-    for (const roomName in Game.rooms) {
-        if (!global.State.scannedRooms.has(roomName)) {
-            global.State.structuresByRoom.set(roomName, new Map());
-            global.State.creepsByRoom.set(roomName, new Map());
-            global.State.hostilesByRoom.set(roomName, new Map());
-            global.State.logisticsByRoom.set(roomName, new Map());
-            global.State.scannedRooms.add(roomName);
-        }
-    }
-
     // Pure Event-Driven Loop
     for (const roomName of global.State.scannedRooms) {
         const room = Game.rooms[roomName];

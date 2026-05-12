@@ -37,15 +37,19 @@ const TrafficManager = {
     },
 
     executeIntents() {
-        this.resolveDeadlocks();
-        this.executeSwaps();
+        try {
+            this.resolveDeadlocks();
+            this.executeSwaps();
 
-        for (const [creepName, intent] of this.intents.entries()) {
-            // Live creep is needed only for final action dispatch
-            const liveCreep = Game.creeps[creepName];
-            if (liveCreep && !this.swapRegistry.has(creepName)) {
-                liveCreep.move(intent.direction);
+            for (const [creepName, intent] of this.intents.entries()) {
+                // Live creep is needed only for final action dispatch
+                const liveCreep = Game.creeps[creepName];
+                if (liveCreep && !this.swapRegistry.has(creepName)) {
+                    liveCreep.move(intent.direction);
+                }
             }
+        } catch (e) {
+            console.log(`[TrafficManager Execution Error]: ${e.stack}`);
         }
     },
 
