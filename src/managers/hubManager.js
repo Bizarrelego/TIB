@@ -1,15 +1,24 @@
 const eventBus = require('../os/eventBus');
 
-/**
- * @typedef {Object} HubState
- * @property {RoomPosition|null} parkPos
- * @property {string} state
- */
+function findParkPos(hubLink, storage, room) {
+    const terrain = global.State.roomTerrain.get(room.name);
+    for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+            if (dx === 0 && dy === 0) continue;
+            const tx = hubLink.pos.x + dx;
+            const ty = hubLink.pos.y + dy;
 
-/**
- * @param {Room} room
- * @returns {void}
- */
+            // Check if adjacent to storage and walkable
+            if (Math.abs(storage.pos.x - tx) <= 1 && Math.abs(storage.pos.y - ty) <= 1) {
+                if (terrain && terrain.get(tx, ty) !== TERRAIN_MASK_WALL) {
+                    return { x: tx, y: ty, roomName: room.name };
+                }
+            }
+        }
+    }
+    return { x: hubLink.pos.x, y: hubLink.pos.y, roomName: room.name };
+}
+
 function run(room) {
     try {
         const roomCreeps = global.State.creepsByRoom.get(room.name);
@@ -61,27 +70,28 @@ function run(room) {
 }
 
 /**
- * @param {Room} room
- * @param {Creep[]} hubManagers
- * @param {StructureLink} hubLink
- * @param {StructureStorage} storage
- * @param {StructureTerminal} terminal
- * @param {boolean} controllerNeedsEnergy
- * @param {Object} TrafficManager
+ * Processes assigned hub managers to execute logic between links, storage, and terminals.
+ * @param {Room} room - The current room context.
+ * @param {Creep[]} hubManagers - An array of hub manager creeps.
+ * @param {StructureLink} hubLink - The link structure to fill/empty.
+ * @param {StructureStorage} storage - The central storage structure.
+ * @param {StructureTerminal} terminal - The terminal structure for trade.
+ * @param {boolean} controllerNeedsEnergy - State indicator if controller link requires energy.
+ * @param {Object} TrafficManager - The global TrafficManager instance.
  * @returns {void}
  */
 function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsEnergy, TrafficManager) {
     try {
-        for (const creep of hubManagers) {
-            if (!(creep.heap instanceof Map)) creep.heap = new Map();
+        for (let i = 0; i < hubManagers.length; i++) {
+            const creep = hubManagers[i];
+
             if (creep.fatigue > 0 || TrafficManager.checkPipeline(creep.id)) continue;
 
-            if (!creep.heap.has('data')) {
-                const pos = global.State.intel?.get(room.name)?.hubPos || null;
-                creep.heap.set('data', { parkPos: pos, state: 'IDLE' });
-            }
+            creep.heap = creep.heap || {};
 
-            const heapData = creep.heap.get('data');
+            if (!creep.heap.parkPos) {
+                creep.heap.parkPos = findParkPos(hubLink, storage, room);
+            }
 
             const creepState = TrafficManager.getVirtualState(creep, RESOURCE_ENERGY);
             const hubLinkState = TrafficManager.getVirtualState(hubLink, RESOURCE_ENERGY);
@@ -115,7 +125,7 @@ function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsE
                         actionRegistered = true;
                     }
                 }
-                heapData.state = actionRegistered ? 'SLEEP' : 'transfer';
+                creep.heap.state = actionRegistered ? 'SLEEP' : 'transfer';
             } else if (creepState.free > 0) {
                 // Priority 1: Empty Link (if controller doesn't need energy)
                 if (!controllerNeedsEnergy && hubLinkState.used > 0) {
@@ -141,11 +151,11 @@ function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsE
                         actionRegistered = true;
                     }
                 }
-                heapData.state = actionRegistered ? 'SLEEP' : 'withdraw';
+                creep.heap.state = actionRegistered ? 'SLEEP' : 'withdraw';
             }
 
             if (creepState.used === 0 && !actionRegistered) {
-                heapData.state = 'SLEEP';
+                creep.heap.state = 'SLEEP';
             }
 
         }
