@@ -1,3 +1,4 @@
+const { cacheInit, CacheRegistry } = require('./os/cache');
 const discoveryManager = require('./state/discoveryManager');
 const stateScanner = require('./state/stateScanner');
 const colonyManager = require('./colonies/colonyManager');
@@ -5,6 +6,15 @@ const operationsManager = require('./operations/operationsManager');
 const trafficManager = require('./traffic/trafficManager');
 
 module.exports.loop = function () {
+    // Initialize OS cache
+    cacheInit();
+
+    // Heap Rehydration Protocol
+    if (!global.isInitialized) {
+        CacheRegistry.runAll();
+        global.isInitialized = true;
+    }
+
     // Phase 1: Discovery Manager (Raw Engine API execution & global.State Bootstrapping)
     try {
         if (discoveryManager) discoveryManager();
