@@ -72,21 +72,23 @@ function run(room) {
  */
 function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsEnergy, TrafficManager) {
     if (!global.Heap) global.Heap = {};
-    if (!global.Heap.hubManagers) global.Heap.hubManagers = new Map();
+    if (!(global.Heap.hubManagers instanceof Map)) {
+        global.Heap.hubManagers = new Map();
+    }
+
+    const hubHeap = /** @type {Map<string, HubState>} */ (global.Heap.hubManagers);
 
     for (let i = 0; i < hubManagers.length; i++) {
         const creep = hubManagers[i];
-        const id = creep.id;
 
-        if (creep.fatigue > 0) continue;
-        if (TrafficManager.checkPipeline(id)) continue;
+        if (creep.fatigue > 0 || TrafficManager.checkPipeline(creep.id)) continue;
 
-        if (!global.Heap.hubManagers.has(id)) {
+        if (!hubHeap.has(creep.id)) {
             const pos = global.State.intel?.get(room.name)?.hubPos || null;
-            global.Heap.hubManagers.set(id, { parkPos: pos, state: 'IDLE' });
+            hubHeap.set(creep.id, { parkPos: pos, state: 'IDLE' });
         }
 
-        const heap = /** @type {HubState} */ (global.Heap.hubManagers.get(id));
+        const heap = /** @type {HubState} */ (hubHeap.get(creep.id));
 
         const creepState = TrafficManager.getVirtualState(creep, RESOURCE_ENERGY);
         const hubLinkState = TrafficManager.getVirtualState(hubLink, RESOURCE_ENERGY);
