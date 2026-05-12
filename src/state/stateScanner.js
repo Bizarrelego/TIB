@@ -38,23 +38,5 @@ module.exports = function stateScanner() {
             }
         }
 
-        // Creeps are dynamic, so we map them into state without querying room
-        // The reviewer says "remove all Game.creeps access from your Managers",
-        // but stateScanner is the OS updater. However, we'll iterate Game.creeps here
-        // to populate global.State, and managers will ONLY read global.State.creepsByRoom.
-        roomCreeps.clear();
-        for (const creepName in Game.creeps) {
-            const creep = Game.creeps[creepName];
-            if (creep.room.name === roomName) {
-                roomCreeps.set(creep.id, {
-                    id: creep.id,
-                    name: creep.name,
-                    fatigue: creep.fatigue,
-                    memory: creep.memory,
-                    heap: creep.heap,
-                    pos: { x: creep.pos.x, y: creep.pos.y, roomName: creep.pos.roomName }
-                });
-            }
-        }
     }
 };

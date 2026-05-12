@@ -120,14 +120,7 @@ const TrafficManager = {
     },
 
     getCreepData(creepName) {
-        if (!global.State || !global.State.creepsByRoom) return null;
-        for (const roomCreeps of global.State.creepsByRoom.values()) {
-            // Find by iterating values. In a real app we'd map creepName -> creepData globally
-            for (const data of roomCreeps.values()) {
-                if (data.name === creepName) return data;
-            }
-        }
-        return null;
+        return global.State.creepLookup.get(creepName);
     },
 
     executeSwaps() {

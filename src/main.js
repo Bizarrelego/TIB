@@ -14,7 +14,8 @@ const initOS = () => {
             structuresByRoom: new Map(),
             creepsByRoom: new Map(),
             hostilesByRoom: new Map(),
-            logisticsByRoom: new Map()
+            logisticsByRoom: new Map(),
+            creepLookup: new Map() // O(1) creep index
         };
     }
 };
