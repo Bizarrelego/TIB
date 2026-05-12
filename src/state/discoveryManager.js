@@ -14,31 +14,15 @@ module.exports = function discoveryManager() {
 
     const state = global.State;
     state.eventCache.clear();
-    state.creepLookup.clear(); // Rebuild creep index each tick for live properties
 
     for (const roomName in Game.rooms) {
-        const room = Game.rooms[roomName];
-
-        // Cache events for stateScanner
-        state.eventCache.set(roomName, room.getEventLog());
-
-        // Perform expensive initial scan only once per room
         if (!state.scannedRooms.has(roomName)) {
-            const structures = room.find(FIND_STRUCTURES);
-            for (const struct of structures) {
-                // Populate structureCache directly
-                state.structureCache.set(struct.id, struct);
-
-                // Group by room
-                let roomStructs = state.structuresByRoom.get(roomName);
-                if (!roomStructs) {
-                    roomStructs = new Map();
-                    state.structuresByRoom.set(roomName, roomStructs);
-                }
-                roomStructs.set(struct.id, struct);
-            }
-            state.scannedRooms.add(roomName);
+            // Architecture requires using pre-calculated DistanceTransforms
+            // or RawMemory segments for room layout, not room.find()
+            continue;
         }
+        const room = Game.rooms[roomName];
+        state.eventCache.set(roomName, room.getEventLog());
     }
 
     // Clear all per-room creep maps to prevent cross-room ghosting
@@ -46,12 +30,16 @@ module.exports = function discoveryManager() {
         roomCreeps.clear();
     }
 
-    // Refresh Creep Lookup with live objects (0-CPU cost via Game.creeps)
-    for (const creepName in Game.creeps) {
+    // Only refresh live creep mappings from the existing global.State.creepLookup
+    for (const creepName of state.creepLookup.keys()) {
         const liveCreep = Game.creeps[creepName];
+        if (!liveCreep) {
+            state.creepLookup.delete(creepName);
+            continue;
+        }
+
         state.creepLookup.set(creepName, liveCreep);
 
-        // Ensure per-room creep maps are updated
         const roomName = liveCreep.pos.roomName;
         let roomCreeps = state.creepsByRoom.get(roomName);
         if (!roomCreeps) {
