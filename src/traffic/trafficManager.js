@@ -82,42 +82,59 @@ const TrafficManager = {
         return false;
     },
 
+    /**
+     * @param {Structure|Creep} target
+     * @param {string} resourceType
+     * @returns {{used: number, free: number, cap: number}}
+     */
     getVirtualState(target, resourceType) {
-        const ledger = global.State.ledger;
-        if (!ledger) return { used: 0, free: 0 };
+        if (!global.State || !global.State.ledger) return { used: 0, free: 0, cap: 0 };
 
-        const state = ledger.get(target.id) || { used: target.store ? target.store.getUsedCapacity(resourceType) : 0, cap: target.store ? target.store.getCapacity(resourceType) : 0 };
-        return { used: state.used, free: state.cap - state.used };
+        // Strictly read from global State; no native polling
+        const state = global.State.ledger.get(target.id) || { used: 0, cap: 0 };
+        return { used: state.used, free: state.cap - state.used, cap: state.cap };
     },
 
-    registerTransfer(creep, target, resourceType, amount) {
+    /**
+     * Executes registered transfers via engine intent.
+     * @param {Creep} creep
+     * @param {Structure} target
+     * @param {ResourceConstant} res
+     * @param {number} amount
+     * @returns {number}
+     */
+    registerTransfer(creep, target, res, amount) {
         const ledger = global.State.ledger;
         if (!ledger) return ERR_FULL;
 
-        const targetState = this.getVirtualState(target, resourceType);
+        const targetState = this.getVirtualState(target, res);
         if (targetState.free < amount) return ERR_FULL;
 
         ledger.set(target.id, { used: targetState.used + amount, cap: targetState.cap });
+        ledger.set(creep.id, { used: this.getVirtualState(creep, res).used - amount, cap: creep.store.getCapacity() });
 
-        const creepState = this.getVirtualState(creep, resourceType);
-        ledger.set(creep.id, { used: creepState.used - amount, cap: creepState.cap });
-
-        return OK;
+        return creep.transfer(target, res, amount);
     },
 
-    registerWithdraw(creep, target, resourceType, amount) {
+    /**
+     * Executes registered withdrawals via engine intent.
+     * @param {Creep} creep
+     * @param {Structure} target
+     * @param {ResourceConstant} res
+     * @param {number} amount
+     * @returns {number}
+     */
+    registerWithdraw(creep, target, res, amount) {
         const ledger = global.State.ledger;
         if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
 
-        const targetState = this.getVirtualState(target, resourceType);
+        const targetState = this.getVirtualState(target, res);
         if (targetState.used < amount) return ERR_NOT_ENOUGH_RESOURCES;
 
         ledger.set(target.id, { used: targetState.used - amount, cap: targetState.cap });
+        ledger.set(creep.id, { used: this.getVirtualState(creep, res).used + amount, cap: creep.store.getCapacity() });
 
-        const creepState = this.getVirtualState(creep, resourceType);
-        ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
-
-        return OK;
+        return creep.withdraw(target, res, amount);
     },
 
     /**
