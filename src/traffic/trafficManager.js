@@ -141,8 +141,47 @@ const TrafficManager = {
         }
     },
 
+    /**
+     * Executes pipeline ledger intents.
+     * @param {object} creep
+     * @param {object} intent
+     * @returns {void}
+     */
+    flushIntent(creep, intent) {
+        if (!creep || creep.fatigue > 0 || !intent || !intent.targetId) return;
+
+        try {
+            // Ensure no conflicting movement intents exist
+            if (global.State.trafficIntents && global.State.trafficIntents.has(creep.name)) {
+                return;
+            }
+
+            const target = Game.getObjectById(intent.targetId);
+            if (!target) return;
+
+            if (creep.store && creep.store.getUsedCapacity() > 0) {
+                creep.transfer(target, intent.resourceType);
+            } else {
+                creep.withdraw(target, intent.resourceType);
+            }
+        } catch (e) {
+            console.error(`[TrafficManager] FlushIntent Error on ${creep.name}: ${e.stack}`);
+        }
+    },
+
     executeIntents() {
         try {
+            // Process pipeline ledger first
+            if (global.State && global.State.pipelineLedger) {
+                for (const [creepId, intent] of global.State.pipelineLedger.entries()) {
+                    const liveCreep = Game.getObjectById(creepId);
+                    if (liveCreep) {
+                        this.flushIntent(liveCreep, intent);
+                    }
+                    global.State.pipelineLedger.delete(creepId);
+                }
+            }
+
             if (!global.State || !global.State.trafficIntents) return;
 
             this.resolveDeadlocks();
