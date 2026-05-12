@@ -1,24 +1,23 @@
-module.exports = function cacheInit() {
-    // Initialize global.Cache if it doesn't exist
-    if (!global.Cache) {
-        global.Cache = {
-            structures: new Map(),
-            distances: new Map(),
-            creeps: new Map(),
-            rooms: new Map()
-        };
-    }
-
-    // Hijack RawMemory._parsed to persist object references across ticks
-    // This avoids JSON.parse overhead when memory hasn't changed.
-    if (!global.MemoryParsed) {
-        if (RawMemory._parsed) {
-            global.MemoryParsed = RawMemory._parsed;
-        } else {
-            global.MemoryParsed = JSON.parse(RawMemory.get() || "{}");
-            RawMemory._parsed = global.MemoryParsed;
+// Tigga-Style Optimized Cache Initialization
+const CacheRegistry = {
+    // Utilize direct reference assignment for O(1) performance
+    init: () => {
+        global.Cache = new Map([
+            ['structures', new Map()],
+            ['creeps', new Map()],
+            ['sources', new Map()]
+        ]);
+    },
+    // Event-Driven Hydration: Only trigger on StateScanner update events
+    hydrate: (key, dataMap) => {
+        if (!global.Cache.has(key) || !(dataMap instanceof Map)) return;
+        const target = global.Cache.get(key);
+        // Clear and update only the delta to minimize CPU
+        target.clear();
+        for (const [k, v] of dataMap) {
+            target.set(k, v);
         }
-    } else {
-        RawMemory._parsed = global.MemoryParsed;
     }
 };
+
+module.exports = { CacheRegistry };
