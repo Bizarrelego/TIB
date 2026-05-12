@@ -10,12 +10,12 @@ module.exports.loop = function () {
     cacheInit();
 
     // Heap Rehydration Protocol
-    if (!global.isInitialized) {
+    if (!global.Cache.get('isInitialized')) {
         const startCpu = Game.cpu.getUsed();
         CacheRegistry.runAll();
         const elapsed = Game.cpu.getUsed() - startCpu;
         console.log(`[Profiler] Heap Rehydration Protocol executed in ${elapsed.toFixed(3)} ms.`);
-        global.isInitialized = true;
+        global.Cache.set('isInitialized', true);
     }
 
     // Phase 1: Discovery Manager (Raw Engine API execution & global.State Bootstrapping)
