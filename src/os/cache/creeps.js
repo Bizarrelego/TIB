@@ -1,11 +1,14 @@
 function initCreeps() {
-    if (RawMemory.segments && RawMemory.segments[1]) {
+    if (global.State && global.State.getSegment) {
         try {
-            const data = JSON.parse(RawMemory.segments[1]);
-            // Use Map constructor with entry mapping for speed
-            global.Cache.set('creeps', new Map(Object.entries(data)));
+            const data = global.State.getSegment(1); // Use abstraction layer
+            const creepMap = new Map();
+            for (const id in data) {
+                creepMap.set(id, data[id]);
+            }
+            global.Cache.set('creeps', creepMap);
         } catch (e) {
-            console.log(`[CacheRegistry] Failed to parse creeps from segment 1: ${e.stack}`);
+            console.log(`[CacheRegistry] Failed to load creeps from segment 1: ${e.stack}`);
         }
     }
 }

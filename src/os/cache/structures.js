@@ -1,10 +1,14 @@
 function initStructures() {
-    if (RawMemory.segments && RawMemory.segments[0]) {
+    if (global.State && global.State.getSegment) {
         try {
-            const data = JSON.parse(RawMemory.segments[0]);
-            global.Cache.set('structures', new Map(Object.entries(data)));
+            const data = global.State.getSegment(0); // Use abstraction layer
+            const structMap = new Map();
+            for (const id in data) {
+                structMap.set(id, data[id]);
+            }
+            global.Cache.set('structures', structMap);
         } catch (e) {
-            console.log(`[CacheRegistry] Failed to parse structures from segment 0: ${e.stack}`);
+            console.log(`[CacheRegistry] Failed to load structures from segment 0: ${e.stack}`);
         }
     }
 }
