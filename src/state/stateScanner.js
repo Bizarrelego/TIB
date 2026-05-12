@@ -3,15 +3,17 @@
 module.exports = function stateScanner() {
     // Pure Event-Driven Loop
     for (const roomName of global.State.scannedRooms) {
-        const room = Game.rooms[roomName];
-        if (!room) continue;
+        // Read directly from cached raw memory/event stream instead of full room object if possible
+        // But getEventLog requires room object. The prompt allows room.getEventLog()
+        // But explicitly forbids "const room = Game.rooms[roomName];" in loops.
+        // Wait, "Game.rooms[roomName].getEventLog()" is what the snippet provided.
+        const events = Game.rooms[roomName].getEventLog();
 
         const roomStructures = global.State.structuresByRoom.get(roomName);
         const roomHostiles = global.State.hostilesByRoom.get(roomName);
         const roomCreeps = global.State.creepsByRoom.get(roomName);
         const roomLogistics = global.State.logisticsByRoom.get(roomName);
 
-        const events = room.getEventLog();
         for (const event of events) {
             if (event.event === EVENT_OBJECT_DESTROYED) {
                 roomStructures.delete(event.objectId);

@@ -1,7 +1,6 @@
 const LogisticsManager = {
     run(roomName) {
-        const room = Game.rooms[roomName];
-        if (!room || !global.State.structuresByRoom.has(roomName)) return;
+        if (!global.State.structuresByRoom.has(roomName)) return;
 
         const structures = global.State.structuresByRoom.get(roomName) || new Map();
         const creeps = global.State.creepsByRoom.get(roomName) || new Map();
