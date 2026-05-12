@@ -43,12 +43,13 @@ jobs:
       - name: Reject on Test Failure
         if: steps.run-tests.outcome == 'failure'
         run: |
-          PAYLOAD=$(jq -Rs --arg prefix "Code failed static analysis and linting. Fix syntax errors before architectural review:\n\n\`\`\`text\n" --arg suffix "\n\`\`\`" '{body: ($prefix + . + $suffix), event: "REQUEST_CHANGES"}' lint_output.txt)
+          # IMPROVEMENT: Using /issues/comments bypasses the 422 error while exit 1 maintains the PR block.
+          PAYLOAD=$(jq -Rs --arg prefix "@jules Code failed static analysis and linting. Fix syntax errors before architectural review:\n\n\`\`\`text\n" --arg suffix "\n\`\`\`" '{body: ($prefix + . + $suffix)}')
           
           curl -s -X POST \
             -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews \
+            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
             -d "$PAYLOAD"
             
           exit 1
@@ -77,7 +78,6 @@ jobs:
       - name: Architect Review
         id: gemini-check
         run: |
-          # Force JSON output schema
           PAYLOAD=$(jq -n --arg text "$REVIEW_TEXT" '{
             contents: [{parts: [{"text": $text}]}], 
             generationConfig: {
@@ -120,21 +120,18 @@ jobs:
           echo "$FEEDBACK" >> "$GITHUB_OUTPUT"
           echo "${delimiter}" >> "$GITHUB_OUTPUT"
 
-      - name: Submit GitHub PR Review
+      - name: Submit GitHub PR Comment
         run: |
-          EVENT="REQUEST_CHANGES"
-          if [ "${{ steps.gemini-check.outputs.status }}" = "APPROVE" ]; then
-            EVENT="APPROVE"
-          fi
-          
-          PAYLOAD=$(jq -n --arg body "${{ steps.gemini-check.outputs.feedback }}" --arg event "$EVENT" '{body: $body, event: $event}')
+          # IMPROVEMENT: Converted from formal review to PR comment to avoid 422 error.
+          PAYLOAD=$(jq -n --arg body "@jules ${{ steps.gemini-check.outputs.feedback }}" '{body: $body}')
           
           curl -s -X POST \
             -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews \
+            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
             -d "$PAYLOAD"
             
-          if [ "$EVENT" = "REQUEST_CHANGES" ]; then
+          # Fails the Action check to block the PR if the AI rejected it
+          if [ "${{ steps.gemini-check.outputs.status }}" != "APPROVE" ]; then
             exit 1
           fi
