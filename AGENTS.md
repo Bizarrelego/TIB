@@ -1,6 +1,5 @@
 TIB Bot Architecture & Coding Standards (Tigga-Style)
 1. Core CPU & Execution Principles
-Strict Token Limits: Max 150 lines per OS manager or role. Fragment larger logic. Exception: Pure algorithmic utilities (Min-Cut, Wasm bindings).
 Strict JS & JSDoc Mandate: .js only. Extensive JSDoc (@param, @typedef, @returns) is mandatory for IDE intellisense and structural integrity.
 Zero Native Polling: No room.find(), room.lookAt(), or room.lookForAt() in tick loops. Use global.State.
 Event-Driven Updates (0-CPU Radar): Parse room.getEventLog() for attacks, structure decay, or construction.
