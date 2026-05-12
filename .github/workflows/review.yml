@@ -43,12 +43,21 @@ jobs:
       - name: Reject on Test Failure
         if: steps.run-tests.outcome == 'failure'
         run: |
-          PAYLOAD=$(jq -Rs --arg prefix "Code failed static analysis and linting. Fix syntax errors before architectural review:\n\n\`\`\`text\n" --arg suffix "\n\`\`\`" '{body: ($prefix + . + $suffix), event: "REQUEST_CHANGES"}' lint_output.txt)
+          # Safely construct the markdown file without Bash string interpolation bugs
+          (
+            echo "@jules Code failed static analysis and linting. Fix syntax errors before architectural review:"
+            echo ""
+            echo "\`\`\`text"
+            cat lint_output.txt
+            echo "\`\`\`"
+          ) > formatted_comment.txt
+          
+          PAYLOAD=$(jq -Rs '{body: .}' formatted_comment.txt)
           
           curl -s -X POST \
             -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews \
+            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
             -d "$PAYLOAD"
             
           exit 1
@@ -77,7 +86,6 @@ jobs:
       - name: Architect Review
         id: gemini-check
         run: |
-          # Force JSON output schema
           PAYLOAD=$(jq -n --arg text "$REVIEW_TEXT" '{
             contents: [{parts: [{"text": $text}]}], 
             generationConfig: {
@@ -120,21 +128,21 @@ jobs:
           echo "$FEEDBACK" >> "$GITHUB_OUTPUT"
           echo "${delimiter}" >> "$GITHUB_OUTPUT"
 
-      - name: Submit GitHub PR Review
+      - name: Submit GitHub PR Comment
         run: |
-          EVENT="REQUEST_CHANGES"
-          if [ "${{ steps.gemini-check.outputs.status }}" = "APPROVE" ]; then
-            EVENT="APPROVE"
-          fi
-
-          PAYLOAD=$(jq -n --arg body "${{ steps.gemini-check.outputs.feedback }}" --arg event "$EVENT" '{body: $body, event: $event}')
+          (
+            echo "@jules"
+            echo "${{ steps.gemini-check.outputs.feedback }}"
+          ) > formatted_review.txt
+          
+          PAYLOAD=$(jq -Rs '{body: .}' formatted_review.txt)
           
           curl -s -X POST \
             -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews \
+            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
             -d "$PAYLOAD"
             
-          if [ "$EVENT" = "REQUEST_CHANGES" ]; then
+          if [ "${{ steps.gemini-check.outputs.status }}" != "APPROVE" ]; then
             exit 1
           fi
