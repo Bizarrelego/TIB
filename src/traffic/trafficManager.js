@@ -1,3 +1,5 @@
+const DeadlockEngine = require('./deadlock');
+
 const DIRECTION_VECTORS = new Map([[1, [0, -1]], [2, [1, -1]], [3, [1, 0]], [4, [1, 1]], [5, [0, 1]], [6, [-1, 1]], [7, [-1, 0]], [8, [-1, -1]]]);
 
 const TrafficManager = {
@@ -84,29 +86,7 @@ const TrafficManager = {
             targetPositions.set(posKey, creepName);
         }
 
-        const detectCycle = (creepName) => {
-            if (!visited.has(creepName)) {
-                visited.add(creepName);
-                recursionStack.add(creepName);
-
-                const nextCreep = dependencyGraph.get(creepName);
-                if (nextCreep && !visited.has(nextCreep) && detectCycle(nextCreep)) {
-                    return true;
-                } else if (recursionStack.has(nextCreep)) {
-                    return true; // Cycle detected
-                }
-            }
-            recursionStack.delete(creepName);
-            return false;
-        };
-
-        // If cycle detected, find lowest priority and break it
-        for (const creepName of dependencyGraph.keys()) {
-            if (detectCycle(creepName)) {
-                this.intents.delete(creepName); // Force lowest priority creep to stay/yield
-                break;
-            }
-        }
+        DeadlockEngine.detectAndResolve(this.intents, dependencyGraph);
     },
 
     executeSwaps() {
