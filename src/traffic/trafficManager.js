@@ -20,35 +20,21 @@ const TrafficManager = {
     pipelineLedger: new Map(),
 
     run() {
-        // Hydrate from Memory proxy on global reset
-        if (this.pipelineLedger.size === 0 && typeof Memory !== 'undefined' && Memory.pipelineLedger) {
-            for (const key in Memory.pipelineLedger) {
-                this.pipelineLedger.set(key, Memory.pipelineLedger[key]);
-            }
-        }
-
         const runLogic = () => {
             this.intents.clear();
             this.ledger.clear();
             this.swapRegistry.clear();
 
-            // Efficient cleanup of expired locks (Aggressive GC)
+            // Aggressive GC: Purge expired locks from Heap
             for (const [id, lock] of this.pipelineLedger) {
-                if (typeof Game !== 'undefined' && Game.time > lock.tickExpiry) {
+                if (Game.time > lock.tickExpiry) {
                     this.pipelineLedger.delete(id);
-                    if (typeof Memory !== 'undefined' && Memory.pipelineLedger) {
-                        delete Memory.pipelineLedger[id];
-                    }
                 }
             }
         };
 
         /* global Profiler */
-        if (typeof Profiler !== 'undefined' && Profiler.wrap) {
-            Profiler.wrap('TrafficManager', runLogic);
-        } else {
-            runLogic();
-        }
+        typeof Profiler !== 'undefined' ? Profiler.wrap('TrafficManager', runLogic) : runLogic();
     },
 
     /**
@@ -60,17 +46,10 @@ const TrafficManager = {
      * @param {number} amount
      */
     lockPipeline(creepName, sourceId, targetId, resourceType, amount) {
-        const lock = {
+        this.pipelineLedger.set(sourceId, {
             creepName, targetId, resourceType, amount,
-            tickExpiry: typeof Game !== 'undefined' ? Game.time + 1 : 1
-        };
-
-        // Proxy to RawMemory/Memory segment as per "Memory Segmentation" rules
-        this.pipelineLedger.set(sourceId, lock);
-        if (typeof Memory !== 'undefined') {
-            Memory.pipelineLedger = Memory.pipelineLedger || {};
-            Memory.pipelineLedger[sourceId] = lock;
-        }
+            tickExpiry: Game.time + 1
+        });
     },
 
     /**
@@ -80,7 +59,7 @@ const TrafficManager = {
      */
     checkPipeline(sourceId) {
         const lock = this.pipelineLedger.get(sourceId);
-        return (lock && typeof Game !== 'undefined' && Game.time <= lock.tickExpiry) ? lock.creepName : false;
+        return (lock && Game.time <= lock.tickExpiry) ? lock.creepName : false;
     },
 
     registerTransfer(creep, target, resourceType, amount) {
