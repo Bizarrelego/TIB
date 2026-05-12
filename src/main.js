@@ -1,5 +1,3 @@
-/* global Game */
-
 const installMemoryProxy = require('./os/memoryProxy');
 const cacheInit = require('./os/cache');
 const stateScanner = require('./state/stateScanner');

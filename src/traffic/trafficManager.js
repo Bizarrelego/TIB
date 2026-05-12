@@ -1,5 +1,3 @@
-/* global Game, OK, ERR_NOT_ENOUGH_RESOURCES, ERR_FULL */
-
 const TrafficManager = {
     intents: new Map(),
     ledger: new Map(), // Sub-Tick Virtual Ledger

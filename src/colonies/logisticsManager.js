@@ -1,5 +1,3 @@
-/* global Game */
-
 const LogisticsManager = {
     run(roomName) {
         const room = Game.rooms[roomName];
@@ -13,7 +11,7 @@ const LogisticsManager = {
         const towers = [];
         let storage = null;
 
-        for (const [id, struct] of structures.entries()) {
+        for (const struct of structures.values()) {
             if (!struct.isActive || !struct.isActive()) continue;
 
             if ((struct.structureType === 'spawn' || struct.structureType === 'extension') && struct.store.getFreeCapacity('energy') > 0) {
@@ -29,7 +27,7 @@ const LogisticsManager = {
         const haulers = [];
         const fastFillers = [];
 
-        for (const [id, creep] of creeps.entries()) {
+        for (const creep of creeps.values()) {
             // Intent Maximization & Fatigue Gating Rule
             if (creep.fatigue > 0) continue; // instantly skip logic for that tick
 

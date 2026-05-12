@@ -1,4 +1,4 @@
-/* global Game, FIND_STRUCTURES, FIND_DROPPED_RESOURCES, FIND_TOMBSTONES, FIND_RUINS */
+/* global EVENT_OBJECT_DESTROYED, EVENT_BUILD, EVENT_ATTACK, EVENT_HEAL, FIND_RUINS */
 
 module.exports = function stateScanner() {
     for (const roomName in Game.rooms) {
