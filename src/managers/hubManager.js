@@ -21,6 +21,9 @@ function findParkPos(hubLink, storage, room) {
 
 function run(room) {
     try {
+        if (!global.Heap) global.Heap = {};
+        if (!global.Heap.hubManagers) global.Heap.hubManagers = new Map();
+
         const roomCreeps = global.State.creepsByRoom.get(room.name);
         if (!roomCreeps) return;
 
@@ -76,10 +79,13 @@ function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsE
         if (creep.fatigue > 0) continue;
         if (TrafficManager.checkPipeline(creep.id)) continue;
 
-        creep.heap = creep.heap || {};
+        if (!global.Heap.hubManagers.has(creep.id)) {
+            global.Heap.hubManagers.set(creep.id, { parkPos: null });
+        }
+        const heap = global.Heap.hubManagers.get(creep.id);
 
-        if (!creep.heap.parkPos) {
-            creep.heap.parkPos = findParkPos(hubLink, storage, room);
+        if (!heap.parkPos) {
+            heap.parkPos = findParkPos(hubLink, storage, room);
         }
 
         const creepState = TrafficManager.getVirtualState(creep, RESOURCE_ENERGY);
@@ -114,7 +120,7 @@ function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsE
                     actionRegistered = true;
                 }
             }
-            creep.heap.state = 'transfer';
+            heap.state = 'transfer';
         } else if (creepState.free > 0) {
             // Priority 1: Empty Link (if controller doesn't need energy)
             if (!controllerNeedsEnergy && hubLinkState.used > 0) {
@@ -140,11 +146,11 @@ function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsE
                     actionRegistered = true;
                 }
             }
-            creep.heap.state = 'withdraw';
+            heap.state = 'withdraw';
         }
 
         if (creepState.used === 0 && !actionRegistered) {
-            creep.heap.state = 'SLEEP';
+            heap.state = 'SLEEP';
         }
 
     }
