@@ -2,63 +2,148 @@ const DeadlockEngine = require('./deadlock');
 
 const DIRECTION_VECTORS = new Map([[1, [0, -1]], [2, [1, -1]], [3, [1, 0]], [4, [1, 1]], [5, [0, 1]], [6, [-1, 1]], [7, [-1, 0]], [8, [-1, -1]]]);
 
-const TrafficManager = {
-    intents: new Map(),
-    ledger: new Map(),
-    swapRegistry: new Map(),
+/**
+ * @typedef {Object} PipelineLock
+ * @property {string} creepName
+ * @property {string} targetId
+ * @property {string} resourceType
+ * @property {number} amount
+ * @property {number} tickExpiry
+ */
 
+const TrafficManager = {
+    /**
+     * Initializes global state only if missing to support hot-reloads/rehydration.
+     */
+    init() {
+        if (!global.State) global.State = {};
+        global.State.trafficIntents = global.State.trafficIntents || new Map();
+        global.State.ledger = global.State.ledger || new Map();
+        global.State.swapRegistry = global.State.swapRegistry || new Map();
+        global.State.pipelineLedger = global.State.pipelineLedger || new Map();
+    },
+
+    /**
+     * TrafficManager must operate on global.State.
+     * State is persistent across ticks, allowing the logic to persist.
+     * @returns {void}
+     */
     run() {
-        this.intents.clear();
-        this.ledger.clear();
-        this.swapRegistry.clear();
+        try {
+            this.init();
+
+            // Clean volatile entries only
+            global.State.trafficIntents.clear();
+            global.State.ledger.clear();
+            global.State.swapRegistry.clear();
+
+            // Clean pipeline locks every 10 ticks
+            if (Game.time % 10 === 0) {
+                for (const [id, lock] of global.State.pipelineLedger) {
+                    if (Game.time > lock.tickExpiry) {
+                        global.State.pipelineLedger.delete(id);
+                    }
+                }
+            }
+        } catch (e) {
+            console.error(`TrafficManager CRITICAL: ${e.stack}`);
+        }
+    },
+
+    /**
+     * @param {string} creepName
+     * @param {string} sourceId
+     * @param {string} targetId
+     * @param {string} resourceType
+     * @param {number} amount
+     * @returns {void}
+     */
+    lockPipeline(creepName, sourceId, targetId, resourceType, amount) {
+        if (global.State && global.State.pipelineLedger) {
+            global.State.pipelineLedger.set(sourceId, {
+                creepName,
+                targetId,
+                resourceType,
+                amount,
+                tickExpiry: Game.time + 1
+            });
+        }
+    },
+
+    /**
+     * @param {string} sourceId
+     * @returns {string|boolean}
+     */
+    checkPipeline(sourceId) {
+        if (global.State && global.State.pipelineLedger) {
+            const lock = global.State.pipelineLedger.get(sourceId);
+            return lock ? lock.creepName : false;
+        }
+        return false;
     },
 
     registerTransfer(creep, target, resourceType, amount) {
-        if (!this.ledger.has(target.id)) {
+        if (!global.State || !global.State.ledger) return ERR_FULL;
+
+        if (!global.State.ledger.has(target.id)) {
             let capacity = target.store ? target.store.getFreeCapacity(resourceType) : 0;
             if (target.energyCapacity) {
                 capacity = target.energyCapacity - target.energy;
             }
-            this.ledger.set(target.id, capacity);
+            global.State.ledger.set(target.id, capacity);
         }
 
-        let currentCapacity = this.ledger.get(target.id);
+        let currentCapacity = global.State.ledger.get(target.id);
         if (currentCapacity < amount) {
             return ERR_FULL;
         }
 
-        this.ledger.set(target.id, currentCapacity - amount);
+        global.State.ledger.set(target.id, currentCapacity - amount);
         return creep.transfer(target, resourceType, amount);
     },
 
+    /**
+     * @param {object} creep
+     * @param {number} direction
+     */
     registerMove(creep, direction) {
-        this.intents.set(creep.name, { direction, priority: creep.heap.priority || 0 });
+        // Fatigue Gating: Ensure only the specific creep is gated.
+        // The TrafficManager should only process creeps that are capable of moving.
+        if (!creep || creep.fatigue > 0) return;
+
+        if (global.State && global.State.trafficIntents) {
+            global.State.trafficIntents.set(creep.name, { direction, priority: creep.heap.priority || 0 });
+        }
     },
 
     registerSwap(creepA, creepB) {
-        this.swapRegistry.set(creepA.name, creepB.name);
-        this.swapRegistry.set(creepB.name, creepA.name);
+        if (global.State && global.State.swapRegistry) {
+            global.State.swapRegistry.set(creepA.name, creepB.name);
+            global.State.swapRegistry.set(creepB.name, creepA.name);
+        }
     },
 
     executeIntents() {
         try {
+            if (!global.State || !global.State.trafficIntents) return;
+
             this.resolveDeadlocks();
             this.executeSwaps();
 
-            for (const [creepName, intent] of this.intents.entries()) {
+            for (const [creepName, intent] of global.State.trafficIntents.entries()) {
                 const liveCreep = global.State.creepLookup.get(creepName);
-                if (liveCreep && !this.swapRegistry.has(creepName)) {
+                if (liveCreep && (!global.State.swapRegistry || !global.State.swapRegistry.has(creepName))) {
                     liveCreep.move(intent.direction);
                 }
             }
         } catch (e) {
-            console.log(`[TrafficManager Execution Error]: ${e.stack}`);
+            console.error(`[TrafficManager Execution Error]: ${e.stack}`);
         }
     },
 
     resolveDeadlocks() {
-        const visited = new Set();
-        const recursionStack = new Set();
+        if (!global.State || !global.State.trafficIntents) return;
+
         const dependencyGraph = new Map();
 
         const targetPositions = new Map();
@@ -69,7 +154,7 @@ const TrafficManager = {
             currentPositions.set(`${liveCreep.pos.roomName}_${liveCreep.pos.x}_${liveCreep.pos.y}`, liveCreep.name);
         }
 
-        for (const [creepName, intent] of this.intents.entries()) {
+        for (const [creepName, intent] of global.State.trafficIntents.entries()) {
             const liveCreep = global.State.creepLookup.get(creepName);
             if (!liveCreep) continue;
             const [dx, dy] = DIRECTION_VECTORS.get(intent.direction) || [0, 0];
@@ -86,19 +171,21 @@ const TrafficManager = {
             targetPositions.set(posKey, creepName);
         }
 
-        DeadlockEngine.detectAndResolve(this.intents, dependencyGraph);
+        DeadlockEngine.detectAndResolve(global.State.trafficIntents, dependencyGraph);
     },
 
     executeSwaps() {
+        if (!global.State || !global.State.swapRegistry) return;
+
         const processed = new Set();
-        for (const [creepA_name, creepB_name] of this.swapRegistry.entries()) {
+        for (const [creepA_name, creepB_name] of global.State.swapRegistry.entries()) {
             if (processed.has(creepA_name) || processed.has(creepB_name)) continue;
 
             const liveCreepA = global.State.creepLookup.get(creepA_name);
             const liveCreepB = global.State.creepLookup.get(creepB_name);
 
             if (liveCreepA && liveCreepB) {
-                const intentA = this.intents.get(creepA_name);
+                const intentA = global.State.trafficIntents ? global.State.trafficIntents.get(creepA_name) : null;
                 if (intentA) {
                     const oppositeDirection = ((intentA.direction + 3) % 8) + 1;
                     liveCreepA.move(intentA.direction);
