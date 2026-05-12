@@ -13,6 +13,17 @@ const DIRECTION_VECTORS = new Map([[1, [0, -1]], [2, [1, -1]], [3, [1, 0]], [4, 
 
 const TrafficManager = {
     /**
+     * Initializes global state only if missing to support hot-reloads/rehydration.
+     */
+    init() {
+        if (!global.State) global.State = {};
+        global.State.trafficIntents = global.State.trafficIntents || new Map();
+        global.State.ledger = global.State.ledger || new Map();
+        global.State.swapRegistry = global.State.swapRegistry || new Map();
+        global.State.pipelineLedger = global.State.pipelineLedger || new Map();
+    },
+
+    /**
      * TrafficManager must operate on global.State.
      * State is persistent across ticks, allowing the logic to persist.
      * @returns {void}
@@ -22,18 +33,15 @@ const TrafficManager = {
             // Fatigue Gating: Global check for creep exhaustion
             if (global.State && global.State.globalFatigue > 0) return;
 
-            // Initialize/clear volatile state from global.State
-            if (global.State) {
-                global.State.trafficIntents = new Map();
-                global.State.ledger = new Map();
-                global.State.swapRegistry = new Map();
-                if (!global.State.pipelineLedger) {
-                    global.State.pipelineLedger = new Map();
-                }
-            }
+            this.init();
+
+            // Clean volatile entries only
+            global.State.trafficIntents.clear();
+            global.State.ledger.clear();
+            global.State.swapRegistry.clear();
 
             // Clean pipeline locks every 10 ticks
-            if (Game.time % 10 === 0 && global.State && global.State.pipelineLedger) {
+            if (Game.time % 10 === 0) {
                 for (const [id, lock] of global.State.pipelineLedger) {
                     if (Game.time > lock.tickExpiry) {
                         global.State.pipelineLedger.delete(id);
