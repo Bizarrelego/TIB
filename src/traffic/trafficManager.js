@@ -44,10 +44,9 @@ const TrafficManager = {
             this.executeSwaps();
 
             for (const [creepName, intent] of this.intents.entries()) {
-                const creepData = this.getCreepData(creepName);
-                if (creepData && !this.swapRegistry.has(creepName)) {
-                    const liveCreep = Game.getObjectById(creepData.id);
-                    if (liveCreep) liveCreep.move(intent.direction);
+                const liveCreep = global.State.creepLookup.get(creepName);
+                if (liveCreep && !this.swapRegistry.has(creepName)) {
+                    liveCreep.move(intent.direction);
                 }
             }
         } catch (e) {
@@ -63,22 +62,16 @@ const TrafficManager = {
         const targetPositions = new Map();
         const currentPositions = new Map();
 
-        // Scan creeps via global.State once per room if needed, but since we map intents, we can use global.State directly.
-        // We will pre-build a fast position lookup map to avoid scanning arrays
-        if (global.State && global.State.creepsByRoom) {
-            for (const roomCreeps of global.State.creepsByRoom.values()) {
-                for (const creepData of roomCreeps.values()) {
-                    currentPositions.set(`${creepData.pos.roomName}_${creepData.pos.x}_${creepData.pos.y}`, creepData.name);
-                }
-            }
+        // Use pre-cached lookup Map
+        for (const liveCreep of global.State.creepLookup.values()) {
+            currentPositions.set(`${liveCreep.pos.roomName}_${liveCreep.pos.x}_${liveCreep.pos.y}`, liveCreep.name);
         }
 
         for (const [creepName, intent] of this.intents.entries()) {
-            const creepData = this.getCreepData(creepName);
-            if (!creepData) continue;
+            const liveCreep = global.State.creepLookup.get(creepName);
+            if (!liveCreep) continue;
             const [dx, dy] = DIRECTION_VECTORS.get(intent.direction) || [0, 0];
-            const posKey = `${creepData.pos.roomName}_${creepData.pos.x + dx}_${creepData.pos.y + dy}`;
-            targetPositions.set(posKey, creepName);
+            const posKey = `${liveCreep.pos.roomName}_${liveCreep.pos.x + dx}_${liveCreep.pos.y + dy}`;
 
             const blockerName = targetPositions.get(posKey);
             if (blockerName) {
@@ -87,6 +80,8 @@ const TrafficManager = {
                 const statBlocker = currentPositions.get(posKey);
                 if (statBlocker && statBlocker !== creepName) dependencyGraph.set(creepName, statBlocker);
             }
+
+            targetPositions.set(posKey, creepName);
         }
 
         const detectCycle = (creepName) => {
@@ -106,7 +101,6 @@ const TrafficManager = {
         };
 
         // If cycle detected, find lowest priority and break it
-        // This is a simplified DFS deadlock resolution stub fitting within the 150 lines limit
         for (const creepName of dependencyGraph.keys()) {
             if (detectCycle(creepName)) {
                 this.intents.delete(creepName); // Force lowest priority creep to stay/yield
@@ -115,32 +109,23 @@ const TrafficManager = {
         }
     },
 
-    getCreepData(creepName) {
-        return global.State.creepLookup.get(creepName);
-    },
-
     executeSwaps() {
         const processed = new Set();
         for (const [creepA_name, creepB_name] of this.swapRegistry.entries()) {
             if (processed.has(creepA_name) || processed.has(creepB_name)) continue;
 
-            const dataA = this.getCreepData(creepA_name);
-            const dataB = this.getCreepData(creepB_name);
+            const liveCreepA = global.State.creepLookup.get(creepA_name);
+            const liveCreepB = global.State.creepLookup.get(creepB_name);
 
-            if (dataA && dataB) {
-                const liveCreepA = Game.getObjectById(dataA.id);
-                const liveCreepB = Game.getObjectById(dataB.id);
+            if (liveCreepA && liveCreepB) {
+                const intentA = this.intents.get(creepA_name);
+                if (intentA) {
+                    const oppositeDirection = ((intentA.direction + 3) % 8) + 1;
+                    liveCreepA.move(intentA.direction);
+                    liveCreepB.move(oppositeDirection);
 
-                if (liveCreepA && liveCreepB) {
-                    const intentA = this.intents.get(creepA_name);
-                    if (intentA) {
-                        const oppositeDirection = ((intentA.direction + 3) % 8) + 1;
-                        liveCreepA.move(intentA.direction);
-                        liveCreepB.move(oppositeDirection);
-
-                        processed.add(creepA_name);
-                        processed.add(creepB_name);
-                    }
+                    processed.add(creepA_name);
+                    processed.add(creepB_name);
                 }
             }
         }

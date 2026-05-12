@@ -11,38 +11,36 @@ const LogisticsManager = {
         let storage = null;
 
         // Note: The structure cache in global.State must contain these properties
-        // For example, properties populated externally or via RawMemory caches
-        for (const structData of structures.values()) {
-            if (!structData.isActive) continue;
+        for (const struct of structures.values()) {
+            if (!struct.isActive) continue;
 
-            if ((structData.structureType === 'spawn' || structData.structureType === 'extension') && structData.freeCapacity > 0) {
-                spawnsAndExtensions.push(structData);
-            } else if (structData.structureType === 'tower' && structData.freeCapacity > 200) {
-                towers.push(structData);
-            } else if (structData.structureType === 'storage') {
-                storage = structData;
+            // Assuming freeCapacity is populated externally, e.g. from discoveryManager properties
+            if ((struct.structureType === 'spawn' || struct.structureType === 'extension') && struct.store && struct.store.getFreeCapacity('energy') > 0) {
+                spawnsAndExtensions.push(struct);
+            } else if (struct.structureType === 'tower' && struct.store && struct.store.getFreeCapacity('energy') > 200) {
+                towers.push(struct);
+            } else if (struct.structureType === 'storage') {
+                storage = struct;
             }
         }
 
-        // Gather logistics creeps (haulers and fastFillers)
         const haulers = [];
         const fastFillers = [];
 
-        for (const creep of creeps.values()) {
-            // Intent Maximization & Fatigue Gating Rule
-            if (creep.fatigue > 0) continue; // instantly skip logic for that tick
+        for (const cachedCreep of creeps.values()) {
+            // Live fatigue check directly from creepLookup
+            const liveCreep = global.State.creepLookup.get(cachedCreep.name);
+            if (!liveCreep || liveCreep.fatigue > 0) continue;
 
-            if (!creep.heap) creep.heap = {}; // Ensure proxy
-            if (creep.memory.role === 'hauler' && !creep.heap.targetId) {
-                haulers.push(creep);
-            } else if (creep.memory.role === 'fastFiller' && !creep.heap.targetId) {
-                fastFillers.push(creep);
+            if (!liveCreep.heap) liveCreep.heap = {};
+            if (liveCreep.memory.role === 'hauler' && !liveCreep.heap.targetId) {
+                haulers.push(liveCreep);
+            } else if (liveCreep.memory.role === 'fastFiller' && !liveCreep.heap.targetId) {
+                fastFillers.push(liveCreep);
             }
         }
 
         // Top-Down Assignment: Assign targets directly to heap
-        // FastFillers prioritized for Spawns/Extensions
-        // We use index-based traversal instead of .shift() for better performance
         let spawnIndex = 0;
         let towerIndex = 0;
         for (const filler of fastFillers) {
@@ -57,13 +55,11 @@ const LogisticsManager = {
             }
         }
 
-        // Haulers handle transport from remote/local drops to Storage
         for (const hauler of haulers) {
             if (storage) {
                 hauler.heap.targetId = storage.id;
                 hauler.heap.task = 'store_energy';
             }
-            // If we needed to assign pickup, we'd query global.State.logisticsByRoom
         }
     }
 };

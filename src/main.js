@@ -1,27 +1,15 @@
+const discoveryManager = require('./state/discoveryManager');
 const stateScanner = require('./state/stateScanner');
 const colonyManager = require('./colonies/colonyManager');
 const operationsManager = require('./operations/operationsManager');
 const trafficManager = require('./traffic/trafficManager');
 
-const initOS = () => {
-    if (!global.State) {
-        global.State = {
-            structuresByRoom: new Map(),
-            creepsByRoom: new Map(),
-            hostilesByRoom: new Map(),
-            logisticsByRoom: new Map(),
-            creepLookup: new Map(),
-            scannedRooms: new Set()
-        };
-    }
-};
-
 module.exports.loop = function () {
-    // Phase 1: OS Init & Cache
+    // Phase 1: Discovery Manager (Raw Engine API execution & global.State Bootstrapping)
     try {
-        initOS();
+        if (discoveryManager) discoveryManager();
     } catch (e) {
-        console.log(`[Phase 1 Error] OS Init: ${e.stack}`);
+        console.log(`[Phase 1 Error] Discovery Manager: ${e.stack}`);
         return; // Fatal OS crash
     }
 
@@ -44,12 +32,12 @@ module.exports.loop = function () {
             break;
     }
 
-    // Phase 2: Global State
+    // Phase 2: State Scanner (Event-driven map updaters)
     if (!skipState) {
         try {
             if (stateScanner) stateScanner();
         } catch (e) {
-            console.log(`[Phase 2 Error] Global State: ${e.stack}`);
+            console.log(`[Phase 2 Error] Global State Scanner: ${e.stack}`);
         }
     }
 
@@ -80,7 +68,6 @@ module.exports.loop = function () {
 
     // Phase 6: Intents & Sleep
     try {
-        // Execute deferred intents and sleep idle creeps
         if (trafficManager && trafficManager.executeIntents) {
             trafficManager.executeIntents();
         }
