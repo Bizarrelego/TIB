@@ -2,18 +2,27 @@
 const { CacheRegistry } = require('../os/cache');
 
 module.exports = function stateScanner() {
-    if (!global.State || !global.State.scannedRooms) return;
+    if (!global.State?.scannedRooms) return;
 
-    // Event-Driven Hydration: Synchronize global.Cache
-    if (global.State.getSegment) {
-        CacheRegistry.hydrate('creeps', new Map(Object.entries(global.State.getSegment(1) || {})));
-        CacheRegistry.hydrate('structures', new Map(Object.entries(global.State.getSegment(0) || {})));
+    // Use pre-existing Maps from segment pointers directly; avoid Object.entries() conversion
+    // Segment 1: Creeps, Segment 0: Structures
+    try {
+        if (global.State.getSegmentMap) {
+            const creepMap = global.State.getSegmentMap(1); // Assume helper returns Map
+            const structMap = global.State.getSegmentMap(0);
+
+            if (creepMap instanceof Map) CacheRegistry.hydrate('creeps', creepMap);
+            if (structMap instanceof Map) CacheRegistry.hydrate('structures', structMap);
+        }
+    } catch (e) {
+        // Error boundaries: Isolated failure
+        console.log(`[stateScanner] Cache hydration failed: ${e.stack}`);
     }
 
     // Pure Event-Driven Consumer Loop
     for (const roomName of global.State.scannedRooms) {
         // Read directly from cached raw memory/event stream populated by discoveryManager
-        const events = global.State.eventCache.get(roomName) || [];
+        const events = global.State.getEvents ? global.State.getEvents(roomName) : (global.State.eventCache.get(roomName) || []);
 
         const roomStructures = global.State.structuresByRoom.get(roomName) || new Map();
         const roomHostiles = global.State.hostilesByRoom.get(roomName) || new Map();
