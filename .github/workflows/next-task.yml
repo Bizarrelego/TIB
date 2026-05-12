@@ -2,8 +2,13 @@ name: Strategy Loop
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      specific_task:
+        description: 'Force a specific task (leave blank for auto)'
+        required: false
+        type: string
 
-# Kills duplicate runs instantly
 concurrency:
   group: strategy-loop
   cancel-in-progress: true
@@ -14,38 +19,37 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 15 # Fetch history to read past tasks
+          fetch-depth: 15
       
       - name: Build Prompt Context
         run: |
           delimiter="$(openssl rand -hex 8)"
           {
             echo "PROMPT_TEXT<<${delimiter}"
-            echo "Determine the exact next priority for the Screeps bot."
-            echo "Write a comprehensive prompt for an AI coding agent (Jules) to execute this priority."
-            echo "**CRITICAL FILE I/O CONSTRAINTS:**"
-            echo "1. You must provide Jules with a strict 'File Manifest' divided into two sections: Files to READ for context, and Files to EDIT."
-            echo "2. Instruct Jules: Read the contextual files first to understand existing variables, imports, and architectures."
-            echo "3. Instruct Jules: DO NOT run unbounded search commands (like grep across the whole repo). Stick strictly to reading and editing the files defined in your manifest."
-            echo "4. Instruct Jules: DO NOT rewrite entire files. Use precise insertions and diffs to modify existing logic."
-            echo "--- RECENT BOT UPDATES (COMPLETED TASKS) ---"
-            git log -n 10 --oneline --no-merges || echo "No history found."
+            echo "You are the Lead Architect for a Screeps bot."
+            echo "Analyze the current codebase and determine the EXACT NEXT SINGLE FILE to create or modify."
+            if [ -n "${{ inputs.specific_task }}" ]; then
+              echo "USER DIRECTIVE: ${{ inputs.specific_task }}"
+            fi
+            echo "**CRITICAL CONSTRAINTS:**"
+            echo "1. Output a prompt for a junior AI agent (Jules)."
+            echo "2. Your prompt MUST restrict Jules to editing or creating EXACTLY ONE FILE. Do not batch tasks."
+            echo "3. Include a 'Files to READ' list containing dependencies for that single file."
+            echo "--- RECENT GIT HISTORY ---"
+            git log -n 5 --oneline --no-merges || echo "No history."
             echo ""
-            echo "--- CURRENT BOT FILES ---"
-            ls -R src/ || echo "No src directory yet"
-            echo ""
-            echo "--- AGENTS.md ---"
-            cat AGENTS.md 2>/dev/null || echo "[WARNING: AGENTS.md NOT FOUND]"
-            echo ""
+            echo "--- CURRENT CODEBASE CONTENTS ---"
+            # Injects actual code, limiting to prevent token overflow
+            find src -name "*.js" -type f -exec sh -c 'echo "FILE: {}"; head -n 100 "{}"; echo "---"' \; || echo "No JS files found."
             echo "${delimiter}"
           } >> "$GITHUB_ENV"
 
       - name: Get Next Task
         id: plan-next
         run: |
-          PAYLOAD=$(jq -n --arg text "$PROMPT_TEXT" '{contents: [{parts: [{"text": $text}]}]}')
+          PAYLOAD=$(jq -n --arg text "$PROMPT_TEXT" '{contents: [{parts: [{"text": $text}]}], generationConfig: {temperature: 0.2}}')
           
-          API_RES=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
+          API_RES=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
             -H 'Content-Type: application/json' \
             -d "$PAYLOAD")
             
@@ -67,13 +71,15 @@ jobs:
         env:
           GEMINI_RESPONSE: ${{ steps.plan-next.outputs.gemini_response }}
         run: |
-          # Pre-seed the context by combining Gemini's task with the AGENTS.md constraints
           AGENTS_DATA=$(cat AGENTS.md 2>/dev/null || echo "[AGENTS.md missing]")
-          FULL_PROMPT=$(cat <<EOF
-          ${GEMINI_RESPONSE}
           
-          --- SYSTEM CONSTRAINTS (AGENTS.md) ---
+          FULL_PROMPT=$(cat <<EOF
+          SYSTEM CONSTRAINTS - STRICTLY ENFORCED:
           ${AGENTS_DATA}
+          
+          =========================================
+          YOUR EXACT TASK:
+          ${GEMINI_RESPONSE}
           EOF
           )
           
