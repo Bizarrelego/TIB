@@ -6,11 +6,50 @@ const TrafficManager = {
     intents: new Map(),
     ledger: new Map(),
     swapRegistry: new Map(),
+    pipelineLedger: new Map(),
 
     run() {
         this.intents.clear();
         this.ledger.clear();
         this.swapRegistry.clear();
+
+        // Fatigue Gating / Cascading CPU Throttling
+        // Skip ledger cleanup if processing high-latency pathing or system is overloaded
+        if (typeof Game !== 'undefined' && Game.cpu && Game.cpu.bucket >= 500) {
+            this.pipelineLedger.clear();
+        }
+    },
+
+    /**
+     * Locks a resource pipeline to prevent multiple creeps from targeting the same source.
+     * @param {string} creepName - The name of the creep locking the pipeline.
+     * @param {string} sourceId - The ID of the source being locked.
+     * @param {string} targetId - The ID of the target.
+     * @param {string} resourceType - The resource type.
+     * @param {number} amount - The amount of resource.
+     */
+    lockPipeline(creepName, sourceId, targetId, resourceType, amount) {
+        this.pipelineLedger.set(sourceId, {
+            creepName,
+            sourceId,
+            targetId,
+            resourceType,
+            amount,
+            tickExpiry: Game.time + 1
+        });
+    },
+
+    /**
+     * Checks if a source pipeline is currently locked.
+     * @param {string} sourceId - The ID of the source.
+     * @returns {string|boolean} - The name of the locking creep, or false if not locked.
+     */
+    checkPipeline(sourceId) {
+        const lock = this.pipelineLedger.get(sourceId);
+        if (lock && Game.time <= lock.tickExpiry) {
+            return lock.creepName;
+        }
+        return false;
     },
 
     registerTransfer(creep, target, resourceType, amount) {
