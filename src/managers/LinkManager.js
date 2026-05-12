@@ -71,4 +71,10 @@ function run(room) {
     }
 }
 
-module.exports = { run };
+function getControllerLink(roomName) {
+    if (!global.State.linksByRoom) return null;
+    const roomLinks = global.State.linksByRoom.get(roomName);
+    return roomLinks ? roomLinks.controllerLink : null;
+}
+
+module.exports = { run, getControllerLink };

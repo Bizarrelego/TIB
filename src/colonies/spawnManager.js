@@ -18,14 +18,20 @@ module.exports = {
 
         const capacity = room.energyCapacityAvailable;
 
-        // RCL 5 Logic: hubManager
+        // RCL 5 Logic: hubManager & upgrader
         if (room.controller.level >= 5) {
             if (spawnLedger.isLinkNetworkPresent(room)) {
                 let hubManagerCount = 0;
+                let upgraderCount = 0;
                 if (roomCreeps) {
                     const hubManagers = roomCreeps.get('hubManager');
                     if (hubManagers) {
                         hubManagerCount = hubManagers.length;
+                    }
+
+                    const upgraders = roomCreeps.get('upgrader');
+                    if (upgraders) {
+                        upgraderCount = upgraders.length;
                     }
                 }
 
@@ -34,14 +40,22 @@ module.exports = {
                     const body = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE];
                     const cost = (16 * BODYPART_COST[CARRY]) + BODYPART_COST[MOVE]; // 16 * 50 + 50 = 850
                     if (spawnLedger.canSpawn(cost)) {
-                        const result = spawn.spawnCreep(body, 'hubManager_' + Game.time, {
+                        spawnLedger.requestSpawn(spawn, body, 'hubManager_' + Game.time, {
                             memory: { role: 'hubManager', colony: room.name }
-                        });
-
-                        if (result === OK) {
-                            spawnLedger.deduct(cost);
-                        }
+                        }, cost);
                         return; // Prioritize hubManager over other logistics
+                    }
+                }
+
+                if (upgraderCount < 1) {
+                    // Static upgrader body
+                    const body = [WORK, WORK, WORK, WORK, WORK, WORK, WORK, WORK, CARRY, CARRY, MOVE];
+                    const cost = 950;
+                    if (spawnLedger.canSpawn(cost)) {
+                        spawnLedger.requestSpawn(spawn, body, 'upgrader_' + Game.time, {
+                            memory: { role: 'upgrader', colony: room.name }
+                        }, cost);
+                        return; // Prioritize upgrader over other logistics
                     }
                 }
             }
@@ -95,13 +109,9 @@ module.exports = {
                     }
 
                     if (body.length > 0 && spawnLedger.canSpawn(cost)) {
-                        const result = spawn.spawnCreep(body, 'fastFiller_' + Game.time, {
+                        spawnLedger.requestSpawn(spawn, body, 'fastFiller_' + Game.time, {
                             memory: { role: 'fastFiller', colony: room.name }
-                        });
-
-                        if (result === OK) {
-                            spawnLedger.deduct(cost);
-                        }
+                        }, cost);
                         return; // Prioritize fastFillers
                     }
                 }
@@ -119,13 +129,9 @@ module.exports = {
             }
 
             if (workerCount < 15 && spawnLedger.canSpawn(200)) {
-                const result = spawn.spawnCreep([WORK, CARRY, MOVE], 'worker_' + Game.time, {
+                spawnLedger.requestSpawn(spawn, [WORK, CARRY, MOVE], 'worker_' + Game.time, {
                     memory: { role: 'worker', colony: room.name }
-                });
-
-                if (result === OK) {
-                    spawnLedger.deduct(200);
-                }
+                }, 200);
             }
         } else {
             // RCL 2 Logic (>= 500 Capacity)
@@ -145,24 +151,16 @@ module.exports = {
 
             // Prioritize Harvesters
             if (harvesterCount < 2 && spawnLedger.canSpawn(500)) {
-                const result = spawn.spawnCreep([WORK, WORK, WORK, WORK, CARRY, MOVE], 'harvester_' + Game.time, {
+                spawnLedger.requestSpawn(spawn, [WORK, WORK, WORK, WORK, CARRY, MOVE], 'harvester_' + Game.time, {
                     memory: { role: 'harvester', colony: room.name }
-                });
-
-                if (result === OK) {
-                    spawnLedger.deduct(500);
-                }
+                }, 500);
                 return; // Stop checking haulers if we just spawned a harvester or are prioritizing it
             }
 
             if (haulerCount < 4 && spawnLedger.canSpawn(500)) {
-                const result = spawn.spawnCreep([CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE], 'hauler_' + Game.time, {
+                spawnLedger.requestSpawn(spawn, [CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE], 'hauler_' + Game.time, {
                     memory: { role: 'hauler', colony: room.name }
-                });
-
-                if (result === OK) {
-                    spawnLedger.deduct(500);
-                }
+                }, 500);
             }
         }
     }

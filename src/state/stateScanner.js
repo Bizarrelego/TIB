@@ -1,3 +1,5 @@
+const Scanner = require('./Scanner');
+
 module.exports = function stateScanner() {
     if (!global.State) {
         global.State = {
@@ -8,7 +10,9 @@ module.exports = function stateScanner() {
             sitesByRoom: new Map(),
             hostilesByRoom: new Map(),
             mineralsByRoom: new Map(),
-            roomTerrain: new Map()
+            roomTerrain: new Map(),
+            controllersByRoom: new Map(),
+            droppedByRoom: new Map()
         };
     } else {
         global.State.creepsByRoom.clear();
@@ -18,6 +22,8 @@ module.exports = function stateScanner() {
         global.State.sitesByRoom.clear();
         global.State.hostilesByRoom.clear();
         global.State.mineralsByRoom.clear();
+        global.State.controllersByRoom.clear();
+        global.State.droppedByRoom.clear();
         // roomTerrain is persistent per global reset, no need to clear it every tick,
         // but since we rebuild it for all visible rooms below anyway, we can clear it,
         // or just rely on global.Cache for actual persistence. Let's put it in global.Cache instead.
@@ -41,42 +47,54 @@ module.exports = function stateScanner() {
         global.State.roomTerrain.set(room.name, global.Cache.roomTerrain.get(room.name));
         let roomCache = global.Cache.rooms.get(room.name);
         if (!roomCache) {
-            roomCache = {};
+            roomCache = {
+                sourceIds: [],
+                mineralIds: []
+            };
             global.Cache.rooms.set(room.name, roomCache);
         }
 
-        if (!roomCache.sourceIds) {
-            const sources = room.find(FIND_SOURCES);
-            roomCache.sourceIds = sources.map(s => s.id);
-        }
-
+        // O(1) Source and Mineral Caching
+        // Removed room.find() logic. Initial discovery must be handled elsewhere or gated if strictly needed.
+        // Assuming global.Cache.rooms[room.name] is seeded by intel/events.
         const roomSources = [];
-        for (let j = 0; j < roomCache.sourceIds.length; j++) {
-            const source = Game.getObjectById(roomCache.sourceIds[j]);
-            if (source) {
-                roomSources.push(source);
+        if (roomCache.sourceIds) {
+            for (let j = 0; j < roomCache.sourceIds.length; j++) {
+                const source = Game.getObjectById(roomCache.sourceIds[j]);
+                if (source) {
+                    roomSources.push(source);
+                }
             }
         }
         global.State.sourcesByRoom.set(room.name, roomSources);
 
-        // O(1) Mineral Caching
-        if (!roomCache.mineralIds) {
-            const minerals = room.find(FIND_MINERALS);
-            roomCache.mineralIds = minerals.map(m => m.id);
-        }
-
         const roomMinerals = [];
-        for (let j = 0; j < roomCache.mineralIds.length; j++) {
-            const mineral = Game.getObjectById(roomCache.mineralIds[j]);
-            if (mineral) {
-                roomMinerals.push(mineral);
+        if (roomCache.mineralIds) {
+            for (let j = 0; j < roomCache.mineralIds.length; j++) {
+                const mineral = Game.getObjectById(roomCache.mineralIds[j]);
+                if (mineral) {
+                    roomMinerals.push(mineral);
+                }
             }
         }
         global.State.mineralsByRoom.set(room.name, roomMinerals);
 
-        // O(1) Hostile Caching
-        const hostiles = room.find(FIND_HOSTILE_CREEPS);
-        global.State.hostilesByRoom.set(room.name, hostiles);
+        if (room.controller) {
+            global.State.controllersByRoom.set(room.name, room.controller);
+        }
+
+        global.State.hostilesByRoom.set(room.name, Scanner.updateHostiles(room));
+        global.State.droppedByRoom.set(room.name, Scanner.updateDropped(room));
+
+        // LinkManager caching
+        if (!global.State.linksByRoom) {
+            global.State.linksByRoom = new Map();
+        }
+        let roomLinks = global.State.linksByRoom.get(room.name);
+        if (!roomLinks) {
+            roomLinks = new Map();
+            global.State.linksByRoom.set(room.name, roomLinks);
+        }
     }
 
     // Reap global.Cache.creeps
@@ -161,6 +179,13 @@ module.exports = function stateScanner() {
                 roomStructs.set(struct.structureType, typeStructs);
             }
             typeStructs.push(struct);
+
+            if (struct.structureType === STRUCTURE_LINK) {
+                const roomLinks = global.State.linksByRoom.get(struct.room.name);
+                if (roomLinks && struct.room.controller && struct.pos.inRangeTo(struct.room.controller, 3)) {
+                    roomLinks.set('controllerLink', struct);
+                }
+            }
         }
     }
 
