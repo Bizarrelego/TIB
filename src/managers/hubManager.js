@@ -72,6 +72,10 @@ function run(room) {
 function process(room, hubManagers, hubLink, storage, terminal, controllerNeedsEnergy, TrafficManager) {
     for (let i = 0; i < hubManagers.length; i++) {
         const creep = hubManagers[i];
+
+        if (creep.fatigue > 0) continue;
+        if (TrafficManager.checkPipeline(creep.id)) continue;
+
         creep.heap = creep.heap || {};
 
         if (!creep.heap.parkPos) {
