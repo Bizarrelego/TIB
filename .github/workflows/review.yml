@@ -31,7 +31,7 @@ jobs:
         run: |
           TS_FILES=$(find src/ -type f -name "*.ts")
           if [ ! -z "$TS_FILES" ]; then
-            echo "::error::TypeScript files are strictly forbidden in this repository. Convert all logic to vanilla JavaScript."
+            echo "::error::TypeScript files are strictly forbidden. Convert all logic to vanilla JavaScript."
             exit 1
           fi
 
@@ -43,13 +43,12 @@ jobs:
       - name: Reject on Test Failure
         if: steps.run-tests.outcome == 'failure'
         run: |
-          # Read file safely into jq, bypassing Bash string interpolation bugs
-          PAYLOAD=$(jq -Rs --arg prefix "@jules Code failed static analysis and linting. Fix the exact syntax errors below before requesting architectural review:\n\n\`\`\`text\n" --arg suffix "\n\`\`\`" '{body: ($prefix + . + $suffix)}' lint_output.txt)
+          PAYLOAD=$(jq -Rs --arg prefix "Code failed static analysis and linting. Fix syntax errors before architectural review:\n\n\`\`\`text\n" --arg suffix "\n\`\`\`" '{body: ($prefix + . + $suffix), event: "REQUEST_CHANGES"}' lint_output.txt)
           
           curl -s -X POST \
             -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+            https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews \
             -d "$PAYLOAD"
             
           exit 1
@@ -60,34 +59,39 @@ jobs:
           delimiter="$(openssl rand -hex 8)"
           {
             echo "REVIEW_TEXT<<${delimiter}"
-            echo "You are a ruthless, expert Screeps architect enforcing Tigga-style efficiency."
-            echo "Analyze the code changes in the diff below against the AGENTS.md constraints."
+            echo "You are a ruthless Screeps architect enforcing Tigga-style efficiency."
+            echo "Analyze the PR diff below against the AGENTS.md constraints."
+            echo "CRITICAL DIRECTIVE: You are reading a unified git diff. ONLY evaluate added lines (lines starting with '+'). IGNORE deleted lines (lines starting with '-')."
             echo "CRITICAL CHECKS:"
-            echo "- Are there ANY room.find() or room.lookAt() calls? (Auto-reject)"
-            echo "- Is state being read from global.State instead of native arrays?"
+            echo "- Are there ANY room.find(), room.lookAt(), or getEventLog() calls inside tick loops? (Auto-reject)"
             echo "- Are they using standard {} objects instead of Map() for dictionaries? (Auto-reject)"
-            echo "If the code passes ALL constraints, reply EXACTLY with 'LGTM'. Do not add any other text."
-            echo "If the code fails, reply with a detailed markdown list of what is wrong, exactly which files violate the rules, and provide the corrected code snippet."
+            echo "Respond STRICTLY in JSON format: {\"status\": \"APPROVE\"|\"REJECT\", \"feedback\": \"Detailed markdown explanation\"}"
             echo "--- AGENTS.md ---"
-            cat AGENTS.md 2>/dev/null || echo "[WARNING: AGENTS.md NOT FOUND]"
+            cat AGENTS.md 2>/dev/null || echo "[AGENTS.md NOT FOUND]"
             echo ""
             echo "--- PR DIFF ---"
-            cat pr_diff.txt 2>/dev/null || echo "[WARNING: pr_diff.txt NOT FOUND]"
-            echo ""
+            cat pr_diff.txt 2>/dev/null || echo "[pr_diff.txt NOT FOUND]"
             echo "${delimiter}"
           } >> "$GITHUB_ENV"
 
       - name: Architect Review
         id: gemini-check
         run: |
-          PAYLOAD=$(jq -n --arg text "$REVIEW_TEXT" '{contents: [{parts: [{"text": $text}]}]}')
+          # Force JSON output schema
+          PAYLOAD=$(jq -n --arg text "$REVIEW_TEXT" '{
+            contents: [{parts: [{"text": $text}]}], 
+            generationConfig: {
+              temperature: 0.1,
+              responseMimeType: "application/json"
+            }
+          }')
           
           MAX_RETRIES=5
           DELAY=1
           SUCCESS=false
           
           for i in $(seq 1 $MAX_RETRIES); do
-            API_RES=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
+            API_RES=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
               -H 'Content-Type: application/json' \
               -d "$PAYLOAD")
               
@@ -102,32 +106,35 @@ jobs:
           done
           
           if [ "$SUCCESS" = false ]; then
-            echo "::error::Gemini API Failed after 5 retries. Please try again later."
+            echo "::error::Gemini API Failed after 5 retries."
             exit 1
           fi
           
+          STATUS=$(echo "$CLEAN_TEXT" | jq -r '.status')
+          FEEDBACK=$(echo "$CLEAN_TEXT" | jq -r '.feedback')
+          
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          
           delimiter="$(openssl rand -hex 8)"
-          {
-            echo "gemini_response<<${delimiter}"
-            echo "$CLEAN_TEXT"
-            echo "${delimiter}"
-          } >> "$GITHUB_OUTPUT"
+          echo "feedback<<${delimiter}" >> "$GITHUB_OUTPUT"
+          echo "$FEEDBACK" >> "$GITHUB_OUTPUT"
+          echo "${delimiter}" >> "$GITHUB_OUTPUT"
 
-      - name: Request Architectural Changes
-        if: "!contains(steps.gemini-check.outputs.gemini_response, 'LGTM')"
-        env:
-          CRITIQUE: ${{ steps.gemini-check.outputs.gemini_response }}
+      - name: Submit GitHub PR Review
         run: |
-          PAYLOAD=$(jq -n --arg body "@jules $CRITIQUE" '{body: $body}')
+          EVENT="REQUEST_CHANGES"
+          if [ "${{ steps.gemini-check.outputs.status }}" = "APPROVE" ]; then
+            EVENT="APPROVE"
+          fi
+          
+          PAYLOAD=$(jq -n --arg body "${{ steps.gemini-check.outputs.feedback }}" --arg event "$EVENT" '{body: $body, event: $event}')
           
           curl -s -X POST \
             -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+            https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews \
             -d "$PAYLOAD"
-
-      - name: Auto-Merge
-        if: contains(steps.gemini-check.outputs.gemini_response, 'LGTM')
-        run: gh pr merge ${{ github.event.pull_request.number }} --auto --merge
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+            
+          if [ "$EVENT" = "REQUEST_CHANGES" ]; then
+            exit 1
+          fi
