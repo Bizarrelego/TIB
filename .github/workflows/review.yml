@@ -43,7 +43,6 @@ jobs:
       - name: Reject on Test Failure
         if: steps.run-tests.outcome == 'failure'
         run: |
-          # Safely construct the markdown file without Bash string interpolation bugs
           (
             echo "@jules Code failed static analysis and linting. Fix syntax errors before architectural review:"
             echo ""
@@ -130,7 +129,6 @@ jobs:
 
       - name: Submit GitHub PR Comment
         env:
-          # Map outputs to env vars to prevent syntax shattering on Bash evaluation
           FEEDBACK: ${{ steps.gemini-check.outputs.feedback }}
         run: |
           echo "@jules" > formatted_review.txt
@@ -148,3 +146,9 @@ jobs:
           if [ "${{ steps.gemini-check.outputs.status }}" != "APPROVE" ]; then
             exit 1
           fi
+
+      - name: Auto-Merge PR
+        if: steps.gemini-check.outputs.status == 'APPROVE'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: gh pr merge ${{ github.event.pull_request.number }} --merge --auto
