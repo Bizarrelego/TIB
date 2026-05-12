@@ -47,7 +47,10 @@ module.exports = function stateScanner() {
         global.State.roomTerrain.set(room.name, global.Cache.roomTerrain.get(room.name));
         let roomCache = global.Cache.rooms.get(room.name);
         if (!roomCache) {
-            roomCache = {};
+            roomCache = {
+                sourceIds: [],
+                mineralIds: []
+            };
             global.Cache.rooms.set(room.name, roomCache);
         }
 
