@@ -9,12 +9,14 @@ const CacheRegistry = {
         ]);
     },
     // Event-Driven Hydration: Only trigger on StateScanner update events
-    hydrate: (key, data) => {
-        if (!global.Cache.has(key)) return;
+    hydrate: (key, dataMap) => {
+        if (!global.Cache.has(key) || !(dataMap instanceof Map)) return;
         const target = global.Cache.get(key);
         // Clear and update only the delta to minimize CPU
         target.clear();
-        for (const [k, v] of Object.entries(data)) target.set(k, v);
+        for (const [k, v] of dataMap) {
+            target.set(k, v);
+        }
     }
 };
 

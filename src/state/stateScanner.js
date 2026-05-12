@@ -6,8 +6,8 @@ module.exports = function stateScanner() {
 
     // Event-Driven Hydration: Synchronize global.Cache
     if (global.State.getSegment) {
-        CacheRegistry.hydrate('creeps', global.State.getSegment(1) || {});
-        CacheRegistry.hydrate('structures', global.State.getSegment(0) || {});
+        CacheRegistry.hydrate('creeps', new Map(Object.entries(global.State.getSegment(1) || {})));
+        CacheRegistry.hydrate('structures', new Map(Object.entries(global.State.getSegment(0) || {})));
     }
 
     // Pure Event-Driven Consumer Loop
