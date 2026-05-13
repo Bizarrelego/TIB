@@ -3,15 +3,15 @@
  * @description Manages prioritized spawn queue
  */
 
-const ROLE_PRIORITIES = {
-    'harvester': 100,
-    'hauler': 90,
-    'fastFiller': 80,
-    'hubManager': 70,
-    'upgrader': 60,
-    'scout': 50,
-    'worker': 40
-};
+const ROLE_PRIORITIES = new Map([
+    ['harvester', 100],
+    ['hauler', 90],
+    ['fastFiller', 80],
+    ['hubManager', 70],
+    ['upgrader', 60],
+    ['scout', 50],
+    ['worker', 40]
+]);
 
 class SpawnQueueManager {
     constructor() {
@@ -40,8 +40,8 @@ class SpawnQueueManager {
         if (this.queue.length === 0) return;
 
         this.queue.sort((a, b) => {
-            const prioA = ROLE_PRIORITIES[a.role] || 0;
-            const prioB = ROLE_PRIORITIES[b.role] || 0;
+            const prioA = ROLE_PRIORITIES.get(a.role) || 0;
+            const prioB = ROLE_PRIORITIES.get(b.role) || 0;
             return prioB - prioA;
         });
 
