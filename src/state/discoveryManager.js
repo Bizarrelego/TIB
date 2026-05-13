@@ -83,7 +83,12 @@ module.exports = function discoveryManager() {
                 state.tombstonesByRoom.set(roomName, room.find(FIND_TOMBSTONES));
                 state.ruinsByRoom.set(roomName, room.find(FIND_RUINS));
                 state.roomTerrain.set(roomName, new Room.Terrain(roomName));
-                state.hostilesByRoom.set(roomName, room.find(FIND_HOSTILE_CREEPS));
+                const hostilesArray = room.find(FIND_HOSTILE_CREEPS);
+                const hostilesMap = new Map();
+                for (const hostile of hostilesArray) {
+                    hostilesMap.set(hostile.id, hostile);
+                }
+                state.hostilesByRoom.set(roomName, hostilesMap);
             }
 
             if (!state.logisticsByRoom.has(roomName)) {
@@ -92,27 +97,26 @@ module.exports = function discoveryManager() {
         }
     }
 
-    // Clear all per-room creep maps to prevent cross-room ghosting
-    for (const roomCreeps of state.creepsByRoom.values()) {
-        roomCreeps.clear();
-    }
+    state.creepLookup.clear();
+    state.creepsByRoom.clear();
 
-    // Only refresh live creep mappings from the existing global.State.creepLookup
-    for (const creepName of state.creepLookup.keys()) {
-        const liveCreep = Game.creeps[creepName];
-        if (!liveCreep) {
-            state.creepLookup.delete(creepName);
-            continue;
-        }
+    for (const creepName in Game.creeps) {
+        const creep = Game.creeps[creepName];
+        state.creepLookup.set(creepName, creep);
 
-        state.creepLookup.set(creepName, liveCreep);
-
-        const roomName = liveCreep.pos.roomName;
+        const roomName = creep.pos.roomName;
         let roomCreeps = state.creepsByRoom.get(roomName);
         if (!roomCreeps) {
             roomCreeps = new Map();
             state.creepsByRoom.set(roomName, roomCreeps);
         }
-        roomCreeps.set(liveCreep.id, liveCreep);
+
+        const role = creep.memory.role || 'default';
+        let roleCreeps = roomCreeps.get(role);
+        if (!roleCreeps) {
+            roleCreeps = [];
+            roomCreeps.set(role, roleCreeps);
+        }
+        roleCreeps.push(creep);
     }
 };
