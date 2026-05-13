@@ -20,14 +20,32 @@ class SpawnLedger {
         return spawn.spawning !== null && spawn.spawning !== undefined;
     }
 
+    /**
+     * Checks if a spawn request can be afforded.
+     * @param {number} cost The cost of the creep to spawn.
+     * @returns {boolean} True if affordable.
+     */
     canSpawn(cost) {
         return this.availableEnergy >= cost;
     }
 
+    /**
+     * Deducts energy cost from the ledger.
+     * @param {number} cost The cost to deduct.
+     */
     deduct(cost) {
         this.availableEnergy -= cost;
     }
 
+    /**
+     * Requests a spawn, deducting cost if successful.
+     * @param {StructureSpawn} spawn The spawn structure to use.
+     * @param {Array<string>} body The creep body array.
+     * @param {string} name The creep name.
+     * @param {Object} opts The spawn options.
+     * @param {number} cost The cost of the creep.
+     * @returns {number} The error code from spawnCreep.
+     */
     requestSpawn(spawn, body, name, opts, cost) {
         if (!this.isSpawnBusy(spawn)) {
             const result = spawn.spawnCreep(body, name, opts);
@@ -39,6 +57,11 @@ class SpawnLedger {
         return ERR_BUSY;
     }
 
+    /**
+     * Checks if a minimum link network is present in the room.
+     * @param {Room} room The room to check.
+     * @returns {boolean} True if network exists.
+     */
     isLinkNetworkPresent(room) {
         const structuresMap = global.State.structuresByRoom.get(room.name);
         if (structuresMap) {
