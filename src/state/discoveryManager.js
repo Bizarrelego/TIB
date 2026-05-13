@@ -95,7 +95,9 @@ module.exports = function discoveryManager() {
     state.creepLookup.clear();
     state.creepsByRoom.clear();
 
-    for (const creepName in Game.creeps) {
+    const creeps = Object.keys(Game.creeps);
+    for (let i = 0; i < creeps.length; i++) {
+        const creepName = creeps[i];
         const creep = Game.creeps[creepName];
         state.creepLookup.set(creepName, creep);
 
