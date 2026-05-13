@@ -47,26 +47,40 @@ module.exports = function stateScanner() {
                 }
 
                 if (roomSites) {
-                    const idx = roomSites.findIndex(s => s.id === event.objectId);
-                    if (idx !== -1) roomSites.splice(idx, 1);
+                    if (roomSites instanceof Map) {
+                        roomSites.delete(event.objectId);
+                    } else if (Array.isArray(roomSites)) {
+                        const idx = roomSites.findIndex(s => s.id === event.objectId);
+                        if (idx !== -1) roomSites.splice(idx, 1);
+                    }
                 }
 
-                if (roomDropped) {
+                if (roomDropped && Array.isArray(roomDropped)) {
                     const idx = roomDropped.findIndex(r => r.id === event.objectId);
                     if (idx !== -1) roomDropped.splice(idx, 1);
+                } else if (roomDropped instanceof Map) {
+                    roomDropped.delete(event.objectId);
                 }
 
                 if (roomTombstones) {
-                    const idx = roomTombstones.findIndex(s => s.id === event.objectId);
-                    if (idx !== -1) roomTombstones.splice(idx, 1);
+                    if (Array.isArray(roomTombstones)) {
+                        const idx = roomTombstones.findIndex(s => s.id === event.objectId);
+                        if (idx !== -1) roomTombstones.splice(idx, 1);
+                    } else if (roomTombstones instanceof Map) {
+                        roomTombstones.delete(event.objectId);
+                    }
                 }
 
                 if (roomRuins) {
-                    const idx = roomRuins.findIndex(s => s.id === event.objectId);
-                    if (idx !== -1) roomRuins.splice(idx, 1);
+                    if (Array.isArray(roomRuins)) {
+                        const idx = roomRuins.findIndex(s => s.id === event.objectId);
+                        if (idx !== -1) roomRuins.splice(idx, 1);
+                    } else if (roomRuins instanceof Map) {
+                        roomRuins.delete(event.objectId);
+                    }
                 }
 
-                const deadCreep = Array.from(global.State.creepLookup.values()).find(c => c.id === event.objectId);
+                const deadCreep = Game.getObjectById(event.objectId);
                 if (deadCreep) {
                     global.State.creepLookup.delete(deadCreep.name);
                     if (deadCreep.pos && deadCreep.pos.roomName) {
@@ -151,8 +165,10 @@ module.exports = function stateScanner() {
             } else if (typeof EVENT_DROP !== 'undefined' && event.event === EVENT_DROP) {
                 let dropObj = Game.getObjectById(event.objectId);
                 if (dropObj && dropObj.resourceType) {
-                    if (roomDropped) {
+                    if (roomDropped && Array.isArray(roomDropped)) {
                         roomDropped.push(dropObj);
+                    } else if (roomDropped instanceof Map) {
+                        roomDropped.set(dropObj.id, dropObj);
                     }
                 }
             }
