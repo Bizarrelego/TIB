@@ -42,8 +42,11 @@ module.exports = {
                         const dropped = global.State.droppedByRoom.get(room.name);
                         if (dropped && dropped.length > 0) {
                             target = dropped[0];
+                        } else if (creep.memory.sourceId) {
+                            target = Game.getObjectById(creep.memory.sourceId);
                         } else {
-                            target = creep.pos.findClosestByPath(FIND_SOURCES_ACTIVE);
+                            const sources = room.find(FIND_SOURCES_ACTIVE);
+                            if (sources.length > 0) target = sources[0];
                         }
                         if (target) creep.heap.targetId = target.id;
                     }
@@ -67,17 +70,8 @@ module.exports = {
                     }
 
                     if (!target || (target.structureType && target.store && target.store.getFreeCapacity(RESOURCE_ENERGY) === 0)) {
-                        const sites = global.State.sitesByRoom.get(room.name);
-                        let sitesArray = [];
-                        if (sites) {
-                            if (Array.isArray(sites)) {
-                                sitesArray = sites;
-                            } else if (sites instanceof Map) {
-                                sitesArray = Array.from(sites.values());
-                            }
-                        }
-                        if (sitesArray.length > 0) {
-                            target = sitesArray[0];
+                        if (creep.memory.targetSiteId) {
+                            target = Game.getObjectById(creep.memory.targetSiteId);
                         } else {
                             target = room.controller;
                         }
