@@ -3,6 +3,23 @@ class SpawnLedger {
         this.availableEnergy = room.energyAvailable;
     }
 
+    /**
+     * Gets the currently available energy in the room.
+     * @returns {number} The available energy.
+     */
+    getAvailableEnergy() {
+        return this.availableEnergy;
+    }
+
+    /**
+     * Checks if the given spawn is currently busy spawning a creep.
+     * @param {StructureSpawn} spawn The spawn structure to check.
+     * @returns {boolean} True if the spawn is busy, false otherwise.
+     */
+    isSpawnBusy(spawn) {
+        return spawn.spawning !== null && spawn.spawning !== undefined;
+    }
+
     canSpawn(cost) {
         return this.availableEnergy >= cost;
     }
@@ -12,7 +29,7 @@ class SpawnLedger {
     }
 
     requestSpawn(spawn, body, name, opts, cost) {
-        if (!spawn.spawning) {
+        if (!this.isSpawnBusy(spawn)) {
             const result = spawn.spawnCreep(body, name, opts);
             if (result === OK) {
                 this.deduct(cost);

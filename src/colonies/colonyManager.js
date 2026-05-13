@@ -14,11 +14,18 @@ const defense = require('./defense');
 const labs = require('./labs');
 const scout = require('../roles/scout');
 
+/**
+ * Executes core colony management loop.
+ * Instantiates the SpawnLedger to track energy use during the tick,
+ * passing it as a singleton-like service to spawnManager.
+ */
 module.exports = function colonyManager() {
     for (const room of Object.values(Game.rooms)) {
         if (room.controller && room.controller.my === true) {
+            // Instantiate SpawnLedger globally for the room per tick
+            const spawnLedger = new SpawnLedger(room);
+
             try {
-                const spawnLedger = new SpawnLedger(room);
                 spawnManager.run(room, spawnLedger);
                 planner.run(room);
                 economy.run(room);

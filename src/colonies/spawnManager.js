@@ -1,4 +1,5 @@
 const planner = require('./planner');
+const SpawnQueueManager = require('../managers/SpawnQueueManager');
 
 module.exports = {
     run: function(room, spawnLedger) {
@@ -9,9 +10,11 @@ module.exports = {
             return;
         }
 
-        if (spawn.spawning) {
+        if (spawnLedger.isSpawnBusy(spawn)) {
             return;
         }
+
+        const queue = new SpawnQueueManager();
 
         // Check creeps count in this room via O(1) lookup
         const roomCreeps = global.State.creepsByRoom.get(room.name);
@@ -26,11 +29,10 @@ module.exports = {
                 if (s) totalScouts += s.length;
             }
 
-            if (totalScouts < 1 && spawnLedger.canSpawn(50)) {
-                const spawned = spawnLedger.requestSpawn(spawn, [MOVE], 'scout_' + Game.time, {
+            if (totalScouts < 1) {
+                queue.add('scout', [MOVE], 'scout_' + Game.time, {
                     memory: { role: 'scout', colony: room.name }
                 }, 50);
-                if (spawned === OK) return;
             }
         }
 
@@ -55,24 +57,18 @@ module.exports = {
                     // Optimized body for hub transfer: 800 capacity
                     const body = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE];
                     const cost = (16 * BODYPART_COST[CARRY]) + BODYPART_COST[MOVE]; // 16 * 50 + 50 = 850
-                    if (spawnLedger.canSpawn(cost)) {
-                        spawnLedger.requestSpawn(spawn, body, 'hubManager_' + Game.time, {
-                            memory: { role: 'hubManager', colony: room.name }
-                        }, cost);
-                        return; // Prioritize hubManager over other logistics
-                    }
+                    queue.add('hubManager', body, 'hubManager_' + Game.time, {
+                        memory: { role: 'hubManager', colony: room.name }
+                    }, cost);
                 }
 
                 if (upgraderCount < 1) {
                     // Static upgrader body
                     const body = [WORK, WORK, WORK, WORK, WORK, WORK, WORK, WORK, CARRY, CARRY, MOVE];
                     const cost = 950;
-                    if (spawnLedger.canSpawn(cost)) {
-                        spawnLedger.requestSpawn(spawn, body, 'upgrader_' + Game.time, {
-                            memory: { role: 'upgrader', colony: room.name }
-                        }, cost);
-                        return; // Prioritize upgrader over other logistics
-                    }
+                    queue.add('upgrader', body, 'upgrader_' + Game.time, {
+                        memory: { role: 'upgrader', colony: room.name }
+                    }, cost);
                 }
             }
         }
@@ -124,11 +120,10 @@ module.exports = {
                         cost += pairCost;
                     }
 
-                    if (body.length > 0 && spawnLedger.canSpawn(cost)) {
-                        spawnLedger.requestSpawn(spawn, body, 'fastFiller_' + Game.time, {
+                    if (body.length > 0) {
+                        queue.add('fastFiller', body, 'fastFiller_' + Game.time, {
                             memory: { role: 'fastFiller', colony: room.name }
                         }, cost);
-                        return; // Prioritize fastFillers
                     }
                 }
             }
@@ -144,8 +139,8 @@ module.exports = {
                 }
             }
 
-            if (workerCount < 15 && spawnLedger.canSpawn(200)) {
-                spawnLedger.requestSpawn(spawn, [WORK, CARRY, MOVE], 'worker_' + Game.time, {
+            if (workerCount < 15) {
+                queue.add('worker', [WORK, CARRY, MOVE], 'worker_' + Game.time, {
                     memory: { role: 'worker', colony: room.name }
                 }, 200);
             }
@@ -165,19 +160,20 @@ module.exports = {
                 }
             }
 
-            // Prioritize Harvesters
-            if (harvesterCount < 2 && spawnLedger.canSpawn(500)) {
-                spawnLedger.requestSpawn(spawn, [WORK, WORK, WORK, WORK, CARRY, MOVE], 'harvester_' + Game.time, {
+            if (harvesterCount < 2) {
+                queue.add('harvester', [WORK, WORK, WORK, WORK, CARRY, MOVE], 'harvester_' + Game.time, {
                     memory: { role: 'harvester', colony: room.name }
                 }, 500);
-                return; // Stop checking haulers if we just spawned a harvester or are prioritizing it
             }
 
-            if (haulerCount < 4 && spawnLedger.canSpawn(500)) {
-                spawnLedger.requestSpawn(spawn, [CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE], 'hauler_' + Game.time, {
+            if (haulerCount < 4) {
+                queue.add('hauler', [CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE], 'hauler_' + Game.time, {
                     memory: { role: 'hauler', colony: room.name }
                 }, 500);
             }
         }
+
+        // Process the queue
+        queue.process(spawn, spawnLedger);
     }
 };
