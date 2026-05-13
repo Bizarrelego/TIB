@@ -14,14 +14,15 @@ module.exports = function stateScanner() {
         const roomLogistics = global.State.logisticsByRoom.get(roomName) || new Map();
 
         let roomHostiles = global.State.hostilesByRoom.get(roomName);
-        if (!(roomHostiles instanceof Map)) {
+        if (Array.isArray(roomHostiles)) {
             const newMap = new Map();
-            if (Array.isArray(roomHostiles)) {
-                for (const hostile of roomHostiles) {
-                    if (hostile && hostile.id) newMap.set(hostile.id, hostile);
-                }
+            for (const hostile of roomHostiles) {
+                if (hostile && hostile.id) newMap.set(hostile.id, hostile);
             }
             roomHostiles = newMap;
+            global.State.hostilesByRoom.set(roomName, roomHostiles);
+        } else if (!(roomHostiles instanceof Map)) {
+            roomHostiles = new Map();
             global.State.hostilesByRoom.set(roomName, roomHostiles);
         }
 
@@ -98,12 +99,10 @@ module.exports = function stateScanner() {
                         let structArray = roomStructures.get(buildObj.structureType);
                         if (!structArray) {
                             structArray = [];
-                            roomStructures.set(buildObj.structureType, structArray);
+                            roomStructures.set(buildObj.structureType, structArray); // Ensure the new array is set
                         }
-                        if (!structArray.some(s => s.id === buildObj.id)) {
-                            structArray.push(buildObj);
-                        }
-                        global.State.structureCache.set(buildObj.id, buildObj);
+                        structArray.push(buildObj); // Add the new structure
+                        global.State.structureCache.set(buildObj.id, buildObj); // Add to global cache
                     }
                 }
             } else if (typeof EVENT_DROP !== 'undefined' && event.event === EVENT_DROP) {
