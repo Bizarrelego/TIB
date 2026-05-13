@@ -113,21 +113,19 @@ module.exports = function stateScanner() {
 
                         let structsOfType = roomStructures.get(buildObj.structureType);
                         if (!structsOfType) {
-                            structsOfType = [];
+                            structsOfType = new Map();
                             roomStructures.set(buildObj.structureType, structsOfType);
-                        } else if (structsOfType instanceof Map) {
-                            // Fallback if it somehow is a Map, converting it to conform to array approach might be complex,
-                            // but the prompt strictly mandates changing this behavior to use an array.
-                            // In discoveryManager, structuresByRoom's inner values are initialized as arrays.
-                            // However, we can preserve Map support just in case, but prioritize the Array behavior given in the prompt.
-                            structsOfType.set(buildObj.id, buildObj);
                         }
 
-                        if (Array.isArray(structsOfType)) {
+                        if (structsOfType instanceof Map) {
+                            structsOfType.set(buildObj.id, buildObj);
+                        } else if (Array.isArray(structsOfType)) {
+                            // Fallback just in case array logic is active, but Map should be the standard.
                             if (!structsOfType.some(s => s.id === buildObj.id)) {
                                 structsOfType.push(buildObj);
                             }
                         }
+
                         global.State.structureCache.set(buildObj.id, buildObj);
                     }
                 }
