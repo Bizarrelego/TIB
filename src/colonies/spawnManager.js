@@ -18,6 +18,22 @@ module.exports = {
 
         const capacity = room.energyCapacityAvailable;
 
+        // Global Scout Spawning Logic (1 active scout globally)
+        if (room.controller.level >= 2) {
+            let totalScouts = 0;
+            for (const crps of global.State.creepsByRoom.values()) {
+                const s = crps.get('scout');
+                if (s) totalScouts += s.length;
+            }
+
+            if (totalScouts < 1 && spawnLedger.canSpawn(50)) {
+                const spawned = spawnLedger.requestSpawn(spawn, [MOVE], 'scout_' + Game.time, {
+                    memory: { role: 'scout', colony: room.name }
+                }, 50);
+                if (spawned === OK) return;
+            }
+        }
+
         // RCL 5 Logic: hubManager & upgrader
         if (room.controller.level >= 5) {
             if (spawnLedger.isLinkNetworkPresent(room)) {
