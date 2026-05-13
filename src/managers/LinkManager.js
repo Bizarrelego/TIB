@@ -66,6 +66,13 @@ function run(room) {
                 }
             }
         }
+
+        // Process Hub Link transferring energy to Controller Link
+        if (hubLink && hubLink.cooldown === 0 && hubLink.store.getUsedCapacity(RESOURCE_ENERGY) >= 700) {
+            if (controllerLink && controllerLink.store.getFreeCapacity(RESOURCE_ENERGY) >= 700) {
+                hubLink.transferEnergy(controllerLink);
+            }
+        }
     } catch (e) {
         console.log(`[LinkManager Error] Room ${room.name}: ${e.stack}`);
     }
