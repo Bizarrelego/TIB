@@ -55,8 +55,11 @@ module.exports = {
                         target = Game.getObjectById(creep.heap.targetId);
                     }
                     if (!target || target.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
-                        const spawns = global.State.structuresByRoom.get(room.name)?.get(STRUCTURE_SPAWN) || [];
-                        const extensions = global.State.structuresByRoom.get(room.name)?.get(STRUCTURE_EXTENSION) || [];
+                        const spawnsMap = global.State.structuresByRoom.get(room.name)?.get(STRUCTURE_SPAWN);
+                        const extensionsMap = global.State.structuresByRoom.get(room.name)?.get(STRUCTURE_EXTENSION);
+
+                        let spawns = spawnsMap ? (Array.isArray(spawnsMap) ? spawnsMap : Array.from(spawnsMap.values())) : [];
+                        let extensions = extensionsMap ? (Array.isArray(extensionsMap) ? extensionsMap : Array.from(extensionsMap.values())) : [];
 
                         let needsRefill = [];
                         for (let i = 0; i < spawns.length; i++) {
@@ -67,7 +70,7 @@ module.exports = {
                         }
 
                         if (needsRefill.length > 0) {
-                            target = creep.pos.findClosestByPath(needsRefill);
+                            target = needsRefill[0];
                             if (target) creep.heap.targetId = target.id;
                         }
                     }

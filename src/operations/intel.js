@@ -41,15 +41,19 @@ function mapToRawMemory() {
 
     try {
         if (global.State.heatmaps) {
-            let hmData = {};
+            let hmDataMap = new Map();
             for (const [roomName, cm] of global.State.heatmaps.entries()) {
-                hmData[roomName] = cm.serialize();
+                hmDataMap.set(roomName, cm.serialize());
             }
 
             // RawMemory access is expensive, do it minimally
-            if (Object.keys(hmData).length > 0) {
+            if (hmDataMap.size > 0) {
                 // Segment 11 for heatmaps
-                RawMemory.segments[11] = JSON.stringify(hmData);
+                let plainObj = {};
+                for (const [k, v] of hmDataMap.entries()) {
+                    plainObj[k] = v;
+                }
+                RawMemory.segments[11] = JSON.stringify(plainObj);
                 RawMemory.setActiveSegments([11]);
             }
         }
