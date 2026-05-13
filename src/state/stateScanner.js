@@ -91,18 +91,16 @@ module.exports = function stateScanner() {
                     const creepName = event.data.name;
                     const deadCreep = global.State.creepLookup.get(creepName);
 
-                    if (deadCreep) {
-                        global.State.creepLookup.delete(creepName);
+                    global.State.creepLookup.delete(creepName);
 
-                        if (deadCreep.pos && deadCreep.pos.roomName) {
-                            const roomCreeps = global.State.creepsByRoom.get(deadCreep.pos.roomName);
-                            if (roomCreeps) {
-                                const role = deadCreep.memory && deadCreep.memory.role ? deadCreep.memory.role : 'default';
-                                const roleCreeps = roomCreeps.get(role);
-                                if (roleCreeps && Array.isArray(roleCreeps)) {
-                                    const idx = roleCreeps.findIndex(c => c.id === event.objectId);
-                                    if (idx !== -1) roleCreeps.splice(idx, 1);
-                                }
+                    if (deadCreep && deadCreep.pos && deadCreep.pos.roomName) {
+                        const roomCreeps = global.State.creepsByRoom.get(deadCreep.pos.roomName);
+                        if (roomCreeps) {
+                            const role = deadCreep.memory && deadCreep.memory.role ? deadCreep.memory.role : 'default';
+                            const roleCreeps = roomCreeps.get(role);
+                            if (roleCreeps && Array.isArray(roleCreeps)) {
+                                const idx = roleCreeps.findIndex(c => c.name === creepName);
+                                if (idx !== -1) roleCreeps.splice(idx, 1);
                             }
                         }
                     }
