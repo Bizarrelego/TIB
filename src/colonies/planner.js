@@ -1,16 +1,16 @@
 
 const DistanceTransform = require('../algorithms/distanceTransform');
 
-const TIGGA_STAMP = {
-    storage: [[0, 0]],
-    terminal: [[0, -1]],
-    link: [[-1, 0]],
-    factory: [[1, 0]],
-    spawn: [[-1, -1], [1, -1], [0, -2]],
-    tower: [[-2, -1], [2, -1], [-1, -2], [1, -2], [-2, 0], [2, 0]],
-    road: [[-1, 1], [0, 2], [1, 1], [-4, 0], [-3, -1], [-3, 1], [-2, -2], [-2, 2], [-1, -3], [-1, 3], [0, -4], [0, 4], [1, -3], [1, 3], [2, -2], [2, 2], [3, -1], [3, 1], [4, 0], [-6, 0], [-5, -1], [-5, 1], [-4, -2], [-4, 2], [-3, -3], [-3, 3], [-2, -4], [-2, 4], [-1, -5], [-1, 5], [0, -6], [0, 6], [1, -5], [1, 5], [2, -4], [2, 4], [3, -3], [3, 3], [4, -2], [4, 2], [5, -1], [5, 1], [6, 0], [-8, 0], [-7, -1], [-7, 1], [-6, -2], [-6, 2], [-5, -3], [-5, 3], [-4, -4], [-4, 4], [-3, -5], [-3, 5], [-2, -6], [-2, 6], [-1, -7], [-1, 7], [0, -8], [0, 8], [1, -7], [1, 7], [2, -6], [2, 6], [3, -5], [3, 5], [4, -4], [4, 4], [5, -3], [5, 3], [6, -2], [6, 2], [7, -1], [7, 1], [8, 0], [-7, -2], [-7, 2], [-6, -3], [-6, 3], [-5, -4], [-5, 4], [-4, -5], [-4, 5], [-3, -6], [-3, 6], [-2, -7], [-2, 7], [-1, -8], [-1, 8], [0, -9], [0, 9], [1, -8], [1, 8], [2, -7], [2, 7], [3, -6], [3, 6], [4, -5], [4, 5], [5, -4], [5, 4], [6, -3], [6, 3], [7, -2], [7, 2], [8, -1], [8, 1], [9, 0]],
-    extension: [[0, 1], [-3, 0], [-2, 1], [-1, 2], [0, -3], [0, 3], [1, 2], [2, 1], [3, 0], [-5, 0], [-4, -1], [-4, 1], [-3, -2], [-3, 2], [-2, -3], [-2, 3], [-1, -4], [-1, 4], [0, -5], [0, 5], [1, -4], [1, 4], [2, -3], [2, 3], [3, -2], [3, 2], [4, -1], [4, 1], [5, 0], [-7, 0], [-6, -1], [-6, 1], [-5, -2], [-5, 2], [-4, -3], [-4, 3], [-3, -4], [-3, 4], [-2, -5], [-2, 5], [-1, -6], [-1, 6], [0, -7], [0, 7], [1, -6], [1, 6], [2, -5], [2, 5], [3, -4], [3, 4], [4, -3], [4, 3], [5, -2], [5, 2], [6, -1], [6, 1], [7, 0], [-9, 0], [-8, -1], [-8, 1]]
-};
+const TIGGA_STAMP = new Map([
+    [STRUCTURE_SPAWN, [[-1, -1], [1, -1], [0, -2]]],
+    [STRUCTURE_EXTENSION, [[0, 1], [-3, 0], [-2, 1], [-1, 2], [0, -3], [0, 3], [1, 2], [2, 1], [3, 0], [-5, 0], [-4, -1], [-4, 1], [-3, -2], [-3, 2], [-2, -3], [-2, 3], [-1, -4], [-1, 4], [0, -5], [0, 5], [1, -4], [1, 4], [2, -3], [2, 3], [3, -2], [3, 2], [4, -1], [4, 1], [5, 0], [-7, 0], [-6, -1], [-6, 1], [-5, -2], [-5, 2], [-4, -3], [-4, 3], [-3, -4], [-3, 4], [-2, -5], [-2, 5], [-1, -6], [-1, 6], [0, -7], [0, 7], [1, -6], [1, 6], [2, -5], [2, 5], [3, -4], [3, 4], [4, -3], [4, 3], [5, -2], [5, 2], [6, -1], [6, 1], [7, 0], [-9, 0], [-8, -1], [-8, 1]]],
+    [STRUCTURE_STORAGE, [[0, 0]]],
+    [STRUCTURE_TOWER, [[-2, -1], [2, -1], [-1, -2], [1, -2], [-2, 0], [2, 0]]],
+    [STRUCTURE_LINK, [[-1, 0]]],
+    [STRUCTURE_TERMINAL, [[0, -1]]],
+    ['factory', [[1, 0]]],
+    [STRUCTURE_ROAD, [[-1, 1], [0, 2], [1, 1], [-4, 0], [-3, -1], [-3, 1], [-2, -2], [-2, 2], [-1, -3], [-1, 3], [0, -4], [0, 4], [1, -3], [1, 3], [2, -2], [2, 2], [3, -1], [3, 1], [4, 0], [-6, 0], [-5, -1], [-5, 1], [-4, -2], [-4, 2], [-3, -3], [-3, 3], [-2, -4], [-2, 4], [-1, -5], [-1, 5], [0, -6], [0, 6], [1, -5], [1, 5], [2, -4], [2, 4], [3, -3], [3, 3], [4, -2], [4, 2], [5, -1], [5, 1], [6, 0], [-8, 0], [-7, -1], [-7, 1], [-6, -2], [-6, 2], [-5, -3], [-5, 3], [-4, -4], [-4, 4], [-3, -5], [-3, 5], [-2, -6], [-2, 6], [-1, -7], [-1, 7], [0, -8], [0, 8], [1, -7], [1, 7], [2, -6], [2, 6], [3, -5], [3, 5], [4, -4], [4, 4], [5, -3], [5, 3], [6, -2], [6, 2], [7, -1], [7, 1], [8, 0], [-7, -2], [-7, 2], [-6, -3], [-6, 3], [-5, -4], [-5, 4], [-4, -5], [-4, 5], [-3, -6], [-3, 6], [-2, -7], [-2, 7], [-1, -8], [-1, 8], [0, -9], [0, 9], [1, -8], [1, 8], [2, -7], [2, 7], [3, -6], [3, 6], [4, -5], [4, 5], [5, -4], [5, 4], [6, -3], [6, 3], [7, -2], [7, 2], [8, -1], [8, 1], [9, 0]]]
+]);
 
 // ... replace module.exports run method
 
@@ -42,23 +42,18 @@ module.exports = {
             if (Game.time % 100 !== 0) return;
             if (!room.controller || !room.controller.my) return;
 
-            // Batched Construction rule: max 5
             const sites = global.State.sitesByRoom.get(room.name) || [];
             if (sites.length >= 5) return;
 
-            // Initialize room planner state if needed
-            global.State.roomPlanner = global.State.roomPlanner || {};
-            if (!global.State.roomPlanner[room.name]) {
-                global.State.roomPlanner[room.name] = {};
+            global.State.roomPlanner = global.State.roomPlanner || new Map();
+            if (!global.State.roomPlanner.has(room.name)) {
+                global.State.roomPlanner.set(room.name, new Map());
             }
-            const plannerState = global.State.roomPlanner[room.name];
+            const plannerState = global.State.roomPlanner.get(room.name);
 
-            // 1. Calculate or retrieve anchor
-            if (!plannerState.anchor) {
-                // Determine anchor using DistanceTransform
+            if (!plannerState.has('anchor')) {
                 const terrain = global.State.roomTerrain.get(room.name);
                 const cm = new PathFinder.CostMatrix();
-                // We add walls and source/controller safety zones
                 for (let y = 0; y < 50; y++) {
                     for (let x = 0; x < 50; x++) {
                         if (terrain.get(x, y) === TERRAIN_MASK_WALL) {
@@ -67,7 +62,6 @@ module.exports = {
                     }
                 }
 
-                // Keep some distance from controller and sources if possible
                 if (room.controller) {
                     for(let dx=-2; dx<=2; dx++) {
                         for(let dy=-2; dy<=2; dy++) {
@@ -97,7 +91,6 @@ module.exports = {
 
                 let maxVal = 0;
                 let bestPos = null;
-                // Search for the most open space
                 for (let y = 8; y < 42; y++) {
                     for (let x = 8; x < 42; x++) {
                         let val = dt.get(x, y);
@@ -109,18 +102,17 @@ module.exports = {
                 }
 
                 if (bestPos) {
-                    plannerState.anchor = bestPos;
+                    plannerState.set('anchor', bestPos);
                 } else {
-                    return; // Cannot find a suitable place
+                    return;
                 }
             }
 
-            const anchor = plannerState.anchor;
+            const anchor = plannerState.get('anchor');
             let activeSites = sites.length;
             const rcl = room.controller.level;
             const structuresMap = global.State.structuresByRoom.get(room.name) || new Map();
 
-            // 2. Iterate over the stamp layout
             const buildOrder = [
                 STRUCTURE_SPAWN,
                 STRUCTURE_EXTENSION,
@@ -132,32 +124,30 @@ module.exports = {
                 STRUCTURE_ROAD
             ];
 
-            // Mapping from CONTROLLER_STRUCTURES array index or property based on level
-            const limitMap = {
-                [STRUCTURE_SPAWN]: CONTROLLER_STRUCTURES[STRUCTURE_SPAWN][rcl],
-                [STRUCTURE_EXTENSION]: CONTROLLER_STRUCTURES[STRUCTURE_EXTENSION][rcl],
-                [STRUCTURE_STORAGE]: CONTROLLER_STRUCTURES[STRUCTURE_STORAGE][rcl],
-                [STRUCTURE_TOWER]: CONTROLLER_STRUCTURES[STRUCTURE_TOWER][rcl],
-                [STRUCTURE_LINK]: CONTROLLER_STRUCTURES[STRUCTURE_LINK][rcl],
-                [STRUCTURE_TERMINAL]: CONTROLLER_STRUCTURES[STRUCTURE_TERMINAL][rcl],
-                ['factory']: CONTROLLER_STRUCTURES['factory'][rcl],
-                [STRUCTURE_ROAD]: 2500 // Arbitrary large limit
-            };
+            const limitMap = new Map([
+                [STRUCTURE_SPAWN, CONTROLLER_STRUCTURES[STRUCTURE_SPAWN][rcl]],
+                [STRUCTURE_EXTENSION, CONTROLLER_STRUCTURES[STRUCTURE_EXTENSION][rcl]],
+                [STRUCTURE_STORAGE, CONTROLLER_STRUCTURES[STRUCTURE_STORAGE][rcl]],
+                [STRUCTURE_TOWER, CONTROLLER_STRUCTURES[STRUCTURE_TOWER][rcl]],
+                [STRUCTURE_LINK, CONTROLLER_STRUCTURES[STRUCTURE_LINK][rcl]],
+                [STRUCTURE_TERMINAL, CONTROLLER_STRUCTURES[STRUCTURE_TERMINAL][rcl]],
+                ['factory', CONTROLLER_STRUCTURES['factory'][rcl]],
+                [STRUCTURE_ROAD, 2500]
+            ]);
 
             for (let i = 0; i < buildOrder.length; i++) {
                 const structType = buildOrder[i];
-                if (!TIGGA_STAMP[structType]) continue; // E.g., extractor might not be in stamp
+                if (!TIGGA_STAMP.has(structType)) continue;
 
-                let limit = limitMap[structType] || 0;
+                let limit = limitMap.get(structType) || 0;
                 if (limit === 0) continue;
 
-                const positions = TIGGA_STAMP[structType];
+                const positions = TIGGA_STAMP.get(structType);
 
                 let existingCount = 0;
                 const existingStructs = structuresMap.get(structType) || [];
                 existingCount += existingStructs.length;
 
-                // Count construction sites for this type
                 for(let s=0; s<sites.length; s++) {
                     if(sites[s].structureType === structType) {
                         existingCount++;
@@ -167,9 +157,8 @@ module.exports = {
                 if (existingCount >= limit && structType !== STRUCTURE_ROAD) continue;
 
                 for (let j = 0; j < positions.length; j++) {
-                    if (activeSites >= 5) return; // Batched Construction rule limit
+                    if (activeSites >= 5) return;
 
-                    // Re-calculate existing count in case we reach the limit during loop
                     let currentCount = (structuresMap.get(structType) || []).length;
                     for(let s=0; s<sites.length; s++) {
                         if(sites[s].structureType === structType) currentCount++;
@@ -182,35 +171,40 @@ module.exports = {
 
                     if (tx < 2 || tx > 47 || ty < 2 || ty > 47) continue;
 
-                    // Check if there is already a structure or site here
-                    const lookStructs = room.lookForAt(LOOK_STRUCTURES, tx, ty);
                     let blocked = false;
                     let alreadyHasStruct = false;
-                    for (let k = 0; k < lookStructs.length; k++) {
-                        if (lookStructs[k].structureType === structType) {
-                            alreadyHasStruct = true;
-                            break;
-                        }
-                        if (lookStructs[k].structureType !== STRUCTURE_ROAD && lookStructs[k].structureType !== STRUCTURE_RAMPART) {
-                            if (structType !== STRUCTURE_ROAD) {
-                                blocked = true;
+
+                    // Replaces room.lookForAt
+                    // Iterate over structuresMap
+                    for (const [sType, sArray] of structuresMap) {
+                        for (let k = 0; k < sArray.length; k++) {
+                            const struct = sArray[k];
+                            if (struct.pos.x === tx && struct.pos.y === ty) {
+                                if (sType === structType) {
+                                    alreadyHasStruct = true;
+                                    break;
+                                }
+                                if (sType !== STRUCTURE_ROAD && sType !== STRUCTURE_RAMPART) {
+                                    if (structType !== STRUCTURE_ROAD) {
+                                        blocked = true;
+                                    }
+                                }
                             }
                         }
                     }
                     if (alreadyHasStruct) continue;
 
-                    const lookSites = room.lookForAt(LOOK_CONSTRUCTION_SITES, tx, ty);
-                    if (lookSites.length > 0) {
-                        blocked = true;
+                    for (let s = 0; s < sites.length; s++) {
+                        if (sites[s].pos.x === tx && sites[s].pos.y === ty) {
+                            blocked = true;
+                            break;
+                        }
                     }
 
                     if (!blocked) {
-                        // Place construction site
                         const res = room.createConstructionSite(tx, ty, structType);
                         if (res === OK) {
                             activeSites++;
-                            // We wait for game state to update sites next tick but we manually increment local activeSites.
-                            // To prevent placing multiple of the same exceeding limit, we rely on the loop condition.
                         }
                     }
                 }
