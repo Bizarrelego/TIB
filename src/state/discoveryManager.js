@@ -66,9 +66,9 @@ module.exports = function discoveryManager() {
                 const structures = room.find(FIND_STRUCTURES);
                 for (const struct of structures) {
                     if (!roomStructures.has(struct.structureType)) {
-                        roomStructures.set(struct.structureType, []);
+                        roomStructures.set(struct.structureType, new Map());
                     }
-                    roomStructures.get(struct.structureType).push(struct);
+                    roomStructures.get(struct.structureType).set(struct.id, struct);
                     state.structureCache.set(struct.id, struct);
                 }
                 state.structuresByRoom.set(roomName, roomStructures);

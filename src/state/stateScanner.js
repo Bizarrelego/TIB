@@ -55,23 +55,28 @@ module.exports = function stateScanner() {
                     }
                 }
 
-                roomDropped.delete(event.objectId);
+                if (roomDropped && Array.isArray(roomDropped)) {
+                    const idx = roomDropped.findIndex(r => r.id === event.objectId);
+                    if (idx !== -1) roomDropped.splice(idx, 1);
+                } else if (roomDropped instanceof Map) {
+                    roomDropped.delete(event.objectId);
+                }
 
                 if (roomTombstones) {
-                    if (roomTombstones instanceof Map) {
-                        roomTombstones.delete(event.objectId);
-                    } else if (Array.isArray(roomTombstones)) {
+                    if (Array.isArray(roomTombstones)) {
                         const idx = roomTombstones.findIndex(s => s.id === event.objectId);
                         if (idx !== -1) roomTombstones.splice(idx, 1);
+                    } else if (roomTombstones instanceof Map) {
+                        roomTombstones.delete(event.objectId);
                     }
                 }
 
                 if (roomRuins) {
-                    if (roomRuins instanceof Map) {
-                        roomRuins.delete(event.objectId);
-                    } else if (Array.isArray(roomRuins)) {
+                    if (Array.isArray(roomRuins)) {
                         const idx = roomRuins.findIndex(s => s.id === event.objectId);
                         if (idx !== -1) roomRuins.splice(idx, 1);
+                    } else if (roomRuins instanceof Map) {
+                        roomRuins.delete(event.objectId);
                     }
                 }
             } else if (event.event === EVENT_ATTACK || event.event === EVENT_HEAL) {
@@ -95,33 +100,32 @@ module.exports = function stateScanner() {
 
                 if (buildObj && buildObj.structureType) {
                     if (!(buildObj instanceof ConstructionSite)) {
-                        if (roomSites) {
-                            if (roomSites instanceof Map) {
-                                for (const [siteId, site] of roomSites.entries()) {
-                                    if (site.pos && buildObj.pos && site.pos.x === buildObj.pos.x && site.pos.y === buildObj.pos.y) {
-                                        roomSites.delete(siteId);
-                                        break;
-                                    }
-                                }
-                            } else if (Array.isArray(roomSites)) {
-                                const idx = roomSites.findIndex(s => s.pos && buildObj.pos && s.pos.x === buildObj.pos.x && s.pos.y === buildObj.pos.y);
-                                if (idx !== -1) roomSites.splice(idx, 1);
+                        if (roomSites && Array.isArray(roomSites)) {
+                            const siteIdToRemove = event.data && event.data.targetId ? event.data.targetId : event.objectId;
+                            const siteIdx = roomSites.findIndex(s => s.id === siteIdToRemove);
+                            if (siteIdx !== -1) {
+                                roomSites.splice(siteIdx, 1);
+                            }
+                        } else if (roomSites instanceof Map) {
+                            const siteIdToRemove = event.data && event.data.targetId ? event.data.targetId : event.objectId;
+                            roomSites.delete(siteIdToRemove);
+                        }
+
+                        let structsOfType = roomStructures.get(buildObj.structureType);
+                        if (!structsOfType) {
+                            structsOfType = new Map();
+                            roomStructures.set(buildObj.structureType, structsOfType);
+                        }
+
+                        if (structsOfType instanceof Map) {
+                            structsOfType.set(buildObj.id, buildObj);
+                        } else if (Array.isArray(structsOfType)) {
+                            // Fallback just in case array logic is active, but Map should be the standard.
+                            if (!structsOfType.some(s => s.id === buildObj.id)) {
+                                structsOfType.push(buildObj);
                             }
                         }
 
-                        let structMapOrArr = roomStructures.get(buildObj.structureType);
-                        if (!structMapOrArr) {
-                            structMapOrArr = new Map();
-                            roomStructures.set(buildObj.structureType, structMapOrArr);
-                        }
-
-                        if (structMapOrArr instanceof Map) {
-                            structMapOrArr.set(buildObj.id, buildObj);
-                        } else if (Array.isArray(structMapOrArr)) {
-                            if (!structMapOrArr.some(s => s.id === buildObj.id)) {
-                                structMapOrArr.push(buildObj);
-                            }
-                        }
                         global.State.structureCache.set(buildObj.id, buildObj);
                     }
                 }
