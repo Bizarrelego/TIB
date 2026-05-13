@@ -10,6 +10,8 @@ const fastFillerManager = require('../managers/FastFillerManager');
 const LinkManager = require('../managers/LinkManager');
 const hubManager = require('../roles/hubManager');
 const upgrader = require('../roles/upgrader');
+const defense = require('./defense');
+const labs = require('./labs');
 
 module.exports = function colonyManager() {
     for (const room of Object.values(Game.rooms)) {
@@ -27,6 +29,8 @@ module.exports = function colonyManager() {
                 LinkManager.run(room);
                 hubManager.run(room);
                 upgrader.run(room);
+                defense.run(room);
+                labs.run(room);
             } catch (e) {
                 console.log(`[ColonyManager Error] Room ${room.name}: ${e.stack}`);
             }
