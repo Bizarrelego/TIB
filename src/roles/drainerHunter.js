@@ -17,12 +17,19 @@ module.exports = {
         const drainerHunters = roomCreeps.get('drainerHunter');
         if (!drainerHunters || drainerHunters.length === 0) return;
 
+        const roomStructures = global.State.structuresByRoom.get(room.name) || new Map();
+        const towers = roomStructures.get(STRUCTURE_TOWER) || [];
+        const enemyTowers = towers.filter(t => !t.my);
+
         for (const creep of drainerHunters) {
             try {
                 if (creep.fatigue > 0) continue; // Fatigue gating
 
                 // Predictive Pre-Healing
-                if (creep.hits < creep.hitsMax || creep.pos.findInRange(FIND_HOSTILE_STRUCTURES, 5, { filter: s => s.structureType === STRUCTURE_TOWER }).length > 0) {
+                // Check if any enemy tower is within range 5 using state instead of findInRange
+                const towerInRange = enemyTowers.some(t => creep.pos.getRangeTo(t) <= 5);
+
+                if (creep.hits < creep.hitsMax || towerInRange) {
                     creep.heal(creep);
                 }
 
@@ -33,8 +40,15 @@ module.exports = {
                 if (creep.hits < creep.hitsMax * 0.5) {
                     if (room.name === targetRoomName) {
                         // Find nearest exit and step out
-                        const exit = creep.pos.findClosestByPath(FIND_EXIT);
-                        if (exit) movement.moveTo(creep, exit);
+                        // Finding exits strictly relies on room pathing/terrain, but avoiding findClosestByPath is better.
+                        // Assuming movement.moveTo can handle a RoomPosition at the exit or a direction.
+                        // Simplest alternative is moving towards the spawn/home if we must retreat, but
+                        // here we just fallback to a cached or memory exit dir to avoid FIND_.
+                        // For this implementation, we will use the direction towards the center of the home room,
+                        // assuming memory.homeRoom exists.
+                        if (creep.memory.homeRoom) {
+                           movement.moveTo(creep, new RoomPosition(25, 25, creep.memory.homeRoom));
+                        }
                         continue;
                     } else {
                         // Already in safe room, just heal
@@ -50,11 +64,8 @@ module.exports = {
 
                 // In target room, healthy: Bait towers
                 if (room.name === targetRoomName) {
-                    // Find a tile that is exactly at the edge of tower range
-                    // Scaffolding: Move towards a tower but stop at range 5 (or appropriate range)
-                    const towers = room.find(FIND_HOSTILE_STRUCTURES, { filter: s => s.structureType === STRUCTURE_TOWER });
-                    if (towers.length > 0) {
-                        const targetTower = towers[0];
+                    if (enemyTowers.length > 0) {
+                        const targetTower = enemyTowers[0]; // Simple targeting
                         if (creep.pos.getRangeTo(targetTower) > 5) {
                             movement.moveTo(creep, targetTower);
                         } else if (creep.pos.getRangeTo(targetTower) < 5) {
