@@ -83,7 +83,7 @@ module.exports = function discoveryManager() {
                 state.tombstonesByRoom.set(roomName, room.find(FIND_TOMBSTONES));
                 state.ruinsByRoom.set(roomName, room.find(FIND_RUINS));
                 state.roomTerrain.set(roomName, new Room.Terrain(roomName));
-                state.hostilesByRoom.set(roomName, room.find(FIND_HOSTILE_CREEPS));
+                state.hostilesByRoom.set(roomName, new Map());
             }
 
             if (!state.logisticsByRoom.has(roomName)) {
@@ -92,27 +92,28 @@ module.exports = function discoveryManager() {
         }
     }
 
-    // Clear all per-room creep maps to prevent cross-room ghosting
-    for (const roomCreeps of state.creepsByRoom.values()) {
-        roomCreeps.clear();
-    }
+    state.creepLookup.clear();
+    state.creepsByRoom.clear();
 
-    // Only refresh live creep mappings from the existing global.State.creepLookup
-    for (const creepName of state.creepLookup.keys()) {
-        const liveCreep = Game.creeps[creepName];
-        if (!liveCreep) {
-            state.creepLookup.delete(creepName);
-            continue;
-        }
+    const creeps = Object.keys(Game.creeps);
+    for (let i = 0; i < creeps.length; i++) {
+        const creepName = creeps[i];
+        const creep = Game.creeps[creepName];
+        state.creepLookup.set(creepName, creep);
 
-        state.creepLookup.set(creepName, liveCreep);
-
-        const roomName = liveCreep.pos.roomName;
+        const roomName = creep.pos.roomName;
         let roomCreeps = state.creepsByRoom.get(roomName);
         if (!roomCreeps) {
             roomCreeps = new Map();
             state.creepsByRoom.set(roomName, roomCreeps);
         }
-        roomCreeps.set(liveCreep.id, liveCreep);
+
+        const role = creep.memory.role || 'default';
+        let roleCreeps = roomCreeps.get(role);
+        if (!roleCreeps) {
+            roleCreeps = [];
+            roomCreeps.set(role, roleCreeps);
+        }
+        roleCreeps.push(creep);
     }
 };
