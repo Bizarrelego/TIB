@@ -55,11 +55,13 @@ module.exports = function stateScanner() {
                     }
                 }
 
-                if (roomDropped && Array.isArray(roomDropped)) {
-                    const idx = roomDropped.findIndex(r => r.id === event.objectId);
-                    if (idx !== -1) roomDropped.splice(idx, 1);
-                } else if (roomDropped instanceof Map) {
-                    roomDropped.delete(event.objectId);
+                if (roomDropped) {
+                    if (Array.isArray(roomDropped)) {
+                        const idx = roomDropped.findIndex(r => r.id === event.objectId);
+                        if (idx !== -1) roomDropped.splice(idx, 1);
+                    } else if (roomDropped instanceof Map) {
+                        roomDropped.delete(event.objectId);
+                    }
                 }
 
                 if (roomTombstones) {
