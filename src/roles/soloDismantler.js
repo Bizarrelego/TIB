@@ -4,7 +4,7 @@
  */
 
 const movement = require('../utils/movement');
-const { calculatePenetrationPath } = require('../algorithms/dijkstra');
+const Dijkstra = require('../algorithms/dijkstra');
 
 module.exports = {
     /**
@@ -40,7 +40,7 @@ module.exports = {
                     } else {
                         // Check if a path is cached
                         if (!creep.heap.penetrationPath) {
-                            creep.heap.penetrationPath = calculatePenetrationPath(creep.pos, target.pos);
+                            creep.heap.penetrationPath = Dijkstra.findPath(creep.pos, [target.pos], null, null);
                         }
 
                         // Use custom Dijkstra path or fallback to standard movement
