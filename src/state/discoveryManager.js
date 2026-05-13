@@ -83,12 +83,7 @@ module.exports = function discoveryManager() {
                 state.tombstonesByRoom.set(roomName, room.find(FIND_TOMBSTONES));
                 state.ruinsByRoom.set(roomName, room.find(FIND_RUINS));
                 state.roomTerrain.set(roomName, new Room.Terrain(roomName));
-                const hostilesArray = room.find(FIND_HOSTILE_CREEPS);
-                const hostilesMap = new Map();
-                for (const hostile of hostilesArray) {
-                    hostilesMap.set(hostile.id, hostile);
-                }
-                state.hostilesByRoom.set(roomName, hostilesMap);
+                state.hostilesByRoom.set(roomName, new Map());
             }
 
             if (!state.logisticsByRoom.has(roomName)) {
