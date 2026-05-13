@@ -24,7 +24,19 @@ module.exports = function discoveryManager() {
             ruinsByRoom: new Map(),
             roomTerrain: new Map(),
             getEvents: function(roomName) {
-                return Game.rooms[roomName]?.getEventLog() || [];
+                const room = Game.rooms[roomName];
+                if (!room) return [];
+
+                const currentEventLog = room.getEventLog() || [];
+                const previousEventLog = global.State.eventCache.get(roomName) || [];
+
+                // Event logs are append-only. New events are at the end.
+                const newEvents = currentEventLog.slice(previousEventLog.length);
+
+                // Update cache so the next call diffs against this
+                global.State.eventCache.set(roomName, currentEventLog);
+
+                return newEvents;
             }
         };
     }
