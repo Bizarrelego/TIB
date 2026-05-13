@@ -1,6 +1,7 @@
 const SpawnLedger = require('./spawnLedger');
 const spawnManager = require('./spawnManager');
 const planner = require('./planner');
+const workerManager = require('../managers/workerManager');
 const worker = require('../roles/worker');
 const harvester = require('./harvester');
 const hauler = require('./hauler');
@@ -29,6 +30,7 @@ module.exports = function colonyManager() {
             try {
                 spawnManager.run(room, spawnLedger);
                 planner.run(room);
+                workerManager.run(room);
                 worker.run(room);
                 harvester.run(room);
                 hauler.run(room);
