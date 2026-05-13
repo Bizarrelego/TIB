@@ -22,12 +22,14 @@ module.exports = function discoveryManager() {
             droppedByRoom: new Map(),
             tombstonesByRoom: new Map(),
             ruinsByRoom: new Map(),
-            roomTerrain: new Map()
+            roomTerrain: new Map(),
+            getEvents: function(roomName) {
+                return Game.rooms[roomName]?.getEventLog() || [];
+            }
         };
     }
 
     const state = global.State;
-    state.eventCache.clear();
 
     // Populate global.State.scannedRooms for owned rooms
     for (const roomName in Game.rooms) {
