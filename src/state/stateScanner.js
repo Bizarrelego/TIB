@@ -13,7 +13,12 @@ module.exports = function stateScanner() {
         const roomStructures = global.State.structuresByRoom.get(roomName) || new Map();
         const roomLogistics = global.State.logisticsByRoom.get(roomName) || new Map();
 
-        const roomHostiles = global.State.hostilesByRoom.get(roomName) || new Map();
+        let roomHostiles = global.State.hostilesByRoom.get(roomName);
+        if (!roomHostiles) {
+            roomHostiles = new Map();
+            global.State.hostilesByRoom.set(roomName, roomHostiles);
+        }
+
         const roomDropped = global.State.droppedByRoom.get(roomName);
 
         const roomSites = global.State.sitesByRoom.get(roomName);
@@ -82,51 +87,57 @@ module.exports = function stateScanner() {
                     }
                 }
 
-                const deadCreep = Game.getObjectById(event.objectId);
-                if (deadCreep) {
-                    global.State.creepLookup.delete(deadCreep.name);
-                    if (deadCreep.pos && deadCreep.pos.roomName) {
-                        const roomCreeps = global.State.creepsByRoom.get(deadCreep.pos.roomName);
-                        if (roomCreeps) {
-                            const role = deadCreep.memory && deadCreep.memory.role ? deadCreep.memory.role : 'default';
-                            const roleCreeps = roomCreeps.get(role);
-                            if (roleCreeps && Array.isArray(roleCreeps)) {
-                                const idx = roleCreeps.findIndex(c => c.id === deadCreep.id);
-                                if (idx !== -1) roleCreeps.splice(idx, 1);
+                if (event.data && event.data.type === 'creep') {
+                    const creepName = event.data.name;
+                    const deadCreep = global.State.creepLookup.get(creepName);
+
+                    if (deadCreep) {
+                        global.State.creepLookup.delete(creepName);
+
+                        if (deadCreep.pos && deadCreep.pos.roomName) {
+                            const roomCreeps = global.State.creepsByRoom.get(deadCreep.pos.roomName);
+                            if (roomCreeps) {
+                                const role = deadCreep.memory && deadCreep.memory.role ? deadCreep.memory.role : 'default';
+                                const roleCreeps = roomCreeps.get(role);
+                                if (roleCreeps && Array.isArray(roleCreeps)) {
+                                    const idx = roleCreeps.findIndex(c => c.id === event.objectId);
+                                    if (idx !== -1) roleCreeps.splice(idx, 1);
+                                }
                             }
                         }
                     }
+                    roomHostiles.delete(event.objectId);
                 }
             } else if (event.event === EVENT_ATTACK || event.event === EVENT_HEAL) {
                 let actor = Game.getObjectById(event.objectId);
                 let target = event.data && event.data.targetId ? Game.getObjectById(event.data.targetId) : null;
 
-                if (actor && actor.my === false) {
+                if (actor && actor.my === false && actor.owner && actor.owner.username !== 'Invader') {
                     roomHostiles.set(actor.id, actor);
                 }
-                if (target && target.my === false) {
+                if (target && target.my === false && target.owner && target.owner.username !== 'Invader') {
                     roomHostiles.set(target.id, target);
                 }
-            } else if (typeof EVENT_CREATE_CREEP !== 'undefined' && event.event === EVENT_CREATE_CREEP) {
-                let creep = Game.getObjectById(event.objectId);
-                if (creep) {
-                    if (creep.my === false) {
-                        roomHostiles.set(creep.id, creep);
+            } else if (event.event === EVENT_CREATE_CREEP) {
+                let newCreep = Game.getObjectById(event.objectId);
+                if (newCreep) {
+                    if (newCreep.my === false) {
+                        roomHostiles.set(newCreep.id, newCreep);
                     } else {
-                        global.State.creepLookup.set(creep.name, creep);
-                        const roomName = creep.pos.roomName;
+                        global.State.creepLookup.set(newCreep.name, newCreep);
+                        const roomName = newCreep.pos.roomName;
                         let roomCreeps = global.State.creepsByRoom.get(roomName);
                         if (!roomCreeps) {
                             roomCreeps = new Map();
                             global.State.creepsByRoom.set(roomName, roomCreeps);
                         }
-                        const role = creep.memory && creep.memory.role ? creep.memory.role : 'default';
+                        const role = newCreep.memory && newCreep.memory.role ? newCreep.memory.role : 'default';
                         let roleCreeps = roomCreeps.get(role);
                         if (!roleCreeps) {
                             roleCreeps = [];
                             roomCreeps.set(role, roleCreeps);
                         }
-                        roleCreeps.push(creep);
+                        roleCreeps.push(newCreep);
                     }
                 }
             } else if (typeof EVENT_BUILD !== 'undefined' && event.event === EVENT_BUILD) {
@@ -164,7 +175,7 @@ module.exports = function stateScanner() {
                         global.State.structureCache.set(buildObj.id, buildObj);
                     }
                 }
-            } else if (typeof EVENT_DROP !== 'undefined' && event.event === EVENT_DROP) {
+            } else if (event.event === EVENT_DROP) {
                 let dropObj = Game.getObjectById(event.objectId);
                 if (dropObj && dropObj.resourceType) {
                     if (roomDropped && Array.isArray(roomDropped)) {
