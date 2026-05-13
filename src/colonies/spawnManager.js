@@ -2,6 +2,11 @@ const planner = require('./planner');
 const SpawnQueueManager = require('../managers/SpawnQueueManager');
 
 module.exports = {
+    /**
+     * Runs the spawn manager.
+     * @param {Room} room The room to run the spawn manager in.
+     * @param {Object} spawnLedger The spawn ledger to use.
+     */
     run: function(room, spawnLedger) {
         // Retrieve spawn via O(1) lookup
         const spawn = global.State.spawnsByRoom.get(room.name)?.[0];
