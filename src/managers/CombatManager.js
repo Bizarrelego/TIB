@@ -84,6 +84,7 @@ class CombatManager {
      * @param {Creep} creep
      * @param {StructureTower[]} enemyTowers
      * @param {Creep[]} enemyCreeps
+     * @returns {number} The calculated incoming damage
      */
     static predictivePreHeal(creep, enemyTowers, enemyCreeps) {
         // Simple heuristic: if we are within 5 tiles of a tower, or taking damage, pre-heal.
@@ -115,6 +116,8 @@ class CombatManager {
         if (incomingDamage > 0 || creep.hits < creep.hitsMax) {
             creep.heal(creep);
         }
+
+        return incomingDamage;
     }
 
     /**
