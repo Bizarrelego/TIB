@@ -43,12 +43,20 @@ jobs:
       - name: Reject on Test Failure
         if: steps.run-tests.outcome == 'failure'
         run: |
-          PAYLOAD=$(jq -Rs --arg prefix "Code failed static analysis and linting. Fix syntax errors before architectural review:\n\n\`\`\`text\n" --arg suffix "\n\`\`\`" '{body: ($prefix + . + $suffix), event: "REQUEST_CHANGES"}' lint_output.txt)
+          (
+            echo "@jules Code failed static analysis and linting. Fix syntax errors before architectural review:"
+            echo ""
+            echo "\`\`\`text"
+            cat lint_output.txt
+            echo "\`\`\`"
+          ) > formatted_comment.txt
+          
+          PAYLOAD=$(jq -Rs '{body: .}' formatted_comment.txt)
           
           curl -s -X POST \
             -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews \
+            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
             -d "$PAYLOAD"
             
           exit 1
@@ -65,7 +73,6 @@ jobs:
             echo "CRITICAL CHECKS:"
             echo "- Are there ANY room.find(), room.lookAt(), or getEventLog() calls inside tick loops? (Auto-reject)"
             echo "- Are they using standard {} objects instead of Map() for dictionaries? (Auto-reject)"
-            echo "Respond STRICTLY in JSON format: {\"status\": \"APPROVE\"|\"REJECT\", \"feedback\": \"Detailed markdown explanation\"}"
             echo "--- AGENTS.md ---"
             cat AGENTS.md 2>/dev/null || echo "[AGENTS.md NOT FOUND]"
             echo ""
@@ -77,12 +84,20 @@ jobs:
       - name: Architect Review
         id: gemini-check
         run: |
-          # Force JSON output schema
+          # Forces strict JSON output schema to prevent AI hallucinations
           PAYLOAD=$(jq -n --arg text "$REVIEW_TEXT" '{
             contents: [{parts: [{"text": $text}]}], 
             generationConfig: {
               temperature: 0.1,
-              responseMimeType: "application/json"
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: "OBJECT",
+                properties: {
+                  status: { type: "STRING", enum: ["APPROVE", "REJECT"] },
+                  feedback: { type: "STRING" }
+                },
+                required: ["status", "feedback"]
+              }
             }
           }')
           
@@ -97,7 +112,7 @@ jobs:
               
             CLEAN_TEXT=$(echo "$API_RES" | jq -r '.candidates[0].content.parts[0].text // empty')
             
-            if [[ -n "$CLEAN_TEXT" ]]; then
+            if [[ -n "$CLEAN_TEXT" && "$CLEAN_TEXT" != "null" ]]; then
               SUCCESS=true
               break
             fi
@@ -120,21 +135,29 @@ jobs:
           echo "$FEEDBACK" >> "$GITHUB_OUTPUT"
           echo "${delimiter}" >> "$GITHUB_OUTPUT"
 
-      - name: Submit GitHub PR Review
+      - name: Submit GitHub PR Comment
+        env:
+          # Reads output into env var. Do not use string interpolation here.
+          FEEDBACK: ${{ steps.gemini-check.outputs.feedback }}
         run: |
-          EVENT="REQUEST_CHANGES"
-          if [ "${{ steps.gemini-check.outputs.status }}" = "APPROVE" ]; then
-            EVENT="APPROVE"
-          fi
+          echo "@jules" > formatted_review.txt
+          echo "" >> formatted_review.txt
+          printf "%s\n" "$FEEDBACK" >> formatted_review.txt
           
-          PAYLOAD=$(jq -n --arg body "${{ steps.gemini-check.outputs.feedback }}" --arg event "$EVENT" '{body: $body, event: $event}')
+          PAYLOAD=$(jq -Rs '{body: .}' formatted_review.txt)
           
           curl -s -X POST \
             -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews \
+            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
             -d "$PAYLOAD"
             
-          if [ "$EVENT" = "REQUEST_CHANGES" ]; then
+          if [ "${{ steps.gemini-check.outputs.status }}" != "APPROVE" ]; then
             exit 1
           fi
+
+      - name: Auto-Merge PR
+        if: steps.gemini-check.outputs.status == 'APPROVE'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: gh pr merge ${{ github.event.pull_request.number }} --merge --auto
