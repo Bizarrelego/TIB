@@ -4,6 +4,7 @@
  */
 
 const movement = require('../utils/movement');
+const { calculatePenetrationPath } = require('../algorithms/dijkstra');
 
 module.exports = {
     /**
@@ -21,7 +22,40 @@ module.exports = {
             try {
                 if (creep.fatigue > 0) continue; // Fatigue gating
 
-                // Implementation placeholder
+                // HVT Target selection (e.g. Storage, Spawn)
+                const targetId = creep.heap.targetId || creep.memory.targetId;
+                const target = Game.getObjectById(targetId);
+
+                if (target) {
+                    if (creep.pos.isNearTo(target)) {
+                        creep.dismantle(target);
+                    } else {
+                        // Check if a path is cached
+                        if (!creep.heap.penetrationPath) {
+                            creep.heap.penetrationPath = calculatePenetrationPath(creep.pos, target.pos);
+                        }
+
+                        // Use custom Dijkstra path or fallback to standard movement
+                        if (creep.heap.penetrationPath && creep.heap.penetrationPath.length > 0) {
+                            const nextPos = creep.heap.penetrationPath[0];
+                            // Check if blocked by structure
+                            const structures = nextPos.lookFor(LOOK_STRUCTURES);
+                            const blocking = structures.find(s => s.structureType !== STRUCTURE_ROAD && s.structureType !== STRUCTURE_CONTAINER);
+
+                            if (blocking) {
+                                creep.dismantle(blocking);
+                            } else {
+                                creep.move(creep.pos.getDirectionTo(nextPos));
+                                creep.heap.penetrationPath.shift(); // Remove step
+                            }
+                        } else {
+                            movement.moveTo(creep, target);
+                        }
+                    }
+                } else {
+                    // Find new HVT or standby
+                }
+
             } catch (e) {
                 console.error(`[soloDismantler Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
             }
