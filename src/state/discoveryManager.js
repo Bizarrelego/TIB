@@ -43,15 +43,12 @@ module.exports = function discoveryManager() {
 
     const state = global.State;
 
-    // Populate global.State.scannedRooms for owned rooms
+    // Populate global.State.scannedRooms for all visible rooms to ensure zero native polling for all logic
     for (const roomName in Game.rooms) {
-        const room = Game.rooms[roomName];
-        if (room.controller && room.controller.my === true) {
-            state.scannedRooms.add(roomName);
-        }
+        state.scannedRooms.add(roomName);
     }
 
-    // Initial Room Scan for Owned Rooms
+    // Initial Room Scan for Scanned Rooms
     for (const roomName in Game.rooms) {
         const room = Game.rooms[roomName];
 

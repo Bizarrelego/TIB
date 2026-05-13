@@ -30,7 +30,7 @@ function run(room) {
                 // Pass custom opts to avoid highly hostile rooms if known
                 const opts = {
                     roomCallback: function(roomName) {
-                        const intel = Memory.intel && Memory.intel[roomName];
+                        const intel = global.State && global.State.intel ? global.State.intel.get(roomName) : null;
                         if (intel && intel.hostile) {
                             return false; // PathFinder won't route through this room
                         }

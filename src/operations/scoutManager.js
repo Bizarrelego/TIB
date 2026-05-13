@@ -15,39 +15,54 @@ function getRoomType(roomName) {
 }
 
 function gatherIntel(roomName) {
-    if (!Memory.intel) Memory.intel = {};
-    if (!Memory.intel[roomName]) Memory.intel[roomName] = {};
+    if (!global.State) return;
+    if (!global.State.intel) global.State.intel = new Map();
+
+    let intel = global.State.intel.get(roomName);
+    if (!intel) {
+        intel = {};
+        global.State.intel.set(roomName, intel);
+    }
 
     const room = Game.rooms[roomName];
     if (!room) return; // Only gather intel if we have vision
 
-    const intel = Memory.intel[roomName];
     intel.lastSeen = Game.time;
     intel.type = getRoomType(roomName);
 
     if (intel.type === 'regular' || intel.type === 'sk') {
-        const sources = room.find(FIND_SOURCES);
+        const sources = global.State.sourcesByRoom.get(roomName) || [];
         intel.sources = sources.length;
 
-        const mineral = room.find(FIND_MINERALS)[0];
+        const minerals = global.State.mineralsByRoom.get(roomName) || [];
+        const mineral = minerals[0];
         if (mineral) {
             intel.mineral = mineral.mineralType;
         }
 
+        const roomStructuresMap = global.State.structuresByRoom.get(roomName);
+        let structureCount = 0;
+
         if (intel.type === 'sk') {
-            const lairs = room.find(FIND_STRUCTURES, {
-                filter: s => s.structureType === STRUCTURE_KEEPER_LAIR
-            });
-            intel.skLairs = lairs.length;
+            const lairsMap = roomStructuresMap ? roomStructuresMap.get(STRUCTURE_KEEPER_LAIR) : null;
+            intel.skLairs = lairsMap ? (lairsMap instanceof Map ? lairsMap.size : lairsMap.length) : 0;
         }
 
-        if (room.controller) {
-            if (room.controller.owner) {
-                intel.owner = room.controller.owner.username;
-                intel.hostile = !room.controller.my;
-            } else if (room.controller.reservation) {
-                intel.reservation = room.controller.reservation.username;
-                intel.hostile = room.controller.reservation.username !== 'jules'; // placeholder for own username
+        if (roomStructuresMap) {
+            for (const structures of roomStructuresMap.values()) {
+                structureCount += (structures instanceof Map ? structures.size : structures.length);
+            }
+        }
+        intel.structureCount = structureCount;
+
+        const controller = global.State.controllersByRoom.get(roomName);
+        if (controller) {
+            if (controller.owner) {
+                intel.owner = controller.owner.username;
+                intel.hostile = !controller.my;
+            } else if (controller.reservation) {
+                intel.reservation = controller.reservation.username;
+                intel.hostile = controller.reservation.username !== 'jules'; // placeholder for own username
             } else {
                 intel.owner = null;
                 intel.reservation = null;
@@ -65,23 +80,18 @@ function gatherIntel(roomName) {
                 intel.expansionScore = 0;
             }
         }
-
-        // Track important structures for routing or target logic
-        const structures = room.find(FIND_STRUCTURES);
-        intel.structureCount = structures.length;
-
     } else if (intel.type === 'highway') {
-        const portals = room.find(FIND_STRUCTURES, {
-            filter: s => s.structureType === STRUCTURE_PORTAL
-        });
-        intel.portals = portals.length > 0;
+        const roomStructuresMap = global.State.structuresByRoom.get(roomName);
+        const portalsMap = roomStructuresMap ? roomStructuresMap.get(STRUCTURE_PORTAL) : null;
+        intel.portals = portalsMap ? (portalsMap instanceof Map ? portalsMap.size > 0 : portalsMap.length > 0) : false;
 
         // Can track power banks and deposits in the future
     }
 }
 
 function getScoutTarget(scoutCreep) {
-    if (!Memory.intel) Memory.intel = {};
+    if (!global.State) return null;
+    if (!global.State.intel) global.State.intel = new Map();
 
     // Breadth-first search to find the nearest room that needs scouting
     const queue = [scoutCreep.room.name];
@@ -106,7 +116,7 @@ function getScoutTarget(scoutCreep) {
                         visited.add(neighborRoom);
                         queue.push(neighborRoom);
 
-                        const intel = Memory.intel[neighborRoom];
+                        const intel = global.State.intel.get(neighborRoom);
 
                         // If we have never seen it, or haven't seen it in 5000 ticks, it's a good target
                         if (!intel || !intel.lastSeen || (Game.time - intel.lastSeen > 5000)) {
