@@ -26,8 +26,20 @@ module.exports = function stateScanner() {
             global.State.hostilesByRoom.set(roomName, roomHostiles);
         }
 
+        let roomDropped = global.State.droppedByRoom.get(roomName);
+        if (Array.isArray(roomDropped)) {
+            const newMap = new Map();
+            for (const dropped of roomDropped) {
+                if (dropped && dropped.id) newMap.set(dropped.id, dropped);
+            }
+            roomDropped = newMap;
+            global.State.droppedByRoom.set(roomName, roomDropped);
+        } else if (!(roomDropped instanceof Map)) {
+            roomDropped = new Map();
+            global.State.droppedByRoom.set(roomName, roomDropped);
+        }
+
         const roomSites = global.State.sitesByRoom.get(roomName);
-        const roomDropped = global.State.droppedByRoom.get(roomName);
         const roomTombstones = global.State.tombstonesByRoom.get(roomName);
         const roomRuins = global.State.ruinsByRoom.get(roomName);
 
@@ -46,10 +58,7 @@ module.exports = function stateScanner() {
                     const idx = roomSites.findIndex(s => s.id === event.objectId);
                     if (idx !== -1) roomSites.splice(idx, 1);
                 }
-                if (roomDropped && Array.isArray(roomDropped)) {
-                    const idx = roomDropped.findIndex(s => s.id === event.objectId);
-                    if (idx !== -1) roomDropped.splice(idx, 1);
-                }
+                roomDropped.delete(event.objectId);
                 if (roomTombstones && Array.isArray(roomTombstones)) {
                     const idx = roomTombstones.findIndex(s => s.id === event.objectId);
                     if (idx !== -1) roomTombstones.splice(idx, 1);
@@ -106,22 +115,9 @@ module.exports = function stateScanner() {
                     }
                 }
             } else if (typeof EVENT_DROP !== 'undefined' && event.event === EVENT_DROP) {
-                // To be safe, try objectId and targetId
-                let dropObj = Game.getObjectById(event.objectId) || (event.data && Game.getObjectById(event.data.targetId));
-                if (!dropObj && event.data && event.data.resourceType) {
-                     // Sometimes dropObj isn't easily obtained this way if it's the resource itself.
-                     // The prompt just says: "If a resource was dropped (object && object.resourceType), add it to roomDropped."
-                }
-
-                // Let's ensure we use "object" from the start of the loop
-                if (object && object.resourceType) {
-                    if (roomDropped && Array.isArray(roomDropped) && !roomDropped.some(r => r.id === object.id)) {
-                        roomDropped.push(object);
-                    }
-                } else if (dropObj && dropObj.resourceType) {
-                    if (roomDropped && Array.isArray(roomDropped) && !roomDropped.some(r => r.id === dropObj.id)) {
-                        roomDropped.push(dropObj);
-                    }
+                let dropObj = Game.getObjectById(event.objectId);
+                if (dropObj && dropObj.resourceType) {
+                    roomDropped.set(dropObj.id, dropObj);
                 }
             }
         }
