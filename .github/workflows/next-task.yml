@@ -23,9 +23,8 @@ jobs:
       
       - name: Build Prompt Context
         run: |
-          delimiter="$(openssl rand -hex 8)"
-          {
-            echo "PROMPT_TEXT<<${delimiter}"
+          # Write context directly to a file to bypass ARG_MAX kernel limits
+          (
             echo "You are the Lead Architect for a Screeps bot."
             echo "We are in the BOOTSTRAP PHASE. Analyze the codebase and output a prompt for Jules to generate the EXACT NEXT LOGICAL MODULE."
             if [ -n "${{ inputs.specific_task }}" ]; then
@@ -46,13 +45,13 @@ jobs:
             echo ""
             echo "--- CURRENT CODEBASE CONTENTS ---"
             find src -name "*.js" -type f -exec sh -c 'echo "FILE: {}"; head -n 100 "{}"; echo "---"' \; || echo "No JS files found."
-            echo "${delimiter}"
-          } >> "$GITHUB_ENV"
+          ) > prompt_context.txt
 
       - name: Get Next Task (With Fallback)
         id: plan-next
         run: |
-          jq -n --arg text "$PROMPT_TEXT" '{contents: [{parts: [{"text": $text}]}], generationConfig: {temperature: 0.2}}' > payload.json
+          # Use --rawfile to stream the file content directly into jq without passing through Bash variables
+          jq -n --rawfile text prompt_context.txt '{contents: [{parts: [{"text": $text}]}], generationConfig: {temperature: 0.2}}' > payload.json
           
           MODELS=("gemini-2.5-flash" "gemini-3.1-flash-lite")
           SUCCESS=false
@@ -69,7 +68,7 @@ jobs:
             
             if [ "$HTTP_STATUS" -eq 200 ]; then
               CLEAN_TEXT=$(echo "$HTTP_BODY" | jq -r '.candidates[0].content.parts[0].text // empty')
-              if [[ -n "$CLEAN_TEXT" ]]; then
+              if [[ -n "$CLEAN_TEXT" && "$CLEAN_TEXT" != "null" ]]; then
                 echo "Successfully generated task using $MODEL."
                 SUCCESS=true
                 break
@@ -86,30 +85,21 @@ jobs:
             exit 1
           fi
           
-          delimiter="$(openssl rand -hex 8)"
-          {
-            echo "gemini_response<<${delimiter}"
-            echo "$CLEAN_TEXT"
-            echo "${delimiter}"
-          } >> "$GITHUB_OUTPUT"
+          # Write the AI response to a file instead of GITHUB_OUTPUT to prevent downstream ARG_MAX issues
+          echo "$CLEAN_TEXT" > jules_task.txt
 
       - name: Trigger Jules
-        env:
-          GEMINI_RESPONSE: ${{ steps.plan-next.outputs.gemini_response }}
         run: |
-          AGENTS_DATA=$(cat AGENTS.md 2>/dev/null || echo "[AGENTS.md missing]")
+          (
+            echo "SYSTEM CONSTRAINTS - STRICTLY ENFORCED:"
+            cat AGENTS.md 2>/dev/null || echo "[AGENTS.md missing]"
+            echo ""
+            echo "========================================="
+            echo "YOUR EXACT TASK:"
+            cat jules_task.txt
+          ) > full_jules_prompt.txt
           
-          FULL_PROMPT=$(cat <<EOF
-          SYSTEM CONSTRAINTS - STRICTLY ENFORCED:
-          ${AGENTS_DATA}
-          
-          =========================================
-          YOUR EXACT TASK:
-          ${GEMINI_RESPONSE}
-          EOF
-          )
-          
-          jq -n --arg prompt "$FULL_PROMPT" '{
+          jq -n --rawfile prompt full_jules_prompt.txt '{
             prompt: $prompt,
             sourceContext: {
               source: "sources/github/${{ github.repository }}",
