@@ -33,7 +33,11 @@ function run(room) {
             }
 
             // 2. Execute Assigned Sub-tick Intents
-            if (state === 'fill_link' || state === 'empty_link') {
+            if (
+                state === 'fill_link' || state === 'empty_link' ||
+                state === 'fill_terminal' || state === 'empty_terminal' ||
+                state === 'fill_storage' || state === 'empty_storage'
+            ) {
                 const srcId = sourceId;
                 const tgtId = targetId;
 

@@ -13,6 +13,7 @@ const upgrader = require('../roles/upgrader');
 const defense = require('./defense');
 const labs = require('./labs');
 const scout = require('../roles/scout');
+const logistics = require('./logistics');
 
 module.exports = function colonyManager() {
     for (const room of Object.values(Game.rooms)) {
@@ -33,6 +34,7 @@ module.exports = function colonyManager() {
                 defense.run(room);
                 labs.run(room);
                 scout.run(room);
+                logistics.run(room);
             } catch (e) {
                 console.log(`[ColonyManager Error] Room ${room.name}: ${e.stack}`);
             }
