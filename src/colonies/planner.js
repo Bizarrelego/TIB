@@ -128,7 +128,7 @@ module.exports = {
                 STRUCTURE_TOWER,
                 STRUCTURE_LINK,
                 STRUCTURE_TERMINAL,
-                STRUCTURE_FACTORY,
+                'factory',
                 STRUCTURE_ROAD
             ];
 
@@ -140,7 +140,7 @@ module.exports = {
                 [STRUCTURE_TOWER]: CONTROLLER_STRUCTURES[STRUCTURE_TOWER][rcl],
                 [STRUCTURE_LINK]: CONTROLLER_STRUCTURES[STRUCTURE_LINK][rcl],
                 [STRUCTURE_TERMINAL]: CONTROLLER_STRUCTURES[STRUCTURE_TERMINAL][rcl],
-                [STRUCTURE_FACTORY]: CONTROLLER_STRUCTURES[STRUCTURE_FACTORY][rcl],
+                ['factory']: CONTROLLER_STRUCTURES['factory'][rcl],
                 [STRUCTURE_ROAD]: 2500 // Arbitrary large limit
             };
 
