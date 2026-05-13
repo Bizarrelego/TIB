@@ -46,19 +46,17 @@ jobs:
       - name: Get Next Task (With Fallback)
         id: plan-next
         run: |
-          PAYLOAD=$(jq -n --arg text "$PROMPT_TEXT" '{contents: [{parts: [{"text": $text}]}], generationConfig: {temperature: 0.2}}')
+          jq -n --arg text "$PROMPT_TEXT" '{contents: [{parts: [{"text": $text}]}], generationConfig: {temperature: 0.2}}' > payload.json
           
-          # Array of models to try in order of preference
           MODELS=("gemini-2.5-flash" "gemini-3.1-flash-lite")
           SUCCESS=false
           
           for MODEL in "${MODELS[@]}"; do
             echo "Attempting inference with $MODEL..."
             
-            # Capture both HTTP status code and response body
             HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://generativelanguage.googleapis.com/v1beta/models/$MODEL:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
               -H 'Content-Type: application/json' \
-              -d "$PAYLOAD")
+              -d @payload.json)
               
             HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed '$d')
             HTTP_STATUS=$(echo "$HTTP_RESPONSE" | tail -n 1)
@@ -71,7 +69,7 @@ jobs:
                 break
               fi
             elif [ "$HTTP_STATUS" -eq 429 ]; then
-              echo "::warning::Quota exceeded for $MODEL (HTTP 429). Falling back to next model..."
+              echo "::warning::Quota exceeded for $MODEL (HTTP 429). Falling back..."
             else
               echo "::error::API Error with $MODEL (HTTP $HTTP_STATUS): $HTTP_BODY"
             fi
@@ -105,7 +103,7 @@ jobs:
           EOF
           )
           
-          PAYLOAD=$(jq -n --arg prompt "$FULL_PROMPT" '{
+          jq -n --arg prompt "$FULL_PROMPT" '{
             prompt: $prompt,
             sourceContext: {
               source: "sources/github/${{ github.repository }}",
@@ -114,9 +112,9 @@ jobs:
               }
             },
             automationMode: "AUTO_CREATE_PR"
-          }')
+          }' > jules_payload.json
           
           curl -s -X POST https://jules.googleapis.com/v1alpha/sessions \
           -H "Content-Type: application/json" \
           -H "X-Goog-Api-Key: ${{ secrets.JULES_TOKEN }}" \
-          -d "$PAYLOAD"
+          -d @jules_payload.json
