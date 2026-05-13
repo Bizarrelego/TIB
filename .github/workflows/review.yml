@@ -81,10 +81,9 @@ jobs:
             echo "${delimiter}"
           } >> "$GITHUB_ENV"
 
-      - name: Architect Review
+      - name: Architect Review (With Fallback)
         id: gemini-check
         run: |
-          # Forces strict JSON output schema to prevent AI hallucinations
           PAYLOAD=$(jq -n --arg text "$REVIEW_TEXT" '{
             contents: [{parts: [{"text": $text}]}], 
             generationConfig: {
@@ -101,27 +100,35 @@ jobs:
             }
           }')
           
-          MAX_RETRIES=5
-          DELAY=1
+          MODELS=("gemini-2.5-flash" "gemini-3.1-flash-lite")
           SUCCESS=false
           
-          for i in $(seq 1 $MAX_RETRIES); do
-            API_RES=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
+          for MODEL in "${MODELS[@]}"; do
+            echo "Attempting review with $MODEL..."
+            
+            HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://generativelanguage.googleapis.com/v1beta/models/$MODEL:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
               -H 'Content-Type: application/json' \
               -d "$PAYLOAD")
               
-            CLEAN_TEXT=$(echo "$API_RES" | jq -r '.candidates[0].content.parts[0].text // empty')
+            HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed '$d')
+            HTTP_STATUS=$(echo "$HTTP_RESPONSE" | tail -n 1)
             
-            if [[ -n "$CLEAN_TEXT" && "$CLEAN_TEXT" != "null" ]]; then
-              SUCCESS=true
-              break
+            if [ "$HTTP_STATUS" -eq 200 ]; then
+              CLEAN_TEXT=$(echo "$HTTP_BODY" | jq -r '.candidates[0].content.parts[0].text // empty')
+              if [[ -n "$CLEAN_TEXT" && "$CLEAN_TEXT" != "null" ]]; then
+                echo "Successfully generated review using $MODEL."
+                SUCCESS=true
+                break
+              fi
+            elif [ "$HTTP_STATUS" -eq 429 ]; then
+              echo "::warning::Quota exceeded for $MODEL (HTTP 429). Falling back to next model..."
+            else
+              echo "::error::API Error with $MODEL (HTTP $HTTP_STATUS): $HTTP_BODY"
             fi
-            sleep $DELAY
-            DELAY=$((DELAY * 2))
           done
           
           if [ "$SUCCESS" = false ]; then
-            echo "::error::Gemini API Failed after 5 retries."
+            echo "::error::All Gemini models failed or quotas exhausted."
             exit 1
           fi
           
@@ -137,7 +144,6 @@ jobs:
 
       - name: Submit GitHub PR Comment
         env:
-          # Reads output into env var. Do not use string interpolation here.
           FEEDBACK: ${{ steps.gemini-check.outputs.feedback }}
         run: |
           echo "@jules" > formatted_review.txt
