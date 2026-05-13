@@ -96,13 +96,15 @@ module.exports = function stateScanner() {
                             if (idx2 !== -1) roomSites.splice(idx2, 1);
                         }
 
-                        let structArray = roomStructures.get(buildObj.structureType);
-                        if (!structArray) {
-                            structArray = [];
-                            roomStructures.set(buildObj.structureType, structArray); // Ensure the new array is set
+                        if (!(buildObj instanceof ConstructionSite)) {
+                            let structArray = roomStructures.get(buildObj.structureType);
+                            if (!structArray) {
+                                structArray = [];
+                                roomStructures.set(buildObj.structureType, structArray); // Ensure the new array is set
+                            }
+                            structArray.push(buildObj); // Add the new structure
+                            global.State.structureCache.set(buildObj.id, buildObj); // Add to global cache
                         }
-                        structArray.push(buildObj); // Add the new structure
-                        global.State.structureCache.set(buildObj.id, buildObj); // Add to global cache
                     }
                 }
             } else if (typeof EVENT_DROP !== 'undefined' && event.event === EVENT_DROP) {
