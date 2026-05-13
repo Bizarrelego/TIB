@@ -13,31 +13,8 @@ module.exports = function stateScanner() {
         const roomStructures = global.State.structuresByRoom.get(roomName) || new Map();
         const roomLogistics = global.State.logisticsByRoom.get(roomName) || new Map();
 
-        let roomHostiles = global.State.hostilesByRoom.get(roomName);
-        if (Array.isArray(roomHostiles)) {
-            const newMap = new Map();
-            for (const hostile of roomHostiles) {
-                if (hostile && hostile.id) newMap.set(hostile.id, hostile);
-            }
-            roomHostiles = newMap;
-            global.State.hostilesByRoom.set(roomName, roomHostiles);
-        } else if (!(roomHostiles instanceof Map)) {
-            roomHostiles = new Map();
-            global.State.hostilesByRoom.set(roomName, roomHostiles);
-        }
-
-        let roomDropped = global.State.droppedByRoom.get(roomName);
-        if (Array.isArray(roomDropped)) {
-            const newMap = new Map();
-            for (const dropped of roomDropped) {
-                if (dropped && dropped.id) newMap.set(dropped.id, dropped);
-            }
-            roomDropped = newMap;
-            global.State.droppedByRoom.set(roomName, roomDropped);
-        } else if (!(roomDropped instanceof Map)) {
-            roomDropped = new Map();
-            global.State.droppedByRoom.set(roomName, roomDropped);
-        }
+        const roomHostiles = global.State.hostilesByRoom.get(roomName) || new Map();
+        const roomDropped = global.State.droppedByRoom.get(roomName) || new Map();
 
         const roomSites = global.State.sitesByRoom.get(roomName);
         const roomTombstones = global.State.tombstonesByRoom.get(roomName);
@@ -50,22 +27,52 @@ module.exports = function stateScanner() {
             }
 
             if (event.event === EVENT_OBJECT_DESTROYED) {
+                const cachedObj = global.State.structureCache.get(event.objectId);
+                const typeToRemove = (event.data && event.data.type) || (cachedObj && cachedObj.structureType);
+
                 global.State.structureCache.delete(event.objectId);
                 roomHostiles.delete(event.objectId);
                 roomLogistics.delete(event.objectId);
 
-                if (roomSites && Array.isArray(roomSites)) {
-                    const idx = roomSites.findIndex(s => s.id === event.objectId);
-                    if (idx !== -1) roomSites.splice(idx, 1);
+                if (typeToRemove) {
+                    let structMapOrArr = roomStructures.get(typeToRemove);
+                    if (structMapOrArr) {
+                        if (structMapOrArr instanceof Map) {
+                            structMapOrArr.delete(event.objectId);
+                        } else if (Array.isArray(structMapOrArr)) {
+                            const idx = structMapOrArr.findIndex(s => s.id === event.objectId);
+                            if (idx !== -1) structMapOrArr.splice(idx, 1);
+                        }
+                    }
                 }
+
+                if (roomSites) {
+                    if (roomSites instanceof Map) {
+                        roomSites.delete(event.objectId);
+                    } else if (Array.isArray(roomSites)) {
+                        const idx = roomSites.findIndex(s => s.id === event.objectId);
+                        if (idx !== -1) roomSites.splice(idx, 1);
+                    }
+                }
+
                 roomDropped.delete(event.objectId);
-                if (roomTombstones && Array.isArray(roomTombstones)) {
-                    const idx = roomTombstones.findIndex(s => s.id === event.objectId);
-                    if (idx !== -1) roomTombstones.splice(idx, 1);
+
+                if (roomTombstones) {
+                    if (roomTombstones instanceof Map) {
+                        roomTombstones.delete(event.objectId);
+                    } else if (Array.isArray(roomTombstones)) {
+                        const idx = roomTombstones.findIndex(s => s.id === event.objectId);
+                        if (idx !== -1) roomTombstones.splice(idx, 1);
+                    }
                 }
-                if (roomRuins && Array.isArray(roomRuins)) {
-                    const idx = roomRuins.findIndex(s => s.id === event.objectId);
-                    if (idx !== -1) roomRuins.splice(idx, 1);
+
+                if (roomRuins) {
+                    if (roomRuins instanceof Map) {
+                        roomRuins.delete(event.objectId);
+                    } else if (Array.isArray(roomRuins)) {
+                        const idx = roomRuins.findIndex(s => s.id === event.objectId);
+                        if (idx !== -1) roomRuins.splice(idx, 1);
+                    }
                 }
             } else if (event.event === EVENT_ATTACK || event.event === EVENT_HEAL) {
                 let actor = Game.getObjectById(event.objectId);
@@ -83,37 +90,39 @@ module.exports = function stateScanner() {
                     roomHostiles.set(creep.id, creep);
                 }
             } else if (typeof EVENT_BUILD !== 'undefined' && event.event === EVENT_BUILD) {
-                // If a structure was built
-                let target = event.data && event.data.targetId ? Game.getObjectById(event.data.targetId) : null;
-                if (!target) target = Game.getObjectById(event.objectId);
+                let buildObj = event.data && event.data.targetId ? Game.getObjectById(event.data.targetId) : null;
+                if (!buildObj) buildObj = Game.getObjectById(event.objectId); // Fallback in case objectId is the site
 
-                // Also check if object is the target itself
-                if (object && object.structureType) target = object;
-
-                if (target && target.structureType) {
-                    // It could be a Structure (finished) or ConstructionSite (progressing)
-                    // The prompt says: "If a structure was built (object && object.structureType), remove the corresponding construction site from roomSites. Add the newly built structure to roomStructures... Add the new structure to global.State.structureCache."
-                    // Actually, let's just do exactly as asked with `object && object.structureType` where object is resolved from event.objectId
-                    let buildObj = Game.getObjectById(event.objectId) || (event.data && Game.getObjectById(event.data.targetId));
-                    if (buildObj && buildObj.structureType) {
-                        if (roomSites && Array.isArray(roomSites)) {
-                            // Find and remove construction site by position or ID
-                            const idx = roomSites.findIndex(s => s.pos && buildObj.pos && s.pos.x === buildObj.pos.x && s.pos.y === buildObj.pos.y);
-                            if (idx !== -1) roomSites.splice(idx, 1);
-
-                            const idx2 = roomSites.findIndex(s => s.id === buildObj.id);
-                            if (idx2 !== -1) roomSites.splice(idx2, 1);
-                        }
-
-                        if (!(buildObj instanceof ConstructionSite)) {
-                            let structArray = roomStructures.get(buildObj.structureType);
-                            if (!structArray) {
-                                structArray = [];
-                                roomStructures.set(buildObj.structureType, structArray); // Ensure the new array is set
+                if (buildObj && buildObj.structureType) {
+                    if (!(buildObj instanceof ConstructionSite)) {
+                        if (roomSites) {
+                            if (roomSites instanceof Map) {
+                                for (const [siteId, site] of roomSites.entries()) {
+                                    if (site.pos && buildObj.pos && site.pos.x === buildObj.pos.x && site.pos.y === buildObj.pos.y) {
+                                        roomSites.delete(siteId);
+                                        break;
+                                    }
+                                }
+                            } else if (Array.isArray(roomSites)) {
+                                const idx = roomSites.findIndex(s => s.pos && buildObj.pos && s.pos.x === buildObj.pos.x && s.pos.y === buildObj.pos.y);
+                                if (idx !== -1) roomSites.splice(idx, 1);
                             }
-                            structArray.push(buildObj); // Add the new structure
-                            global.State.structureCache.set(buildObj.id, buildObj); // Add to global cache
                         }
+
+                        let structMapOrArr = roomStructures.get(buildObj.structureType);
+                        if (!structMapOrArr) {
+                            structMapOrArr = new Map();
+                            roomStructures.set(buildObj.structureType, structMapOrArr);
+                        }
+
+                        if (structMapOrArr instanceof Map) {
+                            structMapOrArr.set(buildObj.id, buildObj);
+                        } else if (Array.isArray(structMapOrArr)) {
+                            if (!structMapOrArr.some(s => s.id === buildObj.id)) {
+                                structMapOrArr.push(buildObj);
+                            }
+                        }
+                        global.State.structureCache.set(buildObj.id, buildObj);
                     }
                 }
             } else if (typeof EVENT_DROP !== 'undefined' && event.event === EVENT_DROP) {
