@@ -45,11 +45,22 @@ module.exports = {
 
                 // 2. Park on a rampart if not already
                 let onRampart = false;
-                const structures = creep.room.lookForAt(LOOK_STRUCTURES, creep.pos);
-                for (const s of structures) {
-                    if (s.structureType === STRUCTURE_RAMPART) {
-                        onRampart = true;
-                        break;
+                const roomStructures = global.State.structuresByRoom.get(room.name);
+                if (roomStructures) {
+                    const ramparts = roomStructures.get(STRUCTURE_RAMPART);
+                    if (ramparts) {
+                        let rampartArray = [];
+                        if (Array.isArray(ramparts)) {
+                            rampartArray = ramparts;
+                        } else if (ramparts instanceof Map) {
+                            rampartArray = Array.from(ramparts.values());
+                        }
+                        for (const s of rampartArray) {
+                            if (s.pos && s.pos.x === creep.pos.x && s.pos.y === creep.pos.y) {
+                                onRampart = true;
+                                break;
+                            }
+                        }
                     }
                 }
 

@@ -60,9 +60,18 @@ function runTowerDrain() {
 
         // Predict damage
         let expectedDamage = 0;
-        const towers = creep.room.find(FIND_HOSTILE_STRUCTURES, {
-            filter: s => s.structureType === STRUCTURE_TOWER
-        });
+        const roomStructures = global.State.structuresByRoom.get(creep.room.name);
+        let towers = [];
+        if (roomStructures) {
+            const towerStructs = roomStructures.get(STRUCTURE_TOWER);
+            if (towerStructs) {
+                if (Array.isArray(towerStructs)) {
+                    towers = towerStructs.filter(s => !s.my);
+                } else if (towerStructs instanceof Map) {
+                    towers = Array.from(towerStructs.values()).filter(s => !s.my);
+                }
+            }
+        }
 
         // Very rough tower damage estimate
         for (const tower of towers) {
