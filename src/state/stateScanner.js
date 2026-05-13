@@ -14,7 +14,7 @@ module.exports = function stateScanner() {
         const roomLogistics = global.State.logisticsByRoom.get(roomName) || new Map();
 
         const roomHostiles = global.State.hostilesByRoom.get(roomName) || new Map();
-        const roomDropped = global.State.droppedByRoom.get(roomName) || new Map();
+        const roomDropped = global.State.droppedByRoom.get(roomName);
 
         const roomSites = global.State.sitesByRoom.get(roomName);
         const roomTombstones = global.State.tombstonesByRoom.get(roomName);
@@ -55,11 +55,13 @@ module.exports = function stateScanner() {
                     }
                 }
 
-                if (roomDropped && Array.isArray(roomDropped)) {
-                    const idx = roomDropped.findIndex(r => r.id === event.objectId);
-                    if (idx !== -1) roomDropped.splice(idx, 1);
-                } else if (roomDropped instanceof Map) {
-                    roomDropped.delete(event.objectId);
+                if (roomDropped) {
+                    if (Array.isArray(roomDropped)) {
+                        const idx = roomDropped.findIndex(r => r.id === event.objectId);
+                        if (idx !== -1) roomDropped.splice(idx, 1);
+                    } else if (roomDropped instanceof Map) {
+                        roomDropped.delete(event.objectId);
+                    }
                 }
 
                 if (roomTombstones) {
@@ -79,6 +81,22 @@ module.exports = function stateScanner() {
                         roomRuins.delete(event.objectId);
                     }
                 }
+
+                const deadCreep = Game.getObjectById(event.objectId);
+                if (deadCreep) {
+                    global.State.creepLookup.delete(deadCreep.name);
+                    if (deadCreep.pos && deadCreep.pos.roomName) {
+                        const roomCreeps = global.State.creepsByRoom.get(deadCreep.pos.roomName);
+                        if (roomCreeps) {
+                            const role = deadCreep.memory && deadCreep.memory.role ? deadCreep.memory.role : 'default';
+                            const roleCreeps = roomCreeps.get(role);
+                            if (roleCreeps && Array.isArray(roleCreeps)) {
+                                const idx = roleCreeps.findIndex(c => c.id === deadCreep.id);
+                                if (idx !== -1) roleCreeps.splice(idx, 1);
+                            }
+                        }
+                    }
+                }
             } else if (event.event === EVENT_ATTACK || event.event === EVENT_HEAL) {
                 let actor = Game.getObjectById(event.objectId);
                 let target = event.data && event.data.targetId ? Game.getObjectById(event.data.targetId) : null;
@@ -91,8 +109,25 @@ module.exports = function stateScanner() {
                 }
             } else if (typeof EVENT_CREATE_CREEP !== 'undefined' && event.event === EVENT_CREATE_CREEP) {
                 let creep = Game.getObjectById(event.objectId);
-                if (creep && creep.my === false) {
-                    roomHostiles.set(creep.id, creep);
+                if (creep) {
+                    if (creep.my === false) {
+                        roomHostiles.set(creep.id, creep);
+                    } else {
+                        global.State.creepLookup.set(creep.name, creep);
+                        const roomName = creep.pos.roomName;
+                        let roomCreeps = global.State.creepsByRoom.get(roomName);
+                        if (!roomCreeps) {
+                            roomCreeps = new Map();
+                            global.State.creepsByRoom.set(roomName, roomCreeps);
+                        }
+                        const role = creep.memory && creep.memory.role ? creep.memory.role : 'default';
+                        let roleCreeps = roomCreeps.get(role);
+                        if (!roleCreeps) {
+                            roleCreeps = [];
+                            roomCreeps.set(role, roleCreeps);
+                        }
+                        roleCreeps.push(creep);
+                    }
                 }
             } else if (typeof EVENT_BUILD !== 'undefined' && event.event === EVENT_BUILD) {
                 let buildObj = event.data && event.data.targetId ? Game.getObjectById(event.data.targetId) : null;
@@ -132,17 +167,12 @@ module.exports = function stateScanner() {
             } else if (typeof EVENT_DROP !== 'undefined' && event.event === EVENT_DROP) {
                 let dropObj = Game.getObjectById(event.objectId);
                 if (dropObj && dropObj.resourceType) {
-                    roomDropped.set(dropObj.id, dropObj);
+                    if (roomDropped && Array.isArray(roomDropped)) {
+                        roomDropped.push(dropObj);
+                    } else if (roomDropped instanceof Map) {
+                        roomDropped.set(dropObj.id, dropObj);
+                    }
                 }
-            }
-        }
-
-        // Clean up creeps maps for dead creeps using O(1) logic instead of array iteration
-        const roomCreeps = global.State.creepsByRoom.get(roomName) || new Map();
-        for (const id of roomCreeps.keys()) {
-            const creep = roomCreeps.get(id);
-            if (!global.State.creepLookup.has(creep.name)) {
-                roomCreeps.delete(id); // Creep died
             }
         }
     }
