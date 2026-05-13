@@ -100,14 +100,8 @@ class CombatManager {
 
         if (enemyCreeps) {
             for (const hostile of enemyCreeps) {
-                let isDangerous = true;
-                if (hostile.body) {
-                    isDangerous = hostile.body.some(p => p.type === ATTACK || p.type === RANGED_ATTACK);
-                }
-                if (isDangerous) {
-                    if (creep.pos.getRangeTo(hostile) <= 3) {
-                        incomingDamage += 100; // Estimate
-                    }
+                if (creep.pos.getRangeTo(hostile) <= 3) {
+                    incomingDamage += 100; // Estimate
                 }
             }
         }
