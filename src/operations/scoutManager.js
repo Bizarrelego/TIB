@@ -68,17 +68,23 @@ function gatherIntel(roomName) {
                 intel.reservation = null;
                 intel.hostile = false;
             }
+        }
 
-            // Score logic for expansion
-            if (!intel.hostile && intel.type === 'regular' && intel.sources >= 2) {
-                let score = 100;
-                // Prefer rooms with multiple sources and a mineral
-                if (intel.mineral) score += 50;
+        // Also check for hostile creeps
+        const hostiles = global.State.hostilesByRoom ? global.State.hostilesByRoom.get(roomName) : null;
+        if (hostiles && hostiles.length > 0) {
+            intel.hostile = true;
+        }
 
-                intel.expansionScore = score;
-            } else {
-                intel.expansionScore = 0;
-            }
+        // Score logic for expansion
+        if (!intel.hostile && intel.type === 'regular' && intel.sources >= 2) {
+            let score = 100;
+            // Prefer rooms with multiple sources and a mineral
+            if (intel.mineral) score += 50;
+
+            intel.expansionScore = score;
+        } else {
+            intel.expansionScore = 0;
         }
     } else if (intel.type === 'highway') {
         const roomStructuresMap = global.State.structuresByRoom.get(roomName);
@@ -99,6 +105,7 @@ function getScoutTarget(scoutCreep) {
     visited.add(scoutCreep.room.name);
 
     let bestTarget = null;
+    let bestScore = -Infinity;
     let maxDistance = 15; // Max depth to search
     let depth = 0;
 
@@ -118,9 +125,24 @@ function getScoutTarget(scoutCreep) {
 
                         const intel = global.State.intel.get(neighborRoom);
 
-                        // If we have never seen it, or haven't seen it in 5000 ticks, it's a good target
+                        // If we have never seen it, or haven't seen it in 5000 ticks, it's a candidate
                         if (!intel || !intel.lastSeen || (Game.time - intel.lastSeen > 5000)) {
-                            return neighborRoom;
+                            // Calculate a score for this target
+                            let score = 0;
+                            if (intel && intel.expansionScore) {
+                                score += intel.expansionScore;
+                            }
+                            // Favor un-scouted rooms slightly to ensure we explore everything
+                            if (!intel || !intel.lastSeen) {
+                                score += 50;
+                            }
+                            // Distance penalty
+                            score -= depth * 10;
+
+                            if (score > bestScore) {
+                                bestScore = score;
+                                bestTarget = neighborRoom;
+                            }
                         }
                     }
                 }
@@ -158,7 +180,7 @@ function runScouts() {
     }
 }
 
-module.exports = function scoutManager() {
+function scoutManager() {
     try {
         // Run scouts every tick to assign targets and gather intel
         runScouts();
@@ -172,4 +194,7 @@ module.exports = function scoutManager() {
     } catch (e) {
         console.error(`[ScoutManager Error] ${e.stack}`);
     }
-};
+}
+
+scoutManager.gatherIntel = gatherIntel;
+module.exports = scoutManager;

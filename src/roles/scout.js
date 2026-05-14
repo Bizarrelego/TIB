@@ -1,10 +1,12 @@
 const movement = require('../utils/movement');
+const scoutManager = require('../operations/scoutManager');
 
 /**
  * @file scout.js
  * @description Scout role that moves to a target room to gather intel.
  */
 function run(room) {
+    if (!global.State || !global.State.creepsByRoom) return;
     const scouts = global.State.creepsByRoom.get(room.name)?.get('scout') || [];
 
     for (const creep of scouts) {
@@ -47,6 +49,10 @@ function run(room) {
                     movement.moveTo(creep, centerPos);
                 } else {
                     // We are in the room and off the exit.
+                    // Gather intel
+                    if (scoutManager && typeof scoutManager.gatherIntel === 'function') {
+                        scoutManager.gatherIntel(creep.room.name);
+                    }
                     // Clear the target so the scout manager will assign a new one next tick.
                     creep.heap.targetRoom = null;
                 }
