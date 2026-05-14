@@ -89,21 +89,27 @@ function gatherIntel(roomName) {
     }
 }
 
+/**
+ * Determines the next best room for a scout to visit using BFS.
+ * @param {Creep} scoutCreep - The scout creep.
+ * @returns {string|null} The name of the target room, or null if none found.
+ */
 function getScoutTarget(scoutCreep) {
     if (!global.State) return null;
     if (!global.State.intel) global.State.intel = new Map();
 
-    // Breadth-first search to find the nearest room that needs scouting
     const queue = [scoutCreep.room.name];
     const visited = new Set();
     visited.add(scoutCreep.room.name);
 
-    let bestTarget = null;
-    let maxDistance = 15; // Max depth to search
+    const maxDistance = 15;
     let depth = 0;
 
+    const highScores = [];
+    const staleRooms = [];
+
     while (queue.length > 0 && depth < maxDistance) {
-        let levelSize = queue.length;
+        const levelSize = queue.length;
         for (let i = 0; i < levelSize; i++) {
             const currentRoom = queue.shift();
             const exits = Game.map.describeExits(currentRoom);
@@ -118,9 +124,19 @@ function getScoutTarget(scoutCreep) {
 
                         const intel = global.State.intel.get(neighborRoom);
 
-                        // If we have never seen it, or haven't seen it in 5000 ticks, it's a good target
-                        if (!intel || !intel.lastSeen || (Game.time - intel.lastSeen > 5000)) {
+                        // Priority 1: Unseen room
+                        if (!intel || !intel.lastSeen) {
                             return neighborRoom;
+                        }
+
+                        // Priority 2: High expansion score
+                        if (intel.expansionScore && intel.expansionScore > 0) {
+                            highScores.push({ roomName: neighborRoom, score: intel.expansionScore, distance: depth + 1 });
+                        }
+
+                        // Priority 3: Stale intel
+                        if (Game.time - intel.lastSeen > 1000) {
+                            staleRooms.push({ roomName: neighborRoom, age: Game.time - intel.lastSeen, distance: depth + 1 });
                         }
                     }
                 }
@@ -129,7 +145,19 @@ function getScoutTarget(scoutCreep) {
         depth++;
     }
 
-    return bestTarget;
+    // Sort and return Priority 2 if available
+    if (highScores.length > 0) {
+        highScores.sort((a, b) => b.score - a.score || a.distance - b.distance);
+        return highScores[0].roomName;
+    }
+
+    // Sort and return Priority 3 if available
+    if (staleRooms.length > 0) {
+        staleRooms.sort((a, b) => b.age - a.age || a.distance - b.distance);
+        return staleRooms[0].roomName;
+    }
+
+    return null;
 }
 
 function runScouts() {
