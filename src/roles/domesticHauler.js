@@ -3,7 +3,6 @@
  * @description Local source to Spawn/Ext transport. Retires when source Links deploy.
  */
 
-const movement = require('../utils/movement');
 
 module.exports = {
     /**

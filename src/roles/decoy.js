@@ -3,7 +3,6 @@
  * @description Parks on enemy sites to block builds. Kites defenders to waste CPU.
  */
 
-const movement = require('../utils/movement');
 
 module.exports = {
     /**

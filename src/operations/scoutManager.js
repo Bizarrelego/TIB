@@ -136,7 +136,7 @@ function runScouts() {
     const allCreeps = global.State.creepsByRoom;
     if (!allCreeps) return;
 
-    for (const [roomName, roomCreeps] of allCreeps.entries()) {
+    for (const [, roomCreeps] of allCreeps.entries()) {
         const scouts = roomCreeps.get('scout');
         if (scouts && scouts.length > 0) {
             for (const scout of scouts) {

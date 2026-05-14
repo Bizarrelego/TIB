@@ -105,12 +105,10 @@ class MinCut {
             return 0;
         }
 
-        let maxFlow = 0;
         while (bfs()) {
             ptr.fill(0);
-            let pushed;
-            while ((pushed = dfs(SOURCE, Infinity)) !== 0) {
-                maxFlow += pushed;
+            while (dfs(SOURCE, Infinity) !== 0) {
+                // Loop until no more flow can be pushed
             }
         }
 

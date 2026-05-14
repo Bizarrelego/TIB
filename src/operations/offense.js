@@ -8,7 +8,7 @@ const CombatManager = require('../managers/CombatManager');
 function runAtomicQuads() {
     if (!global.State || !global.State.activeQuads) return;
 
-    for (const [quadId, quadObj] of global.State.activeQuads) {
+    for (const [, quadObj] of global.State.activeQuads) {
         if (!quadObj.creeps || quadObj.creeps.length === 0) continue;
 
         // Find direction (placeholder logic, usually fetched from quadObj.target or pathing)

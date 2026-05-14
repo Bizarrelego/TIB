@@ -3,7 +3,6 @@
  * @description Parks on choke-points. Swaps with backups at <30% HP. Range 1 targeting.
  */
 
-const movement = require('../utils/movement');
 
 module.exports = {
     /**

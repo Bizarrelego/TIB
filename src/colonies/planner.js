@@ -109,7 +109,7 @@ module.exports = {
             }
 
             const anchor = plannerState.get('anchor');
-            let activeSites = sites.length;
+
             const rcl = room.controller.level;
             const structuresMap = global.State.structuresByRoom.get(room.name) || new Map();
 
@@ -157,7 +157,7 @@ module.exports = {
                 if (existingCount >= limit && structType !== STRUCTURE_ROAD) continue;
 
                 for (let j = 0; j < positions.length; j++) {
-                    if (activeSites >= 5) return;
+                    if (sites.length >= 5) return;
 
                     let currentCount = (structuresMap.get(structType) || []).length;
                     for(let s=0; s<sites.length; s++) {
@@ -204,7 +204,7 @@ module.exports = {
                     if (!blocked) {
                         const res = room.createConstructionSite(tx, ty, structType);
                         if (res === OK) {
-                            activeSites++;
+                            sites.push({pos: {x: tx, y: ty}, structureType: structType});
                         }
                     }
                 }

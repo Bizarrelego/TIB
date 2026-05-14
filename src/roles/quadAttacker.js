@@ -3,7 +3,6 @@
  * @description Atomic lockstep movement. Works with quadHealer.
  */
 
-const movement = require('../utils/movement');
 
 module.exports = {
     /**
