@@ -114,18 +114,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          # 1. Close obsolete issues
-          ISSUES_TO_CLOSE=$(jq -r '.issues_to_close[]?' generated_plan.json)
+          # 1. Close obsolete issues (Safeguard against null array)
+          ISSUES_TO_CLOSE=$(jq -r '.issues_to_close // [] | .[]?' generated_plan.json)
           for issue in $ISSUES_TO_CLOSE; do
-            echo "Closing obsolete issue #$issue..."
-            gh issue close "$issue" -m "Autonomously closed by Strategy Architect: Evaluated as resolved or obsolete." || true
+            if [ -n "$issue" ]; then
+              echo "Closing obsolete issue #$issue..."
+              gh issue close "$issue" -c "Autonomously closed by Strategy Architect: Evaluated as resolved or obsolete." || true
+            fi
           done
 
           # 2. Evaluate if we need to create a new issue
           CREATE_NEW=$(jq -r '.create_new' generated_plan.json)
           if [ "$CREATE_NEW" == "true" ]; then
             TITLE=$(jq -r '.new_issue.title' generated_plan.json)
-            FILES=$(jq -r '.new_issue.files_to_touch | join(", ")' generated_plan.json)
+            # Safeguard against null files array
+            FILES=$(jq -r '.new_issue.files_to_touch // [] | join(", ")' generated_plan.json)
             BODY=$(jq -r '.new_issue.body' generated_plan.json)
             
             FULL_BODY=$(printf "**Target Files:** %s\n\n%s" "$FILES" "$BODY")
