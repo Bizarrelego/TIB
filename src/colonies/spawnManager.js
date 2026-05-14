@@ -178,6 +178,79 @@ module.exports = {
             }
         }
 
+        // Remote Economy Spawning Logic (RCL >= 3)
+        if (room.controller.level >= 3 && global.State.intel) {
+            const exits = Game.map.describeExits(room.name);
+            if (exits) {
+                let colonyRemoteHarvesters = [];
+                let colonyRemoteHaulers = [];
+                let colonyReservers = [];
+
+                for (const rmCreeps of global.State.creepsByRoom.values()) {
+                    const rHarvesters = rmCreeps.get('remoteHarvester') || [];
+                    for (let i = 0; i < rHarvesters.length; i++) {
+                        if (rHarvesters[i].memory.colony === room.name) colonyRemoteHarvesters.push(rHarvesters[i]);
+                    }
+
+                    const rHaulers = rmCreeps.get('remoteHauler') || [];
+                    for (let i = 0; i < rHaulers.length; i++) {
+                        if (rHaulers[i].memory.colony === room.name) colonyRemoteHaulers.push(rHaulers[i]);
+                    }
+
+                    const rReservers = rmCreeps.get('reserver') || [];
+                    for (let i = 0; i < rReservers.length; i++) {
+                        if (rReservers[i].memory.colony === room.name) colonyReservers.push(rReservers[i]);
+                    }
+                }
+
+                for (const direction in exits) {
+                    const targetRoomName = exits[direction];
+                    const intel = global.State.intel.get(targetRoomName);
+
+                    if (intel && intel.type === 'regular' && !intel.hostile) {
+                        const activeReserver = colonyReservers.find(c => c.memory.targetRoom === targetRoomName);
+
+                        if (!activeReserver && intel.reservation !== 'jules') {
+                            const body = capacity >= 1300 ? [CLAIM, CLAIM, MOVE, MOVE] : [CLAIM, MOVE];
+                            const cost = capacity >= 1300 ? 1300 : 650;
+                            if (capacity >= cost) {
+                                queue.add('reserver', body, 'reserver_' + Game.time, {
+                                    memory: { role: 'reserver', colony: room.name, targetRoom: targetRoomName }
+                                }, cost);
+                            }
+                        }
+
+                        const sourcesCount = intel.sources || 0;
+                        if (sourcesCount > 0 && (intel.reservation === 'jules' || activeReserver)) {
+                            const roomRemoteHarvesters = colonyRemoteHarvesters.filter(c => c.memory.targetRoom === targetRoomName);
+
+                            if (roomRemoteHarvesters.length < sourcesCount) {
+                                const body = [WORK, WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE, MOVE];
+                                const cost = 700;
+                                if (capacity >= cost) {
+                                    queue.add('remoteHarvester', body, 'remoteHarvester_' + Game.time, {
+                                        memory: { role: 'remoteHarvester', colony: room.name, targetRoom: targetRoomName, targetSourceId: null }
+                                    }, cost);
+                                }
+                            }
+
+                            const roomRemoteHaulers = colonyRemoteHaulers.filter(c => c.memory.remoteRoom === targetRoomName);
+
+                            if (roomRemoteHaulers.length < roomRemoteHarvesters.length * 2) {
+                                const body = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE];
+                                const cost = 450;
+                                if (capacity >= cost) {
+                                    queue.add('remoteHauler', body, 'remoteHauler_' + Game.time, {
+                                        memory: { role: 'remoteHauler', colony: room.name, homeRoom: room.name, remoteRoom: targetRoomName, containerId: null }
+                                    }, cost);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Process the queue
         queue.process(spawn, spawnLedger);
     }

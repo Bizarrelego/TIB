@@ -42,11 +42,7 @@ function run(room) {
             if (!targetSourceId) continue;
 
             const source = Game.getObjectById(targetSourceId);
-            if (!source) {
-                // We might not have vision yet, but we are in the room. Unlikely since we're in the room,
-                // but just in case, we can't do anything without the source.
-                continue;
-            }
+            if (!source) continue;
 
             const containerId = creep.memory.containerId;
             let container = null;

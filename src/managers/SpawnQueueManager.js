@@ -4,8 +4,11 @@
  */
 
 const ROLE_PRIORITIES = new Map([
+    ['reserver', 110],
     ['harvester', 100],
+    ['remoteHarvester', 95],
     ['hauler', 90],
+    ['remoteHauler', 85],
     ['fastFiller', 80],
     ['hubManager', 70],
     ['upgrader', 60],
