@@ -100,22 +100,28 @@ class BodyCalc {
      * @param {number} energyCapacity Available spawn energy
      * @returns {string[]} Optimal body array
      */
-    static calculateHarvester(energyCapacity) {
-        let work = 1;
+    static calculateEarlyGameHarvester(energyCapacity) {
+        let work = 0;
         let carry = 1;
-        let move = 1;
-        let cost = BODYPART_COST[WORK] + BODYPART_COST[CARRY] + BODYPART_COST[MOVE];
+        let move = 0;
+        let cost = BODYPART_COST[CARRY]; // Start with 1 CARRY
 
-        // Try to add a 2nd WORK part if we can afford it along with its MOVE
+        // Ensure at least 1 WORK and 1 MOVE if possible
         if (cost + BODYPART_COST[WORK] + BODYPART_COST[MOVE] <= energyCapacity) {
             work++;
             move++;
             cost += BODYPART_COST[WORK] + BODYPART_COST[MOVE];
         }
 
-        // Further optimization could be to scale to max energy source (5-7 WORK)
-        // But for early game RCL 1/2 we just cap it based on what's affordable.
-        while (work < 5 && cost + BODYPART_COST[WORK] <= energyCapacity) {
+        // Alternate adding WORK and MOVE up to capacity or logical cap
+        while (cost + BODYPART_COST[WORK] + BODYPART_COST[MOVE] <= energyCapacity && work < 6 && move < 6) {
+            work++;
+            move++;
+            cost += BODYPART_COST[WORK] + BODYPART_COST[MOVE];
+        }
+
+        // If there's still room, prioritize more WORK
+        while (cost + BODYPART_COST[WORK] <= energyCapacity && work < 7) {
             work++;
             cost += BODYPART_COST[WORK];
         }

@@ -28,6 +28,52 @@ module.exports = {
 
             const capacity = room.energyCapacityAvailable;
 
+            // Early Game Spawning (Always maintained regardless of RCL)
+            let harvesterCount = 0;
+            let workerCount = 0;
+            let haulerCount = 0;
+
+            if (roomCreeps) {
+                const harvesters = roomCreeps.get('harvester');
+                if (harvesters) {
+                    harvesterCount = harvesters.length;
+                }
+                const workers = roomCreeps.get('worker');
+                if (workers) {
+                    workerCount = workers.length;
+                }
+                const haulers = roomCreeps.get('hauler');
+                if (haulers) {
+                    haulerCount = haulers.length;
+                }
+            }
+
+            // Spawn harvesters first
+            const sources = global.State.sourcesByRoom.get(room.name);
+            const sourceCount = sources ? sources.length : 1;
+
+            if (harvesterCount < sourceCount) {
+                const energyAvailable = room.energyAvailable;
+                const calcCapacity = (harvesterCount === 0 && energyAvailable < capacity && energyAvailable >= 250) ? energyAvailable : capacity;
+                const body = BodyCalc.calculateEarlyGameHarvester(calcCapacity);
+                const cost = BodyCalc.getCost(body);
+                queue.add('harvester', body, 'harvester_' + Game.time, { memory: { role: 'harvester', colony: room.name } }, cost);
+            }
+
+            // Spawn a domestic hauler to move energy from harvesters to spawn/extensions
+            if (haulerCount < 2) {
+                const body = BodyCalc.calculateHauler(capacity, 10, 10);
+                const cost = BodyCalc.getCost(body);
+                queue.add('hauler', body, 'hauler_' + Game.time, { memory: { role: 'hauler', colony: room.name } }, cost);
+            }
+
+            // Spawn a worker to act as multi-purpose builder/upgrader
+            if (workerCount < 2) {
+                const body = BodyCalc.calculateWorker(capacity);
+                const cost = BodyCalc.getCost(body);
+                queue.add('worker', body, 'worker_' + Game.time, { memory: { role: 'worker', colony: room.name } }, cost);
+            }
+
             // Global Scout Spawning Logic (1 active scout globally)
             if (room.controller.level >= 2) {
             let totalScouts = 0;
@@ -133,49 +179,6 @@ module.exports = {
                         }, cost);
                     }
                 }
-            }
-        }
-
-        // Early Game Spawning (RCL 1 & 2)
-        if (room.controller.level < 3) {
-            let harvesterCount = 0;
-            let workerCount = 0;
-            let haulerCount = 0;
-
-            if (roomCreeps) {
-                const harvesters = roomCreeps.get('harvester');
-                if (harvesters) {
-                    harvesterCount = harvesters.length;
-                }
-                const workers = roomCreeps.get('worker');
-                if (workers) {
-                    workerCount = workers.length;
-                }
-                const haulers = roomCreeps.get('hauler');
-                if (haulers) {
-                    haulerCount = haulers.length;
-                }
-            }
-
-            // Spawn harvesters first
-            if (harvesterCount < 2) {
-                const body = BodyCalc.calculateHarvester(capacity);
-                const cost = BodyCalc.getCost(body);
-                SpawnQueueManager.requestSpawn(room.name, 'harvester', body, 'harvester_' + Game.time, { memory: { role: 'harvester', colony: room.name } }, cost);
-            }
-
-            // Spawn a domestic hauler to move energy from harvesters to spawn/extensions
-            if (haulerCount < 2) {
-                const body = BodyCalc.calculateDomesticHauler(capacity);
-                const cost = BodyCalc.getCost(body);
-                SpawnQueueManager.requestSpawn(room.name, 'hauler', body, 'hauler_' + Game.time, { memory: { role: 'hauler', colony: room.name } }, cost);
-            }
-
-            // Spawn a worker to act as multi-purpose builder/upgrader
-            if (workerCount < 2) {
-                const body = BodyCalc.calculateWorker(capacity);
-                const cost = BodyCalc.getCost(body);
-                SpawnQueueManager.requestSpawn(room.name, 'worker', body, 'worker_' + Game.time, { memory: { role: 'worker', colony: room.name } }, cost);
             }
         }
 
