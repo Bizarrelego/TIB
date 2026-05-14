@@ -14,8 +14,22 @@ jobs:
     permissions:
       issues: write
       contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Auto-Close Conflicted PRs
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          gh pr list --state open --json number,mergeable > open_prs.json || echo "[]" > open_prs.json
+          CONFLICTED_PRS=$(jq -r '.[] | select(.mergeable == "CONFLICTING") | .number' open_prs.json)
+          for pr in $CONFLICTED_PRS; do
+            if [ -n "$pr" ]; then
+              echo "Closing conflicted PR #$pr..."
+              gh pr close "$pr" -d -c "Autonomously closed by Strategy Architect: PR has unresolvable merge conflicts. Branch deleted to reset state." || true
+            fi
+          done
 
       - name: Fetch Open Issues
         env:
