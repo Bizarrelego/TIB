@@ -7,15 +7,16 @@ class SpawnLedger {
      * @param {Room} room The room to track energy for.
      */
     constructor(room) {
-        this.availableEnergy = room.energyAvailable;
+        this.room = room;
+        this.reservedEnergy = 0;
     }
 
     /**
-     * Gets the currently available energy in the room.
+     * Gets the currently available energy in the room, subtracting previously reserved energy for the current tick.
      * @returns {number} The available energy.
      */
     getAvailableEnergy() {
-        return this.availableEnergy;
+        return this.room.energyAvailable - this.reservedEnergy;
     }
 
     /**
@@ -33,7 +34,7 @@ class SpawnLedger {
      * @returns {boolean} True if affordable.
      */
     canSpawn(cost) {
-        return this.availableEnergy >= cost;
+        return this.getAvailableEnergy() >= cost;
     }
 
     /**
@@ -41,7 +42,7 @@ class SpawnLedger {
      * @param {number} amount The energy amount to reserve.
      */
     reserveEnergy(amount) {
-        this.availableEnergy -= amount;
+        this.reservedEnergy += amount;
     }
 
     /**

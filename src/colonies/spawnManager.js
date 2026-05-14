@@ -56,21 +56,21 @@ module.exports = {
                 const calcCapacity = (harvesterCount === 0 && energyAvailable < capacity && energyAvailable >= 250) ? energyAvailable : capacity;
                 const body = BodyCalc.calculateEarlyGameHarvester(calcCapacity);
                 const cost = BodyCalc.getCost(body);
-                SpawnQueueManager.requestSpawn(room.name, 'harvester', body, 'harvester_' + Game.time, { memory: { role: 'harvester', colony: room.name } }, cost);
+                SpawnQueueManager.requestSpawn(room.name, 'harvester', body, 'harvester_' + Game.time, { memory: { role: 'harvester', colony: room.name } }, cost, spawnLedger);
             }
 
             // Spawn a domestic hauler to move energy from harvesters to spawn/extensions
             if (haulerCount < 2) {
                 const body = BodyCalc.calculateDomesticHauler(capacity);
                 const cost = BodyCalc.getCost(body);
-                SpawnQueueManager.requestSpawn(room.name, 'domesticHauler', body, 'domesticHauler_' + Game.time, { memory: { role: 'domesticHauler', colony: room.name } }, cost);
+                SpawnQueueManager.requestSpawn(room.name, 'domesticHauler', body, 'domesticHauler_' + Game.time, { memory: { role: 'domesticHauler', colony: room.name } }, cost, spawnLedger);
             }
 
             // Spawn a worker to act as multi-purpose builder/upgrader
             if (workerCount < 2) {
                 const body = BodyCalc.calculateWorker(capacity);
                 const cost = BodyCalc.getCost(body);
-                SpawnQueueManager.requestSpawn(room.name, 'worker', body, 'worker_' + Game.time, { memory: { role: 'worker', colony: room.name } }, cost);
+                SpawnQueueManager.requestSpawn(room.name, 'worker', body, 'worker_' + Game.time, { memory: { role: 'worker', colony: room.name } }, cost, spawnLedger);
             }
 
             // Global Scout Spawning Logic (1 active scout globally)
@@ -84,7 +84,7 @@ module.exports = {
             if (totalScouts < 1) {
                 SpawnQueueManager.requestSpawn(room.name, 'scout', [MOVE], 'scout_' + Game.time, {
                     memory: { role: 'scout', colony: room.name }
-                }, 50);
+                }, 50, spawnLedger);
             }
         }
 
@@ -111,7 +111,7 @@ module.exports = {
                     const cost = (16 * BODYPART_COST[CARRY]) + BODYPART_COST[MOVE]; // 16 * 50 + 50 = 850
                     SpawnQueueManager.requestSpawn(room.name, 'hubManager', body, 'hubManager_' + Game.time, {
                         memory: { role: 'hubManager', colony: room.name }
-                    }, cost);
+                    }, cost, spawnLedger);
                 }
 
                 const desiredUpgraders = UpgraderManager.getDesiredCount(room);
@@ -120,7 +120,7 @@ module.exports = {
                     const cost = BodyCalc.getCost(body);
                     SpawnQueueManager.requestSpawn(room.name, 'upgrader', body, 'upgrader_' + Game.time, {
                         memory: { role: 'upgrader', colony: room.name }
-                    }, cost);
+                    }, cost, spawnLedger);
                 }
             }
         }
@@ -175,7 +175,7 @@ module.exports = {
                     if (body.length > 0) {
                         SpawnQueueManager.requestSpawn(room.name, 'fastFiller', body, 'fastFiller_' + Game.time, {
                             memory: { role: 'fastFiller', colony: room.name }
-                        }, cost);
+                        }, cost, spawnLedger);
                     }
                 }
             }
@@ -219,7 +219,7 @@ module.exports = {
                             if (capacity >= cost) {
                                 SpawnQueueManager.requestSpawn(room.name, 'reserver', body, 'reserver_' + Game.time, {
                                     memory: { role: 'reserver', colony: room.name, targetRoom: targetRoomName }
-                                }, cost);
+                                }, cost, spawnLedger);
                             }
                         }
 
@@ -233,7 +233,7 @@ module.exports = {
                                 if (capacity >= cost) {
                                     SpawnQueueManager.requestSpawn(room.name, 'remoteHarvester', body, 'remoteHarvester_' + Game.time, {
                                         memory: { role: 'remoteHarvester', colony: room.name, targetRoom: targetRoomName, targetSourceId: null }
-                                    }, cost);
+                                    }, cost, spawnLedger);
                                 }
                             }
 
@@ -245,7 +245,7 @@ module.exports = {
                                 if (capacity >= cost) {
                                     SpawnQueueManager.requestSpawn(room.name, 'remoteHauler', body, 'remoteHauler_' + Game.time, {
                                         memory: { role: 'remoteHauler', colony: room.name, homeRoom: room.name, remoteRoom: targetRoomName, containerId: null }
-                                    }, cost);
+                                    }, cost, spawnLedger);
                                 }
                             }
                         }
@@ -255,8 +255,7 @@ module.exports = {
         }
 
             // Process the queue
-            const queue = new SpawnQueueManager();
-            queue.process(spawn, spawnLedger);
+            SpawnQueueManager.process(spawn, spawnLedger);
 
         } catch (e) {
             console.log(`[SpawnManager Error] Room ${room.name}: ${e.stack}`);

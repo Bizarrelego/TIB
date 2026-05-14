@@ -10,10 +10,6 @@ const ROLE_PRIORITIES = require('../constants/rolePriorities');
  * @description Manages prioritized spawn queue
  */
 class SpawnQueueManager {
-    constructor() {
-        this.queue = [];
-    }
-
     /**
      * Adds a spawn request to the global queue
      * @param {string} roomName
@@ -23,11 +19,32 @@ class SpawnQueueManager {
      * @param {Object} opts
      * @param {number} cost
      */
-    static requestSpawn(roomName, role, body, name, opts, cost) {
+    static requestSpawn(roomName, role, body, name, opts, cost, spawnLedger) {
         if (!SpawnQueueManager.globalQueue.has(roomName)) {
             SpawnQueueManager.globalQueue.set(roomName, []);
         }
-        SpawnQueueManager.globalQueue.get(roomName).push({ role, body, name, opts, cost });
+
+        const queue = SpawnQueueManager.globalQueue.get(roomName);
+
+        // Prevent duplicates based on role and targetRoom (if applicable)
+        const isDuplicate = queue.some(req => {
+            if (req.role !== role) return false;
+            if (opts && opts.memory && req.opts && req.opts.memory) {
+                if (opts.memory.targetRoom) {
+                    return req.opts.memory.targetRoom === opts.memory.targetRoom;
+                }
+            }
+            return true;
+        });
+
+        if (isDuplicate) return;
+
+        // Validating energy using ledger before queuing
+        if (spawnLedger && !spawnLedger.canSpawn(cost)) {
+            return;
+        }
+
+        queue.push({ role, body, name, opts, cost });
     }
 
     /**
@@ -70,47 +87,31 @@ class SpawnQueueManager {
     }
 
     /**
-     * Adds a spawn request to the queue
-     * @param {string} role
-     * @param {Array<string>} body
-     * @param {string} name
-     * @param {Object} opts
-     * @param {number} cost
-     */
-    add(role, body, name, opts, cost) {
-        this.queue.push({ role, body, name, opts, cost });
-    }
-
-    /**
      * Processes the queue, prioritizing the highest priority request.
      * Prevents spawn blocking by stalling if the highest priority request cannot be afforded.
      * @param {StructureSpawn} spawn The spawn to execute the request on
      * @param {Object} spawnLedger The ledger to verify and reserve energy
      */
-    process(spawn, spawnLedger) {
-        // Pull requests from the global queue for this room
-        if (SpawnQueueManager.globalQueue.has(spawn.room.name)) {
-            const requests = SpawnQueueManager.globalQueue.get(spawn.room.name);
-            for (const req of requests) {
-                this.add(req.role, req.body, req.name, req.opts, req.cost);
-            }
-            SpawnQueueManager.globalQueue.delete(spawn.room.name);
-        }
+    static process(spawn, spawnLedger) {
+        if (!SpawnQueueManager.globalQueue.has(spawn.room.name)) return;
 
-        if (this.queue.length === 0) return;
+        const queue = SpawnQueueManager.globalQueue.get(spawn.room.name);
+        if (queue.length === 0) return;
 
-        this.queue.sort((a, b) => {
+        // Sort by role priorities
+        queue.sort((a, b) => {
             const prioA = ROLE_PRIORITIES.get(a.role) || 0;
             const prioB = ROLE_PRIORITIES.get(b.role) || 0;
-            return prioB - prioA;
+            return prioB - prioA; // Descending order (highest priority first)
         });
 
-        for (let i = 0; i < this.queue.length; i++) {
-            const request = this.queue[i];
+        for (let i = 0; i < queue.length; i++) {
+            const request = queue[i];
+
             if (spawnLedger.canSpawn(request.cost) && !spawnLedger.isSpawnBusy(spawn)) {
                 const result = spawnLedger.requestSpawn(spawn, request.body, request.name, request.opts, request.cost);
                 if (result === OK) {
-                    this.queue.splice(i, 1);
+                    queue.splice(i, 1); // Remove the spawned request
                     return; // Spawn is now busy
                 }
             } else {
