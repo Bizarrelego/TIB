@@ -9,6 +9,47 @@ const resourceUtils = require('../utils/resourceUtils');
 
 class EnergyRequestManager {
     /**
+     * Tracks source regeneration and skips logic for harvesters assigned to empty sources.
+     * Iterates over all rooms and sources via global.State.sourcesByRoom.
+     */
+    static handleSourceSleep() {
+        if (!Memory.sources) {
+            Memory.sources = {};
+        }
+
+        if (!global.State.sourcesByRoom) return;
+
+        for (const [roomName, sources] of global.State.sourcesByRoom.entries()) {
+            for (let i = 0; i < sources.length; i++) {
+                const source = sources[i];
+
+                if (source.energy === 0) {
+                    if (!Memory.sources[source.id]) {
+                        Memory.sources[source.id] = {};
+                    }
+                    if (!Memory.sources[source.id].wakeTick) {
+                        Memory.sources[source.id].wakeTick = Game.time + source.ticksToRegeneration;
+                    }
+                } else if (Memory.sources[source.id] && Memory.sources[source.id].wakeTick && Game.time >= Memory.sources[source.id].wakeTick) {
+                    delete Memory.sources[source.id].wakeTick;
+                }
+
+                if (Memory.sources[source.id] && Memory.sources[source.id].wakeTick && Game.time < Memory.sources[source.id].wakeTick) {
+                    // Source is sleeping, filter out its harvesters
+                    const roomCreeps = global.State.creepsByRoom.get(roomName);
+                    if (roomCreeps) {
+                        const harvesters = roomCreeps.get('harvester');
+                        if (harvesters) {
+                            const awakeHarvesters = harvesters.filter(c => !c.heap || c.heap.targetId !== source.id);
+                            roomCreeps.set('harvester', awakeHarvesters);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Identifies and prioritizes structures that need energy in the room.
      * Higher priority number means more urgent.
      * @param {string} roomName - The name of the room.

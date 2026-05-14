@@ -1,4 +1,14 @@
 module.exports = {
+    /**
+     * Checks if a creep is fatigued.
+     * @param {Creep} creep - The creep to check.
+     * @returns {boolean} True if the creep's fatigue is > 0, otherwise false.
+     */
+    checkFatigue: function(creep) {
+        if (!creep) return false;
+        return creep.fatigue > 0;
+    },
+
     moveTo: function(creep, target, opts = {}) {
         if (!creep.heap.path || !Array.isArray(creep.heap.path)) {
             const targetPos = target.pos || target;
