@@ -18,13 +18,13 @@ function roomEventManager() {
 
             switch (event.event) {
                 case EVENT_ATTACK:
-                    eventBus.publish('ROOM_EVENT_ATTACK', eventPayload);
+                    eventBus.publish('HOSTILE_SPOTTED', eventPayload);
                     break;
                 case EVENT_BUILD:
-                    eventBus.publish('ROOM_EVENT_BUILD', eventPayload);
+                    eventBus.publish('CONSTRUCTION_STARTED', eventPayload);
                     break;
                 case EVENT_OBJECT_DESTROYED:
-                    eventBus.publish('ROOM_EVENT_DECAY', eventPayload);
+                    eventBus.publish('STRUCTURE_DECAY', eventPayload);
                     break;
                 case EVENT_HARVEST:
                     eventBus.publish('ROOM_EVENT_HARVEST', eventPayload);
