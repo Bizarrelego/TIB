@@ -240,7 +240,7 @@ const TrafficManager = {
 
 
             for (const [creepName, intent] of global.State.trafficIntents.entries()) {
-                const { creep, targetPos, originalPos } = intent;
+                const { creep, targetPos } = intent;
                 if (!creep || !targetPos) continue;
 
                 let intendedNextPos = null;
@@ -267,15 +267,6 @@ const TrafficManager = {
 
                 if (blockingCreepName && blockingCreepName !== creepName) {
                     dependencyGraph.set(creepName, blockingCreepName);
-
-                    const blockingIntent = global.State.trafficIntents.get(blockingCreepName);
-                    if (blockingIntent && blockingIntent.intendedNextPos) {
-                        const bNextPos = blockingIntent.intendedNextPos;
-                        if (bNextPos.roomName === originalPos.roomName && bNextPos.x === originalPos.x && bNextPos.y === originalPos.y) {
-                            global.State.swapRegistry.set(creepName, blockingCreepName);
-                            global.State.swapRegistry.set(blockingCreepName, creepName);
-                        }
-                    }
                 }
             }
 

@@ -1,13 +1,24 @@
 const { CacheRegistry } = require('./os/cache');
+const RawMemoryManager = require('./os/RawMemoryManager');
 const globalState = require('./state/globalState');
+const roomEventManager = require('./managers/RoomEventManager');
 const discoveryManager = require('./state/discoveryManager');
 const stateScanner = require('./state/stateScanner');
 const colonyManager = require('./colonies/colonyManager');
 const operationsManager = require('./operations/operationsManager'); // High-level orchestrator
 const trafficManager = require('./traffic/trafficManager');
-const SourceManager = require('./managers/SourceManager');
+const movement = require("./utils/movement");
+const EnergyRequestManager = require("./managers/EnergyRequestManager");
+const SourceManager = require("./managers/SourceManager");
 
 module.exports.loop = function () {
+    // Initialize RawMemory segments
+    try {
+        RawMemoryManager.init();
+    } catch (e) {
+        console.log(`[Phase 0 Error] RawMemoryManager: ${e.stack}`);
+    }
+
     // Rehydrate global state
     globalState.rehydrate();
 
@@ -46,6 +57,12 @@ module.exports.loop = function () {
     // Phase 2: State Scanner (Event-driven map updaters)
     if (!skipState) {
         try {
+            if (roomEventManager) roomEventManager();
+        } catch (e) {
+            console.log(`[Phase 2 Error] Room Event Manager: ${e.stack}`);
+        }
+
+        try {
             if (stateScanner) stateScanner();
         } catch (e) {
             console.log(`[Phase 2 Error] Global State Scanner: ${e.stack}`);
@@ -55,6 +72,22 @@ module.exports.loop = function () {
         } catch (e) {
             console.log(`[Phase 2 Error] Source Manager: ${e.stack}`);
         }
+    }
+
+    // Phase 2.5: Execution Gates
+    try {
+        EnergyRequestManager.handleSourceSleep();
+
+        if (global.State.creepsByRoom) {
+            for (const roomCreeps of global.State.creepsByRoom.values()) {
+                for (const [role, creepsArray] of roomCreeps.entries()) {
+                    const activeCreeps = creepsArray.filter(creep => !movement.checkFatigue(creep));
+                    roomCreeps.set(role, activeCreeps);
+                }
+            }
+        }
+    } catch (e) {
+        console.log(`[Phase 2.5 Error] Execution Gates: ${e.stack}`);
     }
 
     // Phase 3: Colonies
@@ -90,4 +123,8 @@ module.exports.loop = function () {
     } catch (e) {
         console.log(`[Phase 6 Error] Intents & Sleep: ${e.stack}`);
     }
+
+    // Profiler output
+    const Profiler = require('./utils/profiler');
+    Profiler.report();
 };

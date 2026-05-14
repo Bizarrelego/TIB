@@ -2,6 +2,7 @@ const planner = require('./planner');
 const BodyCalc = require('../utils/bodyCalc');
 const SpawnQueueManager = require('../managers/SpawnQueueManager');
 const UpgraderManager = require('../managers/UpgraderManager');
+const Profiler = require('../utils/profiler');
 
 module.exports = {
     /**
@@ -9,7 +10,7 @@ module.exports = {
      * @param {Room} room The room to run the spawn manager in.
      * @param {Object} spawnLedger The spawn ledger to use.
      */
-    run: function(room, spawnLedger) {
+    run: Profiler.wrap('SpawnManager.run', function(room, spawnLedger) {
         try {
             // Retrieve spawn via O(1) lookup
             const spawns = global.State.spawnsByRoom.get(room.name);
@@ -269,5 +270,5 @@ module.exports = {
         } catch (e) {
             console.log(`[SpawnManager Error] Room ${room.name}: ${e.stack}`);
         }
-    }
+    })
 };

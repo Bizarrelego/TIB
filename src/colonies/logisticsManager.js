@@ -2,6 +2,7 @@ const eventBus = require('../os/eventBus');
 const TrafficManager = require('../traffic/trafficManager');
 const EnergyRequestManager = require('../managers/EnergyRequestManager');
 const resourceUtils = require('../utils/resourceUtils');
+const Profiler = require('../utils/profiler');
 
 function findHubParkPos(hubLink, storage, terminal, room) {
     if (!storage) return null;
@@ -372,5 +373,7 @@ const LogisticsManager = {
         }
     }
 };
+
+LogisticsManager.run = Profiler.wrap('LogisticsManager.run', LogisticsManager.run);
 
 module.exports = LogisticsManager;
