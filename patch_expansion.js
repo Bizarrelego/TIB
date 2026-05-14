@@ -1,4 +1,6 @@
-/**
+const fs = require('fs');
+
+const content = `/**
  * @file expansion.js
  * @description Manages expansion operations including early poaching, remote denial, and auto-claim.
  */
@@ -150,6 +152,9 @@ module.exports = function expansionManager() {
             runAutoClaim();
         }
     } catch (e) {
-        console.error(`[ExpansionManager Error] ${e.stack}`);
+        console.error(\`[ExpansionManager Error] \${e.stack}\`);
     }
 };
+`;
+
+fs.writeFileSync('src/operations/expansion.js', content);

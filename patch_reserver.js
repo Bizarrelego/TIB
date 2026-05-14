@@ -1,4 +1,6 @@
-/**
+const fs = require('fs');
+
+const content = `/**
  * @file reserver.js
  * @description Reserves or claims a controller in a remote room.
  */
@@ -43,7 +45,7 @@ function run(room) {
 
             // Check if claim part is on cooldown
             // Currently Screeps doesn't expose a 'claim cooldown' on the part itself,
-            // but the room controller has `upgradeBlocked` if attacked. We just attempt the action.
+            // but the room controller has \`upgradeBlocked\` if attacked. We just attempt the action.
 
             const isClaiming = creep.memory.claimFlag === true;
 
@@ -84,9 +86,12 @@ function run(room) {
             }
 
         } catch (e) {
-            console.error(`[reserver Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
+            console.error(\`[reserver Error] Room \${room.name}, Creep \${creep.name}: \${e.stack}\`);
         }
     }
 }
 
 module.exports = { run };
+`;
+
+fs.writeFileSync('src/roles/reserver.js', content);

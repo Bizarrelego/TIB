@@ -1,4 +1,6 @@
-/**
+const fs = require('fs');
+
+const content = `/**
  * @file remoteHauler.js
  * @description Transports energy from a remote room back to the home colony.
  */
@@ -191,9 +193,12 @@ function run(room) {
             }
 
         } catch (e) {
-            console.error(`[remoteHauler Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
+            console.error(\`[remoteHauler Error] Room \${room.name}, Creep \${creep.name}: \${e.stack}\`);
         }
     }
 }
 
 module.exports = { run };
+`;
+
+fs.writeFileSync('src/roles/remoteHauler.js', content);
