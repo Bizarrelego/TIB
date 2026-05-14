@@ -88,32 +88,83 @@ class CombatManager {
      * @returns {number} The calculated incoming damage
      */
     static predictivePreHeal(creep, enemyTowers, enemyCreeps) {
-        // Simple heuristic: if we are within 5 tiles of a tower, or taking damage, pre-heal.
-        // Advanced logic would track incoming damage vectors.
         let incomingDamage = 0;
 
-        if (enemyTowers) {
-            for (const tower of enemyTowers) {
-                if (creep.pos.getRangeTo(tower) <= 15) { // Assuming tower will likely target this creep if close
-                    incomingDamage += 600; // Max tower damage at close range
+        // Calculate potential tower damage
+        if (enemyTowers && enemyTowers.length > 0) {
+            // Find all friendlies in the room to simulate tower target logic (closest first)
+            let friendlies = [];
+            if (global.State && global.State.creepsByRoom) {
+                const roomCreeps = global.State.creepsByRoom.get(creep.room.name);
+                if (roomCreeps) {
+                    for (const [, creeps] of roomCreeps) {
+                        friendlies.push(...creeps);
+                    }
                 }
+            } else {
+                friendlies.push(creep); // Fallback
             }
-        }
 
-        if (enemyCreeps) {
-            for (const hostile of enemyCreeps) {
-                let isDangerous = true;
-                if (hostile.body) {
-                    isDangerous = hostile.body.some(p => p.type === ATTACK || p.type === RANGED_ATTACK);
-                }
-                if (isDangerous) {
-                    if (creep.pos.getRangeTo(hostile) <= 3) {
-                        incomingDamage += 100; // Estimate
+            for (const tower of enemyTowers) {
+                if (tower.store && tower.store[RESOURCE_ENERGY] >= TOWER_ENERGY_COST) {
+                    // Find closest friendly
+                    let closestFriendly = null;
+                    let closestDist = Infinity;
+                    for (const friendly of friendlies) {
+                        const dist = tower.pos.getRangeTo(friendly);
+                        if (dist < closestDist) {
+                            closestDist = dist;
+                            closestFriendly = friendly;
+                        }
+                    }
+
+                    // If this creep is the closest (or tied for closest), it might be targeted
+                    if (closestFriendly && closestFriendly.id === creep.id) {
+                        const range = creep.pos.getRangeTo(tower);
+                        let damage = TOWER_POWER_ATTACK;
+                        if (range > TOWER_OPTIMAL_RANGE) {
+                            if (range >= TOWER_FALLOFF_RANGE) {
+                                damage -= damage * TOWER_FALLOFF;
+                            } else {
+                                damage -= damage * TOWER_FALLOFF * (range - TOWER_OPTIMAL_RANGE) / (TOWER_FALLOFF_RANGE - TOWER_OPTIMAL_RANGE);
+                            }
+                        }
+                        incomingDamage += damage;
                     }
                 }
             }
         }
 
+        // Calculate potential creep damage
+        if (enemyCreeps && enemyCreeps.length > 0) {
+            for (const hostile of enemyCreeps) {
+                if (hostile.body) {
+                    const range = creep.pos.getRangeTo(hostile);
+                    if (range <= 3) {
+                        let attackDmg = 0;
+                        let rangedDmg = 0;
+                        for (const part of hostile.body) {
+                            if (part.hits > 0) {
+                                if (part.type === ATTACK && range <= 1) {
+                                    attackDmg += ATTACK_POWER;
+                                } else if (part.type === RANGED_ATTACK) {
+                                    rangedDmg += RANGED_ATTACK_POWER;
+                                }
+                            }
+                        }
+                        // Assume hostile attacks if capable
+                        incomingDamage += attackDmg + rangedDmg;
+                    }
+                } else {
+                    // Fallback estimate if no body info
+                    if (creep.pos.getRangeTo(hostile) <= 3) {
+                        incomingDamage += 100;
+                    }
+                }
+            }
+        }
+
+        // Execute pre-heal if damage is incoming or already damaged
         if (incomingDamage > 0 || creep.hits < creep.hitsMax) {
             creep.heal(creep);
         }
