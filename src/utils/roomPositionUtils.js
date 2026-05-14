@@ -44,22 +44,23 @@ const roomPositionUtils = {
             return false;
         }
 
-        const structures = global.State.structuresByRoom.get(roomName);
-        if (structures) {
-            for (let i = 0; i < structures.length; i++) {
-                const struct = structures[i];
-                if (struct.pos.x === x && struct.pos.y === y) {
-                    if (structureType === STRUCTURE_ROAD) {
-                        if (struct.structureType !== STRUCTURE_CONTAINER && struct.structureType !== STRUCTURE_LINK && struct.structureType !== STRUCTURE_ROAD && struct.structureType !== STRUCTURE_RAMPART) {
-                            return false;
-                        }
-                    } else if (structureType === STRUCTURE_RAMPART) {
-                        // Ramparts can be built anywhere
-                    } else {
-                            if (struct.structureType === structureType) {
-                                // Already built structure of the planned type is okay to include
-                            } else if (struct.structureType !== STRUCTURE_ROAD && struct.structureType !== STRUCTURE_RAMPART) {
-                            return false;
+        const structuresByType = global.State.structuresByRoom.get(roomName);
+        if (structuresByType) {
+            for (const structs of structuresByType.values()) {
+                for (const struct of structs.values()) {
+                    if (struct.pos.x === x && struct.pos.y === y) {
+                        if (structureType === STRUCTURE_ROAD) {
+                            if (struct.structureType !== STRUCTURE_CONTAINER && struct.structureType !== STRUCTURE_LINK && struct.structureType !== STRUCTURE_ROAD && struct.structureType !== STRUCTURE_RAMPART) {
+                                return false;
+                            }
+                        } else if (structureType === STRUCTURE_RAMPART) {
+                            // Ramparts can be built anywhere
+                        } else {
+                                if (struct.structureType === structureType) {
+                                    // Already built structure of the planned type is okay to include
+                                } else if (struct.structureType !== STRUCTURE_ROAD && struct.structureType !== STRUCTURE_RAMPART) {
+                                return false;
+                            }
                         }
                     }
                 }

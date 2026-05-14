@@ -24,8 +24,8 @@ module.exports = {
 
             // Recompute current counts to respect limits
             const currentCounts = new Map();
-            for (const [sType, sArray] of structuresMap) {
-                currentCounts.set(sType, sArray.length);
+            for (const [sType, sMap] of structuresMap.entries()) {
+                currentCounts.set(sType, sMap.size);
             }
             for (let i = 0; i < sites.length; i++) {
                 const sType = sites[i].structureType;
@@ -49,11 +49,13 @@ module.exports = {
 
                 // Extra check: Filter out if there's already a site or structure at this exact position
                 let alreadyOccupied = false;
-                const existingStructs = structuresMap.get(plannedStruct.type) || [];
-                for (let i = 0; i < existingStructs.length; i++) {
-                    if (existingStructs[i].pos.x === plannedStruct.pos.x && existingStructs[i].pos.y === plannedStruct.pos.y) {
-                        alreadyOccupied = true;
-                        break;
+                const existingStructsMap = structuresMap.get(plannedStruct.type);
+                if (existingStructsMap) {
+                    for (const struct of existingStructsMap.values()) {
+                        if (struct.pos.x === plannedStruct.pos.x && struct.pos.y === plannedStruct.pos.y) {
+                            alreadyOccupied = true;
+                            break;
+                        }
                     }
                 }
                 if (!alreadyOccupied) {
