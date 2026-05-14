@@ -30,15 +30,15 @@ class SpawnLedger {
     }
 
     /**
-     * Deducts energy cost from the ledger.
-     * @param {number} cost The cost to deduct.
+     * Reserves energy cost from the ledger for the tick.
+     * @param {number} amount The energy amount to reserve.
      */
-    deduct(cost) {
-        this.availableEnergy -= cost;
+    reserveEnergy(amount) {
+        this.availableEnergy -= amount;
     }
 
     /**
-     * Requests a spawn, deducting cost if successful.
+     * Requests a spawn, reserving energy cost if successful.
      * @param {StructureSpawn} spawn The spawn structure to use.
      * @param {Array<string>} body The creep body array.
      * @param {string} name The creep name.
@@ -50,7 +50,7 @@ class SpawnLedger {
         if (!this.isSpawnBusy(spawn)) {
             const result = spawn.spawnCreep(body, name, opts);
             if (result === OK) {
-                this.deduct(cost);
+                this.reserveEnergy(cost);
             }
             return result;
         }

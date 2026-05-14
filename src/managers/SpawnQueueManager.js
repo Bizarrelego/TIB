@@ -36,8 +36,8 @@ class SpawnQueueManager {
     /**
      * Processes the queue, prioritizing the highest priority request.
      * Prevents spawn blocking by stalling if the highest priority request cannot be afforded.
-     * @param {StructureSpawn} spawn
-     * @param {Object} spawnLedger
+     * @param {StructureSpawn} spawn The spawn to execute the request on
+     * @param {Object} spawnLedger The ledger to verify and reserve energy
      */
     process(spawn, spawnLedger) {
         if (this.queue.length === 0) return;
@@ -49,10 +49,17 @@ class SpawnQueueManager {
         });
 
         const topRequest = this.queue[0];
-        if (spawnLedger.canSpawn(topRequest.cost)) {
-            spawnLedger.requestSpawn(spawn, topRequest.body, topRequest.name, topRequest.opts, topRequest.cost);
+
+        // Strict queue priority enforcement: stall the queue and return immediately
+        // if the highest priority role cannot be afforded to prevent lower priority spawn blocking.
+        if (!spawnLedger.canSpawn(topRequest.cost)) {
+            return;
         }
+
+        spawnLedger.requestSpawn(spawn, topRequest.body, topRequest.name, topRequest.opts, topRequest.cost);
     }
 }
+
+SpawnQueueManager.ROLE_PRIORITIES = ROLE_PRIORITIES;
 
 module.exports = SpawnQueueManager;
