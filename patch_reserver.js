@@ -1,9 +1,7 @@
-/**
- * @file reserver.js
- * @description Reserves or claims a controller in a remote room.
- */
+const fs = require('fs');
+let code = fs.readFileSync('src/roles/reserver.js', 'utf8');
 
-const movement = require('../utils/movement');
+const replacement = `const movement = require('../utils/movement');
 
 /**
  * Executes logic for reserver role.
@@ -51,36 +49,32 @@ function run(room) {
                 continue;
             }
 
-                        // Move to the room's controller
+            // Move to the room's controller
             const controller = creep.room.controller;
             if (!controller) continue;
 
-            const myName = creep.owner.username; // Fallback username
-                        const isEnemyOwner = controller.owner && controller.owner.username !== myName;
-
-                        const isReservedByEnemy = controller.reservation && controller.reservation.username !== myName;
-
-            if (!controller.owner && !isReservedByEnemy) {
-                // Unowned and not reserved by enemy, so we reserve it
+            if (!controller.owner) {
                 if (creep.reserveController(controller) === ERR_NOT_IN_RANGE) {
                     movement.moveTo(creep, controller);
+                } else if (creep.claimController(controller) === ERR_NOT_IN_RANGE) {
+                    movement.moveTo(creep, controller);
                 }
-            } else if (isEnemyOwner || isReservedByEnemy) {
-                // Owned or reserved by someone else
+            } else if (controller.owner.username !== creep.owner.username) {
                 if (creep.attackController(controller) === ERR_NOT_IN_RANGE) {
                     movement.moveTo(creep, controller);
                 }
             } else {
-                // We own it or already reserved it and are in range doing so
                 if (!creep.pos.isNearTo(controller)) {
                     movement.moveTo(creep, controller);
                 }
             }
 
         } catch (e) {
-            console.error(`[reserver Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
+            console.error(\`[reserver Error] Room \${room.name}, Creep \${creep.name}: \${e.stack}\`);
         }
     }
-}
+}`;
 
-module.exports = { run };
+code = code.replace(/const movement = require\('\.\.\/utils\/movement'\);\s*\/\*\*[\s\S]*\}\s*\n\s*\}/, replacement);
+
+fs.writeFileSync('src/roles/reserver.js', code);

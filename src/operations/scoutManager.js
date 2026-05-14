@@ -118,14 +118,22 @@ function getScoutTarget(scoutCreep) {
                 for (const direction in exits) {
                     const neighborRoom = exits[direction];
 
+                    // Hostile Avoidance check
+                    const hasHeatmap = global.State.heatmapsByRoom && global.State.heatmapsByRoom.has(neighborRoom);
+                    const neighborIntel = global.State.intel.get(neighborRoom);
+                    if (hasHeatmap || (neighborIntel && neighborIntel.hostile)) {
+                        continue;
+                    }
+
                     if (!visited.has(neighborRoom)) {
                         visited.add(neighborRoom);
                         queue.push(neighborRoom);
 
                         const intel = global.State.intel.get(neighborRoom);
 
-                        // Priority 1: Unseen room
+                                                // Priority 1: Unseen room
                         if (!intel || !intel.lastSeen) {
+                            scoutCreep.heap.targetRoom = neighborRoom;
                             return neighborRoom;
                         }
 
@@ -145,15 +153,17 @@ function getScoutTarget(scoutCreep) {
         depth++;
     }
 
-    // Sort and return Priority 2 if available
+        // Sort and return Priority 2 if available
     if (highScores.length > 0) {
         highScores.sort((a, b) => b.score - a.score || a.distance - b.distance);
+        scoutCreep.heap.targetRoom = highScores[0].roomName;
         return highScores[0].roomName;
     }
 
     // Sort and return Priority 3 if available
     if (staleRooms.length > 0) {
         staleRooms.sort((a, b) => b.age - a.age || a.distance - b.distance);
+        scoutCreep.heap.targetRoom = staleRooms[0].roomName;
         return staleRooms[0].roomName;
     }
 

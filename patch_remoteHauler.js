@@ -1,10 +1,7 @@
-/**
- * @file remoteHauler.js
- * @description Transports energy from a remote room back to the home colony.
- */
+const fs = require('fs');
+let code = fs.readFileSync('src/roles/remoteHauler.js', 'utf8');
 
-const movement = require('../utils/movement');
-const pathing = require('../utils/pathing');
+const replacement = `const movement = require('../utils/movement');
 const TrafficManager = require('../traffic/trafficManager');
 
 /**
@@ -37,18 +34,8 @@ function run(room) {
             if (!creep.memory.hauling) {
                 // We are not hauling, need to go to remote room to pick up energy
                 if (creep.room.name !== remoteRoomName) {
-                    if (!creep.heap.path || creep.heap.path.length === 0 || creep.heap.path[creep.heap.path.length - 1].roomName !== remoteRoomName) {
-                        const pathResult = pathing.findPathToRoom(creep.pos, remoteRoomName);
-                        if (pathResult && pathResult.path) {
-                            creep.heap.path = pathResult.path;
-                        }
-                    }
-                    if (creep.heap.path && creep.heap.path.length > 0) {
-                        creep.moveByPath(creep.heap.path);
-                    } else {
-                        const targetPos = new RoomPosition(25, 25, remoteRoomName);
-                        movement.moveTo(creep, targetPos);
-                    }
+                    const targetPos = new RoomPosition(25, 25, remoteRoomName);
+                    movement.moveTo(creep, targetPos);
                     continue;
                 }
 
@@ -141,18 +128,8 @@ function run(room) {
             } else {
                 // We are hauling (have energy), need to drop it off at home
                 if (creep.room.name !== homeRoomName) {
-                    if (!creep.heap.path || creep.heap.path.length === 0 || creep.heap.path[creep.heap.path.length - 1].roomName !== homeRoomName) {
-                        const pathResult = pathing.findPathToRoom(creep.pos, homeRoomName);
-                        if (pathResult && pathResult.path) {
-                            creep.heap.path = pathResult.path;
-                        }
-                    }
-                    if (creep.heap.path && creep.heap.path.length > 0) {
-                        creep.moveByPath(creep.heap.path);
-                    } else {
-                        const targetPos = new RoomPosition(25, 25, homeRoomName);
-                        movement.moveTo(creep, targetPos);
-                    }
+                    const targetPos = new RoomPosition(25, 25, homeRoomName);
+                    movement.moveTo(creep, targetPos);
                     continue;
                 }
 
@@ -216,9 +193,11 @@ function run(room) {
             }
 
         } catch (e) {
-            console.error(`[remoteHauler Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
+            console.error(\`[remoteHauler Error] Room \${room.name}, Creep \${creep.name}: \${e.stack}\`);
         }
     }
-}
+}`;
 
-module.exports = { run };
+code = code.replace(/const movement = require\('\.\.\/utils\/movement'\);\s*\/\*\*[\s\S]*\}\s*\n\s*\}/, replacement);
+
+fs.writeFileSync('src/roles/remoteHauler.js', code);

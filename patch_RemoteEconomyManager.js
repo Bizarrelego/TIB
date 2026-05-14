@@ -1,9 +1,7 @@
-/**
- * @file RemoteEconomyManager.js
- * @description Executes Top-Down Assignment for remote economy roles.
- */
+const fs = require('fs');
+let code = fs.readFileSync('src/managers/RemoteEconomyManager.js', 'utf8');
 
-const SpawnQueueManager = require('./SpawnQueueManager');
+const replacement = `const SpawnQueueManager = require('./SpawnQueueManager');
 const BodyCalc = require('../utils/bodyCalc');
 
 module.exports = {
@@ -149,7 +147,9 @@ module.exports = {
                     }
                 }
             }
-        }
+        }`;
+
+code = code.replace(/module\.exports = \{[\s\S]*?run\(room\) \{[\s\S]*\n\s*\}\n\};/g, replacement + `
 
         if (colonyRemoteHarvesters.length > 0) {
             for (const creep of colonyRemoteHarvesters) {
@@ -232,4 +232,6 @@ module.exports = {
             }
         }
     }
-};
+};`);
+
+fs.writeFileSync('src/managers/RemoteEconomyManager.js', code);

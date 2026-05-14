@@ -1,9 +1,7 @@
-/**
- * @file remoteHarvester.js
- * @description Harvests energy from a designated remote source.
- */
+const fs = require('fs');
+let code = fs.readFileSync('src/roles/remoteHarvester.js', 'utf8');
 
-const movement = require('../utils/movement');
+const replacement = `const movement = require('../utils/movement');
 
 /**
  * Executes logic for remoteHarvester role.
@@ -23,15 +21,12 @@ function run(room) {
             const targetRoomName = creep.memory.targetRoom;
             if (!targetRoomName) continue;
 
-                        // Check hostiles
+            // Check hostiles
             if (global.State.hostilesByRoom && global.State.hostilesByRoom.has(creep.room.name)) {
                 const hostiles = global.State.hostilesByRoom.get(creep.room.name);
                 if (hostiles && hostiles.length > 0) {
-                    // Retreat actively to home room
-                    if (creep.memory.homeRoom && creep.room.name !== creep.memory.homeRoom) {
-                        const homePos = new RoomPosition(25, 25, creep.memory.homeRoom);
-                        movement.moveTo(creep, homePos);
-                    }
+                    // Retreat logic could go here, for now just avoid working/moving towards them
+                    // Since it's remote, we might just return early to sleep/wait or move home
                     continue;
                 }
             }
@@ -138,9 +133,11 @@ function run(room) {
             }
 
         } catch (e) {
-            console.error(`[remoteHarvester Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
+            console.error(\`[remoteHarvester Error] Room \${room.name}, Creep \${creep.name}: \${e.stack}\`);
         }
     }
-}
+}`;
 
-module.exports = { run };
+code = code.replace(/const movement = require\('\.\.\/utils\/movement'\);\s*\/\*\*[\s\S]*\}\s*\n\s*\}/, replacement);
+
+fs.writeFileSync('src/roles/remoteHarvester.js', code);
