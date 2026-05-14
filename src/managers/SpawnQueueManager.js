@@ -5,6 +5,10 @@
 
 const ROLE_PRIORITIES = require('../constants/rolePriorities');
 
+/**
+ * @class SpawnQueueManager
+ * @description Manages prioritized spawn queue
+ */
 class SpawnQueueManager {
     constructor() {
         this.queue = [];

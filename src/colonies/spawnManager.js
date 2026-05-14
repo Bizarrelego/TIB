@@ -52,7 +52,7 @@ module.exports = {
             const sourceCount = sources ? sources.length : 1;
 
             if (harvesterCount < sourceCount) {
-                const energyAvailable = room.energyAvailable;
+                const energyAvailable = spawnLedger.getAvailableEnergy();
                 const calcCapacity = (harvesterCount === 0 && energyAvailable < capacity && energyAvailable >= 250) ? energyAvailable : capacity;
                 const body = BodyCalc.calculateEarlyGameHarvester(calcCapacity);
                 const cost = BodyCalc.getCost(body);
