@@ -1,12 +1,15 @@
 /* global EVENT_OBJECT_DESTROYED, EVENT_ATTACK, EVENT_HEAL, EVENT_BUILD, EVENT_CREATE_CREEP, EVENT_DROP */
+const globalState = require('./globalState');
 
 module.exports = function stateScanner() {
     if (!global.State?.scannedRooms) return;
 
     // Pure Event-Driven Consumer Loop
     for (const roomName of global.State.scannedRooms) {
-        const room = Game.rooms[roomName];
-        if (!room) continue;
+        const roomData = globalState.read(roomName) || { events: [] };
+        if (!globalState.read(roomName)) {
+            globalState.write(roomName, roomData);
+        }
 
         const events = global.State.getEvents ? global.State.getEvents(roomName) : (global.State.eventCache.get(roomName) || []);
 

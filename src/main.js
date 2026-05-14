@@ -1,4 +1,5 @@
 const { CacheRegistry } = require('./os/cache');
+const globalState = require('./state/globalState');
 const discoveryManager = require('./state/discoveryManager');
 const stateScanner = require('./state/stateScanner');
 const colonyManager = require('./colonies/colonyManager');
@@ -6,6 +7,9 @@ const operationsManager = require('./operations/operationsManager'); // High-lev
 const trafficManager = require('./traffic/trafficManager');
 
 module.exports.loop = function () {
+    // Rehydrate global state
+    globalState.rehydrate();
+
     // Initialize OS cache
     if (!global.Cache) {
         CacheRegistry.init();
