@@ -34,7 +34,7 @@ module.exports = {
 
             // Filter out invalid or completed planned structures, and sort by priority
             let toBuild = [];
-            for (const [id, plannedStruct] of plannedStructures.entries()) {
+            for (const plannedStruct of plannedStructures.values()) {
                 if (!plannedStruct || !plannedStruct.pos || !plannedStruct.type) continue;
                 let limit = 0;
                 if (plannedStruct.type === STRUCTURE_ROAD) {
@@ -105,6 +105,12 @@ module.exports = {
                 if (currentCount >= limit && structToBuild.type !== STRUCTURE_ROAD) continue;
 
                 const res = room.createConstructionSite(structToBuild.pos.x, structToBuild.pos.y, structToBuild.type);
+                if (res === OK || res === ERR_INVALID_TARGET) {
+                    if (structToBuild.id) {
+                        plannedStructures.delete(structToBuild.id);
+                    }
+                }
+
                 if (res === OK) {
                     sitesCreated++;
                     currentActiveSites++;
