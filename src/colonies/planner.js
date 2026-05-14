@@ -1,5 +1,7 @@
 
 
+/* eslint-disable no-redeclare */
+/* global Game, PathFinder, TERRAIN_MASK_WALL, STRUCTURE_CONTAINER, STRUCTURE_ROAD, CONTROLLER_STRUCTURES, STRUCTURE_RAMPART, BUILD_POWER, WORK */
 const DistanceTransform = require('../algorithms/distanceTransform');
 const { BASE_LAYOUT_STAMP } = require('../constants/baseLayout');
 const roomPositionUtils = require('../utils/roomPositionUtils');
@@ -212,7 +214,7 @@ module.exports = {
                             {
                                 plainCost: 2,
                                 swampCost: 2,
-                                roomCallback: function(roomName) {
+                                roomCallback: function() {
                                     return cm;
                                 }
                             }
