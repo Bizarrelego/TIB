@@ -1,3 +1,4 @@
+/* global STRUCTURE_FACTORY */
 /**
  * @file EnergyRequestManager.js
  * @description Scans the room, identifies all structures needing energy (requests) and sources of energy (supplies),

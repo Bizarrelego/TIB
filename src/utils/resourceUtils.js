@@ -1,3 +1,4 @@
+/* global STRUCTURE_FACTORY */
 /**
  * @file resourceUtils.js
  * @description Utility functions for finding and filtering resources or structures using global.State (0-CPU native polling).
