@@ -98,12 +98,16 @@ function run(creep, room) {
         }
 
         if (target && creep.store.getFreeCapacity() > 0) {
-            if (target.resourceType) creep.pickup(target);
-            else creep.withdraw(target, RESOURCE_ENERGY);
+            if (target.resourceType) {
+                creep.pickup(target);
+            } else {
+                creep.withdraw(target, RESOURCE_ENERGY);
+            }
         }
     } catch (e) {
         console.log(`[Upgrader Role Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
     }
 }
 
+// Export the module
 module.exports = { run };

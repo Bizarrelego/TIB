@@ -41,6 +41,7 @@ class SpawnLedger {
      * @param {number} amount The energy amount to reserve.
      */
     reserveEnergy(amount) {
+        // Subtracts from this.availableEnergy so subsequent requests in the same tick know the remaining budget
         this.availableEnergy -= amount;
     }
 

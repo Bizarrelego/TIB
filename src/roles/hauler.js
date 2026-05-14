@@ -25,10 +25,18 @@ module.exports = {
                                 movement.moveTo(creep, target);
                             }
                         } else {
-                            // Target is a tombstone or ruin
+                            // Target is a structure, tombstone or ruin
                             if (creep.withdraw(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
                                 movement.moveTo(creep, target);
                             }
+                        }
+                    } else {
+                        // Fallback: move to storage or center if no target
+                        const storage = room.storage;
+                        if (storage) {
+                            movement.moveTo(creep, storage);
+                        } else {
+                            movement.moveTo(creep, new RoomPosition(25, 25, room.name));
                         }
                     }
                 } else if (creep.heap.state === 'transfer') {
@@ -48,6 +56,14 @@ module.exports = {
                             const result = creep.transfer(target, RESOURCE_ENERGY);
                             if (result === ERR_NOT_IN_RANGE) {
                                 movement.moveTo(creep, target);
+                            }
+                        } else {
+                            // Fallback
+                            const storage = room.storage;
+                            if (storage && storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                                if (creep.transfer(storage, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                                    movement.moveTo(creep, storage);
+                                }
                             }
                         }
                     }
