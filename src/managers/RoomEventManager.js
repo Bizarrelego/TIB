@@ -22,9 +22,11 @@ function roomEventManager() {
                     break;
                 case EVENT_BUILD:
                     eventBus.publish('CONSTRUCTION_STARTED', eventPayload);
+                    eventBus.publish('INVALIDATE_COSTMATRIX', roomName);
                     break;
                 case EVENT_OBJECT_DESTROYED:
                     eventBus.publish('STRUCTURE_DECAY', eventPayload);
+                    eventBus.publish('INVALIDATE_COSTMATRIX', roomName);
                     break;
                 case EVENT_HARVEST:
                     eventBus.publish('ROOM_EVENT_HARVEST', eventPayload);
