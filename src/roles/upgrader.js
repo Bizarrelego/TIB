@@ -1,36 +1,54 @@
 const movement = require('../utils/movement');
 
 // Upgraders must be static. Move once, then stay forever.
-function run(room) {
-    const upgraders = global.State.creepsByRoom.get(room.name)?.get('upgrader') || [];
-    const controller = global.State.controllersByRoom.get(room.name);
-
+function run(creep, room) {
+    const controller = room.controller;
     if (!controller) return;
 
-    for (const creep of upgraders) {
-        try {
-            if (creep.fatigue > 0) continue;
+    try {
+        if (creep.fatigue > 0) return;
 
-            if (!creep.heap.rangeToController) {
+        if (!creep.heap.rangeToController) {
+            creep.heap.rangeToController = creep.pos.getRangeTo(controller);
+        }
+
+        // Move to assigned park position
+        if (creep.heap.parkPos) {
+            // Need to create RoomPosition object if it's deserialized as a simple object
+            const targetPos = new RoomPosition(creep.heap.parkPos.x, creep.heap.parkPos.y, creep.heap.parkPos.roomName);
+            if (!creep.pos.isEqualTo(targetPos)) {
+                movement.moveTo(creep, targetPos);
                 creep.heap.rangeToController = creep.pos.getRangeTo(controller);
+                return;
             }
-
+        } else if (creep.heap.rangeToController > 3) {
             // Ensure we are parked on the static spot.
-            // Do NOT use movement if already in range of controller.
-            if (creep.heap.rangeToController > 3) {
-                movement.moveTo(creep, controller);
-                // Update range cache only while moving
-                creep.heap.rangeToController = creep.pos.getRangeTo(controller);
-                continue;
-            }
+            movement.moveTo(creep, controller);
+            // Update range cache only while moving
+            creep.heap.rangeToController = creep.pos.getRangeTo(controller);
+            return;
+        }
 
-            // Static logic: Only work if energy is present (delivered by Haulers)
-            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                creep.upgradeController(controller);
-            }
+        // Static logic: Only work if energy is present (delivered by Haulers)
+        if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+            creep.upgradeController(controller);
+        }
 
-            // Pickup dropped energy or withdraw from link if available without moving
-            let target = null;
+        // Prioritize assigned source from UpgraderManager
+        let target = null;
+        if (creep.heap.sourceId) {
+            target = Game.getObjectById(creep.heap.sourceId);
+            if (target && (
+                (target.resourceType && target.amount > 0) ||
+                (target.store && target.store.getUsedCapacity(RESOURCE_ENERGY) > 0)
+            )) {
+                // Keep target
+            } else {
+                target = null;
+            }
+        }
+
+        if (!target) {
             if (creep.heap.targetId) {
                 target = Game.getObjectById(creep.heap.targetId);
                 // Invalidate if missing or empty
@@ -77,14 +95,14 @@ function run(room) {
                     creep.heap.targetId = target.id;
                 }
             }
-
-            if (target && creep.store.getFreeCapacity() > 0) {
-                if (target.resourceType) creep.pickup(target);
-                else creep.withdraw(target, RESOURCE_ENERGY);
-            }
-        } catch (e) {
-            console.log(`[Upgrader Role Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
         }
+
+        if (target && creep.store.getFreeCapacity() > 0) {
+            if (target.resourceType) creep.pickup(target);
+            else creep.withdraw(target, RESOURCE_ENERGY);
+        }
+    } catch (e) {
+        console.log(`[Upgrader Role Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
     }
 }
 

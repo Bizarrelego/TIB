@@ -11,7 +11,7 @@ const fastFiller = require('../roles/fastFiller');
 const LogisticsManager = require('./logisticsManager');
 const LinkManager = require('../managers/LinkManager');
 const hubManager = require('../roles/hubManager');
-const upgrader = require('../roles/upgrader');
+const UpgraderManager = require('../managers/UpgraderManager');
 const defense = require('./defense');
 const labs = require('./labs');
 const scout = require('../roles/scout');
@@ -45,7 +45,7 @@ module.exports = function colonyManager() {
                 fastFiller.run(room);
                 LinkManager.run(room);
                 hubManager.run(room);
-                upgrader.run(room);
+                UpgraderManager.run(room);
                 defense.run(room);
                 labs.run(room);
                 scout.run(room);
