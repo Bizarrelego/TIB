@@ -32,9 +32,8 @@ module.exports = function colonyManager() {
         if (room.controller && room.controller.my === true) {
             // Instantiate SpawnLedger globally for the room per tick
             const spawnLedger = new SpawnLedger(room);
-
+            spawnManager.run(room, spawnLedger);
             try {
-                spawnManager.run(room, spawnLedger);
                 planner.run(room);
                 ConstructionManager.run(room);
                 workerManager.run(room);
