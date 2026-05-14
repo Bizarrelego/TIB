@@ -12,13 +12,13 @@ module.exports = {
     run: function(room, spawnLedger) {
         try {
             // Retrieve spawn via O(1) lookup
-            const spawn = global.State.spawnsByRoom.get(room.name)?.[0];
-
-            if (!spawn) {
+            const spawns = global.State.spawnsByRoom.get(room.name);
+            if (!spawns || spawns.length === 0) {
                 return;
             }
 
-            if (spawnLedger.isSpawnBusy(spawn)) {
+            const availableSpawns = spawns.filter(s => !spawnLedger.isSpawnBusy(s));
+            if (availableSpawns.length === 0) {
                 return;
             }
 
@@ -82,9 +82,11 @@ module.exports = {
             }
 
             if (totalScouts < 1) {
-                SpawnQueueManager.requestSpawn(room.name, 'scout', [MOVE], 'scout_' + Game.time, {
+                if (spawnLedger.canSpawn(50)) {
+                    SpawnQueueManager.requestSpawn(room.name, 'scout', [MOVE], 'scout_' + Game.time, {
                     memory: { role: 'scout', colony: room.name }
                 }, 50);
+                }
             }
         }
 
@@ -109,18 +111,22 @@ module.exports = {
                     // Optimized body for hub transfer: 800 capacity
                     const body = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE];
                     const cost = (16 * BODYPART_COST[CARRY]) + BODYPART_COST[MOVE]; // 16 * 50 + 50 = 850
+                    if (spawnLedger.canSpawn(cost)) {
                     SpawnQueueManager.requestSpawn(room.name, 'hubManager', body, 'hubManager_' + Game.time, {
                         memory: { role: 'hubManager', colony: room.name }
                     }, cost);
+                }
                 }
 
                 const desiredUpgraders = UpgraderManager.getDesiredCount(room);
                 if (upgraderCount < desiredUpgraders) {
                     const body = BodyCalc.calculateUpgrader(capacity);
                     const cost = BodyCalc.getCost(body);
+                    if (spawnLedger.canSpawn(cost)) {
                     SpawnQueueManager.requestSpawn(room.name, 'upgrader', body, 'upgrader_' + Game.time, {
                         memory: { role: 'upgrader', colony: room.name }
                     }, cost);
+                }
                 }
             }
         }
@@ -173,9 +179,11 @@ module.exports = {
                     }
 
                     if (body.length > 0) {
-                        SpawnQueueManager.requestSpawn(room.name, 'fastFiller', body, 'fastFiller_' + Game.time, {
-                            memory: { role: 'fastFiller', colony: room.name }
-                        }, cost);
+                        if (spawnLedger.canSpawn(cost)) {
+                            SpawnQueueManager.requestSpawn(room.name, 'fastFiller', body, 'fastFiller_' + Game.time, {
+                                memory: { role: 'fastFiller', colony: room.name }
+                            }, cost);
+                        }
                     }
                 }
             }
@@ -216,7 +224,7 @@ module.exports = {
                         if (!activeReserver && intel.reservation !== 'jules') {
                             const body = capacity >= 1300 ? [CLAIM, CLAIM, MOVE, MOVE] : [CLAIM, MOVE];
                             const cost = capacity >= 1300 ? 1300 : 650;
-                            if (capacity >= cost) {
+                            if (capacity >= cost && spawnLedger.canSpawn(cost)) {
                                 SpawnQueueManager.requestSpawn(room.name, 'reserver', body, 'reserver_' + Game.time, {
                                     memory: { role: 'reserver', colony: room.name, targetRoom: targetRoomName }
                                 }, cost);
@@ -230,7 +238,7 @@ module.exports = {
                             if (roomRemoteHarvesters.length < sourcesCount) {
                                 const body = [WORK, WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE, MOVE];
                                 const cost = 700;
-                                if (capacity >= cost) {
+                                if (capacity >= cost && spawnLedger.canSpawn(cost)) {
                                     SpawnQueueManager.requestSpawn(room.name, 'remoteHarvester', body, 'remoteHarvester_' + Game.time, {
                                         memory: { role: 'remoteHarvester', colony: room.name, targetRoom: targetRoomName, targetSourceId: null }
                                     }, cost);
@@ -242,7 +250,7 @@ module.exports = {
                             if (roomRemoteHaulers.length < roomRemoteHarvesters.length * 2) {
                                 const body = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE];
                                 const cost = 450;
-                                if (capacity >= cost) {
+                                if (capacity >= cost && spawnLedger.canSpawn(cost)) {
                                     SpawnQueueManager.requestSpawn(room.name, 'remoteHauler', body, 'remoteHauler_' + Game.time, {
                                         memory: { role: 'remoteHauler', colony: room.name, homeRoom: room.name, remoteRoom: targetRoomName, containerId: null }
                                     }, cost);
@@ -256,7 +264,7 @@ module.exports = {
 
             // Process the queue
             const queue = new SpawnQueueManager();
-            queue.process(spawn, spawnLedger);
+            queue.process(spawns, spawnLedger);
 
         } catch (e) {
             console.log(`[SpawnManager Error] Room ${room.name}: ${e.stack}`);

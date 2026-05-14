@@ -87,14 +87,19 @@ class SpawnQueueManager {
      * @param {StructureSpawn} spawn The spawn to execute the request on
      * @param {Object} spawnLedger The ledger to verify and reserve energy
      */
-    process(spawn, spawnLedger) {
+    process(spawns, spawnLedger) {
+        if (!Array.isArray(spawns)) {
+            spawns = [spawns];
+        }
+        if (spawns.length === 0) return;
+        const roomName = spawns[0].room.name;
         // Pull requests from the global queue for this room
-        if (SpawnQueueManager.globalQueue.has(spawn.room.name)) {
-            const requests = SpawnQueueManager.globalQueue.get(spawn.room.name);
+        if (SpawnQueueManager.globalQueue.has(roomName)) {
+            const requests = SpawnQueueManager.globalQueue.get(roomName);
             for (const req of requests) {
                 this.add(req.role, req.body, req.name, req.opts, req.cost);
             }
-            SpawnQueueManager.globalQueue.delete(spawn.room.name);
+            SpawnQueueManager.globalQueue.delete(roomName);
         }
 
         if (this.queue.length === 0) return;
@@ -105,19 +110,29 @@ class SpawnQueueManager {
             return prioB - prioA;
         });
 
-        for (let i = 0; i < this.queue.length; i++) {
+        let availableSpawns = spawns.filter(s => !spawnLedger.isSpawnBusy(s));
+        if (availableSpawns.length === 0) return;
+
+        let i = 0;
+        while (i < this.queue.length && availableSpawns.length > 0) {
             const request = this.queue[i];
-            if (spawnLedger.canSpawn(request.cost) && !spawnLedger.isSpawnBusy(spawn)) {
-                const result = spawnLedger.requestSpawn(spawn, request.body, request.name, request.opts, request.cost);
-                if (result === OK) {
-                    this.queue.splice(i, 1);
-                    return; // Spawn is now busy
-                }
-            } else {
-                // If we cannot spawn the current highest priority creep (!canSpawn or ERR_NOT_ENOUGH_ENERGY),
-                // we immediately return from the function. This prevents lower-priority creeps from
-                // consuming energy and blocking the high-priority ones.
+
+            if (!spawnLedger.canSpawn(request.cost)) {
+                // If we cannot afford the highest priority request, skip and return to prevent lower-priority
+                // from taking its budget and causing a spawn stall.
                 return;
+            }
+
+            const spawn = availableSpawns[0];
+            const result = spawnLedger.requestSpawn(spawn, request.body, request.name, request.opts, request.cost);
+
+            if (result === OK) {
+                this.queue.splice(i, 1); // remove from queue
+                availableSpawns.shift(); // remove from available spawns
+            } else {
+                // if it failed for some reason other than energy (e.g. invalid body), maybe skip it,
+                // but for now let's just increment to prevent infinite loops if something goes wrong.
+                i++;
             }
         }
     }
