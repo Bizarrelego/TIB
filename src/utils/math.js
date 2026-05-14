@@ -41,10 +41,11 @@ class MathUtils {
     }
 
     /**
-     * Helper to get quartile from sorted array
-     * @param {number[]} sortedArr
-     * @param {number} q (e.g., 0.25 for Q1, 0.75 for Q3)
-     * @returns {number}
+     * Helper to get quartile from sorted array.
+     * Interpolates values if the exact quartile position is not an integer.
+     * @param {number[]} sortedArr Array of numbers, pre-sorted in ascending order
+     * @param {number} q The quartile to calculate (e.g., 0.25 for Q1, 0.75 for Q3)
+     * @returns {number} The calculated quartile value
      */
     static getQuartile(sortedArr, q) {
         const pos = (sortedArr.length - 1) * q;
