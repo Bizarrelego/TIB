@@ -1,6 +1,7 @@
 const DeadlockEngine = require('./deadlock');
+const movement = require('../utils/movement');
+const ROLE_PRIORITIES = require('../constants/rolePriorities');
 
-const DIRECTION_VECTORS = new Map([[1, [0, -1]], [2, [1, -1]], [3, [1, 0]], [4, [1, 1]], [5, [0, 1]], [6, [-1, 1]], [7, [-1, 0]], [8, [-1, -1]]]);
 
 /**
  * @typedef {Object} PipelineLock
@@ -146,6 +147,24 @@ const TrafficManager = {
         }
     },
 
+    /**
+     * @param {object} creep
+     * @param {object} targetPos
+     * @param {object} [opts={}]
+     */
+    registerMoveIntent(creep, targetPos, opts = {}) {
+        if (!creep || creep.fatigue > 0) return;
+        if (!global.State) global.State = {};
+        if (!(global.State.trafficIntents instanceof Map)) global.State.trafficIntents = new Map();
+
+        global.State.trafficIntents.set(creep.name, {
+            creep,
+            targetPos,
+            opts,
+            originalPos: creep.pos
+        });
+    },
+
     registerSwap(creepA, creepB) {
         if (global.State && global.State.swapRegistry) {
             global.State.swapRegistry.set(creepA.name, creepB.name);
@@ -196,76 +215,131 @@ const TrafficManager = {
                 }
             }
 
-            if (!global.State || !global.State.trafficIntents) return;
+            if (!global.State || !global.State.trafficIntents || global.State.trafficIntents.size === 0) return;
 
-            this.resolveDeadlocks();
-            this.executeSwaps();
+            // Phase 1: Build Dependency Graph & Identify Swaps
+            const dependencyGraph = new Map();
+            if (!(global.State.swapRegistry instanceof Map)) global.State.swapRegistry = new Map();
+            global.State.swapRegistry.clear();
+
+
+            const currentPositions = new Map();
+            for (const roomName of global.State.scannedRooms || []) {
+                const roomCreeps = global.State.creepsByRoom.get(roomName);
+                if (roomCreeps) {
+                    for (const roleCreeps of roomCreeps.values()) {
+                        if (Array.isArray(roleCreeps)) {
+                            for (const creep of roleCreeps) {
+                                currentPositions.set(`${creep.pos.roomName}_${creep.pos.x}_${creep.pos.y}`, creep.name);
+                            }
+                        }
+                    }
+                }
+            }
+
+
 
             for (const [creepName, intent] of global.State.trafficIntents.entries()) {
-                const liveCreep = global.State.creepLookup.get(creepName);
-                if (liveCreep && (!global.State.swapRegistry || !global.State.swapRegistry.has(creepName))) {
-                    liveCreep.move(intent.direction);
+                const { creep, targetPos, originalPos } = intent;
+                if (!creep || !targetPos) continue;
+
+                let intendedNextPos = null;
+                const dx = Math.abs(creep.pos.x - targetPos.x);
+                const dy = Math.abs(creep.pos.y - targetPos.y);
+
+                if (dx <= 1 && dy <= 1 && creep.pos.roomName === targetPos.roomName) {
+                    intendedNextPos = targetPos;
+                } else if (creep.heap && creep.heap.path && creep.heap.path.length > 0) {
+                    // Pull from pre-calculated CostMatrix path if available
+                    intendedNextPos = creep.heap.path[0];
+                } else {
+                     // Provide default intendedNextPos to skip heavy PathFinder inside loop
+                     // Since PathFinder is forbidden here.
+                     continue;
                 }
+
+
+                if (!intendedNextPos) continue;
+                intent.intendedNextPos = intendedNextPos;
+
+                const posKey = `${intendedNextPos.roomName}_${intendedNextPos.x}_${intendedNextPos.y}`;
+                const blockingCreepName = currentPositions.get(posKey);
+
+                if (blockingCreepName && blockingCreepName !== creepName) {
+                    dependencyGraph.set(creepName, blockingCreepName);
+
+                    const blockingIntent = global.State.trafficIntents.get(blockingCreepName);
+                    if (blockingIntent && blockingIntent.intendedNextPos) {
+                        const bNextPos = blockingIntent.intendedNextPos;
+                        if (bNextPos.roomName === originalPos.roomName && bNextPos.x === originalPos.x && bNextPos.y === originalPos.y) {
+                            global.State.swapRegistry.set(creepName, blockingCreepName);
+                            global.State.swapRegistry.set(blockingCreepName, creepName);
+                        }
+                    }
+                }
+            }
+
+            // Phase 2: Resolve Deadlocks
+            DeadlockEngine.detectAndResolve(global.State.trafficIntents, dependencyGraph);
+
+            // Phase 3: Execute Moves
+            const remainingIntents = Array.from(global.State.trafficIntents.values());
+            remainingIntents.sort((a, b) => {
+                const priorityA = (a.creep && a.creep.memory && a.creep.memory.role) ? (ROLE_PRIORITIES.get(a.creep.memory.role) || 0) : 0;
+                const priorityB = (b.creep && b.creep.memory && b.creep.memory.role) ? (ROLE_PRIORITIES.get(b.creep.memory.role) || 0) : 0;
+                return priorityB - priorityA; // Descending priority
+            });
+
+            const processedSwaps = new Set();
+
+            for (const intent of remainingIntents) {
+                const { creep, targetPos, opts, intendedNextPos } = intent;
+                if (!creep) continue;
+
+                if (global.State.swapRegistry.has(creep.name)) {
+                    if (processedSwaps.has(creep.name)) continue;
+
+
+                    const blockingCreepName = global.State.swapRegistry.get(creep.name);
+                    const blockingCreep = global.State.creepLookup ? global.State.creepLookup.get(blockingCreepName) : Game.creeps[blockingCreepName];
+
+
+                    if (blockingCreep) {
+
+                        const dir = creep.pos.getDirectionTo(blockingCreep.pos); // Alternative logic
+
+                        // Custom getDirection logic if needed since getDirectionTo exists in Screeps API
+                        if (dir) {
+                           creep.move(dir);
+                           blockingCreep.move(((dir + 3) % 8) + 1);
+                        }
+                    }
+
+                    processedSwaps.add(creep.name);
+                    processedSwaps.add(blockingCreepName);
+                    global.State.trafficIntents.delete(creep.name);
+                    global.State.trafficIntents.delete(blockingCreepName);
+                    continue;
+                }
+
+                if (intendedNextPos) {
+                    const posKey = `${intendedNextPos.roomName}_${intendedNextPos.x}_${intendedNextPos.y}`;
+                    const blockingCreepName = currentPositions.get(posKey);
+
+                    if (blockingCreepName && blockingCreepName !== creep.name) {
+                        if (!global.State.trafficIntents.has(blockingCreepName)) {
+                            // Blocked by a stationary creep, do not move
+                            global.State.trafficIntents.delete(creep.name);
+                            continue;
+                        }
+                    }
+                }
+
+                movement.moveTo(creep, targetPos, opts);
+                global.State.trafficIntents.delete(creep.name);
             }
         } catch (e) {
             console.error(`[TrafficManager Execution Error]: ${e.stack}`);
-        }
-    },
-
-    resolveDeadlocks() {
-        if (!global.State || !global.State.trafficIntents) return;
-
-        const dependencyGraph = new Map();
-
-        const targetPositions = new Map();
-        const currentPositions = new Map();
-
-        // Use pre-cached lookup Map
-        for (const liveCreep of global.State.creepLookup.values()) {
-            currentPositions.set(`${liveCreep.pos.roomName}_${liveCreep.pos.x}_${liveCreep.pos.y}`, liveCreep.name);
-        }
-
-        for (const [creepName, intent] of global.State.trafficIntents.entries()) {
-            const liveCreep = global.State.creepLookup.get(creepName);
-            if (!liveCreep) continue;
-            const [dx, dy] = DIRECTION_VECTORS.get(intent.direction) || [0, 0];
-            const posKey = `${liveCreep.pos.roomName}_${liveCreep.pos.x + dx}_${liveCreep.pos.y + dy}`;
-
-            const blockerName = targetPositions.get(posKey);
-            if (blockerName) {
-                dependencyGraph.set(creepName, blockerName);
-            } else {
-                const statBlocker = currentPositions.get(posKey);
-                if (statBlocker && statBlocker !== creepName) dependencyGraph.set(creepName, statBlocker);
-            }
-
-            targetPositions.set(posKey, creepName);
-        }
-
-        DeadlockEngine.detectAndResolve(global.State.trafficIntents, dependencyGraph);
-    },
-
-    executeSwaps() {
-        if (!global.State || !global.State.swapRegistry) return;
-
-        const processed = new Set();
-        for (const [creepA_name, creepB_name] of global.State.swapRegistry.entries()) {
-            if (processed.has(creepA_name) || processed.has(creepB_name)) continue;
-
-            const liveCreepA = global.State.creepLookup.get(creepA_name);
-            const liveCreepB = global.State.creepLookup.get(creepB_name);
-
-            if (liveCreepA && liveCreepB) {
-                const intentA = global.State.trafficIntents ? global.State.trafficIntents.get(creepA_name) : null;
-                if (intentA) {
-                    const oppositeDirection = ((intentA.direction + 3) % 8) + 1;
-                    liveCreepA.move(intentA.direction);
-                    liveCreepB.move(oppositeDirection);
-
-                    processed.add(creepA_name);
-                    processed.add(creepB_name);
-                }
-            }
         }
     }
 };
