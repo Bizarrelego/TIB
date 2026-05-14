@@ -6,6 +6,24 @@ module.exports = function stateScanner() {
 
     // Pure Event-Driven Consumer Loop
     for (const roomName of global.State.scannedRooms) {
+        const room = Game.rooms[roomName];
+        if (room && room.fatigue > 0) continue;
+
+        if (global.State.sourcesByRoom) {
+            const sources = global.State.sourcesByRoom.get(roomName) || [];
+            for (let i = 0; i < sources.length; i++) {
+                const source = sources[i];
+                if (source.sleep && Game.time < source.nextRegenTick) continue;
+
+                if (source.energy === 0) {
+                    source.sleep = true;
+                    source.nextRegenTick = Game.time + source.ticksToRegeneration;
+                } else {
+                    source.sleep = false;
+                }
+            }
+        }
+
         const roomData = globalState.read(roomName) || { events: [] };
         if (!globalState.read(roomName)) {
             globalState.write(roomName, roomData);
