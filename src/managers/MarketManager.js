@@ -52,13 +52,13 @@ class MarketManager {
             // In a real implementation, prevEma would be fetched from Memory/Heap.
             // For now, we will just use the current average as the baseline if we don't have history.
             if (!global.State) global.State = {};
-            if (!global.State.marketEMA) global.State.marketEMA = {};
+            if (!global.State.marketEMA) global.State.marketEMA = new Map();
 
-            const prevEma = global.State.marketEMA[resourceType] || currentAvgPrice;
+            const prevEma = global.State.marketEMA.get(resourceType) || currentAvgPrice;
             const ema = MathUtils.calculateEMA(currentAvgPrice, prevEma, 100);
 
             // Store new EMA
-            global.State.marketEMA[resourceType] = ema;
+            global.State.marketEMA.set(resourceType, ema);
 
             // Sort orders by price descending
             orders.sort((a, b) => b.price - a.price);
