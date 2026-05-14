@@ -1,3 +1,4 @@
+const Profiler = require('../utils/profiler');
 /**
  * @file offense.js
  * @description Manages combat & siege execution.
@@ -5,10 +6,14 @@
 
 const CombatManager = require('../managers/CombatManager');
 
+/**
+ * Drives all active quads. Implements 4-creep lockstep chain-pulling.
+ * @returns {void}
+ */
 function runAtomicQuads() {
     if (!global.State || !global.State.activeQuads) return;
 
-    for (const [quadId, quadObj] of global.State.activeQuads) {
+    for (const [, quadObj] of global.State.activeQuads) {
         if (!quadObj.creeps || quadObj.creeps.length === 0) continue;
 
         // Find direction (placeholder logic, usually fetched from quadObj.target or pathing)
@@ -18,6 +23,10 @@ function runAtomicQuads() {
     }
 }
 
+/**
+ * Syncs attacker intents within a room, holding fire until ready to hit a target on the exact same tick.
+ * @returns {void}
+ */
 function runSynchronizedBurst() {
     if (!global.State || !global.State.creepsByRoom) return;
 
@@ -36,6 +45,10 @@ function runSynchronizedBurst() {
     }
 }
 
+/**
+ * Orchestrates tower draining operations. Steps into tower range, eats damage, and heals using I-frames.
+ * @returns {void}
+ */
 function runTowerDrain() {
     if (!global.State || !global.State.creepsByRoom) return;
 
@@ -61,7 +74,11 @@ function runTowerDrain() {
     }
 }
 
-module.exports = function offenseManager() {
+/**
+ * Main offense loop executing atomic combat intents.
+ * @returns {void}
+ */
+module.exports = Profiler.wrap('offenseManager', function offenseManager() {
     try {
         // Execute heavy combat logic
         runAtomicQuads();
@@ -70,4 +87,4 @@ module.exports = function offenseManager() {
     } catch (e) {
         console.error(`[OffenseManager Error] ${e.stack}`);
     }
-};
+});

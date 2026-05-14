@@ -1,8 +1,14 @@
+const Profiler = require('../utils/profiler');
 /**
  * @file intel.js
  * @description Manages cross-room intel, heatmaps, and RawMemory mapping.
  */
 
+/**
+ * Builds cost matrices (heatmaps) around hostiles for auto-kiting.
+ * Penalty tiles range up to 3 tiles outward.
+ * @returns {void}
+ */
 function buildHeatmaps() {
     if (!global.State.scannedRooms) return;
     if (!global.State.heatmapsByRoom) global.State.heatmapsByRoom = new Map();
@@ -42,6 +48,10 @@ function buildHeatmaps() {
     }
 }
 
+/**
+ * Serializes and maps intel and heatmaps to RawMemory segments (0 and 1).
+ * @returns {void}
+ */
 function mapToRawMemory() {
     // Request segments
     RawMemory.setActiveSegments([0, 1]);
@@ -62,7 +72,11 @@ function mapToRawMemory() {
     }
 }
 
-module.exports = function intelManager() {
+/**
+ * Main intel loop to generate heatmaps and serialize to memory.
+ * @returns {void}
+ */
+module.exports = Profiler.wrap('intelManager', function intelManager() {
     try {
         if (Game.time % 10 === 0) {
             buildHeatmaps();
@@ -71,4 +85,4 @@ module.exports = function intelManager() {
     } catch (e) {
         console.error(`[IntelManager Error] ${e.stack}`);
     }
-};
+});

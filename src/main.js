@@ -2,7 +2,7 @@ const { CacheRegistry } = require('./os/cache');
 const discoveryManager = require('./state/discoveryManager');
 const stateScanner = require('./state/stateScanner');
 const colonyManager = require('./colonies/colonyManager');
-const operationsManager = require('./operations/operationsManager');
+const operationsManager = require('./operations/operationsManager'); // High-level orchestrator
 const trafficManager = require('./traffic/trafficManager');
 
 module.exports.loop = function () {
@@ -56,7 +56,7 @@ module.exports.loop = function () {
         }
     }
 
-    // Phase 4: Operations
+    // Phase 4: Operations Orchestration Module
     if (!skipOperations) {
         try {
             if (operationsManager) operationsManager();

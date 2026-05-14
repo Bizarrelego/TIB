@@ -1,3 +1,4 @@
+const Profiler = require('../utils/profiler');
 /**
  * @file expansion.js
  * @description Manages expansion operations including early poaching, remote denial, and auto-claim.
@@ -5,6 +6,10 @@
 
 const SpawnQueueManager = require('../managers/SpawnQueueManager');
 
+/**
+ * Runs early poaching operations to kill remote harvesters and steal energy from weak neighbors.
+ * @returns {void}
+ */
 function runEarlyPoaching() {
     if (!global.State || !global.State.intel) return;
 
@@ -49,6 +54,11 @@ function runEarlyPoaching() {
     }
 }
 
+/**
+ * Executes remote denial by deploying 1MOVE decoys onto enemy construction sites.
+ * Designed to block building and kite defenders to drain CPU.
+ * @returns {void}
+ */
 function runRemoteDenial() {
     // Scaffold: Deploy 150-energy decoy creeps to park on enemy construction sites
     // Designed to block builds and kite defenders to drain CPU
@@ -89,6 +99,10 @@ function runRemoteDenial() {
     }
 }
 
+/**
+ * Evaluates intel and automatically launches claim operations based on GCL and room expansion scores.
+ * @returns {void}
+ */
 function runAutoClaim() {
     // Auto-claim operations launch around RCL 8 usually, but we check GCL
     if (!global.State || !global.State.intel) return;
@@ -142,7 +156,11 @@ function runAutoClaim() {
     }
 }
 
-module.exports = function expansionManager() {
+/**
+ * Main expansion loop to evaluate room targets and deploy auto-claimers.
+ * @returns {void}
+ */
+module.exports = Profiler.wrap('expansionManager', function expansionManager() {
     try {
         if (Game.time % 100 === 0) {
             runEarlyPoaching();
@@ -152,4 +170,4 @@ module.exports = function expansionManager() {
     } catch (e) {
         console.error(`[ExpansionManager Error] ${e.stack}`);
     }
-};
+});

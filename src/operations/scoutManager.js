@@ -1,8 +1,14 @@
+const Profiler = require('../utils/profiler');
 /**
  * @file scoutManager.js
  * @description Manages scouting targets, intel gathering (sources, SK, highways, structures), and expansion scoring.
  */
 
+/**
+ * Determines a room's type (highway, SK, center, regular) based on coordinate math.
+ * @param {string} roomName - The name of the room.
+ * @returns {string} The computed room type.
+ */
 function getRoomType(roomName) {
     const coords = roomName.match(/[a-zA-Z]+|[0-9]+/g);
     const x = parseInt(coords[1], 10);
@@ -14,6 +20,12 @@ function getRoomType(roomName) {
     return 'regular';
 }
 
+/**
+ * Gathers current state info for a room and persists it to global.State.intel.
+ * Logs sources, minerals, structures, and controllers.
+ * @param {string} roomName - The name of the room to gather intel from.
+ * @returns {void}
+ */
 function gatherIntel(roomName) {
     if (!global.State) return;
     if (!global.State.intel) global.State.intel = new Map();
@@ -160,11 +172,15 @@ function getScoutTarget(scoutCreep) {
     return null;
 }
 
+/**
+ * Iterates all scouts globally to process their intel gathering and target assignments.
+ * @returns {void}
+ */
 function runScouts() {
     const allCreeps = global.State.creepsByRoom;
     if (!allCreeps) return;
 
-    for (const [roomName, roomCreeps] of allCreeps.entries()) {
+    for (const [, roomCreeps] of allCreeps.entries()) {
         const scouts = roomCreeps.get('scout');
         if (scouts && scouts.length > 0) {
             for (const scout of scouts) {
@@ -186,7 +202,11 @@ function runScouts() {
     }
 }
 
-module.exports = function scoutManager() {
+/**
+ * Main scout manager loop to process global scout assignments.
+ * @returns {void}
+ */
+module.exports = Profiler.wrap('scoutManager', function scoutManager() {
     try {
         // Run scouts every tick to assign targets and gather intel
         runScouts();
@@ -200,4 +220,4 @@ module.exports = function scoutManager() {
     } catch (e) {
         console.error(`[ScoutManager Error] ${e.stack}`);
     }
-};
+});
