@@ -98,6 +98,11 @@ function run(room) {
                         if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
                             if (creep.build(siteFound) === ERR_NOT_IN_RANGE) {
                                 movement.moveTo(creep, siteFound);
+                            } else if (creep.store.getUsedCapacity(RESOURCE_ENERGY) <= creep.getActiveBodyparts(WORK) * BUILD_POWER) {
+                                // Will run out of energy after this build tick or is out, switch to harvest next tick (or right now if 0)
+                                // Standard hysteresis usually requires checking if empty. Since `build` executes at end of tick, we can check.
+                                // It will naturally switch back to harvest if empty next tick.
+                                // Actually, if we are near source, we can't harvest and build at the same time.
                             }
                         } else {
                             if (creep.harvest(source) === ERR_NOT_IN_RANGE) {
@@ -110,7 +115,7 @@ function run(room) {
                         if (creep.harvest(source) === ERR_NOT_IN_RANGE) {
                             movement.moveTo(creep, source);
                         } else {
-                            // Containerless mining logic
+                            // Containerless mining logic: harvest and drop
                             if (creep.store.getFreeCapacity() === 0) {
                                 creep.drop(RESOURCE_ENERGY);
                             }
