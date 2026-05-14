@@ -1,4 +1,5 @@
 const ROLE_PRIORITIES = new Map([
+    ['emergencyBuilder', 115],
     ['reserver', 110],
     ['rampartMelee', 105],
     ['harvester', 100],

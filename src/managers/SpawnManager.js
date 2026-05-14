@@ -1,7 +1,7 @@
-const planner = require('./planner');
+const planner = require('../colonies/planner');
 const BodyCalc = require('../utils/bodyCalc');
-const SpawnQueueManager = require('../managers/SpawnQueueManager');
-const UpgraderManager = require('../managers/UpgraderManager');
+const SpawnQueueManager = require('./SpawnQueueManager');
+const UpgraderManager = require('./UpgraderManager');
 
 module.exports = {
     /**
@@ -47,10 +47,21 @@ module.exports = {
                 }
             }
 
-            // Spawn harvesters first
+            // Handle death spirals (no harvesters, low energy)
             const sources = global.State.sourcesByRoom.get(room.name);
             const sourceCount = sources ? sources.length : 1;
 
+            if (harvesterCount === 0 && spawnLedger.getAvailableEnergy() < 300 && room.energyCapacityAvailable >= 300) {
+                // If we have less than 300 energy and no harvesters, we might be in a death spiral.
+                // Spawn an emergency builder (a small worker) to harvest energy directly to spawn.
+                const body = [WORK, CARRY, MOVE];
+                const cost = 200;
+                if (spawnLedger.canSpawn(cost)) {
+                    SpawnQueueManager.requestSpawn(room.name, 'emergencyBuilder', body, 'emergency_' + Game.time, { memory: { role: 'worker', colony: room.name } }, cost);
+                }
+            }
+
+            // Spawn harvesters first
             if (harvesterCount < sourceCount) {
                 const energyAvailable = spawnLedger.getAvailableEnergy();
                 const calcCapacity = (harvesterCount === 0 && energyAvailable < capacity && energyAvailable >= 250) ? energyAvailable : capacity;

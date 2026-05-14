@@ -1,5 +1,5 @@
 const SpawnLedger = require('./spawnLedger');
-const spawnManager = require('./spawnManager');
+const spawnManager = require('../managers/SpawnManager');
 const planner = require('./planner');
 const ConstructionManager = require('../managers/ConstructionManager');
 const workerManager = require('../managers/workerManager');
