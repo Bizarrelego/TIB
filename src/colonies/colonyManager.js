@@ -29,23 +29,6 @@ const reserver = require('../roles/reserver');
  */
 module.exports = function colonyManager() {
     for (const room of Object.values(Game.rooms)) {
-        if (room.fatigue > 0) continue;
-
-        if (global.State.sourcesByRoom) {
-            const sources = global.State.sourcesByRoom.get(room.name) || [];
-            for (let i = 0; i < sources.length; i++) {
-                const source = sources[i];
-                if (source.sleep && Game.time < source.nextRegenTick) continue;
-
-                if (source.energy === 0) {
-                    source.sleep = true;
-                    source.nextRegenTick = Game.time + source.ticksToRegeneration;
-                } else {
-                    source.sleep = false;
-                }
-            }
-        }
-
         if (room.controller && room.controller.my === true) {
             // Instantiate SpawnLedger globally for the room per tick
             const spawnLedger = new SpawnLedger(room);
