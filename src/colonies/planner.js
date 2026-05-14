@@ -109,9 +109,13 @@ module.exports = {
             }
 
             const anchor = plannerState.get('anchor');
-            let activeSites = sites.length;
             const rcl = room.controller.level;
             const structuresMap = global.State.structuresByRoom.get(room.name) || new Map();
+            const terrain = global.State.roomTerrain.get(room.name);
+
+            // Initialize plannedStructures map
+            plannerState.set('plannedStructures', new Map());
+            const plannedStructures = plannerState.get('plannedStructures');
 
             const buildOrder = [
                 STRUCTURE_SPAWN,
@@ -144,32 +148,16 @@ module.exports = {
 
                 const positions = TIGGA_STAMP.get(structType);
 
-                let existingCount = 0;
-                const existingStructs = structuresMap.get(structType) || [];
-                existingCount += existingStructs.length;
-
-                for(let s=0; s<sites.length; s++) {
-                    if(sites[s].structureType === structType) {
-                        existingCount++;
-                    }
-                }
-
-                if (existingCount >= limit && structType !== STRUCTURE_ROAD) continue;
-
                 for (let j = 0; j < positions.length; j++) {
-                    if (activeSites >= 5) return;
-
-                    let currentCount = (structuresMap.get(structType) || []).length;
-                    for(let s=0; s<sites.length; s++) {
-                        if(sites[s].structureType === structType) currentCount++;
-                    }
-                    if (currentCount >= limit && structType !== STRUCTURE_ROAD) break;
-
                     const posOffset = positions[j];
                     const tx = anchor.x + posOffset[0];
                     const ty = anchor.y + posOffset[1];
 
+                    // Ensure within boundaries
                     if (tx < 2 || tx > 47 || ty < 2 || ty > 47) continue;
+
+                    // Check terrain
+                    if (terrain.get(tx, ty) === TERRAIN_MASK_WALL) continue;
 
                     let blocked = false;
                     let alreadyHasStruct = false;
@@ -196,16 +184,24 @@ module.exports = {
 
                     for (let s = 0; s < sites.length; s++) {
                         if (sites[s].pos.x === tx && sites[s].pos.y === ty) {
-                            blocked = true;
+                            if (sites[s].structureType === structType) {
+                                alreadyHasStruct = true;
+                            } else {
+                                blocked = true;
+                            }
                             break;
                         }
                     }
 
+                    if (alreadyHasStruct) continue;
+
                     if (!blocked) {
-                        const res = room.createConstructionSite(tx, ty, structType);
-                        if (res === OK) {
-                            activeSites++;
-                        }
+                        const posKey = `${tx},${ty}`;
+                        // Add to planned structures map, no construction site created yet.
+                        plannedStructures.set(posKey, {
+                            pos: new RoomPosition(tx, ty, room.name),
+                            type: structType
+                        });
                     }
                 }
             }
