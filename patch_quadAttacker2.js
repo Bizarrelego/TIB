@@ -1,4 +1,6 @@
-/**
+const fs = require('fs');
+
+const replacement = `/**
  * @file quadAttacker.js
  * @description Atomic lockstep movement. Works with quadHealer.
  */
@@ -47,8 +49,12 @@ module.exports = {
                 }
 
             } catch (e) {
-                console.error(`[quadAttacker Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
+                console.error(\`[quadAttacker Error] Room \${room.name}, Creep \${creep.name}: \${e.stack}\`);
             }
         }
     }
 };
+`;
+
+fs.writeFileSync('src/roles/quadAttacker.js', replacement);
+console.log('Patched quadAttacker.js with full implementation');

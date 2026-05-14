@@ -1,4 +1,3 @@
-const TrafficManager = require('../traffic/trafficManager');
 const movement = require('../utils/movement');
 const Profiler = require('../utils/profiler');
 
@@ -128,16 +127,7 @@ class CombatManager {
      * @param {number} direction
      */
     static atomicQuadMove(quad, direction) {
-        if (!quad || quad.length === 0) return;
-
-        // Check if any member is fatigued
-        const anyFatigued = quad.some(creep => creep.fatigue > 0);
-
-        if (!anyFatigued) {
-            for (const creep of quad) {
-                TrafficManager.registerMove(creep, direction);
-            }
-        }
+        movement.atomicQuadMove(quad, direction);
     }
 
     /**
