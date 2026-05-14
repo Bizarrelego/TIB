@@ -1,6 +1,6 @@
-const intelManager = require('./intel');
-const expansionManager = require('./expansion');
-const offenseManager = require('./offense');
+const intelManager = require('../operations/intel');
+const expansionManager = require('../operations/expansion');
+const offenseManager = require('../operations/offense');
 const scoutManager = require('./scoutManager');
 
 module.exports = function operationsManager() {

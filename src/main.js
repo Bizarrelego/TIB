@@ -1,8 +1,8 @@
 const { CacheRegistry } = require('./os/cache');
-const discoveryManager = require('./state/discoveryManager');
+const discoveryManager = require('./managers/discoveryManager');
 const stateScanner = require('./state/stateScanner');
-const colonyManager = require('./colonies/colonyManager');
-const operationsManager = require('./operations/operationsManager');
+const colonyManager = require('./managers/colonyManager');
+const operationsManager = require('./managers/operationsManager');
 const trafficManager = require('./traffic/trafficManager');
 
 module.exports.loop = function () {
