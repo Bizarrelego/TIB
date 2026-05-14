@@ -32,7 +32,11 @@ function run(room) {
                 }
             }
 
-            // 2. Execute Assigned Sub-tick Intents
+            // Note: The execution of the withdraw() or transfer() intent is handled by TrafficManager's
+            // `executeIntents()` pipeline ledger mechanism.
+            // The LogisticsManager sets the pipeline locks.
+
+            // For creeps that may be temporarily out of sync, we keep the fallback execution here:
             if (
                 state === 'fill_link' || state === 'empty_link' ||
                 state === 'fill_terminal' || state === 'empty_terminal' ||

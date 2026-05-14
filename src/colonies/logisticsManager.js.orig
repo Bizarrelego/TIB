@@ -99,10 +99,10 @@ const LogisticsManager = {
 
             const needyStructures = [];
             for (let i = 0; i < spawns.length; i++) {
-                if (spawns[i].store.getFreeCapacity(RESOURCE_ENERGY) > 0) { needyStructures.push(spawns[i]); }
+                if (spawns[i].store.getFreeCapacity(RESOURCE_ENERGY) > 0) needyStructures.push(spawns[i]);
             }
             for (let i = 0; i < extensions.length; i++) {
-                if (extensions[i].store.getFreeCapacity(RESOURCE_ENERGY) > 0) { needyStructures.push(extensions[i]); }
+                if (extensions[i].store.getFreeCapacity(RESOURCE_ENERGY) > 0) needyStructures.push(extensions[i]);
             }
 
             const needsEmergencyRefill = needyStructures.length > 0 && storages.length > 0 && (spawns.every(s => s.store.getUsedCapacity(RESOURCE_ENERGY) === 0));
