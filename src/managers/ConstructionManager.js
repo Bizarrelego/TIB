@@ -1,3 +1,4 @@
+const Profiler = require('../utils/profiler');
 const STRUCTURE_PRIORITIES = require('../constants/structurePriorities');
 
 const MAX_CONSTRUCTION_SITES = 5;
@@ -5,13 +6,15 @@ const MAX_CONSTRUCTION_SITES = 5;
 module.exports = {
     /**
      * Translates planned structures into actual ConstructionSites.
-     * @param {Room} room
+     * Enforces batched construction limits and structure priorities.
+     *
+     * @param {Room} room - The room object to run the construction manager for.
+     * @returns {void}
      */
-    run: function(room) {
+    run: Profiler.wrap('ConstructionManager.run', function(room) {
         try {
-            // Respect batched construction limit
+            // Get current active sites
             const sites = global.State.sitesByRoom.get(room.name) || [];
-            if (sites.length >= MAX_CONSTRUCTION_SITES) return;
 
             const plannerState = global.State.roomPlanner && global.State.roomPlanner.get(room.name);
             if (!plannerState) return;
@@ -80,15 +83,49 @@ module.exports = {
                 return pB - pA; // Descending order
             });
 
+            // Sort existing sites ascending by priority to find lowest priority site easily
+            const activeSitesSorted = [...sites].sort((a, b) => {
+                const pA = STRUCTURE_PRIORITIES.get(a.structureType) || STRUCTURE_PRIORITIES.get('default');
+                const pB = STRUCTURE_PRIORITIES.get(b.structureType) || STRUCTURE_PRIORITIES.get('default');
+                return pA - pB; // Ascending order
+            });
+
             // Iterate and create construction sites
             let sitesCreated = 0;
             let currentActiveSites = sites.length;
 
             for (let i = 0; i < toBuild.length; i++) {
-                if (currentActiveSites >= MAX_CONSTRUCTION_SITES) break;
                 if (sitesCreated >= 3) break; // Create up to 3 per tick to spread CPU cost
 
                 const structToBuild = toBuild[i];
+
+                if (currentActiveSites >= MAX_CONSTRUCTION_SITES) {
+                    if (activeSitesSorted.length > 0) {
+                        const lowestSite = activeSitesSorted[0];
+                        const plannedPriority = STRUCTURE_PRIORITIES.get(structToBuild.type) || STRUCTURE_PRIORITIES.get('default');
+                        const lowestPriority = STRUCTURE_PRIORITIES.get(lowestSite.structureType) || STRUCTURE_PRIORITIES.get('default');
+
+                        // Pause the lowest priority site if the planned one is strictly more important
+                        if (plannedPriority > lowestPriority) {
+                            if (lowestSite.remove() === OK) {
+                                // Add back to planned structures to resume later
+                                const newId = 'paused_' + Math.floor(Math.random() * 1000000);
+                                plannedStructures.set(newId, {
+                                    pos: { x: lowestSite.pos.x, y: lowestSite.pos.y },
+                                    type: lowestSite.structureType
+                                });
+                                activeSitesSorted.shift(); // Remove from our sorted array
+                                currentActiveSites--;
+                            } else {
+                                break; // Failed to remove, break out
+                            }
+                        } else {
+                            break; // No higher priority replacements possible
+                        }
+                    } else {
+                        break;
+                    }
+                }
 
                 // Re-check limits as we might have added same type in this loop
                 let limit = 0;
@@ -120,5 +157,5 @@ module.exports = {
         } catch (e) {
             console.log(`[ConstructionManager Error] Room ${room.name}: ${e.stack}`);
         }
-    }
+    })
 };
