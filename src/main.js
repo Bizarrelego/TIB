@@ -2,13 +2,22 @@ const { CacheRegistry } = require('./os/cache');
 const RawMemoryManager = require('./os/RawMemoryManager');
 const globalState = require('./state/globalState');
 const roomEventManager = require('./managers/RoomEventManager');
-const discoveryManager = require('./state/discoveryManager');
-const stateScanner = require('./state/stateScanner');
-const colonyManager = require('./colonies/colonyManager');
+let discoveryManager = require('./state/discoveryManager');
+let stateScanner = require('./state/stateScanner');
+const Profiler = require('./utils/profiler');
+
+const colonyManager = Profiler.wrap('colonyManager', require('./colonies/colonyManager'));
 const operationsManager = require('./operations/operationsManager'); // High-level orchestrator
 const trafficManager = require('./traffic/trafficManager');
 const movement = require('./utils/movement');
+
 const EnergyRequestManager = require('./managers/EnergyRequestManager');
+Profiler.wrapClass('EnergyRequestManager', EnergyRequestManager);
+
+if (trafficManager.run) trafficManager.run = Profiler.wrap('trafficManager.run', trafficManager.run);
+if (trafficManager.executeIntents) trafficManager.executeIntents = Profiler.wrap('trafficManager.executeIntents', trafficManager.executeIntents);
+if (discoveryManager) discoveryManager = Profiler.wrap('discoveryManager', discoveryManager);
+if (stateScanner) stateScanner = Profiler.wrap('stateScanner', stateScanner);
 
 module.exports.loop = function () {
     // Initialize RawMemory segments
@@ -117,4 +126,7 @@ module.exports.loop = function () {
     } catch (e) {
         console.log(`[Phase 6 Error] Intents & Sleep: ${e.stack}`);
     }
+
+    // Profiler Report
+    Profiler.report();
 };
