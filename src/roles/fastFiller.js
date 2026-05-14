@@ -34,21 +34,25 @@ function run(room) {
             // `executeIntents()` pipeline ledger mechanism.
             // The LogisticsManager sets the pipeline locks.
 
-            // For creeps that may be temporarily out of sync, we keep the fallback execution here:
-            if (state === 'emptying' && targetId) {
-                if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                    const tgt = Game.getObjectById(targetId);
-                    if (tgt && creep.pos.isNearTo(tgt)) {
-                        creep.transfer(tgt, RESOURCE_ENERGY);
+            // To prevent double-execution, we only execute intents if the pipeline does not already hold a lock for us.
+            const hasPipelineLock = require('../traffic/trafficManager').checkPipeline(creep.id);
+            if (!hasPipelineLock) {
+                // For creeps that may be temporarily out of sync, we keep the fallback execution here:
+                if (state === 'emptying' && targetId) {
+                    if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                        const tgt = Game.getObjectById(targetId);
+                        if (tgt && creep.pos.isNearTo(tgt)) {
+                            creep.transfer(tgt, RESOURCE_ENERGY);
+                        }
                     }
+                } else if (state === 'filling' && sourceId) {
+                     if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                        const src = Game.getObjectById(sourceId);
+                        if (src && creep.pos.isNearTo(src)) {
+                            creep.withdraw(src, RESOURCE_ENERGY);
+                        }
+                     }
                 }
-            } else if (state === 'filling' && sourceId) {
-                 if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                    const src = Game.getObjectById(sourceId);
-                    if (src && creep.pos.isNearTo(src)) {
-                        creep.withdraw(src, RESOURCE_ENERGY);
-                    }
-                 }
             }
         } catch (e) {
             console.log(`[fastFiller Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);

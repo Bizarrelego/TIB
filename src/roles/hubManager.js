@@ -16,9 +16,6 @@ function run(room) {
             // Compatibility for both Map and standard object heap
             const heapIsMap = creep.heap instanceof Map;
             const parkPos = heapIsMap ? creep.heap.get('parkPos') : creep.heap.parkPos;
-            const state = heapIsMap ? creep.heap.get('state') : creep.heap.state;
-            const sourceId = heapIsMap ? creep.heap.get('sourceId') : creep.heap.sourceId;
-            const targetId = heapIsMap ? creep.heap.get('targetId') : creep.heap.targetId;
 
             // 1. Move to optimized park position
             if (parkPos) {
@@ -34,29 +31,10 @@ function run(room) {
 
             // Note: The execution of the withdraw() or transfer() intent is handled by TrafficManager's
             // `executeIntents()` pipeline ledger mechanism.
-            // The LogisticsManager sets the pipeline locks.
+            // The HubManager sets the pipeline locks.
 
-            // For creeps that may be temporarily out of sync, we keep the fallback execution here:
-            if (
-                state === 'fill_link' || state === 'empty_link' ||
-                state === 'fill_terminal' || state === 'empty_terminal' ||
-                state === 'fill_storage' || state === 'empty_storage'
-            ) {
-                const srcId = sourceId;
-                const tgtId = targetId;
-
-                if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
-                    const src = Game.getObjectById(srcId);
-                    if (src && creep.pos.isNearTo(src)) {
-                        creep.withdraw(src, RESOURCE_ENERGY);
-                    }
-                } else {
-                    const tgt = Game.getObjectById(tgtId);
-                    if (tgt && creep.pos.isNearTo(tgt)) {
-                        creep.transfer(tgt, RESOURCE_ENERGY);
-                    }
-                }
-            }
+            // Fallback execution removed to rely exclusively on TrafficManager pipeline locks
+            // and avoid double-execution.
         } catch (e) {
             console.log(`[hubManager Role Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
         }
