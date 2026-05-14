@@ -27,7 +27,19 @@ class SpawnQueueManager {
         if (!SpawnQueueManager.globalQueue.has(roomName)) {
             SpawnQueueManager.globalQueue.set(roomName, []);
         }
-        SpawnQueueManager.globalQueue.get(roomName).push({ role, body, name, opts, cost });
+
+        const queue = SpawnQueueManager.globalQueue.get(roomName);
+        const targetRoom = opts && opts.memory ? opts.memory.targetRoom : undefined;
+
+        // Prevent duplicate requests
+        const isDuplicate = queue.some(req =>
+            req.role === role &&
+            (req.opts && req.opts.memory ? req.opts.memory.targetRoom : undefined) === targetRoom
+        );
+
+        if (!isDuplicate) {
+            queue.push({ role, body, name, opts, cost });
+        }
     }
 
     /**
@@ -70,21 +82,9 @@ class SpawnQueueManager {
     }
 
     /**
-     * Adds a spawn request to the queue
-     * @param {string} role
-     * @param {Array<string>} body
-     * @param {string} name
-     * @param {Object} opts
-     * @param {number} cost
-     */
-    add(role, body, name, opts, cost) {
-        this.queue.push({ role, body, name, opts, cost });
-    }
-
-    /**
      * Processes the queue, prioritizing the highest priority request.
      * Prevents spawn blocking by stalling if the highest priority request cannot be afforded.
-     * @param {StructureSpawn} spawn The spawn to execute the request on
+     * @param {StructureSpawn[]} spawns The spawns to execute the requests on
      * @param {Object} spawnLedger The ledger to verify and reserve energy
      */
     process(spawns, spawnLedger) {
@@ -93,20 +93,17 @@ class SpawnQueueManager {
         }
         if (spawns.length === 0) return;
         const roomName = spawns[0].room.name;
-        // Pull requests from the global queue for this room
-        if (SpawnQueueManager.globalQueue.has(roomName)) {
-            const requests = SpawnQueueManager.globalQueue.get(roomName);
-            for (const req of requests) {
-                this.add(req.role, req.body, req.name, req.opts, req.cost);
-            }
-            SpawnQueueManager.globalQueue.delete(roomName);
+
+        if (!SpawnQueueManager.globalQueue.has(roomName)) {
+            return;
         }
 
-        if (this.queue.length === 0) return;
+        let queue = SpawnQueueManager.globalQueue.get(roomName);
+        if (queue.length === 0) return;
 
-        this.queue.sort((a, b) => {
-            const prioA = ROLE_PRIORITIES.get(a.role) || 0;
-            const prioB = ROLE_PRIORITIES.get(b.role) || 0;
+        queue.sort((a, b) => {
+            const prioA = ROLE_PRIORITIES.has(a.role) ? ROLE_PRIORITIES.get(a.role) : (ROLE_PRIORITIES.get('default') || 0);
+            const prioB = ROLE_PRIORITIES.has(b.role) ? ROLE_PRIORITIES.get(b.role) : (ROLE_PRIORITIES.get('default') || 0);
             return prioB - prioA;
         });
 
@@ -114,8 +111,8 @@ class SpawnQueueManager {
         if (availableSpawns.length === 0) return;
 
         let i = 0;
-        while (i < this.queue.length && availableSpawns.length > 0) {
-            const request = this.queue[i];
+        while (i < queue.length && availableSpawns.length > 0) {
+            const request = queue[i];
 
             if (!spawnLedger.canSpawn(request.cost)) {
                 // If we cannot afford the highest priority request, skip and return to prevent lower-priority
@@ -127,7 +124,7 @@ class SpawnQueueManager {
             const result = spawnLedger.requestSpawn(spawn, request.body, request.name, request.opts, request.cost);
 
             if (result === OK) {
-                this.queue.splice(i, 1); // remove from queue
+                queue.splice(i, 1); // remove from queue
                 availableSpawns.shift(); // remove from available spawns
             } else {
                 // if it failed for some reason other than energy (e.g. invalid body), maybe skip it,
