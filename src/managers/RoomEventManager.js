@@ -10,7 +10,7 @@ function roomEventManager() {
     if (!global.State || !global.State.scannedRooms) return;
 
     for (const roomName of global.State.scannedRooms) {
-        const events = global.State.getEvents(roomName);
+        const events = global.State.getEvents ? global.State.getEvents(roomName) : (global.State.eventCache.get(roomName) || []);
         if (!events || events.length === 0) continue;
 
         for (const event of events) {
