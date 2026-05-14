@@ -1,0 +1,53 @@
+name: Issue Dispatcher (Jules)
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  dispatch-jules:
+    if: github.event.label.name == 'jules-approved'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Jules Prompt
+        run: |
+          (
+            echo "SYSTEM CONSTRAINTS - STRICTLY ENFORCED:"
+            echo "Follow all rules in AGENTS.md. Zero Native Polling in tick loops."
+            echo "========================================="
+            echo "YOUR EXACT TASK IS TO RESOLVE THIS ISSUE:"
+            echo "Title: ${{ github.event.issue.title }}"
+            echo ""
+            echo "${{ github.event.issue.body }}"
+            echo ""
+            echo "Create the required files to satisfy these acceptance criteria."
+          ) > full_jules_prompt.txt
+
+      - name: Trigger Jules Execution
+        run: |
+          jq -n --rawfile prompt full_jules_prompt.txt '{
+            prompt: $prompt,
+            sourceContext: {
+              source: "sources/github/${{ github.repository }}",
+              githubRepoContext: {
+                startingBranch: "main"
+              }
+            },
+            automationMode: "AUTO_CREATE_PR"
+          }' > jules_payload.json
+          
+          curl -s -X POST https://jules.googleapis.com/v1alpha/sessions \
+          -H "Content-Type: application/json" \
+          -H "X-Goog-Api-Key: ${{ secrets.JULES_TOKEN }}" \
+          -d @jules_payload.json
+
+      - name: Acknowledge Dispatch
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          gh issue comment ${{ github.event.issue.number }} \
+            --repo ${{ github.repository }} \
+            --body "🚀 Task dispatched to Jules. A PR will be opened shortly."
+          
+          gh issue edit ${{ github.event.issue.number }} \
+            --repo ${{ github.repository }} \
+            --add-label "in-progress"
