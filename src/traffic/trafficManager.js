@@ -222,16 +222,25 @@ const TrafficManager = {
             if (!(global.State.swapRegistry instanceof Map)) global.State.swapRegistry = new Map();
             global.State.swapRegistry.clear();
 
+
             const currentPositions = new Map();
-            if (typeof Game !== 'undefined' && Game.creeps) {
-                for (const creepName in Game.creeps) {
-                    const creep = Game.creeps[creepName];
-                    currentPositions.set(`${creep.pos.roomName}_${creep.pos.x}_${creep.pos.y}`, creepName);
+            for (const roomName of global.State.scannedRooms || []) {
+                const roomCreeps = global.State.creepsByRoom.get(roomName);
+                if (roomCreeps) {
+                    for (const roleCreeps of roomCreeps.values()) {
+                        if (Array.isArray(roleCreeps)) {
+                            for (const creep of roleCreeps) {
+                                currentPositions.set(`${creep.pos.roomName}_${creep.pos.x}_${creep.pos.y}`, creep.name);
+                            }
+                        }
+                    }
                 }
             }
 
+
+
             for (const [creepName, intent] of global.State.trafficIntents.entries()) {
-                const { creep, targetPos, opts, originalPos } = intent;
+                const { creep, targetPos, originalPos } = intent;
                 if (!creep || !targetPos) continue;
 
                 let intendedNextPos = null;
@@ -240,14 +249,15 @@ const TrafficManager = {
 
                 if (dx <= 1 && dy <= 1 && creep.pos.roomName === targetPos.roomName) {
                     intendedNextPos = targetPos;
+                } else if (creep.heap && creep.heap.path && creep.heap.path.length > 0) {
+                    // Pull from pre-calculated CostMatrix path if available
+                    intendedNextPos = creep.heap.path[0];
                 } else {
-                    const pathInfo = PathFinder.search(creep.pos, { pos: targetPos, range: 1 }, opts);
-                    if (pathInfo && pathInfo.path && pathInfo.path.length > 0) {
-                        if (!creep.heap) creep.heap = {};
-                        creep.heap.path = pathInfo.path;
-                        intendedNextPos = pathInfo.path[0];
-                    }
+                     // Provide default intendedNextPos to skip heavy PathFinder inside loop
+                     // Since PathFinder is forbidden here.
+                     continue;
                 }
+
 
                 if (!intendedNextPos) continue;
                 intent.intendedNextPos = intendedNextPos;
@@ -289,8 +299,10 @@ const TrafficManager = {
                 if (global.State.swapRegistry.has(creep.name)) {
                     if (processedSwaps.has(creep.name)) continue;
 
+
                     const blockingCreepName = global.State.swapRegistry.get(creep.name);
-                    const blockingCreep = Game.creeps[blockingCreepName];
+                    const blockingCreep = global.State.creepLookup ? global.State.creepLookup.get(blockingCreepName) : Game.creeps[blockingCreepName];
+
 
                     if (blockingCreep) {
 
