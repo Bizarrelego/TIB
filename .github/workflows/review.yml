@@ -13,7 +13,7 @@ permissions:
 jobs:
   test-and-review:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -81,7 +81,7 @@ jobs:
             echo "${delimiter}"
           } >> "$GITHUB_ENV"
 
-      - name: Architect Review (With Fallback)
+      - name: Architect Review (With Retry & Fallback)
         id: gemini-check
         run: |
           jq -n --arg text "$REVIEW_TEXT" '{
@@ -102,33 +102,41 @@ jobs:
           
           MODELS=("gemini-2.5-flash" "gemini-3.1-flash-lite")
           SUCCESS=false
+          MAX_RETRIES=3
           
           for MODEL in "${MODELS[@]}"; do
             echo "Attempting review with $MODEL..."
             
-            HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://generativelanguage.googleapis.com/v1beta/models/$MODEL:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
-              -H 'Content-Type: application/json' \
-              -d @payload.json)
+            for ((i=1; i<=MAX_RETRIES; i++)); do
+              HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://generativelanguage.googleapis.com/v1beta/models/$MODEL:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
+                -H 'Content-Type: application/json' \
+                -d @payload.json)
+                
+              HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed '$d')
+              HTTP_STATUS=$(echo "$HTTP_RESPONSE" | tail -n 1)
               
-            HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed '$d')
-            HTTP_STATUS=$(echo "$HTTP_RESPONSE" | tail -n 1)
-            
-            if [ "$HTTP_STATUS" -eq 200 ]; then
-              CLEAN_TEXT=$(echo "$HTTP_BODY" | jq -r '.candidates[0].content.parts[0].text // empty')
-              if [[ -n "$CLEAN_TEXT" && "$CLEAN_TEXT" != "null" ]]; then
-                echo "Successfully generated review using $MODEL."
-                SUCCESS=true
-                break
+              if [ "$HTTP_STATUS" -eq 200 ]; then
+                CLEAN_TEXT=$(echo "$HTTP_BODY" | jq -r '.candidates[0].content.parts[0].text // empty')
+                if [[ -n "$CLEAN_TEXT" && "$CLEAN_TEXT" != "null" ]]; then
+                  echo "Successfully generated review using $MODEL."
+                  SUCCESS=true
+                  break 2 # Break out of both retry and model loops
+                else
+                  echo "::warning::Model returned empty response. Trying next model."
+                  break # Break retry loop, try next model
+                fi
+              elif [[ "$HTTP_STATUS" -eq 429 || "$HTTP_STATUS" -ge 500 ]]; then
+                echo "::warning::High usage/Error for $MODEL (HTTP $HTTP_STATUS). Retry $i/$MAX_RETRIES in $((i * 15))s..."
+                sleep $((i * 15))
+              else
+                echo "::error::API Error with $MODEL (HTTP $HTTP_STATUS): $HTTP_BODY"
+                break # Fatal error, try next model
               fi
-            elif [ "$HTTP_STATUS" -eq 429 ]; then
-              echo "::warning::Quota exceeded for $MODEL (HTTP 429). Falling back..."
-            else
-              echo "::error::API Error with $MODEL (HTTP $HTTP_STATUS): $HTTP_BODY"
-            fi
+            done
           done
           
           if [ "$SUCCESS" = false ]; then
-            echo "::error::All Gemini models failed or quotas exhausted."
+            echo "::error::All Gemini models failed or quotas exhausted after retries."
             exit 1
           fi
           
