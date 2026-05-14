@@ -6,6 +6,8 @@ const stateScanner = require('./state/stateScanner');
 const colonyManager = require('./colonies/colonyManager');
 const operationsManager = require('./operations/operationsManager'); // High-level orchestrator
 const trafficManager = require('./traffic/trafficManager');
+const movement = require('./utils/movement');
+const EnergyRequestManager = require('./managers/EnergyRequestManager');
 
 module.exports.loop = function () {
     // Initialize RawMemory segments
@@ -57,6 +59,22 @@ module.exports.loop = function () {
         } catch (e) {
             console.log(`[Phase 2 Error] Global State Scanner: ${e.stack}`);
         }
+    }
+
+    // Phase 2.5: Execution Gates
+    try {
+        EnergyRequestManager.handleSourceSleep();
+
+        if (global.State.creepsByRoom) {
+            for (const roomCreeps of global.State.creepsByRoom.values()) {
+                for (const [role, creepsArray] of roomCreeps.entries()) {
+                    const activeCreeps = creepsArray.filter(creep => !movement.checkFatigue(creep));
+                    roomCreeps.set(role, activeCreeps);
+                }
+            }
+        }
+    } catch (e) {
+        console.log(`[Phase 2.5 Error] Execution Gates: ${e.stack}`);
     }
 
     // Phase 3: Colonies
