@@ -58,7 +58,12 @@ function runTowerDrain() {
 
         const roomStructures = global.State.structuresByRoom ? global.State.structuresByRoom.get(roomName) || new Map() : new Map();
         const towers = roomStructures.get(STRUCTURE_TOWER) || [];
-        const enemyTowers = towers.filter(t => !t.my);
+        const enemyTowers = [];
+        for (let i = 0; i < towers.length; i++) {
+            if (!towers[i].my) {
+                enemyTowers.push(towers[i]);
+            }
+        }
 
         const hostiles = global.State.hostilesByRoom ? global.State.hostilesByRoom.get(roomName) || [] : [];
 

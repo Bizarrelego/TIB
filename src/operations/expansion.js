@@ -6,6 +6,43 @@ const Profiler = require('../utils/profiler');
 
 const SpawnQueueManager = require('../managers/SpawnQueueManager');
 
+function getAdjacentRooms(roomName) {
+    const coords = roomName.match(/([WE])([0-9]+)([NS])([0-9]+)/);
+    let hDir = coords[1];
+    let x = parseInt(coords[2], 10);
+    let vDir = coords[3];
+    let y = parseInt(coords[4], 10);
+    const neighbors = [];
+
+    const getNextCoord = (dir, val, delta) => {
+        let newVal = val + delta;
+        if (newVal < 0) {
+            newVal = Math.abs(newVal) - 1;
+            dir = dir === 'W' ? 'E' : (dir === 'E' ? 'W' : (dir === 'N' ? 'S' : 'N'));
+        }
+        return dir + newVal;
+    };
+
+    neighbors.push(getNextCoord(hDir, x, 0) + getNextCoord(vDir, y, -1));
+    neighbors.push(getNextCoord(hDir, x, 1) + getNextCoord(vDir, y, 0));
+    neighbors.push(getNextCoord(hDir, x, 0) + getNextCoord(vDir, y, 1));
+    neighbors.push(getNextCoord(hDir, x, -1) + getNextCoord(vDir, y, 0));
+
+    return neighbors;
+}
+
+function getRoomDistance(room1, room2) {
+    const c1 = room1.match(/([WE])([0-9]+)([NS])([0-9]+)/);
+    const c2 = room2.match(/([WE])([0-9]+)([NS])([0-9]+)/);
+
+    const x1 = c1[1] === 'W' ? -parseInt(c1[2], 10) : parseInt(c1[2], 10) + 1;
+    const y1 = c1[3] === 'N' ? -parseInt(c1[4], 10) : parseInt(c1[4], 10) + 1;
+    const x2 = c2[1] === 'W' ? -parseInt(c2[2], 10) : parseInt(c2[2], 10) + 1;
+    const y2 = c2[3] === 'N' ? -parseInt(c2[4], 10) : parseInt(c2[4], 10) + 1;
+
+    return Math.max(Math.abs(x1 - x2), Math.abs(y1 - y2));
+}
+
 /**
  * Runs early poaching operations to kill remote harvesters and steal energy from weak neighbors.
  * @returns {void}
@@ -16,16 +53,15 @@ function runEarlyPoaching() {
     // Logic to target weak neighbors and kill remote harvesters
     // Collect dropped energy to boost early game economy.
     // For now, look for unseen/unowned rooms with energy
-    for (const [roomName, room] of Object.entries(Game.rooms)) {
-        if (!room.controller || !room.controller.my) continue;
+    for (const [roomName, controller] of global.State.controllersByRoom.entries()) {
+        if (!controller || !controller.my) continue;
 
+        const room = controller.room;
         if (room.energyCapacityAvailable < 400) continue; // Basic gating
 
-        const exits = Game.map.describeExits(roomName);
-        if (!exits) continue;
-
-        for (const dir in exits) {
-            const neighborRoom = exits[dir];
+        const neighbors = getAdjacentRooms(roomName);
+        for (let i = 0; i < neighbors.length; i++) {
+            const neighborRoom = neighbors[i];
             const intel = global.State.intel.get(neighborRoom);
             if (intel && !intel.hostile && intel.type === 'regular' && intel.owner === null) {
                 // Check if we already have poachers
@@ -77,8 +113,8 @@ function runRemoteDenial() {
 
     if (targetRoom) {
         // Find a room to spawn the decoy
-        for (const roomName of Object.keys(Game.rooms)) {
-            const room = Game.rooms[roomName];
+        for (const [roomName, controller] of global.State.controllersByRoom.entries()) {
+            const room = controller.room;
             if (room.controller && room.controller.my && room.energyCapacityAvailable >= 50) {
                 let decoys = 0;
                 for (const creeps of global.State.creepsByRoom.values()) {
@@ -107,7 +143,14 @@ function runAutoClaim() {
     // Auto-claim operations launch around RCL 8 usually, but we check GCL
     if (!global.State || !global.State.intel) return;
 
-    const myRooms = Object.values(Game.rooms).filter(r => r.controller && r.controller.my);
+    const myRooms = [];
+    if (global.State.controllersByRoom) {
+        for (const controller of global.State.controllersByRoom.values()) {
+            if (controller && controller.my && controller.room) {
+                myRooms.push(controller.room);
+            }
+        }
+    }
     if (myRooms.length >= Game.gcl.level) return; // Cannot claim
 
     let bestTarget = null;
@@ -128,9 +171,9 @@ function runAutoClaim() {
         for (const room of myRooms) {
             if (room.energyCapacityAvailable < 650) continue; // Need CLAIM+MOVE
 
-            const route = Game.map.findRoute(room.name, bestTarget);
-            if (route !== ERR_NO_PATH && route.length < minRoute) {
-                minRoute = route.length;
+            const dist = getRoomDistance(room.name, bestTarget);
+            if (dist < minRoute) {
+                minRoute = dist;
                 closestRoom = room;
             }
         }
