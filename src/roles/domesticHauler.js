@@ -22,7 +22,7 @@ module.exports = {
                 if (creep.fatigue > 0) continue; // Fatigue gating
 
                 // Retirement Logic
-                if (creep.heap.retired) {
+                if (creep.heap && creep.heap.retired) {
                     const homeRoomName = creep.memory.homeRoom || room.name;
                     const structures = global.State.structuresByRoom.get(homeRoomName);
                     if (structures) {
@@ -55,17 +55,33 @@ module.exports = {
                     continue;
                 }
 
-                if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
-                    creep.heap.task = 'pickup';
-                } else if (creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
-                    creep.heap.task = 'transfer';
-                } else if (!creep.heap.task) {
-                    creep.heap.task = 'pickup'; // Default
+                creep.heap = creep.heap || {};
+                let task = creep.heap.state || creep.heap.task;
+
+                // If the logisticsManager assigned a state, use it as task priority
+                if (creep.heap.state) {
+                    task = creep.heap.state;
+                } else {
+                    // Fallback to legacy assignment
+                    if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+                        task = 'pickup';
+                        creep.heap.task = task;
+                    } else if (creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+                        task = 'transfer';
+                        creep.heap.task = task;
+                    } else if (!task) {
+                        task = 'pickup'; // Default
+                        creep.heap.task = task;
+                    }
                 }
 
-                if (creep.heap.task === 'transfer') {
-                    let target = null;
-                    const structures = global.State.structuresByRoom.get(room.name);
+                if (task === 'transfer') {
+                    let targetId = creep.heap.targetId;
+                    let target = targetId ? Game.getObjectById(targetId) : null;
+
+                    if (!target) {
+                        // Fallback logic
+                        const structures = global.State.structuresByRoom.get(room.name);
 
                     if (structures) {
                         // 1. Spawns / Extensions
@@ -119,7 +135,7 @@ module.exports = {
 
                         // 4. Containers
                         if (!target) {
-                            const containersMap = structures.get(STRUCTURE_CONTAINER);
+                            const containersMap = structures ? structures.get(STRUCTURE_CONTAINER) : null;
                             if (containersMap) {
                                 for (const container of containersMap.values()) {
                                     if (container.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
@@ -130,16 +146,28 @@ module.exports = {
                             }
                         }
                     }
+                    }
 
-                    if (target) {
+                    if (targetId === 'controller') {
+                        if (room.controller) {
+                            if (creep.pos.inRangeTo(room.controller, 3)) {
+                                creep.drop(RESOURCE_ENERGY);
+                            } else {
+                                movement.moveTo(creep, room.controller);
+                            }
+                        }
+                    } else if (target) {
                         if (creep.transfer(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
                             movement.moveTo(creep, target);
                         }
                     }
                 } else {
-                    let target = null;
+                    let dropId = creep.heap.dropId;
+                    let target = dropId ? Game.getObjectById(dropId) : null;
 
-                    // 1. Dropped Energy
+                    if (!target) {
+                        // Fallback logic
+                        // 1. Dropped Energy
                     const dropped = global.State.droppedByRoom.get(room.name);
                     if (dropped && dropped.length > 0) {
                         let minDistance = Infinity;
@@ -185,7 +213,7 @@ module.exports = {
 
                         // 4. Source Links
                         if (!target) {
-                            const linksMap = structures.get(STRUCTURE_LINK);
+                            const linksMap = structures ? structures.get(STRUCTURE_LINK) : null;
                             if (linksMap) {
                                 for (const link of linksMap.values()) {
                                     if (link.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
@@ -196,9 +224,10 @@ module.exports = {
                             }
                         }
                     }
+                    }
 
                     if (target) {
-                        if (target instanceof Resource) {
+                        if (target.amount !== undefined) {
                             if (creep.pickup(target) === ERR_NOT_IN_RANGE) {
                                 movement.moveTo(creep, target);
                             }
