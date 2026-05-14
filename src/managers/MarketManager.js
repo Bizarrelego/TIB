@@ -46,6 +46,13 @@ class MarketManager {
 
             if (filteredPrices.length === 0) continue;
 
+            const minPrice = Math.min(...filteredPrices);
+            const maxPrice = Math.max(...filteredPrices);
+
+            const validOrders = orders.filter(o => o.price >= minPrice && o.price <= maxPrice);
+
+            if (validOrders.length === 0) continue;
+
             // Calculate EMA (using a simple average of filtered prices for the current value, could be more complex based on historical data)
             const currentAvgPrice = filteredPrices.reduce((sum, price) => sum + price, 0) / filteredPrices.length;
 
@@ -61,15 +68,19 @@ class MarketManager {
             global.State.marketEMA.set(resourceType, ema);
 
             // Sort orders by price descending
-            orders.sort((a, b) => b.price - a.price);
+            validOrders.sort((a, b) => b.price - a.price);
 
-            for (const order of orders) {
+            for (const order of validOrders) {
                 // Sell if price is above EMA and spread is good enough to cover energy costs
                 if (order.price >= ema) {
+                    const spread = order.price - ema;
                     const energyCost = Game.market.calcTransactionCost(MIN_SELL_AMOUNT, room.name, order.roomName);
+                    const transferCostPerUnit = energyCost / MIN_SELL_AMOUNT;
+
                     // Basic sanity check: Is the energy cost worth the trade?
                     // (Assuming energy is worth roughly 1 credit for this simple example, can be adjusted)
-                    if (terminal.store[RESOURCE_ENERGY] >= energyCost) {
+                    // Only execute trades if the spread exceeds transfer costs
+                    if (spread > transferCostPerUnit && terminal.store[RESOURCE_ENERGY] >= energyCost) {
                          const amountToSell = Math.min(amount, order.remainingAmount, MIN_SELL_AMOUNT);
                          const result = Game.market.deal(order.id, amountToSell, room.name);
                          if (result === OK) {
