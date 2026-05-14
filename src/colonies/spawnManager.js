@@ -178,6 +178,61 @@ module.exports = {
             }
         }
 
+        // Remote Economy Spawning Logic (RCL >= 3)
+        if (room.controller.level >= 3 && global.State.intel) {
+            const exits = Game.map.describeExits(room.name);
+            if (exits) {
+                for (const direction in exits) {
+                    const targetRoomName = exits[direction];
+                    const intel = global.State.intel.get(targetRoomName);
+
+                    if (intel && intel.type === 'regular' && !intel.hostile) {
+                        const reservers = roomCreeps ? (roomCreeps.get('reserver') || []) : [];
+                        const activeReserver = reservers.find(c => c.memory.targetRoom === targetRoomName);
+
+                        if (!activeReserver && intel.reservation !== 'jules') {
+                            const body = capacity >= 1300 ? [CLAIM, CLAIM, MOVE, MOVE] : [CLAIM, MOVE];
+                            const cost = capacity >= 1300 ? 1300 : 650;
+                            if (capacity >= cost) {
+                                queue.add('reserver', body, 'reserver_' + Game.time, {
+                                    memory: { role: 'reserver', colony: room.name, targetRoom: targetRoomName }
+                                }, cost);
+                            }
+                        }
+
+                        const sourcesCount = intel.sources || 0;
+                        if (sourcesCount > 0 && (intel.reservation === 'jules' || activeReserver)) {
+                            const remoteHarvesters = roomCreeps ? (roomCreeps.get('remoteHarvester') || []) : [];
+                            const roomRemoteHarvesters = remoteHarvesters.filter(c => c.memory.targetRoom === targetRoomName);
+
+                            if (roomRemoteHarvesters.length < sourcesCount) {
+                                const body = [WORK, WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE, MOVE];
+                                const cost = 700;
+                                if (capacity >= cost) {
+                                    queue.add('remoteHarvester', body, 'remoteHarvester_' + Game.time, {
+                                        memory: { role: 'remoteHarvester', colony: room.name, targetRoom: targetRoomName }
+                                    }, cost);
+                                }
+                            }
+
+                            const remoteHaulers = roomCreeps ? (roomCreeps.get('remoteHauler') || []) : [];
+                            const roomRemoteHaulers = remoteHaulers.filter(c => c.memory.remoteRoom === targetRoomName);
+
+                            if (roomRemoteHaulers.length < roomRemoteHarvesters.length * 2) {
+                                const body = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE];
+                                const cost = 450;
+                                if (capacity >= cost) {
+                                    queue.add('remoteHauler', body, 'remoteHauler_' + Game.time, {
+                                        memory: { role: 'remoteHauler', colony: room.name, homeRoom: room.name, remoteRoom: targetRoomName }
+                                    }, cost);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Process the queue
         queue.process(spawn, spawnLedger);
     }

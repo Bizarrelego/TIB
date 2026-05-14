@@ -38,15 +38,24 @@ function run(room) {
             }
 
             // In the target room and off the exit.
-            const targetSourceId = creep.memory.targetSourceId;
+            let targetSourceId = creep.memory.targetSourceId;
+            if (!targetSourceId) {
+                const roomSources = global.State.sourcesByRoom.get(creep.room.name) || [];
+                const assignedSources = remoteHarvesters.map(c => c.memory.targetSourceId).filter(id => id);
+
+                for (const src of roomSources) {
+                    if (!assignedSources.includes(src.id)) {
+                        targetSourceId = src.id;
+                        creep.memory.targetSourceId = src.id;
+                        break;
+                    }
+                }
+            }
+
             if (!targetSourceId) continue;
 
             const source = Game.getObjectById(targetSourceId);
-            if (!source) {
-                // We might not have vision yet, but we are in the room. Unlikely since we're in the room,
-                // but just in case, we can't do anything without the source.
-                continue;
-            }
+            if (!source) continue;
 
             const containerId = creep.memory.containerId;
             let container = null;
