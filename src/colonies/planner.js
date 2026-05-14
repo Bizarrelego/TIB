@@ -110,100 +110,52 @@ module.exports = {
 
             const anchor = plannerState.get('anchor');
             const rcl = room.controller.level;
-            const structuresMap = global.State.structuresByRoom.get(room.name) || new Map();
-            const terrain = global.State.roomTerrain.get(room.name);
 
-            // Initialize plannedStructures map
-            plannerState.set('plannedStructures', new Map());
-            const plannedStructures = plannerState.get('plannedStructures');
+            const lastRcl = plannerState.get('lastRcl');
+            if (lastRcl !== rcl || !plannerState.has('plannedStructures')) {
+                plannerState.set('lastRcl', rcl);
 
-            const buildOrder = [
-                STRUCTURE_SPAWN,
-                STRUCTURE_EXTENSION,
-                STRUCTURE_STORAGE,
-                STRUCTURE_TOWER,
-                STRUCTURE_LINK,
-                STRUCTURE_TERMINAL,
-                'factory',
-                STRUCTURE_ROAD
-            ];
+                const plannedStructures = new Map();
+                const terrain = global.State.roomTerrain.get(room.name);
 
-            const limitMap = new Map([
-                [STRUCTURE_SPAWN, CONTROLLER_STRUCTURES[STRUCTURE_SPAWN][rcl]],
-                [STRUCTURE_EXTENSION, CONTROLLER_STRUCTURES[STRUCTURE_EXTENSION][rcl]],
-                [STRUCTURE_STORAGE, CONTROLLER_STRUCTURES[STRUCTURE_STORAGE][rcl]],
-                [STRUCTURE_TOWER, CONTROLLER_STRUCTURES[STRUCTURE_TOWER][rcl]],
-                [STRUCTURE_LINK, CONTROLLER_STRUCTURES[STRUCTURE_LINK][rcl]],
-                [STRUCTURE_TERMINAL, CONTROLLER_STRUCTURES[STRUCTURE_TERMINAL][rcl]],
-                ['factory', CONTROLLER_STRUCTURES['factory'][rcl]],
-                [STRUCTURE_ROAD, 2500]
-            ]);
-
-            for (let i = 0; i < buildOrder.length; i++) {
-                const structType = buildOrder[i];
-                if (!TIGGA_STAMP.has(structType)) continue;
-
-                let limit = limitMap.get(structType) || 0;
-                if (limit === 0) continue;
-
-                const positions = TIGGA_STAMP.get(structType);
-
-                for (let j = 0; j < positions.length; j++) {
-                    const posOffset = positions[j];
-                    const tx = anchor.x + posOffset[0];
-                    const ty = anchor.y + posOffset[1];
-
-                    // Ensure within boundaries
-                    if (tx < 2 || tx > 47 || ty < 2 || ty > 47) continue;
-
-                    // Check terrain
-                    if (terrain.get(tx, ty) === TERRAIN_MASK_WALL) continue;
-
-                    let blocked = false;
-                    let alreadyHasStruct = false;
-
-                    // Replaces room.lookForAt
-                    // Iterate over structuresMap
-                    for (const [sType, sArray] of structuresMap) {
-                        for (let k = 0; k < sArray.length; k++) {
-                            const struct = sArray[k];
-                            if (struct.pos.x === tx && struct.pos.y === ty) {
-                                if (sType === structType) {
-                                    alreadyHasStruct = true;
-                                    break;
-                                }
-                                if (sType !== STRUCTURE_ROAD && sType !== STRUCTURE_RAMPART) {
-                                    if (structType !== STRUCTURE_ROAD) {
-                                        blocked = true;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if (alreadyHasStruct) continue;
-
-                    for (let s = 0; s < sites.length; s++) {
-                        if (sites[s].pos.x === tx && sites[s].pos.y === ty) {
-                            if (sites[s].structureType === structType) {
-                                alreadyHasStruct = true;
-                            } else {
-                                blocked = true;
-                            }
-                            break;
-                        }
+                for (const [structureType, offsets] of TIGGA_STAMP.entries()) {
+                    let rclLimit = 0;
+                    if (structureType === STRUCTURE_CONTAINER) {
+                        rclLimit = 5;
+                    } else if (structureType === STRUCTURE_ROAD) {
+                        rclLimit = 2500;
+                    } else if (CONTROLLER_STRUCTURES[structureType]) {
+                        rclLimit = CONTROLLER_STRUCTURES[structureType][rcl] || 0;
                     }
 
-                    if (alreadyHasStruct) continue;
+                    if (rclLimit === 0) continue;
 
-                    if (!blocked) {
-                        const posKey = `${tx},${ty}`;
-                        // Add to planned structures map, no construction site created yet.
-                        plannedStructures.set(posKey, {
-                            pos: new RoomPosition(tx, ty, room.name),
-                            type: structType
+                    let count = 0;
+
+                    for (let j = 0; j < offsets.length; j++) {
+                        if (structureType !== STRUCTURE_ROAD && count >= rclLimit) break;
+
+                        const dx = offsets[j][0];
+                        const dy = offsets[j][1];
+                        const plannedX = anchor.x + dx;
+                        const plannedY = anchor.y + dy;
+
+                        // Ensure within boundaries
+                        if (plannedX < 1 || plannedX > 48 || plannedY < 1 || plannedY > 48) continue;
+
+                        // Check terrain
+                        if (terrain.get(plannedX, plannedY) === TERRAIN_MASK_WALL) continue;
+
+                        const uniqueId = `${structureType}-${plannedX}-${plannedY}`;
+                        plannedStructures.set(uniqueId, {
+                            pos: new RoomPosition(plannedX, plannedY, room.name),
+                            type: structureType
                         });
+                        count++;
                     }
                 }
+
+                plannerState.set('plannedStructures', plannedStructures);
             }
         } catch (e) {
             console.log(`[Planner Error] Room ${room.name}: ${e.stack}`);
