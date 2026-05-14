@@ -1,3 +1,5 @@
+const STRUCTURE_PRIORITIES = require('../constants/structurePriorities');
+
 module.exports = {
     /**
      * Executes Top-Down Assignment for workers.
@@ -76,7 +78,23 @@ module.exports = {
                 }
             } else if (creep.heap.state === 'build') {
                 if (sites && sites.length > 0) {
-                    creep.heap.targetId = sites[0].id;
+                    let bestSite = null;
+                    let highestPriority = -Infinity;
+
+                    for (let i = 0; i < sites.length; i++) {
+                        const site = sites[i];
+                        const priority = STRUCTURE_PRIORITIES.get(site.structureType) || STRUCTURE_PRIORITIES.get('default');
+                        if (priority > highestPriority) {
+                            highestPriority = priority;
+                            bestSite = site;
+                        }
+                    }
+
+                    if (bestSite) {
+                        creep.heap.targetId = bestSite.id;
+                    } else {
+                        creep.heap.targetId = sites[0].id;
+                    }
                 } else {
                     creep.heap.state = 'upgrade'; // fallback
                     if (room.controller) {
