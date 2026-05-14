@@ -117,4 +117,8 @@ module.exports.loop = function () {
     } catch (e) {
         console.log(`[Phase 6 Error] Intents & Sleep: ${e.stack}`);
     }
+
+    // Profiler output
+    const Profiler = require('./utils/profiler');
+    Profiler.report();
 };

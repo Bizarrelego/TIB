@@ -28,20 +28,25 @@ class Profiler {
 
             let stats = global.ProfilerStats.get(name);
             if (!stats) {
-                stats = { totalCpu: 0, calls: 0, avg: 0 };
+                stats = { totalCpu: 0, calls: 0, avg: 0, ticks: 0, lastTick: Game.time };
             }
 
             stats.totalCpu += cpuUsed;
             stats.calls += 1;
 
-            // Rolling average over 1000 calls to prevent memory bloat
-            if (stats.calls > 1000) {
-                stats.avg = stats.totalCpu / stats.calls;
+            if (stats.lastTick !== Game.time) {
+                stats.ticks += 1;
+                stats.lastTick = Game.time;
+            }
+
+            // Rolling average over 1000 ticks to prevent memory bloat
+            if (stats.ticks > 1000) {
+                stats.avg = stats.totalCpu / stats.ticks;
                 // Reset rolling window
                 stats.totalCpu = stats.avg;
-                stats.calls = 1;
+                stats.ticks = 1;
             } else {
-                stats.avg = stats.totalCpu / stats.calls;
+                stats.avg = stats.ticks === 0 ? stats.totalCpu : stats.totalCpu / stats.ticks;
             }
 
             global.ProfilerStats.set(name, stats);
@@ -54,6 +59,7 @@ class Profiler {
      */
     static report() {
         if (!global.ProfilerStats) return;
+        if (Game.cpu.bucket < 9000) return;
 
         console.log('--- Profiler Report ---');
         let sorted = Array.from(global.ProfilerStats.entries())

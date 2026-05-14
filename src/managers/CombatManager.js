@@ -1,5 +1,6 @@
 const TrafficManager = require('../traffic/trafficManager');
 const movement = require('../utils/movement');
+const Profiler = require('../utils/profiler');
 
 /**
  * @file CombatManager.js
@@ -211,6 +212,12 @@ class CombatManager {
         }
 
         return bestTarget;
+    }
+}
+
+for (const method of Object.getOwnPropertyNames(CombatManager)) {
+    if (typeof CombatManager[method] === 'function' && method !== 'constructor' && method !== 'prototype' && method !== 'name' && method !== 'length') {
+        CombatManager[method] = Profiler.wrap(`CombatManager.${method}`, CombatManager[method]);
     }
 }
 
