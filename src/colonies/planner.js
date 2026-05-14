@@ -142,12 +142,14 @@ module.exports = {
                         if (roomPositionUtils.isBuildable(room.name, targetPos.x, targetPos.y, structureType)) {
                             let alreadyExists = false;
 
-                            const structures = global.State.structuresByRoom ? (global.State.structuresByRoom.get(room.name) || []) : [];
-                            for (let i = 0; i < structures.length; i++) {
-                                const struct = structures[i];
-                                if (struct.pos.x === targetPos.x && struct.pos.y === targetPos.y && struct.structureType === structureType) {
-                                    alreadyExists = true;
-                                    break;
+                            const structuresByType = global.State.structuresByRoom ? (global.State.structuresByRoom.get(room.name) || new Map()) : new Map();
+                            const structsOfSameType = structuresByType.get(structureType);
+                            if (structsOfSameType) {
+                                for (const struct of structsOfSameType.values()) {
+                                    if (struct.pos.x === targetPos.x && struct.pos.y === targetPos.y) {
+                                        alreadyExists = true;
+                                        break;
+                                    }
                                 }
                             }
 
