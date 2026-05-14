@@ -31,6 +31,9 @@ module.exports = {
 
         if (colonyRemoteHarvesters.length > 0) {
             for (const creep of colonyRemoteHarvesters) {
+                // Ensure homeRoom and targetRoom are consistent
+                if (!creep.memory.homeRoom) creep.memory.homeRoom = room.name;
+
                 if (!creep.memory.targetSourceId && creep.room.name === creep.memory.targetRoom) {
                     const roomSources = global.State.sourcesByRoom.get(creep.room.name) || [];
                     const assignedSources = colonyRemoteHarvesters.map(c => c.memory.targetSourceId).filter(id => id);
@@ -42,11 +45,32 @@ module.exports = {
                         }
                     }
                 }
+
+                // Container lifecycle awareness for harvesters
+                if (creep.memory.containerId && Game.rooms[creep.memory.targetRoom]) {
+                    // Room is visible, check if container exists
+                    const container = Game.getObjectById(creep.memory.containerId);
+                    if (!container) {
+                        creep.memory.containerId = null; // Container destroyed or invalid
+                    }
+                }
             }
         }
 
         if (colonyRemoteHaulers.length > 0) {
             for (const creep of colonyRemoteHaulers) {
+                // Ensure homeRoom and remoteRoom are consistent
+                if (!creep.memory.homeRoom) creep.memory.homeRoom = room.name;
+
+                // Container lifecycle awareness for haulers
+                if (creep.memory.containerId && Game.rooms[creep.memory.remoteRoom]) {
+                    // Room is visible, check if container exists
+                    const container = Game.getObjectById(creep.memory.containerId);
+                    if (!container) {
+                        creep.memory.containerId = null; // Container destroyed or invalid
+                    }
+                }
+
                 if (!creep.memory.containerId && creep.room.name === creep.memory.remoteRoom) {
                     const structuresMap = global.State.structuresByRoom.get(creep.room.name);
                     if (structuresMap) {

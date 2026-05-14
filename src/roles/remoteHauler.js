@@ -98,14 +98,23 @@ function run(room) {
 
                 if (target) {
                     let result;
+                    let targetAmount = 0;
                     if (target instanceof Resource) {
                         result = creep.pickup(target);
+                        targetAmount = target.amount;
                     } else {
                         result = creep.withdraw(target, RESOURCE_ENERGY);
+                        targetAmount = target.store.getUsedCapacity(RESOURCE_ENERGY);
                     }
 
                     if (result === ERR_NOT_IN_RANGE) {
                         movement.moveTo(creep, target);
+                    } else if (result === OK) {
+                        // Check if this action will fill the creep
+                        const amountTransferred = Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), targetAmount);
+                        if (creep.store.getFreeCapacity(RESOURCE_ENERGY) - amountTransferred <= 0) {
+                            creep.memory.hauling = true;
+                        }
                     }
                 }
             } else {
@@ -131,34 +140,15 @@ function run(room) {
 
                 let target = null;
 
-                const spawns = global.State.spawnsByRoom.get(homeRoomName) || [];
-                const extensions = structuresMap.get(STRUCTURE_EXTENSION) || [];
-
-                // Critically low check
-                if (homeRoom && homeRoom.energyAvailable < homeRoom.energyCapacityAvailable) {
-                    for (let i = 0; i < spawns.length; i++) {
-                        if (spawns[i].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                            target = spawns[i];
-                            break;
-                        }
-                    }
-                    if (!target) {
-                        for (let i = 0; i < extensions.length; i++) {
-                            if (extensions[i].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                                target = extensions[i];
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                if (!target && !restrictStorageOutflow) {
+                // Priority 1: Storage
+                if (!restrictStorageOutflow) {
                     const storages = structuresMap.get(STRUCTURE_STORAGE) || [];
                     if (storages.length > 0 && storages[0].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
                         target = storages[0];
                     }
                 }
 
+                // Priority 2: Terminal
                 if (!target && !restrictStorageOutflow) {
                     const terminals = structuresMap.get(STRUCTURE_TERMINAL) || [];
                     if (terminals.length > 0 && terminals[0].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
@@ -166,21 +156,31 @@ function run(room) {
                     }
                 }
 
-                // Fallback to spawn/extension if storage/terminal are restricted or not found
+                // Priority 3: Spawn / Extension
                 if (!target) {
+                    const spawns = global.State.spawnsByRoom.get(homeRoomName) || [];
                     for (let i = 0; i < spawns.length; i++) {
                         if (spawns[i].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
                             target = spawns[i];
                             break;
                         }
                     }
-                    if (!target) {
-                        for (let i = 0; i < extensions.length; i++) {
-                            if (extensions[i].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                                target = extensions[i];
-                                break;
-                            }
+                }
+                if (!target) {
+                    const extensions = structuresMap.get(STRUCTURE_EXTENSION) || [];
+                    for (let i = 0; i < extensions.length; i++) {
+                        if (extensions[i].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                            target = extensions[i];
+                            break;
                         }
+                    }
+                }
+
+                // If no specific target, default to storage if it exists (even if we fallback here, it will just drop or block but that is fine)
+                if (!target) {
+                    const storages = structuresMap.get(STRUCTURE_STORAGE) || [];
+                    if (storages.length > 0) {
+                        target = storages[0];
                     }
                 }
 
