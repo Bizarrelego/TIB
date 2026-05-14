@@ -34,11 +34,8 @@ class SourceManager {
         if (!global.State || !global.State.scannedRooms) return;
 
         for (const roomName of global.State.scannedRooms) {
-            const room = Game.rooms[roomName];
-            if (!room) continue; // Only process visible rooms
-
             // Track sources
-            const sources = room.find(FIND_SOURCES);
+            const sources = global.State.sourcesByRoom.get(roomName) || [];
             for (let i = 0; i < sources.length; i++) {
                 const source = sources[i];
                 let data = globalState.sourceData.get(source.id);
@@ -65,7 +62,7 @@ class SourceManager {
             }
 
             // Track minerals
-            const minerals = room.find(FIND_MINERALS);
+            const minerals = global.State.mineralsByRoom.get(roomName) || [];
             for (let i = 0; i < minerals.length; i++) {
                 const mineral = minerals[i];
                 let data = globalState.sourceData.get(mineral.id);
