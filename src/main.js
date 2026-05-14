@@ -1,4 +1,5 @@
 const { CacheRegistry } = require('./os/cache');
+const RawMemoryManager = require('./os/RawMemoryManager');
 const globalState = require('./state/globalState');
 const discoveryManager = require('./state/discoveryManager');
 const stateScanner = require('./state/stateScanner');
@@ -7,6 +8,13 @@ const operationsManager = require('./operations/operationsManager'); // High-lev
 const trafficManager = require('./traffic/trafficManager');
 
 module.exports.loop = function () {
+    // Initialize RawMemory segments
+    try {
+        RawMemoryManager.init();
+    } catch (e) {
+        console.log(`[Phase 0 Error] RawMemoryManager: ${e.stack}`);
+    }
+
     // Rehydrate global state
     globalState.rehydrate();
 
