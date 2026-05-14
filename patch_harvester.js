@@ -1,4 +1,6 @@
-/**
+const fs = require('fs');
+
+const content = `/**
  * @file remoteHarvester.js
  * @description Harvests energy from a designated remote source.
  */
@@ -135,9 +137,12 @@ function run(room) {
             }
 
         } catch (e) {
-            console.error(`[remoteHarvester Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
+            console.error(\`[remoteHarvester Error] Room \${room.name}, Creep \${creep.name}: \${e.stack}\`);
         }
     }
 }
 
 module.exports = { run };
+`;
+
+fs.writeFileSync('src/roles/remoteHarvester.js', content);

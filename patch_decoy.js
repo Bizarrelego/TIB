@@ -1,4 +1,6 @@
-/**
+const fs = require('fs');
+
+const content = `/**
  * @file decoy.js
  * @description Parks on enemy sites to block builds. Kites defenders to waste CPU.
  */
@@ -58,8 +60,11 @@ module.exports = {
                     }
                 }
             } catch (e) {
-                console.error(`[decoy Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
+                console.error(\`[decoy Error] Room \${room.name}, Creep \${creep.name}: \${e.stack}\`);
             }
         }
     }
 };
+`;
+
+fs.writeFileSync('src/roles/decoy.js', content);
