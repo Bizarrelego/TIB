@@ -99,8 +99,60 @@ const TrafficManager = {
         const ledger = global.State.ledger;
         if (!ledger) return { used: 0, free: 0 };
 
-        const state = ledger.get(target.id) || { used: target.store ? target.store.getUsedCapacity(resourceType) : 0, cap: target.store ? target.store.getCapacity(resourceType) : 0 };
+        let defaultUsed = 0;
+        let defaultCap = 0;
+
+        if (target.store) {
+            defaultUsed = target.store.getUsedCapacity(resourceType);
+            defaultCap = target.store.getCapacity(resourceType);
+        } else if (target.amount !== undefined) {
+            defaultUsed = target.amount;
+            defaultCap = target.amount;
+        } else if (target.energy !== undefined) {
+            defaultUsed = target.energy;
+            defaultCap = target.energyCapacity;
+        } else if (target.mineralAmount !== undefined) {
+            defaultUsed = target.mineralAmount;
+            defaultCap = target.mineralAmount;
+        }
+
+        const state = ledger.get(target.id) || { used: defaultUsed, cap: defaultCap };
         return { used: state.used, free: state.cap - state.used };
+    },
+
+    registerHarvest(creep, target, amount) {
+        const ledger = global.State.ledger;
+        if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
+
+        // Harvesting uses energy for sources, mineralAmount for minerals. Assume RESOURCE_ENERGY for sources.
+        const resourceType = target.mineralType ? target.mineralType : RESOURCE_ENERGY;
+        const targetState = this.getVirtualState(target, resourceType);
+
+        if (targetState.used < amount) return ERR_NOT_ENOUGH_RESOURCES;
+
+        ledger.set(target.id, { used: targetState.used - amount, cap: targetState.cap });
+
+        const creepState = this.getVirtualState(creep, resourceType);
+        ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
+
+        return OK;
+    },
+
+    registerPickup(creep, target, amount) {
+        const ledger = global.State.ledger;
+        if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
+
+        const resourceType = target.resourceType || RESOURCE_ENERGY;
+        const targetState = this.getVirtualState(target, resourceType);
+
+        if (targetState.used < amount) return ERR_NOT_ENOUGH_RESOURCES;
+
+        ledger.set(target.id, { used: targetState.used - amount, cap: targetState.cap });
+
+        const creepState = this.getVirtualState(creep, resourceType);
+        ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
+
+        return OK;
     },
 
     registerTransfer(creep, target, resourceType, amount) {
@@ -194,9 +246,15 @@ const TrafficManager = {
             if (!target) return;
 
             // Use intent.type instead of re-scanning creep.store
-            intent.type === 'TRANSFER'
-                ? creep.transfer(target, intent.resourceType)
-                : creep.withdraw(target, intent.resourceType);
+            if (intent.type === 'TRANSFER') {
+                creep.transfer(target, intent.resourceType);
+            } else if (intent.type === 'WITHDRAW') {
+                creep.withdraw(target, intent.resourceType);
+            } else if (intent.type === 'HARVEST') {
+                creep.harvest(target);
+            } else if (intent.type === 'PICKUP') {
+                creep.pickup(target);
+            }
         } catch (e) {
             console.error(`[TrafficManager] FlushIntent Error on ${creep.name}: ${e.stack}`);
         }
