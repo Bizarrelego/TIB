@@ -5,7 +5,7 @@ module.exports = function stateScanner() {
 
     // Pure Event-Driven Consumer Loop
     for (const roomName of global.State.scannedRooms) {
-        const room = Game.rooms[roomName];
+        const room = global.State.rooms[roomName];
         if (!room) continue;
 
         const events = global.State.getEvents ? global.State.getEvents(roomName) : (global.State.eventCache.get(roomName) || []);

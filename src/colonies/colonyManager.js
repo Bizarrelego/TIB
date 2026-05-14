@@ -28,7 +28,7 @@ const reserver = require('../roles/reserver');
  * passing it as a singleton-like service to spawnManager.
  */
 module.exports = function colonyManager() {
-    for (const room of Object.values(Game.rooms)) {
+    for (const room of Object.values(global.State.rooms)) {
         if (room.controller && room.controller.my === true) {
             // Instantiate SpawnLedger globally for the room per tick
             const spawnLedger = new SpawnLedger(room);

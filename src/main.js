@@ -1,4 +1,5 @@
 const { CacheRegistry } = require('./os/cache');
+const installMemoryProxy = require('./os/memoryProxy');
 const discoveryManager = require('./state/discoveryManager');
 const stateScanner = require('./state/stateScanner');
 const colonyManager = require('./colonies/colonyManager');
@@ -9,6 +10,13 @@ module.exports.loop = function () {
     // Initialize OS cache
     if (!global.Cache) {
         CacheRegistry.init();
+    }
+
+    // Install Memory Proxy & Rehydrate (Zero-Polling Proxying)
+    installMemoryProxy();
+    if (global.State && global.State.rehydrate && !global.isRehydrated) {
+        global.State.rehydrate();
+        global.isRehydrated = true;
     }
 
     // Phase 1: Discovery Manager (Raw Engine API execution & global.State Bootstrapping)

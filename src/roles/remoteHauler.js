@@ -135,7 +135,7 @@ function run(room) {
                 const structuresMap = global.State.structuresByRoom.get(homeRoomName);
                 if (!structuresMap) continue;
 
-                const restrictStorageOutflow = Game.rooms[homeRoomName] && Game.rooms[homeRoomName].memory.restrictStorageOutflow;
+                const restrictStorageOutflow = global.State.rooms[homeRoomName] && global.State.rooms[homeRoomName].memory.restrictStorageOutflow;
 
                 let target = null;
 

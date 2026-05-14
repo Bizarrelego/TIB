@@ -32,10 +32,10 @@ class TerminalManager {
 
         // If this room has excess energy, look for rooms that need it
         if (terminal.store[RESOURCE_ENERGY] > TARGET_ENERGY_BUFFER + 10000) {
-            for (const otherRoomName in Game.rooms) {
+            for (const otherRoomName in global.State.rooms) {
                 if (otherRoomName === room.name) continue;
 
-                const otherRoom = Game.rooms[otherRoomName];
+                const otherRoom = global.State.rooms[otherRoomName];
                 if (otherRoom.controller && otherRoom.controller.my && otherRoom.terminal) {
                     if (otherRoom.terminal.store[RESOURCE_ENERGY] < TARGET_ENERGY_BUFFER) {
                         const amountNeeded = TARGET_ENERGY_BUFFER - otherRoom.terminal.store[RESOURCE_ENERGY];
@@ -72,10 +72,10 @@ class TerminalManager {
             const amount = terminal.store[resourceType];
             if (amount > TARGET_MINERAL_AMOUNT + 1000) {
                 // Find a room that needs this resource
-                for (const otherRoomName in Game.rooms) {
+                for (const otherRoomName in global.State.rooms) {
                     if (otherRoomName === room.name) continue;
 
-                    const otherRoom = Game.rooms[otherRoomName];
+                    const otherRoom = global.State.rooms[otherRoomName];
                     if (otherRoom.controller && otherRoom.controller.my && otherRoom.terminal) {
                         const otherAmount = otherRoom.terminal.store[resourceType] || 0;
                         if (otherAmount < TARGET_MINERAL_AMOUNT) {

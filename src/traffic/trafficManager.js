@@ -301,7 +301,7 @@ const TrafficManager = {
 
 
                     const blockingCreepName = global.State.swapRegistry.get(creep.name);
-                    const blockingCreep = global.State.creepLookup ? global.State.creepLookup.get(blockingCreepName) : Game.creeps[blockingCreepName];
+                    const blockingCreep = global.State.creepLookup ? global.State.creepLookup.get(blockingCreepName) : global.State.creeps[blockingCreepName];
 
 
                     if (blockingCreep) {

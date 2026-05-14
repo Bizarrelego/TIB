@@ -47,7 +47,7 @@ module.exports = {
                 }
 
                 // Container lifecycle awareness for harvesters
-                if (creep.memory.containerId && Game.rooms[creep.memory.targetRoom]) {
+                if (creep.memory.containerId && global.State.rooms[creep.memory.targetRoom]) {
                     // Room is visible, check if container exists
                     const container = Game.getObjectById(creep.memory.containerId);
                     if (!container) {
@@ -63,7 +63,7 @@ module.exports = {
                 if (!creep.memory.homeRoom) creep.memory.homeRoom = room.name;
 
                 // Container lifecycle awareness for haulers
-                if (creep.memory.containerId && Game.rooms[creep.memory.remoteRoom]) {
+                if (creep.memory.containerId && global.State.rooms[creep.memory.remoteRoom]) {
                     // Room is visible, check if container exists
                     const container = Game.getObjectById(creep.memory.containerId);
                     if (!container) {
