@@ -1,8 +1,39 @@
+const Profiler = require('../utils/profiler');
 /**
  * @file scoutManager.js
  * @description Manages scouting targets, intel gathering (sources, SK, highways, structures), and expansion scoring.
  */
 
+function getAdjacentRooms(roomName) {
+    const coords = roomName.match(/([WE])([0-9]+)([NS])([0-9]+)/);
+    let hDir = coords[1];
+    let x = parseInt(coords[2], 10);
+    let vDir = coords[3];
+    let y = parseInt(coords[4], 10);
+    const neighbors = [];
+
+    const getNextCoord = (dir, val, delta) => {
+        let newVal = val + delta;
+        if (newVal < 0) {
+            newVal = Math.abs(newVal) - 1;
+            dir = dir === 'W' ? 'E' : (dir === 'E' ? 'W' : (dir === 'N' ? 'S' : 'N'));
+        }
+        return dir + newVal;
+    };
+
+    neighbors.push(getNextCoord(hDir, x, 0) + getNextCoord(vDir, y, -1)); // TOP
+    neighbors.push(getNextCoord(hDir, x, 1) + getNextCoord(vDir, y, 0)); // RIGHT
+    neighbors.push(getNextCoord(hDir, x, 0) + getNextCoord(vDir, y, 1)); // BOTTOM
+    neighbors.push(getNextCoord(hDir, x, -1) + getNextCoord(vDir, y, 0)); // LEFT
+
+    return neighbors;
+}
+
+/**
+ * Determines a room's type (highway, SK, center, regular) based on coordinate math.
+ * @param {string} roomName - The name of the room.
+ * @returns {string} The computed room type.
+ */
 function getRoomType(roomName) {
     const coords = roomName.match(/[a-zA-Z]+|[0-9]+/g);
     const x = parseInt(coords[1], 10);
@@ -14,6 +45,12 @@ function getRoomType(roomName) {
     return 'regular';
 }
 
+/**
+ * Gathers current state info for a room and persists it to global.State.intel.
+ * Logs sources, minerals, structures, and controllers.
+ * @param {string} roomName - The name of the room to gather intel from.
+ * @returns {void}
+ */
 function gatherIntel(roomName) {
     if (!global.State) return;
     if (!global.State.intel) global.State.intel = new Map();
@@ -24,8 +61,7 @@ function gatherIntel(roomName) {
         global.State.intel.set(roomName, intel);
     }
 
-    const room = Game.rooms[roomName];
-    if (!room) return; // Only gather intel if we have vision
+    if (!global.State.scannedRooms || !global.State.scannedRooms.has(roomName)) return; // Only gather if vision
 
     intel.lastSeen = Game.time;
     intel.type = getRoomType(roomName);
@@ -112,32 +148,30 @@ function getScoutTarget(scoutCreep) {
         const levelSize = queue.length;
         for (let i = 0; i < levelSize; i++) {
             const currentRoom = queue.shift();
-            const exits = Game.map.describeExits(currentRoom);
+            const neighbors = getAdjacentRooms(currentRoom);
 
-            if (exits) {
-                for (const direction in exits) {
-                    const neighborRoom = exits[direction];
+            for (let j = 0; j < neighbors.length; j++) {
+                const neighborRoom = neighbors[j];
 
-                    if (!visited.has(neighborRoom)) {
-                        visited.add(neighborRoom);
-                        queue.push(neighborRoom);
+                if (!visited.has(neighborRoom)) {
+                    visited.add(neighborRoom);
+                    queue.push(neighborRoom);
 
-                        const intel = global.State.intel.get(neighborRoom);
+                    const intel = global.State.intel.get(neighborRoom);
 
-                        // Priority 1: Unseen room
-                        if (!intel || !intel.lastSeen) {
-                            return neighborRoom;
-                        }
+                    // Priority 1: Unseen room
+                    if (!intel || !intel.lastSeen) {
+                        return neighborRoom;
+                    }
 
-                        // Priority 2: High expansion score
-                        if (intel.expansionScore && intel.expansionScore > 0) {
-                            highScores.push({ roomName: neighborRoom, score: intel.expansionScore, distance: depth + 1 });
-                        }
+                    // Priority 2: High expansion score
+                    if (intel.expansionScore && intel.expansionScore > 0) {
+                        highScores.push({ roomName: neighborRoom, score: intel.expansionScore, distance: depth + 1 });
+                    }
 
-                        // Priority 3: Stale intel
-                        if (Game.time - intel.lastSeen > 1000) {
-                            staleRooms.push({ roomName: neighborRoom, age: Game.time - intel.lastSeen, distance: depth + 1 });
-                        }
+                    // Priority 3: Stale intel
+                    if (Game.time - intel.lastSeen > 1000) {
+                        staleRooms.push({ roomName: neighborRoom, age: Game.time - intel.lastSeen, distance: depth + 1 });
                     }
                 }
             }
@@ -160,11 +194,15 @@ function getScoutTarget(scoutCreep) {
     return null;
 }
 
+/**
+ * Iterates all scouts globally to process their intel gathering and target assignments.
+ * @returns {void}
+ */
 function runScouts() {
     const allCreeps = global.State.creepsByRoom;
     if (!allCreeps) return;
 
-    for (const [roomName, roomCreeps] of allCreeps.entries()) {
+    for (const [, roomCreeps] of allCreeps.entries()) {
         const scouts = roomCreeps.get('scout');
         if (scouts && scouts.length > 0) {
             for (const scout of scouts) {
@@ -186,18 +224,22 @@ function runScouts() {
     }
 }
 
-module.exports = function scoutManager() {
+/**
+ * Main scout manager loop to process global scout assignments.
+ * @returns {void}
+ */
+module.exports = Profiler.wrap('scoutManager', function scoutManager() {
     try {
         // Run scouts every tick to assign targets and gather intel
         runScouts();
 
         // Also gather intel on our own rooms where we have vision naturally
-        if (Game.time % 100 === 0) {
-            for (const roomName in Game.rooms) {
+        if (Game.time % 100 === 0 && global.State.scannedRooms) {
+            for (const roomName of global.State.scannedRooms) {
                 gatherIntel(roomName);
             }
         }
     } catch (e) {
         console.error(`[ScoutManager Error] ${e.stack}`);
     }
-};
+});
