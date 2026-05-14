@@ -1,18 +1,9 @@
 
+
 const DistanceTransform = require('../algorithms/distanceTransform');
+const { BASE_LAYOUT_STAMP } = require('../constants/baseLayout');
+const roomPositionUtils = require('../utils/roomPositionUtils');
 
-const TIGGA_STAMP = new Map([
-    [STRUCTURE_SPAWN, [[-1, -1], [1, -1], [0, -2]]],
-    [STRUCTURE_EXTENSION, [[0, 1], [-3, 0], [-2, 1], [-1, 2], [0, -3], [0, 3], [1, 2], [2, 1], [3, 0], [-5, 0], [-4, -1], [-4, 1], [-3, -2], [-3, 2], [-2, -3], [-2, 3], [-1, -4], [-1, 4], [0, -5], [0, 5], [1, -4], [1, 4], [2, -3], [2, 3], [3, -2], [3, 2], [4, -1], [4, 1], [5, 0], [-7, 0], [-6, -1], [-6, 1], [-5, -2], [-5, 2], [-4, -3], [-4, 3], [-3, -4], [-3, 4], [-2, -5], [-2, 5], [-1, -6], [-1, 6], [0, -7], [0, 7], [1, -6], [1, 6], [2, -5], [2, 5], [3, -4], [3, 4], [4, -3], [4, 3], [5, -2], [5, 2], [6, -1], [6, 1], [7, 0], [-9, 0], [-8, -1], [-8, 1]]],
-    [STRUCTURE_STORAGE, [[0, 0]]],
-    [STRUCTURE_TOWER, [[-2, -1], [2, -1], [-1, -2], [1, -2], [-2, 0], [2, 0]]],
-    [STRUCTURE_LINK, [[-1, 0]]],
-    [STRUCTURE_TERMINAL, [[0, -1]]],
-    ['factory', [[1, 0]]],
-    [STRUCTURE_ROAD, [[-1, 1], [0, 2], [1, 1], [-4, 0], [-3, -1], [-3, 1], [-2, -2], [-2, 2], [-1, -3], [-1, 3], [0, -4], [0, 4], [1, -3], [1, 3], [2, -2], [2, 2], [3, -1], [3, 1], [4, 0], [-6, 0], [-5, -1], [-5, 1], [-4, -2], [-4, 2], [-3, -3], [-3, 3], [-2, -4], [-2, 4], [-1, -5], [-1, 5], [0, -6], [0, 6], [1, -5], [1, 5], [2, -4], [2, 4], [3, -3], [3, 3], [4, -2], [4, 2], [5, -1], [5, 1], [6, 0], [-8, 0], [-7, -1], [-7, 1], [-6, -2], [-6, 2], [-5, -3], [-5, 3], [-4, -4], [-4, 4], [-3, -5], [-3, 5], [-2, -6], [-2, 6], [-1, -7], [-1, 7], [0, -8], [0, 8], [1, -7], [1, 7], [2, -6], [2, 6], [3, -5], [3, 5], [4, -4], [4, 4], [5, -3], [5, 3], [6, -2], [6, 2], [7, -1], [7, 1], [8, 0], [-7, -2], [-7, 2], [-6, -3], [-6, 3], [-5, -4], [-5, 4], [-4, -5], [-4, 5], [-3, -6], [-3, 6], [-2, -7], [-2, 7], [-1, -8], [-1, 8], [0, -9], [0, 9], [1, -8], [1, 8], [2, -7], [2, 7], [3, -6], [3, 6], [4, -5], [4, 5], [5, -4], [5, 4], [6, -3], [6, 3], [7, -2], [7, 2], [8, -1], [8, 1], [9, 0]]]
-]);
-
-// ... replace module.exports run method
 
 module.exports = {
     getBuildPower: function(roomName) {
@@ -116,9 +107,8 @@ module.exports = {
                 plannerState.set('lastRcl', rcl);
 
                 const plannedStructures = new Map();
-                const terrain = global.State.roomTerrain.get(room.name);
 
-                for (const [structureType, offsets] of TIGGA_STAMP.entries()) {
+                for (const [structureType, offsets] of BASE_LAYOUT_STAMP.entries()) {
                     let rclLimit = 0;
                     if (structureType === STRUCTURE_CONTAINER) {
                         rclLimit = 5;
@@ -137,21 +127,21 @@ module.exports = {
 
                         const dx = offsets[j][0];
                         const dy = offsets[j][1];
+
                         const plannedX = anchor.x + dx;
                         const plannedY = anchor.y + dy;
-
-                        // Ensure within boundaries
                         if (plannedX < 1 || plannedX > 48 || plannedY < 1 || plannedY > 48) continue;
 
-                        // Check terrain
-                        if (terrain.get(plannedX, plannedY) === TERRAIN_MASK_WALL) continue;
+                        const plannedPos = roomPositionUtils.getAbsolutePosition(anchor, dx, dy, room.name);
 
-                        const uniqueId = `${structureType}-${plannedX}-${plannedY}`;
-                        plannedStructures.set(uniqueId, {
-                            pos: new RoomPosition(plannedX, plannedY, room.name),
-                            type: structureType
-                        });
-                        count++;
+                        if (roomPositionUtils.isBuildable(room.name, plannedPos.x, plannedPos.y, structureType)) {
+                            const uniqueId = `${structureType}_${plannedPos.x}_${plannedPos.y}`;
+                            plannedStructures.set(uniqueId, {
+                                pos: plannedPos,
+                                type: structureType
+                            });
+                            count++;
+                        }
                     }
                 }
 
