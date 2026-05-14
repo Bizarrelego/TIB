@@ -47,6 +47,14 @@ const DeadlockEngine = {
     resolveDeadlock(cycle, intents) {
         if (!cycle || cycle.length === 0) return;
 
+        if (cycle.length === 2) {
+            if (!global.State) global.State = {};
+            if (!global.State.swapRegistry) global.State.swapRegistry = new Map();
+            global.State.swapRegistry.set(cycle[0], cycle[1]);
+            global.State.swapRegistry.set(cycle[1], cycle[0]);
+            return;
+        }
+
         let lowestPriority = Infinity;
         let lowestPriorityCreep = null;
 
@@ -66,6 +74,10 @@ const DeadlockEngine = {
 
         if (lowestPriorityCreep) {
             intents.delete(lowestPriorityCreep);
+            const liveCreep = global.State && global.State.creepLookup ? global.State.creepLookup.get(lowestPriorityCreep) : null;
+            if (liveCreep && liveCreep.heap && liveCreep.heap.path) {
+                delete liveCreep.heap.path;
+            }
         }
     }
 };
