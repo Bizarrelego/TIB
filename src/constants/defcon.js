@@ -17,30 +17,29 @@ function determineDefcon(roomName) {
         return DEFCON.NORMAL;
     }
 
-    // Simple logic for now: if there are hostiles, go to alert.
-    // In the future, this can be expanded to check hostile body parts (ATTACK, RANGED_ATTACK, HEAL, DISMANTLE)
-    // to distinguish between harmless scouts and actual threats.
+    let combatPartsCount = 0;
 
-    let hasCombatParts = false;
     for (let i = 0; i < hostiles.length; i++) {
         const creep = hostiles[i];
         if (creep.body) {
             for (let j = 0; j < creep.body.length; j++) {
                 const type = creep.body[j].type;
                 if (type === ATTACK || type === RANGED_ATTACK || type === HEAL || type === DISMANTLE) {
-                    hasCombatParts = true;
-                    break;
+                    combatPartsCount++;
                 }
             }
         } else {
             // Invaders often don't expose body array clearly without active vision or we just assume the worst
-            hasCombatParts = true;
+            combatPartsCount += 5; // Assume at least 5 combat parts to trigger CRITICAL or ALERT
         }
-        if (hasCombatParts) break;
     }
 
-    if (hasCombatParts) {
-        return DEFCON.ALERT; // Or lower depending on threat analysis
+    if (combatPartsCount >= 15) {
+        return DEFCON.EMERGENCY;
+    } else if (combatPartsCount >= 5) {
+        return DEFCON.CRITICAL;
+    } else if (combatPartsCount > 0) {
+        return DEFCON.ALERT;
     }
 
     return DEFCON.CAUTION; // Non-combat hostiles (scouts)

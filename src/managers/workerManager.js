@@ -43,7 +43,7 @@ module.exports = {
                 } else if (sites && sites.length > 0) {
                     creep.heap.state = 'build';
                 } else {
-                    creep.heap.state = 'upgrade';
+                    creep.heap.state = room.memory.haltUpgrades ? 'refill' : 'upgrade'; // use refill as idle state if upgrades halted
                 }
             } else if (!creep.heap.state) {
                 // Fallback for global reset
@@ -71,9 +71,11 @@ module.exports = {
                 if (refillTargets.length > 0) {
                     creep.heap.targetId = refillTargets[0].id;
                 } else {
-                    creep.heap.state = 'upgrade'; // fallback
-                    if (room.controller) {
+                    creep.heap.state = room.memory.haltUpgrades ? 'idle' : 'upgrade'; // fallback
+                    if (creep.heap.state === 'upgrade' && room.controller) {
                         creep.heap.targetId = room.controller.id;
+                    } else {
+                        creep.heap.targetId = null;
                     }
                 }
             } else if (creep.heap.state === 'build') {
@@ -96,9 +98,11 @@ module.exports = {
                         creep.heap.targetId = sites[0].id;
                     }
                 } else {
-                    creep.heap.state = 'upgrade'; // fallback
-                    if (room.controller) {
+                    creep.heap.state = room.memory.haltUpgrades ? 'idle' : 'upgrade'; // fallback
+                    if (creep.heap.state === 'upgrade' && room.controller) {
                         creep.heap.targetId = room.controller.id;
+                    } else {
+                        creep.heap.targetId = null;
                     }
                 }
             } else if (creep.heap.state === 'upgrade') {
