@@ -11,6 +11,14 @@ module.exports = {
         for (const creep of harvesters) {
             try {
                 let targetId = creep.heap.targetId;
+
+                if (targetId) {
+                    if (!Memory.sources) Memory.sources = {};
+                    if (Memory.sources[targetId] && Memory.sources[targetId].sleepUntil && Game.time < Memory.sources[targetId].sleepUntil) {
+                        continue;
+                    }
+                }
+
                 if (!targetId) {
                     const sources = global.State.sourcesByRoom.get(room.name) || [];
                     if (sources.length > 0) {
@@ -47,6 +55,13 @@ module.exports = {
                 if (targetId) {
                     const target = Game.getObjectById(targetId);
                     if (target) {
+                        if (target.energy === 0) {
+                            if (!Memory.sources) Memory.sources = {};
+                            if (!Memory.sources[targetId]) Memory.sources[targetId] = {};
+                            Memory.sources[targetId].sleepUntil = Game.time + target.ticksToRegeneration;
+                            continue;
+                        }
+
                         if (creep.harvest(target) === ERR_NOT_IN_RANGE) {
                             movement.moveTo(creep, target);
                         } else {

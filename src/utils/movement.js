@@ -1,5 +1,12 @@
 module.exports = {
+    canExecute: function(creep) {
+        if (creep.fatigue > 0) return false;
+        return true;
+    },
+
     moveTo: function(creep, target, opts = {}) {
+        if (!this.canExecute(creep)) return ERR_TIRED;
+
         if (!creep.heap.path || !Array.isArray(creep.heap.path)) {
             const targetPos = target.pos || target;
             // The destination for PathFinder.search should be mapped to an object like {pos: targetPos, range: 1} or just targetPos if we assume room position.
