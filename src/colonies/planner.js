@@ -1,35 +1,12 @@
 
 
 /* eslint-disable no-redeclare */
-/* global Game, PathFinder, TERRAIN_MASK_WALL, STRUCTURE_CONTAINER, STRUCTURE_ROAD, CONTROLLER_STRUCTURES, STRUCTURE_RAMPART, BUILD_POWER, WORK */
+/* global Game, PathFinder, TERRAIN_MASK_WALL, STRUCTURE_CONTAINER, STRUCTURE_ROAD, CONTROLLER_STRUCTURES, STRUCTURE_RAMPART */
 const DistanceTransform = require('../algorithms/distanceTransform');
 const { BASE_LAYOUT_STAMP } = require('../constants/baseLayout');
 const roomPositionUtils = require('../utils/roomPositionUtils');
 
-
 module.exports = {
-    getBuildPower: function(roomName) {
-        let buildPower = 0;
-        const roomCreeps = global.State.creepsByRoom.get(roomName);
-        if (roomCreeps) {
-            const workers = roomCreeps.get('worker');
-            if (workers) {
-                for (let w = 0; w < workers.length; w++) {
-                    const worker = workers[w];
-                    if (worker.body) {
-                        for (let b = 0; b < worker.body.length; b++) {
-                            if (worker.body[b].type === WORK) {
-                                buildPower += BUILD_POWER;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        if (buildPower === 0) buildPower = BUILD_POWER; // Default
-        return buildPower;
-    },
-
     run: function(room) {
         try {
             if (Game.time % 100 !== 0) return;
@@ -169,7 +146,8 @@ module.exports = {
                                 if (!plannedStructures.has(id)) {
                                     plannedStructures.set(id, {
                                         pos: targetPos,
-                                        type: structureType
+                                        type: structureType,
+                                        id: id
                                     });
                                 }
                             }
@@ -239,7 +217,8 @@ module.exports = {
                                 if (!plannedStructures.has(uniqueId)) {
                                     plannedStructures.set(uniqueId, {
                                         pos: pos,
-                                        type: STRUCTURE_ROAD
+                                        type: STRUCTURE_ROAD,
+                                        id: uniqueId
                                     });
                                     roadCount++;
                                 }

@@ -1,3 +1,6 @@
+/* eslint-disable no-redeclare */
+/* global BODYPART_COST, CARRY, MOVE, WORK, BUILD_POWER */
+
 /**
  * Dynamic Body Calculus
  * Mathematically generates exact body arrays based on path distance and target energy limits.
@@ -242,6 +245,33 @@ class BodyCalc {
         }
 
         return this.buildArray({ [WORK]: work, [CARRY]: carry, [MOVE]: move });
+    }
+
+    /**
+     * Calculates the total build power of all workers in a room.
+     * @param {string} roomName
+     * @returns {number} Total build power
+     */
+    static getBuildPower(roomName) {
+        let buildPower = 0;
+        const roomCreeps = global.State.creepsByRoom.get(roomName);
+        if (roomCreeps) {
+            const workers = roomCreeps.get('worker');
+            if (workers) {
+                for (let w = 0; w < workers.length; w++) {
+                    const worker = workers[w];
+                    if (worker.body) {
+                        for (let b = 0; b < worker.body.length; b++) {
+                            if (worker.body[b].type === WORK) {
+                                buildPower += BUILD_POWER;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (buildPower === 0) buildPower = BUILD_POWER; // Default
+        return buildPower;
     }
 
 }
