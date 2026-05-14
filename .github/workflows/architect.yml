@@ -96,4 +96,6 @@ jobs:
           
           FULL_BODY=$(printf "**Target Files:** %s\n\n%s" "$FILES" "$BODY")
           
+          gh label create "architect-proposal" --color "0E8A16" --force || true
+          
           gh issue create --title "[Architect] $TITLE" --body "$FULL_BODY" --label "architect-proposal"
