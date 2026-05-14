@@ -121,7 +121,7 @@ module.exports = {
                     if (rclLimit === 0) continue;
 
                     for (let j = 0; j < offsets.length; j++) {
-                        if (structureType !== STRUCTURE_ROAD && j >= rclLimit) break;
+                        if (j >= rclLimit) break;
 
                         const dx = offsets[j][0];
                         const dy = offsets[j][1];
@@ -133,11 +133,35 @@ module.exports = {
                         const plannedPos = roomPositionUtils.getAbsolutePosition(anchor, dx, dy, room.name);
 
                         if (roomPositionUtils.isBuildable(room.name, plannedPos.x, plannedPos.y, structureType)) {
-                            const uniqueId = `${structureType}-${plannedPos.x}-${plannedPos.y}`;
-                            plannedStructures.set(uniqueId, {
-                                pos: plannedPos,
-                                type: structureType
-                            });
+                            let alreadyExists = false;
+
+                            const structures = global.State.structuresByRoom ? (global.State.structuresByRoom.get(room.name) || []) : [];
+                            for (let i = 0; i < structures.length; i++) {
+                                const struct = structures[i];
+                                if (struct.pos.x === plannedPos.x && struct.pos.y === plannedPos.y && struct.structureType === structureType) {
+                                    alreadyExists = true;
+                                    break;
+                                }
+                            }
+
+                            if (!alreadyExists) {
+                                const sites = global.State.sitesByRoom ? (global.State.sitesByRoom.get(room.name) || []) : [];
+                                for (let i = 0; i < sites.length; i++) {
+                                    const site = sites[i];
+                                    if (site.pos.x === plannedPos.x && site.pos.y === plannedPos.y && site.structureType === structureType) {
+                                        alreadyExists = true;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (!alreadyExists) {
+                                const uniqueId = `${structureType}-${plannedPos.x}-${plannedPos.y}`;
+                                plannedStructures.set(uniqueId, {
+                                    pos: plannedPos,
+                                    type: structureType
+                                });
+                            }
                         }
                     }
                 }
