@@ -50,7 +50,6 @@ module.exports = function colonyManager() {
                 labs.run(room);
                 scout.run(room);
                 logistics.run(room);
-                LogisticsManager.run(room.name);
                 RemoteEconomyManager.run(room);
                 remoteHarvester.run(room);
                 remoteHauler.run(room);

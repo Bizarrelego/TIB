@@ -4,6 +4,7 @@
  */
 
 const movement = require('../utils/movement');
+const CombatManager = require('../managers/CombatManager');
 
 module.exports = {
     /**
@@ -21,39 +22,26 @@ module.exports = {
         const towers = roomStructures.get(STRUCTURE_TOWER) || [];
         const enemyTowers = towers.filter(t => !t.my);
 
+        let hostiles = [];
+        if (global.State.hostilesByRoom && global.State.hostilesByRoom.has(room.name)) {
+            hostiles = global.State.hostilesByRoom.get(room.name);
+        }
+
         for (const creep of drainerHunters) {
             try {
                 if (creep.fatigue > 0) continue; // Fatigue gating
 
-                // Predictive Pre-Healing
-                // Check if any enemy tower is within range 5 using state instead of findInRange
-                const towerInRange = enemyTowers.some(t => creep.pos.getRangeTo(t) <= 5);
-
-                if (creep.hits < creep.hitsMax || towerInRange) {
-                    creep.heal(creep);
-                }
+                // 1. Predictive Pre-Healing
+                CombatManager.predictivePreHeal(creep, enemyTowers, hostiles);
 
                 const targetRoomName = creep.memory.targetRoom;
 
-                // Border Bouncing (I-Frames)
-                // If taking heavy damage, step back to adjacent room
+                // 2. Border Bouncing (I-Frames)
                 if (creep.hits < creep.hitsMax * 0.5) {
-                    if (room.name === targetRoomName) {
-                        // Find nearest exit and step out
-                        // Finding exits strictly relies on room pathing/terrain, but avoiding findClosestByPath is better.
-                        // Assuming movement.moveTo can handle a RoomPosition at the exit or a direction.
-                        // Simplest alternative is moving towards the spawn/home if we must retreat, but
-                        // here we just fallback to a cached or memory exit dir to avoid FIND_.
-                        // For this implementation, we will use the direction towards the center of the home room,
-                        // assuming memory.homeRoom exists.
-                        if (creep.memory.homeRoom) {
-                           movement.moveTo(creep, new RoomPosition(25, 25, creep.memory.homeRoom));
-                        }
-                        continue;
-                    } else {
-                        // Already in safe room, just heal
-                        continue;
+                    if (creep.memory.homeRoom) {
+                        CombatManager.borderBounce(creep, creep.memory.homeRoom);
                     }
+                    continue;
                 }
 
                 // If healthy and not in target room, move in
@@ -62,10 +50,20 @@ module.exports = {
                     continue;
                 }
 
-                // In target room, healthy: Bait towers
+                // 3. Set target selection strictly to the nearest element within the enemyTowers array
                 if (room.name === targetRoomName) {
                     if (enemyTowers.length > 0) {
-                        const targetTower = enemyTowers[0]; // Simple targeting
+                        // Find nearest enemy tower
+                        let targetTower = enemyTowers[0];
+                        let minRange = creep.pos.getRangeTo(targetTower);
+                        for (let i = 1; i < enemyTowers.length; i++) {
+                            const range = creep.pos.getRangeTo(enemyTowers[i]);
+                            if (range < minRange) {
+                                minRange = range;
+                                targetTower = enemyTowers[i];
+                            }
+                        }
+
                         if (creep.pos.getRangeTo(targetTower) > 5) {
                             movement.moveTo(creep, targetTower);
                         } else if (creep.pos.getRangeTo(targetTower) < 5) {
@@ -74,6 +72,9 @@ module.exports = {
                             const oppositeDir = ((dir + 3) % 8) + 1;
                             creep.move(oppositeDir);
                         }
+                    } else if (hostiles.length > 0) {
+                        // Kiting when no towers left
+                        CombatManager.kite(creep, hostiles);
                     }
                 }
 
