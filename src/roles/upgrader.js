@@ -2,6 +2,8 @@ const movement = require('../utils/movement');
 
 // Upgraders must be static. Move once, then stay forever.
 function run(creep, room) {
+    if (room.memory.haltUpgrades) return;
+
     const controller = room.controller;
     if (!controller) return;
 

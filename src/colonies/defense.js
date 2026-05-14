@@ -17,6 +17,12 @@ module.exports = {
         try {
             const defconLevel = determineDefcon(room.name);
 
+            if (defconLevel <= DEFCON.CRITICAL) {
+                room.memory.haltUpgrades = true;
+            } else {
+                room.memory.haltUpgrades = false;
+            }
+
             let defenseRepairTarget = null;
             const structuresMap = global.State.structuresByRoom ? global.State.structuresByRoom.get(room.name) : null;
 
@@ -34,7 +40,7 @@ module.exports = {
                     }
                 }
 
-                if (!defenseRepairTarget) {
+                if (!defenseRepairTarget || defconLevel > DEFCON.CRITICAL) {
                     for (const wall of walls) {
                         if (wall.hits < wall.hitsMax && wall.hits < lowestHits) {
                             lowestHits = wall.hits;
