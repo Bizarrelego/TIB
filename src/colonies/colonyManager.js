@@ -16,6 +16,7 @@ const labs = require('./labs');
 const scout = require('../roles/scout');
 const logistics = require('./logistics');
 const LogisticsManager = require('./logisticsManager');
+const RemoteEconomyManager = require('../managers/RemoteEconomyManager');
 const remoteHarvester = require('../roles/remoteHarvester');
 const remoteHauler = require('../roles/remoteHauler');
 const reserver = require('../roles/reserver');
@@ -49,6 +50,7 @@ module.exports = function colonyManager() {
                 scout.run(room);
                 logistics.run(room);
                 LogisticsManager.run(room.name);
+                RemoteEconomyManager.run(room);
                 remoteHarvester.run(room);
                 remoteHauler.run(room);
                 reserver.run(room);

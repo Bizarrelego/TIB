@@ -38,20 +38,7 @@ function run(room) {
             }
 
             // In the target room and off the exit.
-            let targetSourceId = creep.memory.targetSourceId;
-            if (!targetSourceId) {
-                const roomSources = global.State.sourcesByRoom.get(creep.room.name) || [];
-                const assignedSources = remoteHarvesters.map(c => c.memory.targetSourceId).filter(id => id);
-
-                for (const src of roomSources) {
-                    if (!assignedSources.includes(src.id)) {
-                        targetSourceId = src.id;
-                        creep.memory.targetSourceId = src.id;
-                        break;
-                    }
-                }
-            }
-
+            const targetSourceId = creep.memory.targetSourceId;
             if (!targetSourceId) continue;
 
             const source = Game.getObjectById(targetSourceId);

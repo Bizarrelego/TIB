@@ -49,18 +49,7 @@ function run(room) {
 
                 // Find energy to pick up
                 // 1. containerId
-                let containerId = creep.memory.containerId;
-                if (!containerId) {
-                    const structuresMap = global.State.structuresByRoom.get(creep.room.name);
-                    if (structuresMap) {
-                        const containers = structuresMap.get(STRUCTURE_CONTAINER) || [];
-                        if (containers.length > 0) {
-                            containerId = containers[0].id;
-                            creep.memory.containerId = containerId;
-                        }
-                    }
-                }
-
+                const containerId = creep.memory.containerId;
                 let target = null;
 
                 if (containerId) {
