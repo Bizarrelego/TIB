@@ -1,5 +1,7 @@
 const eventBus = require('../os/eventBus');
 const TrafficManager = require('../traffic/trafficManager');
+const EnergyRequestManager = require('../managers/EnergyRequestManager');
+const resourceUtils = require('../utils/resourceUtils');
 
 function findHubParkPos(hubLink, storage, terminal, room) {
     if (!storage) return null;
@@ -180,61 +182,60 @@ const LogisticsManager = {
             }
         }
 
-        // HAULER ASSIGNMENT LOGIC
-        if (haulers.length > 0) {
-            for (let i = 0; i < haulers.length; i++) {
-                const creep = haulers[i];
+        // HAULER AND DOMESTIC HAULER ASSIGNMENT LOGIC via EnergyRequestManager
+        const domesticHaulers = roomCreeps.get('domesticHauler') || [];
+        const allHaulers = [...haulers, ...domesticHaulers];
+
+        if (allHaulers.length > 0) {
+            const requests = EnergyRequestManager.getEnergyRequests(room.name);
+            const supplies = EnergyRequestManager.getEnergySupplies(room.name);
+
+            let requestIndex = 0;
+            let supplyIndex = 0;
+
+            for (let i = 0; i < allHaulers.length; i++) {
+                const creep = allHaulers[i];
+                if (creep.fatigue > 0 || TrafficManager.checkPipeline(creep.id)) continue;
+                if (creep.heap && creep.heap.retired) continue; // Respect domesticHauler retirement
+
                 creep.heap = creep.heap || {};
 
-                if (creep.store.getFreeCapacity() > 0) {
+                const energy = creep.store.getUsedCapacity(RESOURCE_ENERGY);
+                const free = creep.store.getFreeCapacity(RESOURCE_ENERGY);
+
+                if (energy === 0 || (free > 0 && creep.heap.state !== 'transfer' && supplyIndex < supplies.length)) {
+                    // Needs energy -> pickup
                     creep.heap.state = 'pickup';
-                    let dropId = creep.heap.dropId;
-                    let target = dropId ? Game.getObjectById(dropId) : null;
+                    creep.heap.targetId = null;
 
-                    if (!target || (target.amount === 0) || (target.store && target.store.getUsedCapacity(RESOURCE_ENERGY) === 0)) {
-                        target = null;
-                        const droppedEnergy = global.State.droppedEnergyByRoom.get(room.name) || [];
-                        const tombstones = global.State.tombstonesByRoom.get(room.name) || [];
-                        const ruins = global.State.ruinsByRoom.get(room.name) || [];
-
-                        let minDistance = Infinity;
-                        const checkTarget = (t) => {
-                            const dist = Math.max(Math.abs(creep.pos.x - t.pos.x), Math.abs(creep.pos.y - t.pos.y));
-                            if (dist < minDistance) {
-                                minDistance = dist;
-                                target = t;
-                            }
-                        };
-
-                        for (let j = 0; j < droppedEnergy.length; j++) checkTarget(droppedEnergy[j]);
-                        for (let j = 0; j < tombstones.length; j++) checkTarget(tombstones[j]);
-                        for (let j = 0; j < ruins.length; j++) checkTarget(ruins[j]);
-
-                        creep.heap.dropId = target ? target.id : null;
+                    if (supplyIndex < supplies.length) {
+                        const supply = supplies[supplyIndex];
+                        creep.heap.dropId = supply.target.id;
+                        creep.heap.resourceType = RESOURCE_ENERGY;
+                        // For large supplies, allow multiple haulers by decreasing amount
+                        supply.amount -= creep.store.getFreeCapacity(RESOURCE_ENERGY);
+                        if (supply.amount <= 0) {
+                            supplyIndex++;
+                        }
+                    } else {
+                        creep.heap.dropId = null;
                     }
                 } else {
+                    // Has energy -> transfer
                     creep.heap.state = 'transfer';
                     creep.heap.dropId = null;
 
-                    let target = null;
-                    for (let j = 0; j < spawns.length; j++) {
-                        if (spawns[j].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                            target = spawns[j];
-                            break;
+                    if (requestIndex < requests.length) {
+                        const request = requests[requestIndex];
+                        creep.heap.targetId = request.target.id;
+                        creep.heap.resourceType = RESOURCE_ENERGY;
+                        // Same logic for large requests
+                        request.amount -= creep.store.getUsedCapacity(RESOURCE_ENERGY);
+                        if (request.amount <= 0) {
+                            requestIndex++;
                         }
-                    }
-                    if (!target) {
-                        for (let j = 0; j < extensions.length; j++) {
-                            if (extensions[j].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                                target = extensions[j];
-                                break;
-                            }
-                        }
-                    }
-
-                    if (target) {
-                        creep.heap.targetId = target.id;
                     } else if (room.controller) {
+                        // Fallback to controller if no requests
                         creep.heap.targetId = 'controller';
                     } else {
                         creep.heap.targetId = null;
