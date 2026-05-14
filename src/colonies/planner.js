@@ -102,13 +102,18 @@ module.exports = {
             }
 
             const anchor = plannerState.get('anchor');
-            const rcl = room.controller.level;
+            if (!anchor) return;
 
+            const rcl = room.controller.level;
             const lastRcl = plannerState.get('lastRcl');
+
             if (lastRcl !== rcl || !plannerState.has('plannedStructures')) {
                 plannerState.set('lastRcl', rcl);
 
-                const plannedStructures = new Map();
+                if (!plannerState.has('plannedStructures')) {
+                    plannerState.set('plannedStructures', new Map());
+                }
+                const plannedStructures = plannerState.get('plannedStructures');
 
                 for (const [structureType, offsets] of BASE_LAYOUT_STAMP.entries()) {
                     let rclLimit = 0;
@@ -132,15 +137,15 @@ module.exports = {
                         const plannedY = anchor.y + dy;
                         if (plannedX < 1 || plannedX > 48 || plannedY < 1 || plannedY > 48) continue;
 
-                        const plannedPos = roomPositionUtils.getAbsolutePosition(anchor, dx, dy, room.name);
+                        const targetPos = roomPositionUtils.getAbsolutePosition(anchor, dx, dy, room.name);
 
-                        if (roomPositionUtils.isBuildable(room.name, plannedPos.x, plannedPos.y, structureType)) {
+                        if (roomPositionUtils.isBuildable(room.name, targetPos.x, targetPos.y, structureType)) {
                             let alreadyExists = false;
 
                             const structures = global.State.structuresByRoom ? (global.State.structuresByRoom.get(room.name) || []) : [];
                             for (let i = 0; i < structures.length; i++) {
                                 const struct = structures[i];
-                                if (struct.pos.x === plannedPos.x && struct.pos.y === plannedPos.y && struct.structureType === structureType) {
+                                if (struct.pos.x === targetPos.x && struct.pos.y === targetPos.y && struct.structureType === structureType) {
                                     alreadyExists = true;
                                     break;
                                 }
@@ -150,7 +155,7 @@ module.exports = {
                                 const sites = global.State.sitesByRoom ? (global.State.sitesByRoom.get(room.name) || []) : [];
                                 for (let i = 0; i < sites.length; i++) {
                                     const site = sites[i];
-                                    if (site.pos.x === plannedPos.x && site.pos.y === plannedPos.y && site.structureType === structureType) {
+                                    if (site.pos.x === targetPos.x && site.pos.y === targetPos.y && site.structureType === structureType) {
                                         alreadyExists = true;
                                         break;
                                     }
@@ -158,17 +163,17 @@ module.exports = {
                             }
 
                             if (!alreadyExists) {
-                                const uniqueId = `${structureType}-${plannedPos.x}-${plannedPos.y}`;
-                                plannedStructures.set(uniqueId, {
-                                    pos: plannedPos,
-                                    type: structureType
-                                });
+                                const id = `${structureType}-${plannedX}-${plannedY}`;
+                                if (!plannedStructures.has(id)) {
+                                    plannedStructures.set(id, {
+                                        pos: targetPos,
+                                        type: structureType
+                                    });
+                                }
                             }
                         }
                     }
                 }
-
-                plannerState.set('plannedStructures', plannedStructures);
             }
 
             // Integrate road planning
