@@ -2,6 +2,7 @@ class GlobalStateManager {
     constructor() {
         this.heapCache = new Map();
         this.isRehydrated = false;
+        this.sourceData = new Map();
     }
 
     rehydrate() {

@@ -1,4 +1,5 @@
 const movement = require('../utils/movement');
+const SourceManager = require('../managers/SourceManager');
 
 module.exports = {
     run: function(room) {
@@ -45,6 +46,10 @@ module.exports = {
                 }
 
                 if (targetId) {
+                    if (SourceManager.isSourceAsleep(targetId)) {
+                        continue; // Sleep execution until source regenerates
+                    }
+
                     const target = Game.getObjectById(targetId);
                     if (target) {
                         if (creep.harvest(target) === ERR_NOT_IN_RANGE) {

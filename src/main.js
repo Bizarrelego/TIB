@@ -5,6 +5,7 @@ const stateScanner = require('./state/stateScanner');
 const colonyManager = require('./colonies/colonyManager');
 const operationsManager = require('./operations/operationsManager'); // High-level orchestrator
 const trafficManager = require('./traffic/trafficManager');
+const SourceManager = require('./managers/SourceManager');
 
 module.exports.loop = function () {
     // Rehydrate global state
@@ -48,6 +49,11 @@ module.exports.loop = function () {
             if (stateScanner) stateScanner();
         } catch (e) {
             console.log(`[Phase 2 Error] Global State Scanner: ${e.stack}`);
+        }
+        try {
+            if (SourceManager && SourceManager.run) SourceManager.run();
+        } catch (e) {
+            console.log(`[Phase 2 Error] Source Manager: ${e.stack}`);
         }
     }
 
