@@ -1,19 +1,29 @@
+/**
+ * @file hauler.js
+ * @description Hauler role. Sweeps dropped energy/ruins/tombstones and fills structures.
+ * State and targets are managed by EconomyManager.
+ */
+
 const movement = require('../utils/movement');
 
 module.exports = {
+    /**
+     * Executes logic for hauler role.
+     * @param {Room} room
+     */
     run: function(room) {
         const roomCreeps = global.State.creepsByRoom.get(room.name);
         if (!roomCreeps) return;
 
         const haulers = roomCreeps.get('hauler');
-        if (!haulers) return;
+        if (!haulers || haulers.length === 0) return;
 
         for (const creep of haulers) {
             try {
                 // Return immediately if fatigue > 0
                 if (creep.fatigue > 0) continue;
 
-                // State assigned centrally by logisticsManager
+                // State assigned centrally by EconomyManager
                 if (creep.heap.state === 'pickup') {
                     let dropId = creep.heap.dropId;
                     let target = dropId ? Game.getObjectById(dropId) : null;

@@ -1,6 +1,7 @@
 /**
  * @file worker.js
  * @description Multi-tool fallback (Harvest/Build/Upgrade). Replaced by dedicated roles.
+ * Assignments are managed by EconomyManager.
  */
 
 const movement = require('../utils/movement');
@@ -8,7 +9,7 @@ const movement = require('../utils/movement');
 module.exports = {
     /**
      * Executes logic for worker role.
-     * Targets and state are pre-assigned to creep.heap by workerManager.
+     * Targets and state are pre-assigned to creep.heap by EconomyManager.
      * @param {Room} room
      */
     run(room) {
@@ -36,6 +37,16 @@ module.exports = {
                 if (state === 'harvest') {
                     if (creep.harvest(target) === ERR_NOT_IN_RANGE) {
                         movement.moveTo(creep, target);
+                    }
+                } else if (state === 'pickup') {
+                    if (target.amount !== undefined) {
+                        if (creep.pickup(target) === ERR_NOT_IN_RANGE) {
+                            movement.moveTo(creep, target);
+                        }
+                    } else {
+                        if (creep.withdraw(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                            movement.moveTo(creep, target);
+                        }
                     }
                 } else if (state === 'refill') {
                     if (creep.transfer(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
