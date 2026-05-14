@@ -1,4 +1,11 @@
+/**
+ * @class SpawnLedger
+ * @description Tracks energy reservations per tick to ensure multiple spawns in one room do not exceed room.energyAvailable.
+ */
 class SpawnLedger {
+    /**
+     * @param {Room} room The room to track energy for.
+     */
     constructor(room) {
         this.availableEnergy = room.energyAvailable;
     }
