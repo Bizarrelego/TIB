@@ -1,5 +1,5 @@
 /* global DISMANTLE */
-const { determineDefcon } = require('../constants/defcon');
+const { determineDefcon, DEFCON } = require('../constants/defcon');
 
 function getDistance(pos1, pos2) {
     return Math.max(Math.abs(pos1.x - pos2.x), Math.abs(pos1.y - pos2.y));
@@ -19,7 +19,7 @@ function getDangerScore(creep) {
     return score;
 }
 
-function run(room) {
+function run(room, defenseRepairTarget = null) {
     if (Game.cpu.bucket < 500) return; // Cascading CPU Throttling: gating tower operations
 
     try {
@@ -31,11 +31,11 @@ function run(room) {
         const towers = structuresMap.get(STRUCTURE_TOWER) || [];
         if (towers.length === 0) return;
 
-        determineDefcon(room.name);
+        const defconLevel = determineDefcon(room.name);
 
         let targetHostile = null;
         let targetHeal = null;
-        let targetRoad = null;
+        let repairTarget = null;
 
         // 1. Hostiles Priority
         const hostiles = global.State.hostilesByRoom ? (global.State.hostilesByRoom.get(room.name) || []) : [];
@@ -79,14 +79,19 @@ function run(room) {
             }
         }
 
-        // 3. Roads Priority - Only repair critical structures (roads) below 10% HP (Cascading CPU Throttling: Skip if bucket < 1000)
+        // 3. Defense / Roads Priority - Only repair critical structures (roads) below 10% HP (Cascading CPU Throttling: Skip if bucket < 1000)
         if (!targetHostile && !targetHeal && Game.cpu.bucket >= 1000) {
-            const roads = structuresMap.get(STRUCTURE_ROAD) || [];
-            for (let i = 0; i < roads.length; i++) {
-                const road = roads[i];
-                if (road.hits < road.hitsMax * 0.1) { // Strictly below 10% HP
-                    targetRoad = road;
-                    break;
+            if (defenseRepairTarget) {
+                repairTarget = defenseRepairTarget;
+            } else if (defconLevel > DEFCON.ALERT) {
+                // Only repair roads if DEFCON is not high
+                const roads = structuresMap.get(STRUCTURE_ROAD) || [];
+                for (let i = 0; i < roads.length; i++) {
+                    const road = roads[i];
+                    if (road.hits < road.hitsMax * 0.1) { // Strictly below 10% HP
+                        repairTarget = road;
+                        break;
+                    }
                 }
             }
         }
@@ -104,8 +109,8 @@ function run(room) {
                     }
                 } else if (targetHeal) {
                     tower.heal(targetHeal);
-                } else if (targetRoad) {
-                    tower.repair(targetRoad);
+                } else if (repairTarget) {
+                    tower.repair(repairTarget);
                 }
             }
         }
