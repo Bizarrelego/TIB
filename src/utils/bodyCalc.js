@@ -193,6 +193,57 @@ class BodyCalc {
         return this.buildArray({ [CARRY]: carry, [MOVE]: move });
     }
 
+    /**
+     * Calculates the optimal static upgrader body
+     * Prioritizes WORK parts, 1 CARRY part minimum, and sufficient MOVE parts (1 per 2 other parts).
+     * @param {number} energyCapacity Available spawn energy
+     * @returns {string[]} Optimal body array
+     */
+    static calculateUpgrader(energyCapacity) {
+        let work = 0;
+        let carry = 1;
+        let move = 1;
+        let cost = BODYPART_COST[CARRY] + BODYPART_COST[MOVE];
+        let totalParts = 2; // CARRY and MOVE
+
+        const partCost = BODYPART_COST[WORK];
+        const moveRatio = 2; // 1 MOVE per 2 WORK/CARRY parts
+
+        // Fill with WORK parts and add MOVE parts to maintain the ratio
+        while (cost + partCost <= energyCapacity && totalParts < 50) {
+            // Check if adding one WORK part requires adding another MOVE part
+            const neededMove = Math.ceil((work + carry + 1) / moveRatio);
+            let addedCost = partCost;
+            let partsToAdd = 1; // 1 WORK
+
+            if (neededMove > move) {
+                addedCost += BODYPART_COST[MOVE];
+                partsToAdd += 1; // 1 MOVE
+            }
+
+            if (cost + addedCost <= energyCapacity && totalParts + partsToAdd <= 50 && work < 15) { // Cap WORK to 15 (max 15 energy upgraded per tick without boosts usually suffices for general upgrading unless RCL 8 where we limit to 15 anyway, wait, up to capacity)
+                // Let's cap WORK to say, 15 for a single upgrader to not overkill unless it's the only one. 15 WORK * 2 energy = 30 energy per tick, very high.
+                work++;
+                if (neededMove > move) {
+                    move++;
+                }
+                cost += addedCost;
+                totalParts += partsToAdd;
+            } else {
+                break;
+            }
+        }
+
+        // Ensure at least 1 WORK part if somehow capacity is extremely low but above 300
+        if (work === 0 && energyCapacity >= 300) {
+            work = 1;
+            carry = 1;
+            move = 1;
+        }
+
+        return this.buildArray({ [WORK]: work, [CARRY]: carry, [MOVE]: move });
+    }
+
 }
 
 module.exports = BodyCalc;

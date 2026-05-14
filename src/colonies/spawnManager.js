@@ -1,6 +1,7 @@
 const planner = require('./planner');
 const BodyCalc = require('../utils/bodyCalc');
 const SpawnQueueManager = require('../managers/SpawnQueueManager');
+const UpgraderManager = require('../managers/UpgraderManager');
 
 module.exports = {
     /**
@@ -115,10 +116,10 @@ module.exports = {
                     }, cost);
                 }
 
-                if (upgraderCount < 1) {
-                    // Static upgrader body
-                    const body = [WORK, WORK, WORK, WORK, WORK, WORK, WORK, WORK, CARRY, CARRY, MOVE];
-                    const cost = 950;
+                const desiredUpgraders = UpgraderManager.getDesiredCount(room);
+                if (upgraderCount < desiredUpgraders) {
+                    const body = BodyCalc.calculateUpgrader(capacity);
+                    const cost = BodyCalc.getCost(body);
                     queue.add('upgrader', body, 'upgrader_' + Game.time, {
                         memory: { role: 'upgrader', colony: room.name }
                     }, cost);
