@@ -1,4 +1,6 @@
 
+/* eslint-disable no-redeclare */
+/* global RoomPosition, TERRAIN_MASK_WALL, STRUCTURE_ROAD, STRUCTURE_CONTAINER, STRUCTURE_LINK, STRUCTURE_RAMPART */
 const roomPositionUtils = {
     /**
      * Calculates a new RoomPosition given an anchorPos and relative dx, dy offsets.

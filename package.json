@@ -9,6 +9,6 @@
   },
   "devDependencies": {
     "eslint": "^8.57.0",
-    "eslint-plugin-screeps": "^1.0.1"
+    "eslint-plugin-screeps": "^1.4.0"
   }
 }
