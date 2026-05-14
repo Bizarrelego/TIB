@@ -201,45 +201,91 @@ const LogisticsManager = {
 
                 creep.heap = creep.heap || {};
 
-                const energy = creep.store.getUsedCapacity(RESOURCE_ENERGY);
-                const free = creep.store.getFreeCapacity(RESOURCE_ENERGY);
+                const creepState = TrafficManager.getVirtualState(creep, RESOURCE_ENERGY);
 
-                if (energy === 0 || (free > 0 && creep.heap.state !== 'transfer' && supplyIndex < supplies.length)) {
+                if (creepState.used === 0 || (creepState.free > 0 && creep.heap.state !== 'transfer' && supplyIndex < supplies.length)) {
                     // Needs energy -> pickup
                     creep.heap.state = 'pickup';
                     creep.heap.targetId = null;
 
-                    if (supplyIndex < supplies.length) {
+                    while (supplyIndex < supplies.length) {
                         const supply = supplies[supplyIndex];
-                        creep.heap.dropId = supply.target.id;
-                        creep.heap.resourceType = RESOURCE_ENERGY;
-                        // For large supplies, allow multiple haulers by decreasing amount
-                        supply.amount -= creep.store.getFreeCapacity(RESOURCE_ENERGY);
-                        if (supply.amount <= 0) {
+                        const supplyState = TrafficManager.getVirtualState(supply.target, RESOURCE_ENERGY);
+
+                        if (supplyState.used > 0) {
+                            const amountToTake = Math.min(creepState.free, supplyState.used);
+                            let status;
+
+                            if (supply.target instanceof Resource) {
+                                status = TrafficManager.registerPickup(creep, supply.target, RESOURCE_ENERGY, amountToTake);
+                                if (status === OK) {
+                                    TrafficManager.lockPipeline(creep.name, creep.id, supply.target.id, RESOURCE_ENERGY, amountToTake, 'PICKUP');
+                                }
+                            } else {
+                                status = TrafficManager.registerWithdraw(creep, supply.target, RESOURCE_ENERGY, amountToTake);
+                                if (status === OK) {
+                                    TrafficManager.lockPipeline(creep.name, creep.id, supply.target.id, RESOURCE_ENERGY, amountToTake, 'WITHDRAW');
+                                }
+                            }
+
+                            if (status === OK) {
+                                creep.heap.dropId = supply.target.id;
+                                creep.heap.resourceType = RESOURCE_ENERGY;
+
+                                const updatedSupplyState = TrafficManager.getVirtualState(supply.target, RESOURCE_ENERGY);
+                                if (updatedSupplyState.used <= 0) {
+                                    supplyIndex++;
+                                }
+                                break;
+                            } else {
+                                supplyIndex++;
+                            }
+                        } else {
                             supplyIndex++;
                         }
-                    } else {
+                    }
+
+                    if (supplyIndex >= supplies.length && !creep.heap.dropId) {
                         creep.heap.dropId = null;
                     }
+
                 } else {
                     // Has energy -> transfer
                     creep.heap.state = 'transfer';
                     creep.heap.dropId = null;
 
-                    if (requestIndex < requests.length) {
+                    while (requestIndex < requests.length) {
                         const request = requests[requestIndex];
-                        creep.heap.targetId = request.target.id;
-                        creep.heap.resourceType = RESOURCE_ENERGY;
-                        // Same logic for large requests
-                        request.amount -= creep.store.getUsedCapacity(RESOURCE_ENERGY);
-                        if (request.amount <= 0) {
+                        const requestState = TrafficManager.getVirtualState(request.target, RESOURCE_ENERGY);
+
+                        if (requestState.free > 0) {
+                            const amountToTransfer = Math.min(creepState.used, requestState.free);
+                            if (TrafficManager.registerTransfer(creep, request.target, RESOURCE_ENERGY, amountToTransfer) === OK) {
+                                TrafficManager.lockPipeline(creep.name, creep.id, request.target.id, RESOURCE_ENERGY, amountToTransfer, 'TRANSFER');
+
+                                creep.heap.targetId = request.target.id;
+                                creep.heap.resourceType = RESOURCE_ENERGY;
+
+                                const updatedRequestState = TrafficManager.getVirtualState(request.target, RESOURCE_ENERGY);
+                                if (updatedRequestState.free <= 0) {
+                                    requestIndex++;
+                                }
+                                break;
+                            } else {
+                                requestIndex++;
+                            }
+                        } else {
                             requestIndex++;
                         }
-                    } else if (room.controller) {
-                        // Fallback to controller if no requests
-                        creep.heap.targetId = 'controller';
-                    } else {
-                        creep.heap.targetId = null;
+                    }
+
+                    if (requestIndex >= requests.length && !creep.heap.targetId) {
+                        if (room.controller) {
+                            // Fallback to controller if no requests
+                            creep.heap.targetId = 'controller';
+                        } else {
+                            creep.heap.targetId = null;
+                        }
                     }
                 }
             }
