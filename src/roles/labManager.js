@@ -20,11 +20,9 @@ function run(room) {
         try {
             if (creep.fatigue > 0 || TrafficManager.checkPipeline(creep.id)) continue; // Fatigue gating and pipeline check
 
-            // Compatibility for both Map and standard object heap
-            const heapIsMap = creep.heap instanceof Map;
-            const state = heapIsMap ? creep.heap.get('state') : creep.heap.state;
-            const targetId = heapIsMap ? creep.heap.get('targetId') : creep.heap.targetId;
-            const resource = heapIsMap ? creep.heap.get('resource') : creep.heap.resource;
+            const state = creep.heap.get('state');
+            const targetId = creep.heap.get('targetId');
+            const resource = creep.heap.get('resource');
 
             if (!state || state === 'idle' || !targetId) continue;
 

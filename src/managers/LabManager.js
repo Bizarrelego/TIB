@@ -185,15 +185,15 @@ class LabManager {
             }
 
             if (carryingOther) {
-                creep.heap instanceof Map ? creep.heap.set('state', 'store_wrong') : creep.heap.state = 'store_wrong';
-                creep.heap instanceof Map ? creep.heap.set('targetId', storage ? storage.id : null) : creep.heap.targetId = storage ? storage.id : null;
-                creep.heap instanceof Map ? creep.heap.set('resource', wrongResource) : creep.heap.resource = wrongResource;
+                creep.heap.set('state', 'store_wrong');
+                creep.heap.set('targetId', storage ? storage.id : null);
+                creep.heap.set('resource', wrongResource);
                 continue;
             }
 
             // If no reaction, just idle or clean up
             if (!labReaction) {
-                creep.heap instanceof Map ? creep.heap.set('state', 'idle') : creep.heap.state = 'idle';
+                creep.heap.set('state', 'idle');
                 continue;
             }
 
@@ -219,14 +219,14 @@ class LabManager {
                     // Deadlock fix: drop whatever wrong item we are carrying first
                     const carriedRes = Object.keys(creep.store).find(k => k !== RESOURCE_ENERGY);
                     if (carriedRes) {
-                        creep.heap instanceof Map ? creep.heap.set('state', 'store_output') : creep.heap.state = 'store_output';
-                        creep.heap instanceof Map ? creep.heap.set('targetId', storage ? storage.id : terminal ? terminal.id : null) : creep.heap.targetId = storage ? storage.id : terminal ? terminal.id : null;
-                        creep.heap instanceof Map ? creep.heap.set('resource', carriedRes) : creep.heap.resource = carriedRes;
+                        creep.heap.set('state', 'store_output');
+                        creep.heap.set('targetId', storage ? storage.id : terminal ? terminal.id : null);
+                        creep.heap.set('resource', carriedRes);
                     }
                 } else {
-                    creep.heap instanceof Map ? creep.heap.set('state', 'empty_output') : creep.heap.state = 'empty_output';
-                    creep.heap instanceof Map ? creep.heap.set('targetId', outputToEmpty.id) : creep.heap.targetId = outputToEmpty.id;
-                    creep.heap instanceof Map ? creep.heap.set('resource', outputResource) : creep.heap.resource = outputResource;
+                    creep.heap.set('state', 'empty_output');
+                    creep.heap.set('targetId', outputToEmpty.id);
+                    creep.heap.set('resource', outputResource);
                 }
                 continue;
             }
@@ -237,14 +237,14 @@ class LabManager {
                 if (creep.store.getUsedCapacity() > 0) {
                     const carriedRes = Object.keys(creep.store).find(k => k !== RESOURCE_ENERGY);
                     if (carriedRes) {
-                        creep.heap instanceof Map ? creep.heap.set('state', 'store_wrong') : creep.heap.state = 'store_wrong';
-                        creep.heap instanceof Map ? creep.heap.set('targetId', storage ? storage.id : null) : creep.heap.targetId = storage ? storage.id : null;
-                        creep.heap instanceof Map ? creep.heap.set('resource', carriedRes) : creep.heap.resource = carriedRes;
+                        creep.heap.set('state', 'store_wrong');
+                        creep.heap.set('targetId', storage ? storage.id : null);
+                        creep.heap.set('resource', carriedRes);
                     }
                 } else {
-                    creep.heap instanceof Map ? creep.heap.set('state', 'empty_wrong') : creep.heap.state = 'empty_wrong';
-                    creep.heap instanceof Map ? creep.heap.set('targetId', input1.id) : creep.heap.targetId = input1.id;
-                    creep.heap instanceof Map ? creep.heap.set('resource', in1Res) : creep.heap.resource = in1Res;
+                    creep.heap.set('state', 'empty_wrong');
+                    creep.heap.set('targetId', input1.id);
+                    creep.heap.set('resource', in1Res);
                 }
                 continue;
             }
@@ -254,14 +254,14 @@ class LabManager {
                 if (creep.store.getUsedCapacity() > 0) {
                     const carriedRes = Object.keys(creep.store).find(k => k !== RESOURCE_ENERGY);
                     if (carriedRes) {
-                        creep.heap instanceof Map ? creep.heap.set('state', 'store_wrong') : creep.heap.state = 'store_wrong';
-                        creep.heap instanceof Map ? creep.heap.set('targetId', storage ? storage.id : null) : creep.heap.targetId = storage ? storage.id : null;
-                        creep.heap instanceof Map ? creep.heap.set('resource', carriedRes) : creep.heap.resource = carriedRes;
+                        creep.heap.set('state', 'store_wrong');
+                        creep.heap.set('targetId', storage ? storage.id : null);
+                        creep.heap.set('resource', carriedRes);
                     }
                 } else {
-                    creep.heap instanceof Map ? creep.heap.set('state', 'empty_wrong') : creep.heap.state = 'empty_wrong';
-                    creep.heap instanceof Map ? creep.heap.set('targetId', input2.id) : creep.heap.targetId = input2.id;
-                    creep.heap instanceof Map ? creep.heap.set('resource', in2Res) : creep.heap.resource = in2Res;
+                    creep.heap.set('state', 'empty_wrong');
+                    creep.heap.set('targetId', input2.id);
+                    creep.heap.set('resource', in2Res);
                 }
                 continue;
             }
@@ -269,31 +269,31 @@ class LabManager {
             // Priority 4: Fill input labs
             if (input1.store[labReaction.reagent1] < 2000) {
                 if (creep.store[labReaction.reagent1] > 0) {
-                    creep.heap instanceof Map ? creep.heap.set('state', 'fill_input1') : creep.heap.state = 'fill_input1';
-                    creep.heap instanceof Map ? creep.heap.set('targetId', input1.id) : creep.heap.targetId = input1.id;
-                    creep.heap instanceof Map ? creep.heap.set('resource', labReaction.reagent1) : creep.heap.resource = labReaction.reagent1;
+                    creep.heap.set('state', 'fill_input1');
+                    creep.heap.set('targetId', input1.id);
+                    creep.heap.set('resource', labReaction.reagent1);
                 } else {
-                    creep.heap instanceof Map ? creep.heap.set('state', 'gather_input1') : creep.heap.state = 'gather_input1';
-                    creep.heap instanceof Map ? creep.heap.set('targetId', storage && storage.store[labReaction.reagent1] > 0 ? storage.id : terminal && terminal.store[labReaction.reagent1] > 0 ? terminal.id : null) : creep.heap.targetId = storage && storage.store[labReaction.reagent1] > 0 ? storage.id : terminal && terminal.store[labReaction.reagent1] > 0 ? terminal.id : null;
-                    creep.heap instanceof Map ? creep.heap.set('resource', labReaction.reagent1) : creep.heap.resource = labReaction.reagent1;
+                    creep.heap.set('state', 'gather_input1');
+                    creep.heap.set('targetId', storage && storage.store[labReaction.reagent1] > 0 ? storage.id : terminal && terminal.store[labReaction.reagent1] > 0 ? terminal.id : null);
+                    creep.heap.set('resource', labReaction.reagent1);
                 }
                 continue;
             }
 
             if (input2.store[labReaction.reagent2] < 2000) {
                 if (creep.store[labReaction.reagent2] > 0) {
-                    creep.heap instanceof Map ? creep.heap.set('state', 'fill_input2') : creep.heap.state = 'fill_input2';
-                    creep.heap instanceof Map ? creep.heap.set('targetId', input2.id) : creep.heap.targetId = input2.id;
-                    creep.heap instanceof Map ? creep.heap.set('resource', labReaction.reagent2) : creep.heap.resource = labReaction.reagent2;
+                    creep.heap.set('state', 'fill_input2');
+                    creep.heap.set('targetId', input2.id);
+                    creep.heap.set('resource', labReaction.reagent2);
                 } else {
-                    creep.heap instanceof Map ? creep.heap.set('state', 'gather_input2') : creep.heap.state = 'gather_input2';
-                    creep.heap instanceof Map ? creep.heap.set('targetId', storage && storage.store[labReaction.reagent2] > 0 ? storage.id : terminal && terminal.store[labReaction.reagent2] > 0 ? terminal.id : null) : creep.heap.targetId = storage && storage.store[labReaction.reagent2] > 0 ? storage.id : terminal && terminal.store[labReaction.reagent2] > 0 ? terminal.id : null;
-                    creep.heap instanceof Map ? creep.heap.set('resource', labReaction.reagent2) : creep.heap.resource = labReaction.reagent2;
+                    creep.heap.set('state', 'gather_input2');
+                    creep.heap.set('targetId', storage && storage.store[labReaction.reagent2] > 0 ? storage.id : terminal && terminal.store[labReaction.reagent2] > 0 ? terminal.id : null);
+                    creep.heap.set('resource', labReaction.reagent2);
                 }
                 continue;
             }
 
-            creep.heap instanceof Map ? creep.heap.set('state', 'idle') : creep.heap.state = 'idle';
+            creep.heap.set('state', 'idle');
         }
     }
 }
