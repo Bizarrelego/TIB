@@ -8,26 +8,27 @@ module.exports = {
      * @param {Object} spawnLedger The spawn ledger to use.
      */
     run: function(room, spawnLedger) {
-        // Retrieve spawn via O(1) lookup
-        const spawn = global.State.spawnsByRoom.get(room.name)?.[0];
+        try {
+            // Retrieve spawn via O(1) lookup
+            const spawn = global.State.spawnsByRoom.get(room.name)?.[0];
 
-        if (!spawn) {
-            return;
-        }
+            if (!spawn) {
+                return;
+            }
 
-        if (spawnLedger.isSpawnBusy(spawn)) {
-            return;
-        }
+            if (spawnLedger.isSpawnBusy(spawn)) {
+                return;
+            }
 
-        const queue = new SpawnQueueManager();
+            const queue = new SpawnQueueManager();
 
-        // Check creeps count in this room via O(1) lookup
-        const roomCreeps = global.State.creepsByRoom.get(room.name);
+            // Check creeps count in this room via O(1) lookup
+            const roomCreeps = global.State.creepsByRoom.get(room.name);
 
-        const capacity = room.energyCapacityAvailable;
+            const capacity = room.energyCapacityAvailable;
 
-        // Global Scout Spawning Logic (1 active scout globally)
-        if (room.controller.level >= 2) {
+            // Global Scout Spawning Logic (1 active scout globally)
+            if (room.controller.level >= 2) {
             let totalScouts = 0;
             for (const crps of global.State.creepsByRoom.values()) {
                 const s = crps.get('scout');
@@ -251,7 +252,11 @@ module.exports = {
             }
         }
 
-        // Process the queue
-        queue.process(spawn, spawnLedger);
+            // Process the queue
+            queue.process(spawn, spawnLedger);
+
+        } catch (e) {
+            console.log(`[SpawnManager Error] Room ${room.name}: ${e.stack}`);
+        }
     }
 };
