@@ -1,6 +1,7 @@
 const { CacheRegistry } = require('./os/cache');
 const RawMemoryManager = require('./os/RawMemoryManager');
 const globalState = require('./state/globalState');
+const roomEventManager = require('./managers/RoomEventManager');
 const discoveryManager = require('./state/discoveryManager');
 const stateScanner = require('./state/stateScanner');
 const colonyManager = require('./colonies/colonyManager');
@@ -52,6 +53,12 @@ module.exports.loop = function () {
 
     // Phase 2: State Scanner (Event-driven map updaters)
     if (!skipState) {
+        try {
+            if (roomEventManager) roomEventManager();
+        } catch (e) {
+            console.log(`[Phase 2 Error] Room Event Manager: ${e.stack}`);
+        }
+
         try {
             if (stateScanner) stateScanner();
         } catch (e) {
