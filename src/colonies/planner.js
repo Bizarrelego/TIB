@@ -120,10 +120,8 @@ module.exports = {
 
                     if (rclLimit === 0) continue;
 
-                    let count = 0;
-
                     for (let j = 0; j < offsets.length; j++) {
-                        if (structureType !== STRUCTURE_ROAD && count >= rclLimit) break;
+                        if (structureType !== STRUCTURE_ROAD && j >= rclLimit) break;
 
                         const dx = offsets[j][0];
                         const dy = offsets[j][1];
@@ -135,17 +133,87 @@ module.exports = {
                         const plannedPos = roomPositionUtils.getAbsolutePosition(anchor, dx, dy, room.name);
 
                         if (roomPositionUtils.isBuildable(room.name, plannedPos.x, plannedPos.y, structureType)) {
-                            const uniqueId = `${structureType}_${plannedPos.x}_${plannedPos.y}`;
+                            const uniqueId = `${structureType}-${plannedPos.x}-${plannedPos.y}`;
                             plannedStructures.set(uniqueId, {
                                 pos: plannedPos,
                                 type: structureType
                             });
-                            count++;
                         }
                     }
                 }
 
                 plannerState.set('plannedStructures', plannedStructures);
+            }
+
+            // Integrate road planning
+            const plannedStructures = plannerState.get('plannedStructures');
+            if (plannedStructures) {
+                const spawns = global.State.spawnsByRoom ? (global.State.spawnsByRoom.get(room.name) || []) : [];
+                if (spawns.length > 0) {
+                    const spawn = spawns[0];
+                    const destinations = [];
+
+                    const sources = global.State.sourcesByRoom ? (global.State.sourcesByRoom.get(room.name) || []) : [];
+                    for (let i = 0; i < sources.length; i++) {
+                        destinations.push(sources[i]);
+                    }
+
+                    if (room.controller) {
+                        destinations.push(room.controller);
+                    }
+
+                    const minerals = global.State.mineralsByRoom ? (global.State.mineralsByRoom.get(room.name) || []) : [];
+                    for (let i = 0; i < minerals.length; i++) {
+                        destinations.push(minerals[i]);
+                    }
+
+                    const occupiedCoords = new Set();
+                    let roadCount = 0;
+
+                    const cm = new PathFinder.CostMatrix();
+                    for (const struct of plannedStructures.values()) {
+                        if (struct.type !== STRUCTURE_ROAD && struct.type !== STRUCTURE_CONTAINER && struct.type !== STRUCTURE_RAMPART) {
+                            cm.set(struct.pos.x, struct.pos.y, 255);
+                            occupiedCoords.add(`${struct.pos.x},${struct.pos.y}`);
+                        } else if (struct.type === STRUCTURE_ROAD) {
+                            roadCount++;
+                        }
+                    }
+
+                    for (let i = 0; i < destinations.length; i++) {
+                        const dest = destinations[i];
+                        const pathInfo = PathFinder.search(
+                            spawn.pos,
+                            { pos: dest.pos, range: 1 },
+                            {
+                                plainCost: 2,
+                                swampCost: 2,
+                                roomCallback: function(roomName) {
+                                    return cm;
+                                }
+                            }
+                        );
+
+                        for (let j = 0; j < pathInfo.path.length; j++) {
+                            if (roadCount >= 2500) break;
+                            const pos = pathInfo.path[j];
+
+                            if (pos.x === 0 || pos.x === 49 || pos.y === 0 || pos.y === 49) continue;
+
+                            const coordKey = `${pos.x},${pos.y}`;
+                            if (!occupiedCoords.has(coordKey) && roomPositionUtils.isBuildable(room.name, pos.x, pos.y, STRUCTURE_ROAD)) {
+                                const uniqueId = `${STRUCTURE_ROAD}-${pos.x}-${pos.y}`;
+                                if (!plannedStructures.has(uniqueId)) {
+                                    plannedStructures.set(uniqueId, {
+                                        pos: pos,
+                                        type: STRUCTURE_ROAD
+                                    });
+                                    roadCount++;
+                                }
+                            }
+                        }
+                    }
+                }
             }
         } catch (e) {
             console.log(`[Planner Error] Room ${room.name}: ${e.stack}`);
