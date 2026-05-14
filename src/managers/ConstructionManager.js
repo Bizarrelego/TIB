@@ -34,7 +34,7 @@ module.exports = {
 
             // Filter out invalid or completed planned structures, and sort by priority
             let toBuild = [];
-            for (const [posKey, plannedStruct] of plannedStructures.entries()) {
+            for (const plannedStruct of plannedStructures.values()) {
                 let limit = 0;
                 if (plannedStruct.type === STRUCTURE_ROAD) {
                     limit = 2500;

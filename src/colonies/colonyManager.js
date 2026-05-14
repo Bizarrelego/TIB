@@ -16,7 +16,6 @@ const defense = require('./defense');
 const labs = require('./labs');
 const scout = require('../roles/scout');
 const logistics = require('./logistics');
-const LogisticsManager = require('./logisticsManager');
 const RemoteEconomyManager = require('../managers/RemoteEconomyManager');
 const remoteHarvester = require('../roles/remoteHarvester');
 const remoteHauler = require('../roles/remoteHauler');

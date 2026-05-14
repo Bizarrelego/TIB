@@ -109,7 +109,6 @@ module.exports = {
             }
 
             const anchor = plannerState.get('anchor');
-            let activeSites = sites.length;
             const rcl = room.controller.level;
             const structuresMap = global.State.structuresByRoom.get(room.name) || new Map();
             const terrain = global.State.roomTerrain.get(room.name);
