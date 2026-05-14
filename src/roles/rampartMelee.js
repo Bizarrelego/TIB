@@ -30,43 +30,22 @@ module.exports = {
                     continue;
                 }
 
-                // Assign parkPos if not set
-                if (!creep.memory.parkPos) {
-                    const structuresMap = global.State.structuresByRoom.get(room.name);
-                    if (structuresMap) {
-                        const ramparts = structuresMap.get(STRUCTURE_RAMPART) || [];
-                        if (ramparts.length > 0) {
-                            const origin = room.controller || (global.State.spawnsByRoom.get(room.name) || [])[0];
-                            if (origin) {
-                                let closestRampart = null;
-                                let minDist = Infinity;
-                                for (const rampart of ramparts) {
-                                    const dist = Math.max(Math.abs(rampart.pos.x - origin.pos.x), Math.abs(rampart.pos.y - origin.pos.y));
-                                    if (dist < minDist) {
-                                        minDist = dist;
-                                        closestRampart = rampart;
-                                    }
-                                }
-                                if (closestRampart) {
-                                    creep.memory.parkPos = { x: closestRampart.pos.x, y: closestRampart.pos.y, roomName: closestRampart.pos.roomName };
-                                }
-                            }
-                        }
-                    }
+                // State machine assigned by defense.js top-down.
+                // We should expect creep.heap.parkPos to be assigned if missing
+                if (!creep.heap.parkPos && creep.memory.parkPos) {
+                    creep.heap.parkPos = creep.memory.parkPos;
                 }
 
-                // Pathing to parkPos
                 let parked = false;
-                if (creep.memory.parkPos) {
-                    const parkPos = new RoomPosition(creep.memory.parkPos.x, creep.memory.parkPos.y, creep.memory.parkPos.roomName);
-                    if (creep.pos.x !== parkPos.x || creep.pos.y !== parkPos.y) {
-                        movement.moveTo(creep, parkPos);
+                if (creep.heap.parkPos) {
+                    if (creep.pos.x !== creep.heap.parkPos.x || creep.pos.y !== creep.heap.parkPos.y) {
+                        movement.moveTo(creep, creep.heap.parkPos);
                     } else {
                         parked = true;
                     }
                 }
 
-                // Combat logic
+                // Combat logic without native distance checks (rely on state and simple O(N) Chebyshev)
                 let hostilesInRange = false;
                 const hostiles = global.State.hostilesByRoom.get(room.name) || [];
                 for (const hostile of hostiles) {
