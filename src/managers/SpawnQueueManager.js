@@ -101,15 +101,21 @@ class SpawnQueueManager {
             return prioB - prioA;
         });
 
-        const topRequest = this.queue[0];
-
-        // Strict queue priority enforcement: stall the queue and return immediately
-        // if the highest priority role cannot be afforded to prevent lower priority spawn blocking.
-        if (!spawnLedger.canSpawn(topRequest.cost)) {
-            return;
+        for (let i = 0; i < this.queue.length; i++) {
+            const request = this.queue[i];
+            if (spawnLedger.canSpawn(request.cost) && !spawnLedger.isSpawnBusy(spawn)) {
+                const result = spawnLedger.requestSpawn(spawn, request.body, request.name, request.opts, request.cost);
+                if (result === OK) {
+                    this.queue.splice(i, 1);
+                    return; // Spawn is now busy
+                }
+            } else {
+                // If we cannot spawn the current highest priority creep (!canSpawn or ERR_NOT_ENOUGH_ENERGY),
+                // we immediately return from the function. This prevents lower-priority creeps from
+                // consuming energy and blocking the high-priority ones.
+                return;
+            }
         }
-
-        spawnLedger.requestSpawn(spawn, topRequest.body, topRequest.name, topRequest.opts, topRequest.cost);
     }
 }
 
