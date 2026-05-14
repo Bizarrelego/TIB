@@ -62,9 +62,9 @@ module.exports = {
 
             // Spawn a domestic hauler to move energy from harvesters to spawn/extensions
             if (haulerCount < 2) {
-                const body = BodyCalc.calculateHauler(capacity, 10, 10);
+                const body = BodyCalc.calculateDomesticHauler(capacity);
                 const cost = BodyCalc.getCost(body);
-                queue.add('hauler', body, 'hauler_' + Game.time, { memory: { role: 'hauler', colony: room.name } }, cost);
+                queue.add('domesticHauler', body, 'domesticHauler_' + Game.time, { memory: { role: 'domesticHauler', colony: room.name } }, cost);
             }
 
             // Spawn a worker to act as multi-purpose builder/upgrader
