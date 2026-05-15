@@ -122,7 +122,8 @@ class EnergyRequestManager {
 
         // Priority 10: Storage
         for (let i = 0; i < storage.length; i++) {
-            requests.push({ target: storage[i], priority: 10, amount: storage[i].store.getFreeCapacity(RESOURCE_ENERGY) });
+            // Give Storage priority 100 for general haulers moving energy
+            requests.push({ target: storage[i], priority: 100, amount: storage[i].store.getFreeCapacity(RESOURCE_ENERGY) });
         }
 
         // Sort requests by priority (descending)
@@ -229,7 +230,8 @@ class EnergyRequestManager {
         for (let i = 0; i < storage.length; i++) {
             const store = storage[i];
             const amount = store.store.getUsedCapacity(RESOURCE_ENERGY);
-            supplies.push({ target: store, priority: 10, amount: amount });
+            // If Storage exists and has energy, it becomes priority 100 for general logistics (workers/upgraders)
+            supplies.push({ target: store, priority: 100, amount: amount });
         }
 
         // Sort supplies by priority (descending)
