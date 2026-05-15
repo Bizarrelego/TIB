@@ -80,7 +80,11 @@ module.exports.loop = function () {
         if (energyRequestManager && energyRequestManager.handleSourceSleep) {
             energyRequestManager.handleSourceSleep();
         }
+    } catch (e) {
+        console.log(`[Phase 2.5 Error] EnergyRequestManager: ${e.stack}`);
+    }
 
+    try {
         if (global.State.creepsByRoom) {
             for (const roomCreeps of global.State.creepsByRoom.values()) {
                 for (const [role, creepsArray] of roomCreeps.entries()) {

@@ -1,15 +1,5 @@
 const Profiler = require('../utils/profiler');
-
-// Import Managers
-const ConstructionManager = require('./ConstructionManager');
-const LabManager = require('./LabManager');
-const MarketManager = require('./MarketManager');
-const TerminalManager = require('./TerminalManager');
-const UpgraderManager = require('./UpgraderManager');
-const StorageManager = require('./StorageManager');
-const LinkManager = require('./LinkManager');
-const RemoteEconomyManager = require('./RemoteEconomyManager');
-const workerManager = require('./workerManager');
+const globalState = require('../state/globalState');
 
 /**
  * @file managerOrchestrator.js
@@ -39,26 +29,29 @@ function managerOrchestrator() {
         // Only run managers in controlled rooms
         if (!room || !room.controller || !room.controller.my) continue;
 
-        /** @type {Array<{run: function(Room): void, name?: string}>} */
-        const managers = [
-            ConstructionManager,
-            LabManager,
-            MarketManager,
-            TerminalManager,
-            UpgraderManager,
-            StorageManager,
-            LinkManager,
-            RemoteEconomyManager,
-            workerManager
+        // Managers configuration for tick-slicing
+        const managersConfig = [
+            { name: 'TowerManager', slice: 1 },
+            { name: 'ConstructionManager', slice: 1 },
+            { name: 'workerManager', slice: 1 },
+            { name: 'LinkManager', slice: 1 },
+            { name: 'UpgraderManager', slice: 1 },
+            { name: 'StorageManager', slice: 1 },
+            { name: 'LabManager', slice: 5 },
+            { name: 'RemoteEconomyManager', slice: 5 },
+            { name: 'MarketManager', slice: 10 },
+            { name: 'TerminalManager', slice: 10 }
         ];
 
-        for (const manager of managers) {
+        for (const config of managersConfig) {
+            if (Game.time % config.slice !== 0) continue;
+
+            const manager = globalState.getManager(config.name);
             if (manager && typeof manager.run === 'function') {
                 try {
                     manager.run(room);
                 } catch (e) {
-                    const managerName = manager.name || 'UnknownManager';
-                    console.log(`[ManagerOrchestrator Error] ${managerName} in Room ${room.name}: ${e.stack}`);
+                    console.log(`[ManagerOrchestrator Error] ${config.name} in Room ${room.name}: ${e.stack}`);
                 }
             }
         }
