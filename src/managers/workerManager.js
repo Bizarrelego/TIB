@@ -33,25 +33,65 @@ module.exports = {
             }
         }
 
+        const roomCreepsAll = global.State.creepsByRoom.get(room.name);
+        let harvesterCount = 0;
+        let haulerCount = 0;
+        if (roomCreepsAll) {
+            const harvesters = roomCreepsAll.get('harvester');
+            if (harvesters) harvesterCount = harvesters.length;
+            const haulers = roomCreepsAll.get('hauler');
+            if (haulers) haulerCount += haulers.length;
+            const domesticHaulers = roomCreepsAll.get('domesticHauler');
+            if (domesticHaulers) haulerCount += domesticHaulers.length;
+        }
+        const isBootstrapping = harvesterCount === 0 && haulerCount === 0;
+
         for (const creep of workers) {
             // Determine state based on capacity
             if (creep.store.getUsedCapacity() === 0) {
-                creep.heap.state = 'harvest';
+                creep.heap.state = isBootstrapping ? 'harvest' : 'pickup';
             } else if (creep.store.getFreeCapacity() === 0) {
                 if (room.energyAvailable < room.energyCapacityAvailable) {
                     creep.heap.state = 'refill';
                 } else if (sites && sites.length > 0) {
                     creep.heap.state = 'build';
                 } else {
-                    creep.heap.state = room.memory.haltUpgrades ? 'refill' : 'upgrade'; // use refill as idle state if upgrades halted
+                    creep.heap.state = 'repair';
                 }
             } else if (!creep.heap.state) {
                 // Fallback for global reset
-                creep.heap.state = 'harvest';
+                creep.heap.state = isBootstrapping ? 'harvest' : 'pickup';
             }
 
             // Assign targets based on state
-            if (creep.heap.state === 'harvest') {
+            if (creep.heap.state === 'pickup') {
+                const EnergyRequestManager = require('./EnergyRequestManager');
+                const supplies = EnergyRequestManager.getEnergySupplies(room.name);
+                if (supplies.length > 0) {
+                    creep.heap.targetId = supplies[0].target.id;
+                } else {
+                    creep.heap.targetId = null;
+                }
+            } else if (creep.heap.state === 'repair') {
+                const ramparts = structures ? (structures.get(STRUCTURE_RAMPART) || []) : [];
+                let target = null;
+                for (let i = 0; i < ramparts.length; i++) {
+                    if (ramparts[i].hits < 5000) {
+                        target = ramparts[i];
+                        break;
+                    }
+                }
+                if (target) {
+                    creep.heap.targetId = target.id;
+                } else {
+                    creep.heap.state = room.memory.haltUpgrades ? 'idle' : 'upgrade'; // fallback to upgrade if nothing to repair
+                    if (creep.heap.state === 'upgrade' && room.controller) {
+                        creep.heap.targetId = room.controller.id;
+                    } else {
+                        creep.heap.targetId = null;
+                    }
+                }
+            } else if (creep.heap.state === 'harvest') {
                 if (sources.length > 0) {
                     // O(N) Chebyshev distance for target selection
                     let bestSource = null;
@@ -80,14 +120,49 @@ module.exports = {
                 }
             } else if (creep.heap.state === 'build') {
                 if (sites && sites.length > 0) {
-                    let bestSite = null;
                     let highestPriority = -Infinity;
+
+                    // Priority Order: STRUCTURE_EXTENSION > STRUCTURE_CONTAINER > STRUCTURE_TOWER > STRUCTURE_STORAGE > STRUCTURE_RAMPART > STRUCTURE_ROAD
+                    const customPriorities = {
+                        [STRUCTURE_EXTENSION]: 100,
+                        [STRUCTURE_CONTAINER]: 90,
+                        [STRUCTURE_TOWER]: 80,
+                        [STRUCTURE_STORAGE]: 70,
+                        [STRUCTURE_RAMPART]: 60,
+                        [STRUCTURE_ROAD]: 50
+                    };
 
                     for (let i = 0; i < sites.length; i++) {
                         const site = sites[i];
-                        const priority = STRUCTURE_PRIORITIES.get(site.structureType) || STRUCTURE_PRIORITIES.get('default');
+                        const priority = customPriorities[site.structureType] || STRUCTURE_PRIORITIES.get(site.structureType) || STRUCTURE_PRIORITIES.get('default');
                         if (priority > highestPriority) {
                             highestPriority = priority;
+                        }
+                    }
+
+                    let highestPrioritySites = [];
+                    for (let i = 0; i < sites.length; i++) {
+                        const site = sites[i];
+                        const priority = customPriorities[site.structureType] || STRUCTURE_PRIORITIES.get(site.structureType) || STRUCTURE_PRIORITIES.get('default');
+                        if (priority === highestPriority) {
+                            highestPrioritySites.push(site);
+                        }
+                    }
+
+                    let bestSite = null;
+                    let minDistance = Infinity;
+
+                    // Calculate closest highest priority site to a central point (spawns[0] or controller) to group workers
+                    let referencePos = room.controller ? room.controller.pos : creep.pos;
+                    if (structures && structures.get(STRUCTURE_SPAWN) && structures.get(STRUCTURE_SPAWN).length > 0) {
+                        referencePos = structures.get(STRUCTURE_SPAWN)[0].pos;
+                    }
+
+                    for (let i = 0; i < highestPrioritySites.length; i++) {
+                        const site = highestPrioritySites[i];
+                        const dist = Math.max(Math.abs(referencePos.x - site.pos.x), Math.abs(referencePos.y - site.pos.y));
+                        if (dist < minDistance) {
+                            minDistance = dist;
                             bestSite = site;
                         }
                     }

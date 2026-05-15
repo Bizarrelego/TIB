@@ -37,6 +37,20 @@ module.exports = {
                     if (creep.harvest(target) === ERR_NOT_IN_RANGE) {
                         movement.moveTo(creep, target);
                     }
+                } else if (state === 'pickup') {
+                    let res = OK;
+                    if (target instanceof Resource) {
+                        res = creep.pickup(target);
+                    } else {
+                        res = creep.withdraw(target, RESOURCE_ENERGY);
+                    }
+                    if (res === ERR_NOT_IN_RANGE) {
+                        movement.moveTo(creep, target);
+                    }
+                } else if (state === 'repair') {
+                    if (creep.repair(target) === ERR_NOT_IN_RANGE) {
+                        movement.moveTo(creep, target);
+                    }
                 } else if (state === 'refill') {
                     if (creep.transfer(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
                         movement.moveTo(creep, target);
