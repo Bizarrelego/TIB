@@ -1,7 +1,7 @@
 const DeadlockEngine = require('./deadlock');
 const movement = require('../utils/movement');
 const ROLE_PRIORITIES = require('../constants/rolePriorities');
-
+const Ledger = require('./ledger');
 
 /**
  * @typedef {Object} PipelineLock
@@ -19,9 +19,9 @@ const TrafficManager = {
     init() {
         if (!global.State) global.State = {};
         if (!(global.State.trafficIntents instanceof Map)) global.State.trafficIntents = new Map();
-        if (!(global.State.ledger instanceof Map)) global.State.ledger = new Map();
         if (!(global.State.swapRegistry instanceof Map)) global.State.swapRegistry = new Map();
         if (!(global.State.pipelineLedger instanceof Map)) global.State.pipelineLedger = new Map();
+        Ledger.init();
     },
 
     /**
@@ -32,6 +32,7 @@ const TrafficManager = {
         if (!(global.State.pipelineLedger instanceof Map)) {
             global.State.pipelineLedger = new Map();
         }
+        Ledger.init();
     },
 
     /**
@@ -45,8 +46,8 @@ const TrafficManager = {
 
             // Clean volatile entries only
             global.State.trafficIntents.clear();
-            global.State.ledger.clear();
             global.State.swapRegistry.clear();
+            Ledger.clear();
 
             // Clean pipeline locks every 10 ticks
             if (Game.time % 10 === 0) {
@@ -96,107 +97,27 @@ const TrafficManager = {
     },
 
     getVirtualState(target, resourceType) {
-        const ledger = global.State.ledger;
-        if (!ledger) return { used: 0, free: 0, cap: 0 };
-
-        if (ledger.has(target.id)) {
-            const state = ledger.get(target.id);
-            return { used: state.used, free: state.cap - state.used, cap: state.cap };
-        }
-
-        let used = 0;
-        let cap = 0;
-
-        if (target.store) {
-            used = target.store.getUsedCapacity(resourceType) || 0;
-            cap = target.store.getCapacity(resourceType) || 0;
-        } else if (target.amount !== undefined) {
-            used = target.amount;
-            cap = target.amount; // For dropped resources, cap is amount
-        } else if (target.energyCapacity !== undefined) {
-            used = target.energy;
-            cap = target.energyCapacity;
-        } else if (target.progressTotal !== undefined) {
-            used = target.progress;
-            cap = target.progressTotal;
-        }
-
-        return { used, free: Math.max(0, cap - used), cap };
+        return Ledger.getVirtualState(target, resourceType);
     },
 
     registerTransfer(creep, target, resourceType, amount) {
-        const ledger = global.State.ledger;
-        if (!ledger) return ERR_FULL;
-
-        const targetState = this.getVirtualState(target, resourceType);
-        if (targetState.free < amount) return ERR_FULL;
-
-        ledger.set(target.id, { used: targetState.used + amount, cap: targetState.cap });
-
-        const creepState = this.getVirtualState(creep, resourceType);
-        ledger.set(creep.id, { used: creepState.used - amount, cap: creepState.cap });
-
-        return OK;
+        return Ledger.registerTransfer(creep, target, resourceType, amount);
     },
 
     registerWithdraw(creep, target, resourceType, amount) {
-        const ledger = global.State.ledger;
-        if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
-
-        const targetState = this.getVirtualState(target, resourceType);
-        if (targetState.used < amount) return ERR_NOT_ENOUGH_RESOURCES;
-
-        ledger.set(target.id, { used: targetState.used - amount, cap: targetState.cap });
-
-        const creepState = this.getVirtualState(creep, resourceType);
-        ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
-
-        return OK;
+        return Ledger.registerWithdraw(creep, target, resourceType, amount);
     },
 
     registerPickup(creep, target, resourceType, amount) {
-        const ledger = global.State.ledger;
-        if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
-
-        const targetState = this.getVirtualState(target, resourceType);
-        if (targetState.used < amount) return ERR_NOT_ENOUGH_RESOURCES;
-
-        ledger.set(target.id, { used: targetState.used - amount, cap: targetState.cap });
-
-        const creepState = this.getVirtualState(creep, resourceType);
-        ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
-
-        return OK;
+        return Ledger.registerPickup(creep, target, resourceType, amount);
     },
 
     registerDrop(creep, resourceType, amount) {
-        const ledger = global.State.ledger;
-        if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
-
-        const creepState = this.getVirtualState(creep, resourceType);
-        if (creepState.used < amount) return ERR_NOT_ENOUGH_RESOURCES;
-
-        ledger.set(creep.id, { used: creepState.used - amount, cap: creepState.cap });
-
-        return OK;
+        return Ledger.registerDrop(creep, resourceType, amount);
     },
 
     registerHarvest(creep, target) {
-        const ledger = global.State.ledger;
-        if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
-
-        const targetState = this.getVirtualState(target, RESOURCE_ENERGY);
-        const workParts = creep.getActiveBodyparts(WORK);
-        const harvestAmount = Math.min(targetState.used, workParts * 2); // 2 energy per work part
-
-        if (harvestAmount <= 0) return ERR_NOT_ENOUGH_RESOURCES;
-
-        ledger.set(target.id, { used: targetState.used - harvestAmount, cap: targetState.cap });
-
-        const creepState = this.getVirtualState(creep, RESOURCE_ENERGY);
-        ledger.set(creep.id, { used: creepState.used + harvestAmount, cap: creepState.cap });
-
-        return OK;
+        return Ledger.registerHarvest(creep, target);
     },
 
     /**
@@ -207,6 +128,7 @@ const TrafficManager = {
         // Fatigue Gating: Ensure only the specific creep is gated.
         // The TrafficManager should only process creeps that are capable of moving.
         if (!creep || creep.fatigue > 0) return;
+        if (!Ledger.registerIntent(creep, 'move')) return;
 
         if (global.State && global.State.trafficIntents) {
             global.State.trafficIntents.set(creep.name, { direction, priority: creep.heap.priority || 0 });
@@ -220,6 +142,8 @@ const TrafficManager = {
      */
     registerMoveIntent(creep, targetPos, opts = {}) {
         if (!creep || creep.fatigue > 0) return;
+        if (!Ledger.registerIntent(creep, 'move')) return;
+
         if (!global.State) global.State = {};
         if (!(global.State.trafficIntents instanceof Map)) global.State.trafficIntents = new Map();
 
