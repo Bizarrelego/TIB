@@ -1,4 +1,4 @@
-/* global FIND_RUINS, FIND_TOMBSTONES */
+/* global FIND_RUINS */
 
 /**
  * Initializes and populates global.State for owned rooms.
