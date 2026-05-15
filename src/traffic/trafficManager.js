@@ -138,6 +138,7 @@ const TrafficManager = {
 
         const creepState = this.getVirtualState(creep, resourceType);
         ledger.set(creep.id, { used: creepState.used - amount, cap: creepState.cap });
+        this.lockPipeline(creep.name, creep.id, target.id, resourceType, amount, 'TRANSFER');
 
         return OK;
     },
@@ -156,6 +157,7 @@ const TrafficManager = {
 
         const creepState = this.getVirtualState(creep, resType);
         ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
+        this.lockPipeline(creep.name, creep.id, target.id, resType, amount, 'WITHDRAW');
 
         return OK;
     },
@@ -172,6 +174,7 @@ const TrafficManager = {
 
         const creepState = this.getVirtualState(creep, resourceType);
         ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
+        this.lockPipeline(creep.name, creep.id, target.id, resourceType, amount, 'PICKUP');
 
         return OK;
     },
@@ -186,6 +189,7 @@ const TrafficManager = {
         if (creepState.used < amount) return ERR_NOT_ENOUGH_RESOURCES;
 
         ledger.set(creep.id, { used: creepState.used - amount, cap: creepState.cap });
+        this.lockPipeline(creep.name, creep.id, null, resType, amount, 'DROP');
 
         return OK;
     },
@@ -212,6 +216,7 @@ const TrafficManager = {
 
         const creepState = this.getVirtualState(creep, resType);
         ledger.set(creep.id, { used: creepState.used + harvestAmount, cap: creepState.cap });
+        this.lockPipeline(creep.name, creep.id, target.id, resType, harvestAmount, 'HARVEST');
 
         return OK;
     },
@@ -223,11 +228,12 @@ const TrafficManager = {
     registerMove(creep, direction) {
         // Fatigue Gating: Ensure only the specific creep is gated.
         // The TrafficManager should only process creeps that are capable of moving.
-        if (!creep || creep.fatigue > 0 || this.checkPipeline(creep.id)) return;
+        if (!creep || creep.fatigue > 0 || this.checkPipeline(creep.id)) return ERR_BUSY;
 
         if (global.State && global.State.trafficIntents) {
             global.State.trafficIntents.set(creep.name, { direction, priority: creep.heap.priority || 0 });
         }
+        return OK;
     },
 
     /**
@@ -236,7 +242,7 @@ const TrafficManager = {
      * @param {object} [opts={}]
      */
     registerMoveIntent(creep, targetPos, opts = {}) {
-        if (!creep || creep.fatigue > 0 || this.checkPipeline(creep.id)) return;
+        if (!creep || creep.fatigue > 0 || this.checkPipeline(creep.id)) return ERR_BUSY;
         if (!global.State) global.State = {};
         if (!(global.State.trafficIntents instanceof Map)) global.State.trafficIntents = new Map();
 
@@ -246,6 +252,7 @@ const TrafficManager = {
             opts,
             originalPos: creep.pos
         });
+        return OK;
     },
 
     registerSwap(creepA, creepB) {

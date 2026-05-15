@@ -57,7 +57,18 @@ assert.strictEqual(targetState.used, 150, 'Target used should be 150');
 let creepState = TrafficManager.getVirtualState(creep, RESOURCE_ENERGY);
 assert.strictEqual(creepState.used, 0, 'Creep used should be 0');
 
-result = TrafficManager.registerTransfer(creep, target, RESOURCE_ENERGY, 60);
+// Mock creep2 for testing ERR_FULL
+const creep2 = {
+    id: 'creep2',
+    name: 'creep2',
+    store: {
+        getUsedCapacity: () => 50,
+        getCapacity: () => 100
+    }
+};
+global.State.objects['creep2'] = creep2;
+
+result = TrafficManager.registerTransfer(creep2, target, RESOURCE_ENERGY, 60);
 assert.strictEqual(result, ERR_FULL, 'Transfer 60 should be ERR_FULL');
 
 console.log('Test passed!');

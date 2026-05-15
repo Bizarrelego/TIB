@@ -147,7 +147,7 @@ module.exports = {
 
         // 3. Synchronize intents
         for (const intent of intents) {
-            TrafficManager.registerMove(intent.creep, direction);
+            TrafficManager.registerMoveIntent(intent.creep, intent.targetPos, intent.opts);
         }
     }
 };
