@@ -7,6 +7,11 @@ function run(room) {
     const fastFillers = roomCreeps.get('fastFiller');
     if (!fastFillers || fastFillers.length === 0) return;
 
+    const plannerState = global.State.roomPlanner ? global.State.roomPlanner.get(room.name) : null;
+    const fastFillerPositions = plannerState ? plannerState.get('fastFillerPositions') : null;
+
+    if (!fastFillerPositions || fastFillerPositions.length === 0) return;
+
     const storage = room.storage && room.storage.isActive() ? room.storage : null;
     let coreContainer = null;
 
@@ -26,63 +31,79 @@ function run(room) {
 
     const source = storage || coreContainer;
 
+    // Fast fillers are stationary. Claim a position.
+    const claimedPositions = new Set();
+    for (let i = 0; i < fastFillers.length; i++) {
+        const creep = fastFillers[i];
+        if (creep.memory.targetPos) {
+            claimedPositions.add(`${creep.memory.targetPos.x},${creep.memory.targetPos.y}`);
+        }
+    }
+
     for (let i = 0; i < fastFillers.length; i++) {
         const creep = fastFillers[i];
         try {
-            if (creep.fatigue > 0) continue; // Fatigue gating
+            if (creep.fatigue > 0) continue;
 
-            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
-                if (source) {
-                    if (creep.withdraw(source, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
-                        movement.moveTo(creep, source);
+            if (!creep.memory.targetPos) {
+                for (let j = 0; j < fastFillerPositions.length; j++) {
+                    const pos = fastFillerPositions[j];
+                    const key = `${pos.x},${pos.y}`;
+                    if (!claimedPositions.has(key)) {
+                        creep.memory.targetPos = { x: pos.x, y: pos.y, roomName: pos.roomName };
+                        claimedPositions.add(key);
+                        break;
                     }
+                }
+            }
+
+            if (!creep.memory.targetPos) continue;
+
+            const targetPos = new RoomPosition(creep.memory.targetPos.x, creep.memory.targetPos.y, creep.memory.targetPos.roomName);
+
+            // If not on spot, move to it.
+            if (creep.pos.x !== targetPos.x || creep.pos.y !== targetPos.y) {
+                movement.moveTo(creep, targetPos);
+                continue;
+            }
+
+            // Once on spot, execute strictly stationary calls.
+            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+                if (source && creep.pos.isNearTo(source)) {
+                    creep.withdraw(source, RESOURCE_ENERGY);
                 }
             } else {
                 const structuresMap = global.State.structuresByRoom.get(room.name);
                 let target = null;
-                let minDistance = Infinity;
 
                 if (structuresMap) {
                     const spawns = structuresMap.get(STRUCTURE_SPAWN) || [];
                     for (let j = 0; j < spawns.length; j++) {
-                        if (spawns[j].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                            const dist = creep.pos.getRangeTo(spawns[j]);
-                            if (dist < minDistance) {
-                                minDistance = dist;
-                                target = spawns[j];
-                            }
+                        if (creep.pos.isNearTo(spawns[j]) && spawns[j].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                            target = spawns[j];
+                            break;
                         }
                     }
 
-                    const extensions = structuresMap.get(STRUCTURE_EXTENSION) || [];
-                    for (let j = 0; j < extensions.length; j++) {
-                        if (extensions[j].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                            const dist = creep.pos.getRangeTo(extensions[j]);
-                            if (dist < minDistance) {
-                                minDistance = dist;
+                    if (!target) {
+                        const extensions = structuresMap.get(STRUCTURE_EXTENSION) || [];
+                        for (let j = 0; j < extensions.length; j++) {
+                            if (creep.pos.isNearTo(extensions[j]) && extensions[j].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
                                 target = extensions[j];
+                                break;
                             }
                         }
                     }
                 }
 
                 if (target) {
-                    if (creep.transfer(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
-                        movement.moveTo(creep, target);
-                    }
+                    creep.transfer(target, RESOURCE_ENERGY);
                 } else {
-                    if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0 && source) {
-                        if (creep.withdraw(source, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
-                            movement.moveTo(creep, source);
-                        }
-                    } else {
-                        const heapIsMap = creep.heap instanceof Map;
-                        const parkPos = heapIsMap ? creep.heap.get('parkPos') : creep.heap.parkPos;
-                        if (parkPos) {
-                            movement.moveTo(creep, new RoomPosition(parkPos.x, parkPos.y, parkPos.roomName));
-                        }
+                    // Refill if empty, otherwise wait.
+                    if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0 && source && creep.pos.isNearTo(source)) {
+                        creep.withdraw(source, RESOURCE_ENERGY);
                     }
-                 }
+                }
             }
         } catch (e) {
             console.log(`[fastFiller Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
