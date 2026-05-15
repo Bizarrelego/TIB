@@ -22,7 +22,7 @@ module.exports = {
 
         // Flatten all structures from global state for fast filtering
         let allStructures = [];
-        for (const [type, structures] of roomStructures) {
+        for (const [, structures] of roomStructures) {
             allStructures = allStructures.concat(structures);
         }
 
