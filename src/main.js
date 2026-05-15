@@ -1,6 +1,7 @@
 const { CacheRegistry } = require('./os/cache');
 const RawMemoryManager = require('./os/RawMemoryManager');
 const globalState = require('./state/globalState');
+const installMemoryProxy = require('./os/memoryProxy');
 const roomEventManager = require('./managers/RoomEventManager');
 const discoveryManager = require('./state/discoveryManager');
 const stateScanner = require('./state/stateScanner');
@@ -25,6 +26,9 @@ module.exports.loop = function () {
     if (!global.Cache) {
         CacheRegistry.init();
     }
+
+    // Install Memory Proxy
+    installMemoryProxy();
 
     // Phase 1: Discovery Manager (Raw Engine API execution & global.State Bootstrapping)
     try {

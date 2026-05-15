@@ -77,7 +77,7 @@ const LogisticsManager = {
     run(roomName) {
         if (!global.State.structuresByRoom.has(roomName)) return;
 
-        const room = Game.rooms[roomName];
+        const room = global.State.rooms.get(roomName);
         if (!room) return;
 
         const structuresMap = global.State.structuresByRoom.get(roomName) || new Map();
