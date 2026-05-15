@@ -1,5 +1,6 @@
 const { CacheRegistry } = require('./os/cache');
 const RawMemoryManager = require('./os/RawMemoryManager');
+const installMemoryProxy = require('./os/memoryProxy');
 const globalState = require('./state/globalState');
 const managersIntegration = require('./managers/index');
 const discoveryManager = require('./state/discoveryManager');
@@ -11,6 +12,9 @@ const trafficManager = require('./traffic/trafficManager');
 const movement = require('./utils/movement');
 
 module.exports.loop = function () {
+    // Install memory proxy to bind heap to Creep prototypes
+    installMemoryProxy();
+
     // Initialize RawMemory segments
     try {
         RawMemoryManager.init();
