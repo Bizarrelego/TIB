@@ -3,6 +3,8 @@
  * Calculates optimal choke points by treating room tiles as graph nodes.
  */
 
+const MinCutInterface = require('./wasm/minCutInterface');
+
 class MinCut {
     /**
      * Helper to map x, y to a 1D array index
@@ -20,6 +22,11 @@ class MinCut {
      * @returns {RoomPosition[]}
      */
     static getCutTiles(roomName, sources, bounds = new PathFinder.CostMatrix()) {
+        const wasmResult = MinCutInterface.getCutTilesWasm(roomName, sources, bounds);
+        if (wasmResult !== null) {
+            return wasmResult;
+        }
+
         const V = 50 * 50 + 2;
         const SOURCE = V - 2;
         const SINK = V - 1;
