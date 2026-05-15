@@ -5,7 +5,6 @@ function getHeap(creep, key) { return creep.heap instanceof Map ? creep.heap.get
 const eventBus = require('../os/eventBus');
 const TrafficManager = require('../traffic/trafficManager');
 const EnergyRequestManager = require('../managers/EnergyRequestManager');
-const resourceUtils = require('../utils/resourceUtils');
 const Profiler = require('../utils/profiler');
 
 function findHubParkPos(hubLink, storage, terminal, room) {

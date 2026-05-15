@@ -3,7 +3,6 @@
  * @description Ignores all standard logic. Mines nearest node, directly refills spawn.
  */
 
-const movement = require('../utils/movement');
 
 module.exports = {
     /**

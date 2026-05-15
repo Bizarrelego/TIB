@@ -22,7 +22,7 @@ class MinCutInterface {
      * @param {CostMatrix} bounds
      * @returns {RoomPosition[]|null}
      */
-    static getCutTilesWasm(roomName, sources, bounds) {
+    static getCutTilesWasm() {
         if (!wasmModule || !wasmModule.getCutTiles) {
             return null; // Fallback to JS implementation
         }
