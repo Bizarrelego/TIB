@@ -131,13 +131,16 @@ const TrafficManager = {
         const ledger = global.State.ledger;
         if (!ledger) return ERR_FULL;
 
-        const targetState = this.getVirtualState(target, resourceType);
+        const resType = resourceType || target.mineralType || target.resourceType || RESOURCE_ENERGY;
+        const targetState = this.getVirtualState(target, resType);
         if (targetState.free < amount) return ERR_FULL;
 
         ledger.set(target.id, { used: targetState.used + amount, cap: targetState.cap });
 
-        const creepState = this.getVirtualState(creep, resourceType);
+        const creepState = this.getVirtualState(creep, resType);
         ledger.set(creep.id, { used: creepState.used - amount, cap: creepState.cap });
+
+        this.lockPipeline(creep.name, creep.id, target.id, resType, amount, 'TRANSFER');
 
         return OK;
     },
@@ -148,7 +151,7 @@ const TrafficManager = {
         const ledger = global.State.ledger;
         if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
 
-        const resType = resourceType || target.resourceType || RESOURCE_ENERGY;
+        const resType = resourceType || target.mineralType || target.resourceType || RESOURCE_ENERGY;
         const targetState = this.getVirtualState(target, resType);
         if (targetState.used < amount) return ERR_NOT_ENOUGH_RESOURCES;
 
@@ -156,6 +159,8 @@ const TrafficManager = {
 
         const creepState = this.getVirtualState(creep, resType);
         ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
+
+        this.lockPipeline(creep.name, creep.id, target.id, resType, amount, 'WITHDRAW');
 
         return OK;
     },
@@ -165,13 +170,16 @@ const TrafficManager = {
         const ledger = global.State.ledger;
         if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
 
-        const targetState = this.getVirtualState(target, resourceType);
+        const resType = resourceType || target.mineralType || target.resourceType || RESOURCE_ENERGY;
+        const targetState = this.getVirtualState(target, resType);
         if (targetState.used < amount) return ERR_NOT_ENOUGH_RESOURCES;
 
         ledger.set(target.id, { used: targetState.used - amount, cap: targetState.cap });
 
-        const creepState = this.getVirtualState(creep, resourceType);
+        const creepState = this.getVirtualState(creep, resType);
         ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
+
+        this.lockPipeline(creep.name, creep.id, target.id, resType, amount, 'PICKUP');
 
         return OK;
     },
@@ -186,6 +194,8 @@ const TrafficManager = {
         if (creepState.used < amount) return ERR_NOT_ENOUGH_RESOURCES;
 
         ledger.set(creep.id, { used: creepState.used - amount, cap: creepState.cap });
+
+        this.lockPipeline(creep.name, creep.id, null, resType, amount, 'DROP');
 
         return OK;
     },
@@ -212,6 +222,8 @@ const TrafficManager = {
 
         const creepState = this.getVirtualState(creep, resType);
         ledger.set(creep.id, { used: creepState.used + harvestAmount, cap: creepState.cap });
+
+        this.lockPipeline(creep.name, creep.id, target.id, resType, harvestAmount, 'HARVEST');
 
         return OK;
     },
@@ -278,10 +290,10 @@ const TrafficManager = {
 
             switch (intent.type) {
                 case 'TRANSFER':
-                    creep.transfer(target, intent.resourceType);
+                    creep.transfer(target, intent.resourceType, intent.amount);
                     break;
                 case 'WITHDRAW':
-                    creep.withdraw(target, intent.resourceType);
+                    creep.withdraw(target, intent.resourceType, intent.amount);
                     break;
                 case 'PICKUP':
                     creep.pickup(target);
