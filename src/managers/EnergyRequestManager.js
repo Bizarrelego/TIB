@@ -57,6 +57,8 @@ class EnergyRequestManager {
      */
     static getEnergyRequests(roomName) {
         const requests = [];
+        const room = Game.rooms[roomName];
+        const hasStorage = room && room.storage && room.storage.isActive();
 
         const spawns = resourceUtils.getStructuresWithFreeCapacity(roomName, [STRUCTURE_SPAWN]);
         const extensions = resourceUtils.getStructuresWithFreeCapacity(roomName, [STRUCTURE_EXTENSION]);
@@ -84,12 +86,13 @@ class EnergyRequestManager {
         }
 
         // Priority 80: Controller Container
-        const controller = Game.rooms[roomName] ? Game.rooms[roomName].controller : null;
+        const controller = room ? room.controller : null;
         if (controller) {
             const containers = resourceUtils.getStructuresWithFreeCapacity(roomName, [STRUCTURE_CONTAINER]);
+            const priority = hasStorage ? 90 : 80;
             for (let i = 0; i < containers.length; i++) {
                 if (containers[i].pos.inRangeTo(controller, 3)) {
-                    requests.push({ target: containers[i], priority: 80, amount: containers[i].store.getFreeCapacity(RESOURCE_ENERGY) });
+                    requests.push({ target: containers[i], priority: priority, amount: containers[i].store.getFreeCapacity(RESOURCE_ENERGY) });
                 }
             }
         }
@@ -121,9 +124,9 @@ class EnergyRequestManager {
         }
 
         // Priority 10: Storage
+        const storagePriority = hasStorage ? 100 : 10;
         for (let i = 0; i < storage.length; i++) {
-            // Give Storage priority 100 for general haulers moving energy
-            requests.push({ target: storage[i], priority: 100, amount: storage[i].store.getFreeCapacity(RESOURCE_ENERGY) });
+            requests.push({ target: storage[i], priority: storagePriority, amount: storage[i].store.getFreeCapacity(RESOURCE_ENERGY) });
         }
 
         // Sort requests by priority (descending)
@@ -140,6 +143,8 @@ class EnergyRequestManager {
      */
     static getEnergySupplies(roomName) {
         const supplies = [];
+        const room = Game.rooms[roomName];
+        const hasStorage = room && room.storage && room.storage.isActive();
 
         // Containers (Priority 100 if Source Container with > 200 energy)
         const containers = resourceUtils.getStructuresWithUsedCapacity(roomName, [STRUCTURE_CONTAINER]);
@@ -227,11 +232,11 @@ class EnergyRequestManager {
 
         // Storage (always available as a low priority source if nothing else is)
         const storage = resourceUtils.getStructuresWithUsedCapacity(roomName, [STRUCTURE_STORAGE]);
+        const storagePriority = hasStorage ? 100 : 10;
         for (let i = 0; i < storage.length; i++) {
             const store = storage[i];
             const amount = store.store.getUsedCapacity(RESOURCE_ENERGY);
-            // If Storage exists and has energy, it becomes priority 100 for general logistics (workers/upgraders)
-            supplies.push({ target: store, priority: 100, amount: amount });
+            supplies.push({ target: store, priority: storagePriority, amount: amount });
         }
 
         // Sort supplies by priority (descending)

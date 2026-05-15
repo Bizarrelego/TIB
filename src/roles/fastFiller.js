@@ -5,48 +5,82 @@ function run(room) {
     if (!roomCreeps) return;
 
     const fastFillers = roomCreeps.get('fastFiller');
-    if (!fastFillers) return;
+    if (!fastFillers || fastFillers.length === 0) return;
+
+    const storage = room.storage && room.storage.isActive() ? room.storage : null;
+    let coreContainer = null;
+
+    if (!storage) {
+        const structuresMap = global.State.structuresByRoom.get(room.name);
+        const containers = structuresMap ? (structuresMap.get(STRUCTURE_CONTAINER) || []) : [];
+        const spawns = structuresMap ? (structuresMap.get(STRUCTURE_SPAWN) || []) : [];
+        if (spawns.length > 0) {
+            for (let i = 0; i < containers.length; i++) {
+                if (containers[i].pos.inRangeTo(spawns[0], 2)) {
+                    coreContainer = containers[i];
+                    break;
+                }
+            }
+        }
+    }
+
+    const source = storage || coreContainer;
 
     for (let i = 0; i < fastFillers.length; i++) {
         const creep = fastFillers[i];
         try {
-            creep.heap = creep.heap || {};
             if (creep.fatigue > 0) continue; // Fatigue gating
 
-            const heapIsMap = creep.heap instanceof Map;
-            const parkPos = heapIsMap ? creep.heap.get('parkPos') : creep.heap.parkPos;
-            const state = heapIsMap ? creep.heap.get('state') : creep.heap.state;
-            const sourceId = heapIsMap ? creep.heap.get('sourceId') : creep.heap.sourceId;
-            const targetId = heapIsMap ? creep.heap.get('targetId') : creep.heap.targetId;
-
-            // Move to parkPos if not there
-            if (parkPos) {
-                if (creep.pos.x !== parkPos.x || creep.pos.y !== parkPos.y) {
-                    movement.moveTo(creep, new RoomPosition(parkPos.x, parkPos.y, parkPos.roomName));
-                    // Intentionally avoid skipping tick to allow Intents to process if adjacent
-                    if (!creep.pos.isNearTo(parkPos.x, parkPos.y)) {
-                        continue; // Wait until arrived or adjacent enough
+            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+                if (source) {
+                    if (creep.withdraw(source, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                        movement.moveTo(creep, source);
                     }
                 }
-            }
+            } else {
+                const structuresMap = global.State.structuresByRoom.get(room.name);
+                let target = null;
+                let minDistance = Infinity;
 
-            // Note: The execution of the withdraw() or transfer() intent is handled by TrafficManager's
-            // `executeIntents()` pipeline ledger mechanism.
-            // The LogisticsManager sets the pipeline locks.
+                if (structuresMap) {
+                    const spawns = structuresMap.get(STRUCTURE_SPAWN) || [];
+                    for (let j = 0; j < spawns.length; j++) {
+                        if (spawns[j].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                            const dist = creep.pos.getRangeTo(spawns[j]);
+                            if (dist < minDistance) {
+                                minDistance = dist;
+                                target = spawns[j];
+                            }
+                        }
+                    }
 
-            // For creeps that may be temporarily out of sync, we keep the fallback execution here:
-            if (state === 'emptying' && targetId) {
-                if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                    const tgt = Game.getObjectById(targetId);
-                    if (tgt && creep.pos.isNearTo(tgt)) {
-                        creep.transfer(tgt, RESOURCE_ENERGY);
+                    const extensions = structuresMap.get(STRUCTURE_EXTENSION) || [];
+                    for (let j = 0; j < extensions.length; j++) {
+                        if (extensions[j].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                            const dist = creep.pos.getRangeTo(extensions[j]);
+                            if (dist < minDistance) {
+                                minDistance = dist;
+                                target = extensions[j];
+                            }
+                        }
                     }
                 }
-            } else if (state === 'filling' && sourceId) {
-                 if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                    const src = Game.getObjectById(sourceId);
-                    if (src && creep.pos.isNearTo(src)) {
-                        creep.withdraw(src, RESOURCE_ENERGY);
+
+                if (target) {
+                    if (creep.transfer(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                        movement.moveTo(creep, target);
+                    }
+                } else {
+                    if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0 && source) {
+                        if (creep.withdraw(source, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                            movement.moveTo(creep, source);
+                        }
+                    } else {
+                        const heapIsMap = creep.heap instanceof Map;
+                        const parkPos = heapIsMap ? creep.heap.get('parkPos') : creep.heap.parkPos;
+                        if (parkPos) {
+                            movement.moveTo(creep, new RoomPosition(parkPos.x, parkPos.y, parkPos.roomName));
+                        }
                     }
                  }
             }

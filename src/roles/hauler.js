@@ -8,10 +8,21 @@ module.exports = {
         const haulers = roomCreeps.get('hauler');
         if (!haulers) return;
 
+        const fastFillers = roomCreeps.get('fastFiller') || [];
+        const hasStorage = room.storage && room.storage.isActive();
+        const ignoreCore = hasStorage && fastFillers.length > 0;
+
         for (const creep of haulers) {
             try {
                 // Return immediately if fatigue > 0
                 if (creep.fatigue > 0) continue;
+
+                if (ignoreCore && creep.heap.state === 'transfer' && creep.heap.targetId) {
+                    const target = Game.getObjectById(creep.heap.targetId);
+                    if (target && (target.structureType === STRUCTURE_SPAWN || target.structureType === STRUCTURE_EXTENSION)) {
+                        creep.heap.targetId = null; // Invalidate target
+                    }
+                }
 
                 // State assigned centrally by logisticsManager
                 if (creep.heap.state === 'pickup') {

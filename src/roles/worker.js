@@ -18,12 +18,44 @@ module.exports = {
         const workers = roomCreeps.get('worker');
         if (!workers || workers.length === 0) return;
 
+        const storage = room.storage && room.storage.isActive() ? room.storage : null;
+
         for (const creep of workers) {
             try {
                 if (creep.fatigue > 0) continue; // Fatigue gating
 
                 const state = creep.heap.state;
-                const targetId = creep.heap.targetId;
+                let targetId = creep.heap.targetId;
+
+                if (state === 'pickup') {
+                    let target = null;
+                    if (storage && storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                        target = storage;
+                    } else if (targetId) {
+                        target = Game.getObjectById(targetId);
+                    }
+
+                    if (!target || (target.store && target.store.getUsedCapacity(RESOURCE_ENERGY) === 0) || (target.amount !== undefined && target.amount === 0)) {
+                         const EnergyRequestManager = require('../managers/EnergyRequestManager');
+                         const supplies = EnergyRequestManager.getEnergySupplies(room.name);
+                         if (supplies.length > 0) {
+                             target = supplies[0].target;
+                         }
+                    }
+
+                    if (target) {
+                        let res = OK;
+                        if (target instanceof Resource) {
+                            res = creep.pickup(target);
+                        } else {
+                            res = creep.withdraw(target, RESOURCE_ENERGY);
+                        }
+                        if (res === ERR_NOT_IN_RANGE) {
+                            movement.moveTo(creep, target);
+                        }
+                    }
+                    continue;
+                }
 
                 if (!state || !targetId) continue;
 
@@ -35,16 +67,6 @@ module.exports = {
 
                 if (state === 'harvest') {
                     if (creep.harvest(target) === ERR_NOT_IN_RANGE) {
-                        movement.moveTo(creep, target);
-                    }
-                } else if (state === 'pickup') {
-                    let res = OK;
-                    if (target instanceof Resource) {
-                        res = creep.pickup(target);
-                    } else {
-                        res = creep.withdraw(target, RESOURCE_ENERGY);
-                    }
-                    if (res === ERR_NOT_IN_RANGE) {
                         movement.moveTo(creep, target);
                     }
                 } else if (state === 'repair') {
