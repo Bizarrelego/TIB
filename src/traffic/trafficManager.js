@@ -48,12 +48,10 @@ const TrafficManager = {
             global.State.ledger.clear();
             global.State.swapRegistry.clear();
 
-            // Clean pipeline locks every 10 ticks
-            if (Game.time % 10 === 0) {
-                for (const [id, lock] of global.State.pipelineLedger) {
-                    if (Game.time > lock.tickExpiry) {
-                        global.State.pipelineLedger.delete(id);
-                    }
+            // Clean pipeline locks every tick
+            for (const [id, lock] of global.State.pipelineLedger) {
+                if (Game.time > lock.tickExpiry) {
+                    global.State.pipelineLedger.delete(id);
                 }
             }
         } catch (e) {
@@ -95,6 +93,11 @@ const TrafficManager = {
         return false;
     },
 
+    /**
+     * @param {object} target
+     * @param {string} resourceType
+     * @returns {{used: number, free: number, cap: number}}
+     */
     getVirtualState(target, resourceType) {
         const ledger = global.State.ledger;
         if (!ledger) return { used: 0, free: 0, cap: 0 };
@@ -124,7 +127,15 @@ const TrafficManager = {
         return { used, free: Math.max(0, cap - used), cap };
     },
 
+    /**
+     * @param {object} creep
+     * @param {object} target
+     * @param {string} resourceType
+     * @param {number} amount
+     * @returns {number} OK or Error code
+     */
     registerTransfer(creep, target, resourceType, amount) {
+        if (this.checkPipeline(creep.id)) return ERR_BUSY;
         const ledger = global.State.ledger;
         if (!ledger) return ERR_FULL;
 
@@ -136,10 +147,20 @@ const TrafficManager = {
         const creepState = this.getVirtualState(creep, resourceType);
         ledger.set(creep.id, { used: creepState.used - amount, cap: creepState.cap });
 
+        this.lockPipeline(creep.name, creep.id, target.id, resourceType, amount, 'TRANSFER');
+
         return OK;
     },
 
+    /**
+     * @param {object} creep
+     * @param {object} target
+     * @param {string} resourceType
+     * @param {number} amount
+     * @returns {number} OK or Error code
+     */
     registerWithdraw(creep, target, resourceType, amount) {
+        if (this.checkPipeline(creep.id)) return ERR_BUSY;
         const ledger = global.State.ledger;
         if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
 
@@ -151,10 +172,20 @@ const TrafficManager = {
         const creepState = this.getVirtualState(creep, resourceType);
         ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
 
+        this.lockPipeline(creep.name, creep.id, target.id, resourceType, amount, 'WITHDRAW');
+
         return OK;
     },
 
+    /**
+     * @param {object} creep
+     * @param {object} target
+     * @param {string} resourceType
+     * @param {number} amount
+     * @returns {number} OK or Error code
+     */
     registerPickup(creep, target, resourceType, amount) {
+        if (this.checkPipeline(creep.id)) return ERR_BUSY;
         const ledger = global.State.ledger;
         if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
 
@@ -166,10 +197,19 @@ const TrafficManager = {
         const creepState = this.getVirtualState(creep, resourceType);
         ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
 
+        this.lockPipeline(creep.name, creep.id, target.id, resourceType, amount, 'PICKUP');
+
         return OK;
     },
 
+    /**
+     * @param {object} creep
+     * @param {string} resourceType
+     * @param {number} amount
+     * @returns {number} OK or Error code
+     */
     registerDrop(creep, resourceType, amount) {
+        if (this.checkPipeline(creep.id)) return ERR_BUSY;
         const ledger = global.State.ledger;
         if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
 
@@ -178,10 +218,18 @@ const TrafficManager = {
 
         ledger.set(creep.id, { used: creepState.used - amount, cap: creepState.cap });
 
+        this.lockPipeline(creep.name, creep.id, null, resourceType, amount, 'DROP');
+
         return OK;
     },
 
+    /**
+     * @param {object} creep
+     * @param {object} target
+     * @returns {number} OK or Error code
+     */
     registerHarvest(creep, target) {
+        if (this.checkPipeline(creep.id)) return ERR_BUSY;
         const ledger = global.State.ledger;
         if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
 
@@ -196,6 +244,8 @@ const TrafficManager = {
         const creepState = this.getVirtualState(creep, RESOURCE_ENERGY);
         ledger.set(creep.id, { used: creepState.used + harvestAmount, cap: creepState.cap });
 
+        this.lockPipeline(creep.name, creep.id, target.id, RESOURCE_ENERGY, harvestAmount, 'HARVEST');
+
         return OK;
     },
 
@@ -204,6 +254,7 @@ const TrafficManager = {
      * @param {number} direction
      */
     registerMove(creep, direction) {
+        if (creep && this.checkPipeline(creep.id)) return;
         // Fatigue Gating: Ensure only the specific creep is gated.
         // The TrafficManager should only process creeps that are capable of moving.
         if (!creep || creep.fatigue > 0) return;
@@ -219,6 +270,7 @@ const TrafficManager = {
      * @param {object} [opts={}]
      */
     registerMoveIntent(creep, targetPos, opts = {}) {
+        if (creep && this.checkPipeline(creep.id)) return;
         if (!creep || creep.fatigue > 0) return;
         if (!global.State) global.State = {};
         if (!(global.State.trafficIntents instanceof Map)) global.State.trafficIntents = new Map();
