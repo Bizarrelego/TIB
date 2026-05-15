@@ -48,12 +48,10 @@ const TrafficManager = {
             global.State.ledger.clear();
             global.State.swapRegistry.clear();
 
-            // Clean pipeline locks every 10 ticks
-            if (Game.time % 10 === 0) {
-                for (const [id, lock] of global.State.pipelineLedger) {
-                    if (Game.time > lock.tickExpiry) {
-                        global.State.pipelineLedger.delete(id);
-                    }
+            // Clean pipeline locks every tick
+            for (const [id, lock] of global.State.pipelineLedger) {
+                if (Game.time > lock.tickExpiry) {
+                    global.State.pipelineLedger.delete(id);
                 }
             }
         } catch (e) {
@@ -104,6 +102,8 @@ const TrafficManager = {
     },
 
     registerTransfer(creep, target, resourceType, amount) {
+        if (this.checkPipeline(creep.id)) return ERR_BUSY;
+
         const ledger = global.State.ledger;
         if (!ledger) return ERR_FULL;
 
@@ -119,6 +119,8 @@ const TrafficManager = {
     },
 
     registerWithdraw(creep, target, resourceType, amount) {
+        if (this.checkPipeline(creep.id)) return ERR_BUSY;
+
         const ledger = global.State.ledger;
         if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
 
@@ -140,7 +142,7 @@ const TrafficManager = {
     registerMove(creep, direction) {
         // Fatigue Gating: Ensure only the specific creep is gated.
         // The TrafficManager should only process creeps that are capable of moving.
-        if (!creep || creep.fatigue > 0) return;
+        if (!creep || creep.fatigue > 0 || this.checkPipeline(creep.id)) return;
 
         if (global.State && global.State.trafficIntents) {
             global.State.trafficIntents.set(creep.name, { direction, priority: creep.heap.priority || 0 });
@@ -153,7 +155,7 @@ const TrafficManager = {
      * @param {object} [opts={}]
      */
     registerMoveIntent(creep, targetPos, opts = {}) {
-        if (!creep || creep.fatigue > 0) return;
+        if (!creep || creep.fatigue > 0 || this.checkPipeline(creep.id)) return;
         if (!global.State) global.State = {};
         if (!(global.State.trafficIntents instanceof Map)) global.State.trafficIntents = new Map();
 
