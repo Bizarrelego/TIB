@@ -6,6 +6,7 @@ const discoveryManager = require('./state/discoveryManager');
 const stateScanner = require('./state/stateScanner');
 const colonyManager = require('./colonies/colonyManager');
 const operationsManager = require('./operations/operationsManager'); // High-level orchestrator
+const managerOrchestrator = require('./managers/managerOrchestrator'); // Standalone Managers
 const trafficManager = require('./traffic/trafficManager');
 const movement = require('./utils/movement');
 const EnergyRequestManager = require('./managers/EnergyRequestManager');
@@ -37,6 +38,7 @@ module.exports.loop = function () {
     // Cascading CPU Throttling based on Game.cpu.bucket
     let skipState = false;
     let skipColonies = false;
+    let skipManagers = false;
     let skipOperations = false;
 
     switch (true) {
@@ -45,6 +47,7 @@ module.exports.loop = function () {
             // fallthrough
         case Game.cpu.bucket < 500:
             skipColonies = true;
+            skipManagers = true;
             // fallthrough
         case Game.cpu.bucket < 2000:
             skipOperations = true;
@@ -90,6 +93,15 @@ module.exports.loop = function () {
             if (colonyManager) colonyManager();
         } catch (e) {
             console.log(`[Phase 3 Error] Colonies: ${e.stack}`);
+        }
+    }
+
+    // Phase 3.5: Standalone Managers
+    if (!skipManagers) {
+        try {
+            if (managerOrchestrator && managerOrchestrator.run) managerOrchestrator.run();
+        } catch (e) {
+            console.log(`[Phase 3.5 Error] Managers: ${e.stack}`);
         }
     }
 
