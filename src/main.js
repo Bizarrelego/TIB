@@ -58,13 +58,6 @@ module.exports.loop = function () {
     // Phase 2: State Scanner (Event-driven map updaters)
     if (!skipState) {
         try {
-            const roomEventManager = globalState.getManager('RoomEventManager');
-            if (roomEventManager) roomEventManager();
-        } catch (e) {
-            console.log(`[Phase 2 Error] Room Event Manager: ${e.stack}`);
-        }
-
-        try {
             if (stateScanner) stateScanner();
         } catch (e) {
             console.log(`[Phase 2 Error] Global State Scanner: ${e.stack}`);
@@ -96,6 +89,12 @@ module.exports.loop = function () {
             if (colonyManager) colonyManager();
         } catch (e) {
             console.log(`[Phase 3 Error] Colonies: ${e.stack}`);
+        }
+
+        try {
+            if (managersIntegration && managersIntegration.run) managersIntegration.run();
+        } catch (e) {
+            console.log(`[Phase 3 Error] Managers Integration: ${e.stack}`);
         }
     }
 

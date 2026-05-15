@@ -12,6 +12,7 @@ const TerminalManager = require('./TerminalManager');
 const TowerManager = require('./TowerManager');
 const UpgraderManager = require('./UpgraderManager');
 const workerManager = require('./workerManager');
+const managerOrchestrator = require('./managerOrchestrator');
 
 const managers = {
     CombatManager,
@@ -35,5 +36,6 @@ module.exports = {
         for (const [name, manager] of Object.entries(managers)) {
             globalState.registerManager(name, manager);
         }
-    }
+    },
+    run: managerOrchestrator
 };
