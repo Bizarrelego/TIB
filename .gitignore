@@ -1,3 +1,5 @@
 node_modules
 /dist
 /scripts
+/scripts
+scripts/deploy-local.js

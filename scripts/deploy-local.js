@@ -3,7 +3,7 @@ const path = require('path');
 const rollup = require('rollup');
 const { nodeResolve } = require('@rollup/plugin-node-resolve');
 const commonjs = require('@rollup/plugin-commonjs');
-
+// node scripts/deploy-local.js
 // Target directory on Blake's PC
 const targetDir = 'C:\\Users\\Blake\\AppData\\Local\\Screeps\\scripts\\127_0_0_1___21025\\default';
 const projectRoot = path.resolve(__dirname, '..');
