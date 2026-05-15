@@ -21,9 +21,11 @@ function managerOrchestrator() {
 
     // Zero Native Polling: rely on global.State for room objects if available.
     // Ensure discoveryManager has populated global.State.rooms
-    if (!global.State || !global.State.scannedRooms) return;
+    if (!global.State || !global.State.rooms) return;
 
-    for (const room of Object.values(Game.rooms)) {
+    for (const roomName of global.State.rooms.keys()) {
+        const room = global.State.rooms.get(roomName);
+
         // Only run managers in controlled rooms
         if (!room || !room.controller || !room.controller.my) continue;
 

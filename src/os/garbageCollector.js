@@ -12,17 +12,29 @@ function garbageCollector() {
         }
 
         // Clean up stale intel
-        const intelCache = RawMemoryManager.loadIntel();
-        if (intelCache) {
+        let intelCacheMap = null;
+        const rawIntelCache = RawMemoryManager.loadIntel();
+        if (rawIntelCache) {
+            // "V8 Map Optimization: Use Map() for O(1) lookups."
+            // Ensure we treat intelCache as a map if it isn't one already for processing,
+            // or if it's stored as an object, iterate over its keys properly.
+            // RawMemoryManager returns a raw object from JSON.parse.
+            // We should use Object.keys instead of for...in to avoid prototype chain iteration,
+            // but the feedback specifically mentions using Map.
+
+            intelCacheMap = new Map(Object.entries(rawIntelCache));
+        }
+
+        if (intelCacheMap) {
             let changed = false;
-            for (const roomName in intelCache) {
-                if (Game.time - (intelCache[roomName].lastSeen || 0) > 1000) {
-                    delete intelCache[roomName];
+            for (const [roomName, intelData] of intelCacheMap.entries()) {
+                if (Game.time - (intelData.lastSeen || 0) > 1000) {
+                    intelCacheMap.delete(roomName);
                     changed = true;
                 }
             }
             if (changed) {
-                RawMemoryManager.saveIntel(intelCache);
+                RawMemoryManager.saveIntel(Object.fromEntries(intelCacheMap));
             }
         }
 
