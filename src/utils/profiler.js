@@ -172,6 +172,13 @@ class Profiler {
             }
         }
     }
+
+    /**
+     * Alias for logBottlenecks to match main.js invocation.
+     */
+    static report() {
+        this.logBottlenecks();
+    }
 }
 
 module.exports = Profiler;
