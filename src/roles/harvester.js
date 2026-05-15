@@ -1,4 +1,5 @@
 const movement = require('../utils/movement');
+const TrafficManager = require('../traffic/trafficManager');
 
 module.exports = {
     run: function(room) {

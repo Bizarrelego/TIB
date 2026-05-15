@@ -97,6 +97,7 @@ module.exports = {
                     let bestSource = null;
                     let minDistance = Infinity;
                     for (let i = 0; i < sources.length; i++) {
+                        if (sources[i].energy === 0) continue;
                         const dist = Math.max(Math.abs(creep.pos.x - sources[i].pos.x), Math.abs(creep.pos.y - sources[i].pos.y));
                         if (dist < minDistance) {
                             minDistance = dist;

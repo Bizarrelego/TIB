@@ -37,7 +37,7 @@ module.exports = {
 
                     if (!target || (target.store && target.store.getUsedCapacity(RESOURCE_ENERGY) === 0) || (target.amount !== undefined && target.amount === 0)) {
                          const EnergyRequestManager = require('../managers/EnergyRequestManager');
-                         const supplies = EnergyRequestManager.getEnergySupplies(room.name);
+                         const supplies = EnergyRequestManager.getEnergySupplies(room.name, 'worker');
                          if (supplies.length > 0) {
                              target = supplies[0].target;
                          }
