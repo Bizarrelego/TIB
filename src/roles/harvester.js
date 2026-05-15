@@ -11,8 +11,7 @@ module.exports = {
 
         let sources = global.State.sourcesByRoom.get(room.name);
         if (!sources || sources.length === 0) {
-            sources = room.find(FIND_SOURCES);
-            global.State.sourcesByRoom.set(room.name, sources);
+            return;
         }
 
         const haulerCount = (roomCreeps.get('hauler') ? roomCreeps.get('hauler').length : 0) +
@@ -58,11 +57,32 @@ module.exports = {
                     if (target) {
                         if (creep.store.getFreeCapacity() === 0) {
                             if (haulerCount === 0) {
-                                const targets = room.find(FIND_MY_STRUCTURES, {
-                                    filter: (s) => (s.structureType === STRUCTURE_SPAWN || s.structureType === STRUCTURE_EXTENSION) && s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
-                                });
+                                const roomStructures = global.State.structuresByRoom.get(room.name);
+                                const targets = [];
+                                if (roomStructures) {
+                                    const spawns = roomStructures.get(STRUCTURE_SPAWN);
+                                    if (spawns) {
+                                        for (const spawn of spawns.values()) {
+                                            if (spawn.store.getFreeCapacity(RESOURCE_ENERGY) > 0) targets.push(spawn);
+                                        }
+                                    }
+                                    const extensions = roomStructures.get(STRUCTURE_EXTENSION);
+                                    if (extensions) {
+                                        for (const ext of extensions.values()) {
+                                            if (ext.store.getFreeCapacity(RESOURCE_ENERGY) > 0) targets.push(ext);
+                                        }
+                                    }
+                                }
                                 if (targets.length > 0) {
-                                    const nearest = creep.pos.findClosestByPath(targets);
+                                    let nearest = null;
+                                    let minPathLen = Infinity;
+                                    for (let i = 0; i < targets.length; i++) {
+                                        const dist = creep.pos.getRangeTo(targets[i]);
+                                        if (dist < minPathLen) {
+                                            minPathLen = dist;
+                                            nearest = targets[i];
+                                        }
+                                    }
                                     if (nearest) {
                                         if (!creep.pos.isNearTo(nearest)) {
                                             movement.moveTo(creep, nearest);
