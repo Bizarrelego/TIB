@@ -87,7 +87,6 @@ module.exports = {
                             if (creep.store.getFreeCapacity() === 0) {
                                 if (parkingSpot && parkingSpot.structureType === STRUCTURE_CONTAINER) {
                                     // if sitting on container, do not drop or transfer. the engine drops when full if we try to harvest.
-                                    creep.harvest(target);
                                 } else if (haulerCount === 0) {
                                     const roomStructures = global.State.structuresByRoom.get(room.name);
                                     const targets = [];
@@ -126,11 +125,9 @@ module.exports = {
                                 } else {
                                     // Just drop it if no container and haulers exist
                                     creep.drop(RESOURCE_ENERGY, creep.store.getUsedCapacity(RESOURCE_ENERGY));
-                                    creep.harvest(target);
                                 }
-                            } else {
-                                creep.harvest(target);
                             }
+                            creep.harvest(target);
                         }
                     } else {
                         creep.heap.targetId = null;
