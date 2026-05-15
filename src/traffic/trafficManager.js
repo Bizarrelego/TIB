@@ -65,7 +65,7 @@ const TrafficManager = {
      * @param {string} targetId
      * @param {string} resourceType
      * @param {number} amount
-     * @param {string} type - 'TRANSFER' or 'WITHDRAW'
+     * @param {string} type - 'TRANSFER', 'WITHDRAW', 'PICKUP', 'DROP', or 'HARVEST'
      * @returns {void}
      */
     lockPipeline(creepName, sourceId, targetId, resourceType, amount, type) {
@@ -93,6 +93,12 @@ const TrafficManager = {
         return false;
     },
 
+    /**
+     * Gets the virtual capacity state from the ledger or the object's native store.
+     * @param {object} target - Target structure, creep, or source.
+     * @param {string} resourceType - Resource constant.
+     * @returns {{used: number, free: number, cap: number}} Virtual state.
+     */
     getVirtualState(target, resourceType) {
         const ledger = global.State.ledger;
         if (!ledger) return { used: 0, free: 0, cap: 0 };
@@ -122,6 +128,14 @@ const TrafficManager = {
         return { used, free: Math.max(0, cap - used), cap };
     },
 
+    /**
+     * Registers a transfer intent into the sub-tick ledger.
+     * @param {object} creep - The executing creep.
+     * @param {object} target - The target to transfer to.
+     * @param {string} resourceType - Resource constant.
+     * @param {number} amount - Amount to transfer.
+     * @returns {number} OK or Screeps error code.
+     */
     registerTransfer(creep, target, resourceType, amount) {
         if (this.checkPipeline(creep.id)) return ERR_BUSY;
 
@@ -136,9 +150,18 @@ const TrafficManager = {
         const creepState = this.getVirtualState(creep, resourceType);
         ledger.set(creep.id, { used: creepState.used - amount, cap: creepState.cap });
 
+        this.lockPipeline(creep.name, creep.id, target.id, resourceType, amount, 'TRANSFER');
         return OK;
     },
 
+    /**
+     * Registers a withdraw intent into the sub-tick ledger.
+     * @param {object} creep - The executing creep.
+     * @param {object} target - The target to withdraw from.
+     * @param {string} resourceType - Resource constant.
+     * @param {number} amount - Amount to withdraw.
+     * @returns {number} OK or Screeps error code.
+     */
     registerWithdraw(creep, target, resourceType, amount) {
         if (this.checkPipeline(creep.id)) return ERR_BUSY;
 
@@ -153,10 +176,21 @@ const TrafficManager = {
         const creepState = this.getVirtualState(creep, resourceType);
         ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
 
+        this.lockPipeline(creep.name, creep.id, target.id, resourceType, amount, 'WITHDRAW');
         return OK;
     },
 
+    /**
+     * Registers a pickup intent into the sub-tick ledger.
+     * @param {object} creep - The executing creep.
+     * @param {object} target - The resource to pickup.
+     * @param {string} resourceType - Resource constant.
+     * @param {number} amount - Amount to pickup.
+     * @returns {number} OK or Screeps error code.
+     */
     registerPickup(creep, target, resourceType, amount) {
+        if (this.checkPipeline(creep.id)) return ERR_BUSY;
+
         const ledger = global.State.ledger;
         if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
 
@@ -168,10 +202,20 @@ const TrafficManager = {
         const creepState = this.getVirtualState(creep, resourceType);
         ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
 
+        this.lockPipeline(creep.name, creep.id, target.id, resourceType, amount, 'PICKUP');
         return OK;
     },
 
+    /**
+     * Registers a drop intent into the sub-tick ledger.
+     * @param {object} creep - The executing creep.
+     * @param {string} resourceType - Resource constant.
+     * @param {number} amount - Amount to drop.
+     * @returns {number} OK or Screeps error code.
+     */
     registerDrop(creep, resourceType, amount) {
+        if (this.checkPipeline(creep.id)) return ERR_BUSY;
+
         const ledger = global.State.ledger;
         if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
 
@@ -180,10 +224,19 @@ const TrafficManager = {
 
         ledger.set(creep.id, { used: creepState.used - amount, cap: creepState.cap });
 
+        this.lockPipeline(creep.name, creep.id, null, resourceType, amount, 'DROP');
         return OK;
     },
 
+    /**
+     * Registers a harvest intent into the sub-tick ledger.
+     * @param {object} creep - The executing creep.
+     * @param {object} target - The target to harvest from.
+     * @returns {number} OK or Screeps error code.
+     */
     registerHarvest(creep, target) {
+        if (this.checkPipeline(creep.id)) return ERR_BUSY;
+
         const ledger = global.State.ledger;
         if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
 
@@ -198,6 +251,7 @@ const TrafficManager = {
         const creepState = this.getVirtualState(creep, RESOURCE_ENERGY);
         ledger.set(creep.id, { used: creepState.used + harvestAmount, cap: creepState.cap });
 
+        this.lockPipeline(creep.name, creep.id, target.id, RESOURCE_ENERGY, harvestAmount, 'HARVEST');
         return OK;
     },
 
