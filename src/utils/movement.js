@@ -1,4 +1,5 @@
-const TrafficManager = require('../traffic/trafficManager');
+const getTrafficManager = () => require('../traffic/trafficManager');
+
 
 module.exports = {
     /**
@@ -12,8 +13,11 @@ module.exports = {
     },
 
     moveTo: function(creep, target, opts = {}) {
+        if (getTrafficManager().checkPipeline && getTrafficManager().checkPipeline(creep.id)) return ERR_BUSY;
+
+        let targetPos = target.pos || target;
+
         if (!creep.heap.path || !Array.isArray(creep.heap.path)) {
-            const targetPos = target.pos || target;
             const pathInfo = PathFinder.search(creep.pos, targetPos, opts);
             if (pathInfo && pathInfo.path) {
                 creep.heap.path = pathInfo.path;
@@ -23,13 +27,18 @@ module.exports = {
         }
 
         if (creep.heap.path && creep.heap.path.length > 0) {
-            const result = creep.moveByPath(creep.heap.path);
-
-            if (result === ERR_NOT_FOUND || result === ERR_INVALID_ARGS) {
-                creep.heap.path = null;
+            if (creep.pos.x === creep.heap.path[0].x &&
+                creep.pos.y === creep.heap.path[0].y &&
+                creep.pos.roomName === creep.heap.path[0].roomName) {
+                creep.heap.path.shift();
             }
 
-            return result;
+            if (creep.heap.path.length > 0) {
+                getTrafficManager().registerMoveIntent(creep, targetPos, opts);
+                return OK;
+            } else {
+                creep.heap.path = null;
+            }
         }
 
         return ERR_NOT_FOUND;
@@ -147,7 +156,7 @@ module.exports = {
 
         // 3. Synchronize intents
         for (const intent of intents) {
-            TrafficManager.registerMove(intent.creep, direction);
+            getTrafficManager().registerMove(intent.creep, direction);
         }
     }
 };

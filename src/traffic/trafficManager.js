@@ -139,6 +139,8 @@ const TrafficManager = {
         const creepState = this.getVirtualState(creep, resourceType);
         ledger.set(creep.id, { used: creepState.used - amount, cap: creepState.cap });
 
+        this.lockPipeline(creep.name, creep.id, target.id, resourceType, amount, 'TRANSFER');
+
         return OK;
     },
 
@@ -157,6 +159,8 @@ const TrafficManager = {
         const creepState = this.getVirtualState(creep, resType);
         ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
 
+        this.lockPipeline(creep.name, creep.id, target.id, resType, amount, 'WITHDRAW');
+
         return OK;
     },
 
@@ -173,6 +177,8 @@ const TrafficManager = {
         const creepState = this.getVirtualState(creep, resourceType);
         ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
 
+        this.lockPipeline(creep.name, creep.id, target.id, resourceType, amount, 'PICKUP');
+
         return OK;
     },
 
@@ -186,6 +192,8 @@ const TrafficManager = {
         if (creepState.used < amount) return ERR_NOT_ENOUGH_RESOURCES;
 
         ledger.set(creep.id, { used: creepState.used - amount, cap: creepState.cap });
+
+        this.lockPipeline(creep.name, creep.id, null, resType, amount, 'DROP');
 
         return OK;
     },
@@ -212,6 +220,8 @@ const TrafficManager = {
 
         const creepState = this.getVirtualState(creep, resType);
         ledger.set(creep.id, { used: creepState.used + harvestAmount, cap: creepState.cap });
+
+        this.lockPipeline(creep.name, creep.id, target.id, resType, harvestAmount, 'HARVEST');
 
         return OK;
     },
@@ -420,9 +430,13 @@ const TrafficManager = {
                             continue;
                         }
                     }
+
+                    const dir = creep.pos.getDirectionTo(intendedNextPos);
+                    if (dir) {
+                        creep.move(dir);
+                    }
                 }
 
-                movement.moveTo(creep, targetPos, opts);
                 global.State.trafficIntents.delete(creep.name);
             }
         } catch (e) {

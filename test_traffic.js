@@ -57,7 +57,11 @@ assert.strictEqual(targetState.used, 150, 'Target used should be 150');
 let creepState = TrafficManager.getVirtualState(creep, RESOURCE_ENERGY);
 assert.strictEqual(creepState.used, 0, 'Creep used should be 0');
 
+
+// need to bypass pipeline lock to test ERR_FULL
+global.State.pipelineLedger.delete(creep.id);
 result = TrafficManager.registerTransfer(creep, target, RESOURCE_ENERGY, 60);
+
 assert.strictEqual(result, ERR_FULL, 'Transfer 60 should be ERR_FULL');
 
 console.log('Test passed!');
