@@ -117,7 +117,8 @@ class SpawnQueueManager {
             if (!spawnLedger.canSpawn(request.cost)) {
                 // If we cannot afford the highest priority request, skip and return to prevent lower-priority
                 // from taking its budget and causing a spawn stall.
-                return;
+                i++;
+                continue;
             }
 
             const spawn = availableSpawns[0];
