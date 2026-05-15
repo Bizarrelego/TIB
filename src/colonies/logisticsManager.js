@@ -1,3 +1,7 @@
+
+function setHeap(creep, key, val) { if (creep.heap instanceof Map) creep.heap.set(key, val); else creep.heap[key] = val; }
+function hasHeap(creep, key) { return creep.heap instanceof Map ? creep.heap.has(key) : creep.heap[key] !== undefined; }
+function getHeap(creep, key) { return creep.heap instanceof Map ? creep.heap.get(key) : creep.heap[key]; }
 const eventBus = require('../os/eventBus');
 const TrafficManager = require('../traffic/trafficManager');
 const EnergyRequestManager = require('../managers/EnergyRequestManager');
@@ -118,18 +122,24 @@ const LogisticsManager = {
                     creep.heap = new Map();
                 }
 
-                if (parkPos && !creep.heap.has('parkPos')) {
-                    creep.heap.set('parkPos', parkPos);
+                if (parkPos && !hasHeap(creep, 'parkPos')) {
+                    setHeap(creep, 'parkPos', parkPos);
                 }
 
                 const creepState = TrafficManager.getVirtualState(creep, RESOURCE_ENERGY);
                 const storageState = storage ? TrafficManager.getVirtualState(storage, RESOURCE_ENERGY) : null;
                 const terminalState = terminal ? TrafficManager.getVirtualState(terminal, RESOURCE_ENERGY) : null;
 
-                let state = creep.heap.get('state') || 'emptying';
+                let state = (creep.heap instanceof Map) ? getHeap(creep, 'state') : creep.heap.state;
+                if (!state) state = 'emptying';
                 if (creepState.used === 0) state = 'filling';
                 else if (creepState.free === 0) state = 'emptying';
-                creep.heap.set('state', state);
+
+                if (creep.heap instanceof Map) {
+                    setHeap(creep, 'state', state);
+                } else {
+                    creep.heap.state = state;
+                }
 
                 if (state === 'emptying') {
                     let target = null;
@@ -149,7 +159,7 @@ const LogisticsManager = {
                         const amount = Math.min(creepState.used, structState.free);
                         if (amount > 0 && TrafficManager.registerTransfer(creep, target, RESOURCE_ENERGY, amount) === OK) {
                             TrafficManager.lockPipeline(creep.name, creep.id, target.id, RESOURCE_ENERGY, amount, 'TRANSFER');
-                            creep.heap.set('targetId', target.id);
+                            setHeap(creep, 'targetId', target.id);
                         }
                     }
                 } else if (state === 'filling') {
@@ -176,7 +186,7 @@ const LogisticsManager = {
                         const amount = Math.min(creepState.free, sourceState.used);
                         if (amount > 0 && TrafficManager.registerWithdraw(creep, source, RESOURCE_ENERGY, amount) === OK) {
                             TrafficManager.lockPipeline(creep.name, creep.id, source.id, RESOURCE_ENERGY, amount, 'WITHDRAW');
-                            creep.heap.set('sourceId', source.id);
+                            setHeap(creep, 'sourceId', source.id);
                         }
                     }
                 }
@@ -322,8 +332,8 @@ const LogisticsManager = {
                         creep.heap = new Map();
                     }
 
-                    if (parkPos && !creep.heap.has('parkPos')) {
-                        creep.heap.set('parkPos', parkPos);
+                    if (parkPos && !hasHeap(creep, 'parkPos')) {
+                        setHeap(creep, 'parkPos', parkPos);
                     }
 
                     const creepState = TrafficManager.getVirtualState(creep, RESOURCE_ENERGY);
@@ -338,59 +348,59 @@ const LogisticsManager = {
                             const amount = Math.min(creepState.used, hubLinkState.free);
                             if (TrafficManager.registerTransfer(creep, hubLink, RESOURCE_ENERGY, amount) === OK) {
                                 TrafficManager.lockPipeline(creep.name, creep.id, hubLink.id, RESOURCE_ENERGY, amount, 'TRANSFER');
-                                creep.heap.set('state', 'fill_link');
-                                creep.heap.set('sourceId', creep.id);
-                                creep.heap.set('targetId', hubLink.id);
+                                setHeap(creep, 'state', 'fill_link');
+                                setHeap(creep, 'sourceId', creep.id);
+                                setHeap(creep, 'targetId', hubLink.id);
                                 actionRegistered = true;
                             }
                         } else if (terminal && terminalState.free > 0 && storageState.used > 100000 && !controllerNeedsEnergy && hubLinkState.used === 0) {
                             const amount = Math.min(creepState.used, terminalState.free);
                             if (TrafficManager.registerTransfer(creep, terminal, RESOURCE_ENERGY, amount) === OK) {
                                 TrafficManager.lockPipeline(creep.name, creep.id, terminal.id, RESOURCE_ENERGY, amount, 'TRANSFER');
-                                creep.heap.set('state', 'fill_terminal');
-                                creep.heap.set('sourceId', creep.id);
-                                creep.heap.set('targetId', terminal.id);
+                                setHeap(creep, 'state', 'fill_terminal');
+                                setHeap(creep, 'sourceId', creep.id);
+                                setHeap(creep, 'targetId', terminal.id);
                                 actionRegistered = true;
                             }
                         } else if (storageState.free > 0) {
                             const amount = Math.min(creepState.used, storageState.free);
                             if (TrafficManager.registerTransfer(creep, storage, RESOURCE_ENERGY, amount) === OK) {
                                 TrafficManager.lockPipeline(creep.name, creep.id, storage.id, RESOURCE_ENERGY, amount, 'TRANSFER');
-                                creep.heap.set('state', 'fill_storage');
-                                creep.heap.set('sourceId', creep.id);
-                                creep.heap.set('targetId', storage.id);
+                                setHeap(creep, 'state', 'fill_storage');
+                                setHeap(creep, 'sourceId', creep.id);
+                                setHeap(creep, 'targetId', storage.id);
                                 actionRegistered = true;
                             }
                         }
                         if (!actionRegistered) {
-                            creep.heap.set('state', 'SLEEP');
+                            setHeap(creep, 'state', 'SLEEP');
                         }
                     } else if (creepState.free > 0) {
                         if (!controllerNeedsEnergy && hubLinkState.used > 0) {
                             const amount = Math.min(creepState.free, hubLinkState.used);
                             if (TrafficManager.registerWithdraw(creep, hubLink, RESOURCE_ENERGY, amount) === OK) {
                                 TrafficManager.lockPipeline(creep.name, creep.id, hubLink.id, RESOURCE_ENERGY, amount, 'WITHDRAW');
-                                creep.heap.set('state', 'empty_link');
-                                creep.heap.set('sourceId', hubLink.id);
-                                creep.heap.set('targetId', creep.id);
+                                setHeap(creep, 'state', 'empty_link');
+                                setHeap(creep, 'sourceId', hubLink.id);
+                                setHeap(creep, 'targetId', creep.id);
                                 actionRegistered = true;
                             }
                         } else if (controllerNeedsEnergy && hubLinkState.free > 0 && storageState.used > 0) {
                             const amount = Math.min(creepState.free, storageState.used);
                             if (TrafficManager.registerWithdraw(creep, storage, RESOURCE_ENERGY, amount) === OK) {
                                 TrafficManager.lockPipeline(creep.name, creep.id, storage.id, RESOURCE_ENERGY, amount, 'WITHDRAW');
-                                creep.heap.set('state', 'empty_storage');
-                                creep.heap.set('sourceId', storage.id);
-                                creep.heap.set('targetId', creep.id);
+                                setHeap(creep, 'state', 'empty_storage');
+                                setHeap(creep, 'sourceId', storage.id);
+                                setHeap(creep, 'targetId', creep.id);
                                 actionRegistered = true;
                             }
                         } else if (terminal && terminalState.free > 0 && storageState.used > 100000 && !controllerNeedsEnergy && hubLinkState.used === 0) {
                             const amount = Math.min(creepState.free, storageState.used);
                             if (TrafficManager.registerWithdraw(creep, storage, RESOURCE_ENERGY, amount) === OK) {
                                 TrafficManager.lockPipeline(creep.name, creep.id, storage.id, RESOURCE_ENERGY, amount, 'WITHDRAW');
-                                creep.heap.set('state', 'empty_storage');
-                                creep.heap.set('sourceId', storage.id);
-                                creep.heap.set('targetId', creep.id);
+                                setHeap(creep, 'state', 'empty_storage');
+                                setHeap(creep, 'sourceId', storage.id);
+                                setHeap(creep, 'targetId', creep.id);
                                 actionRegistered = true;
                             }
                         }
@@ -399,20 +409,20 @@ const LogisticsManager = {
                             const amount = Math.min(creepState.free, terminalState.used);
                             if (TrafficManager.registerWithdraw(creep, terminal, RESOURCE_ENERGY, amount) === OK) {
                                 TrafficManager.lockPipeline(creep.name, creep.id, terminal.id, RESOURCE_ENERGY, amount, 'WITHDRAW');
-                                creep.heap.set('state', 'empty_terminal');
-                                creep.heap.set('sourceId', terminal.id);
-                                creep.heap.set('targetId', creep.id);
+                                setHeap(creep, 'state', 'empty_terminal');
+                                setHeap(creep, 'sourceId', terminal.id);
+                                setHeap(creep, 'targetId', creep.id);
                                 actionRegistered = true;
                             }
                         }
 
                         if (!actionRegistered) {
-                            creep.heap.set('state', 'SLEEP');
+                            setHeap(creep, 'state', 'SLEEP');
                         }
                     }
 
                     if (creepState.used === 0 && !actionRegistered) {
-                        creep.heap.set('state', 'SLEEP');
+                        setHeap(creep, 'state', 'SLEEP');
                     }
                 }
             }
