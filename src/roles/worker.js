@@ -4,6 +4,7 @@
  */
 
 const movement = require('../utils/movement');
+const TrafficManager = require('../traffic/trafficManager');
 
 module.exports = {
     /**
@@ -19,6 +20,7 @@ module.exports = {
         if (!workers || workers.length === 0) return;
 
         const storage = room.storage && room.storage.isActive() ? room.storage : null;
+
 
         // RCL 1 Blitz Mode
         if (room.controller && room.controller.level === 1) {
@@ -77,7 +79,9 @@ module.exports = {
 
                         if (bestSource) {
                             creep.heap.blitzTarget = bestSource.id;
-                            if (creep.harvest(bestSource) === ERR_NOT_IN_RANGE) {
+                            if (creep.pos.isNearTo(bestSource)) {
+                                TrafficManager.registerHarvest(creep, bestSource);
+                            } else {
                                 movement.moveTo(creep, bestSource);
                             }
                         }
@@ -100,11 +104,15 @@ module.exports = {
                         }
 
                         if (targetSpawn) {
-                            if (creep.transfer(targetSpawn, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                            if (creep.pos.isNearTo(targetSpawn)) {
+                                TrafficManager.registerTransfer(creep, targetSpawn, RESOURCE_ENERGY, creep.store.getUsedCapacity(RESOURCE_ENERGY));
+                            } else {
                                 movement.moveTo(creep, targetSpawn);
                             }
                         } else if (room.controller) {
-                            if (creep.upgradeController(room.controller) === ERR_NOT_IN_RANGE) {
+                            if (creep.pos.isNearTo(room.controller)) {
+                                creep.upgradeController(room.controller);
+                            } else {
                                 movement.moveTo(creep, room.controller);
                             }
                         }
@@ -113,7 +121,9 @@ module.exports = {
                         if (creep.heap.blitzTarget) {
                              const target = Game.getObjectById(creep.heap.blitzTarget);
                              if (target) {
-                                 if (creep.harvest(target) === ERR_NOT_IN_RANGE) {
+                                 if (creep.pos.isNearTo(target)) {
+                                     TrafficManager.registerHarvest(creep, target);
+                                 } else {
                                      movement.moveTo(creep, target);
                                  }
                              } else {
@@ -137,11 +147,15 @@ module.exports = {
                             }
 
                             if (targetSpawn) {
-                                if (creep.transfer(targetSpawn, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                                if (creep.pos.isNearTo(targetSpawn)) {
+                                    TrafficManager.registerTransfer(creep, targetSpawn, RESOURCE_ENERGY, creep.store.getUsedCapacity(RESOURCE_ENERGY));
+                                } else {
                                     movement.moveTo(creep, targetSpawn);
                                 }
                             } else if (room.controller) {
-                                if (creep.upgradeController(room.controller) === ERR_NOT_IN_RANGE) {
+                                if (creep.pos.isNearTo(room.controller)) {
+                                    creep.upgradeController(room.controller);
+                                } else {
                                     movement.moveTo(creep, room.controller);
                                 }
                             }
@@ -182,10 +196,13 @@ module.exports = {
                         if (!creep.pos.isNearTo(target)) {
                             movement.moveTo(creep, target);
                         } else {
-                            if (target instanceof Resource) {
-                                creep.pickup(target);
-                            } else {
-                                creep.withdraw(target, RESOURCE_ENERGY);
+                            const amountToTake = Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), target.amount || (target.store ? target.store.getUsedCapacity(RESOURCE_ENERGY) : 0));
+                            if (amountToTake > 0) {
+                                if (target instanceof Resource) {
+                                    TrafficManager.registerPickup(creep, target, RESOURCE_ENERGY, amountToTake);
+                                } else {
+                                    TrafficManager.registerWithdraw(creep, target, RESOURCE_ENERGY, amountToTake);
+                                }
                             }
                         }
                     }
@@ -204,7 +221,7 @@ module.exports = {
                     if (!creep.pos.isNearTo(target)) {
                         movement.moveTo(creep, target);
                     } else {
-                        creep.harvest(target);
+                        TrafficManager.registerHarvest(creep, target);
                     }
                 } else if (state === 'repair') {
                     if (creep.repair(target) === ERR_NOT_IN_RANGE) {
@@ -214,7 +231,10 @@ module.exports = {
                     if (!creep.pos.isNearTo(target)) {
                         movement.moveTo(creep, target);
                     } else {
-                        creep.transfer(target, RESOURCE_ENERGY);
+                        const amountToGive = Math.min(creep.store.getUsedCapacity(RESOURCE_ENERGY), TrafficManager.getVirtualState(target, RESOURCE_ENERGY).free);
+                        if (amountToGive > 0) {
+                            TrafficManager.registerTransfer(creep, target, RESOURCE_ENERGY, amountToGive);
+                        }
                     }
                 } else if (state === 'build') {
                     if (creep.build(target) === ERR_NOT_IN_RANGE) {
@@ -230,5 +250,6 @@ module.exports = {
                 console.log(`[worker Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
             }
         }
+
     }
 };
