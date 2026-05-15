@@ -4,6 +4,8 @@
  * @description Utility functions for finding and filtering resources or structures using global.State (0-CPU native polling).
  */
 
+const TrafficManager = require('../traffic/trafficManager');
+
 /**
  * Gets structures of given types in a room that have free capacity for the specified resource.
  * @param {string} roomName - The name of the room.
@@ -21,7 +23,7 @@ function getStructuresWithFreeCapacity(roomName, structureTypes, resourceType = 
         const typeMap = roomStructures.get(type);
         if (typeMap) {
             for (const structure of typeMap.values()) {
-                if (structure.store && structure.store.getFreeCapacity(resourceType) > 0) {
+                if (TrafficManager.getVirtualState(structure, resourceType).free > 0) {
                     results.push(structure);
                 }
             }
@@ -47,7 +49,7 @@ function getStructuresWithUsedCapacity(roomName, structureTypes, resourceType = 
         const typeMap = roomStructures.get(type);
         if (typeMap) {
             for (const structure of typeMap.values()) {
-                if (structure.store && structure.store.getUsedCapacity(resourceType) > 0) {
+                if (TrafficManager.getVirtualState(structure, resourceType).used > 0) {
                     results.push(structure);
                 }
             }
@@ -87,7 +89,7 @@ function findNearestEnergySource(pos, roomName, minAmount = 0) {
     for (let i = 0; i < dropped.length; i++) {
         const resource = dropped[i];
         if (resource.resourceType === undefined || resource.resourceType === RESOURCE_ENERGY) {
-            checkTarget(resource, resource.amount);
+            checkTarget(resource, TrafficManager.getVirtualState(resource, RESOURCE_ENERGY).used);
         }
     }
 
@@ -96,7 +98,7 @@ function findNearestEnergySource(pos, roomName, minAmount = 0) {
     for (let i = 0; i < tombstones.length; i++) {
         const tombstone = tombstones[i];
         if (tombstone.store) {
-            checkTarget(tombstone, tombstone.store.getUsedCapacity(RESOURCE_ENERGY));
+            checkTarget(tombstone, TrafficManager.getVirtualState(tombstone, RESOURCE_ENERGY).used);
         }
     }
 
@@ -105,7 +107,7 @@ function findNearestEnergySource(pos, roomName, minAmount = 0) {
     for (let i = 0; i < ruins.length; i++) {
         const ruin = ruins[i];
         if (ruin.store) {
-            checkTarget(ruin, ruin.store.getUsedCapacity(RESOURCE_ENERGY));
+            checkTarget(ruin, TrafficManager.getVirtualState(ruin, RESOURCE_ENERGY).used);
         }
     }
 
@@ -113,7 +115,7 @@ function findNearestEnergySource(pos, roomName, minAmount = 0) {
     const sources = getStructuresWithUsedCapacity(roomName, [STRUCTURE_CONTAINER, STRUCTURE_STORAGE, STRUCTURE_LINK], RESOURCE_ENERGY);
     for (let i = 0; i < sources.length; i++) {
         const source = sources[i];
-        checkTarget(source, source.store.getUsedCapacity(RESOURCE_ENERGY));
+        checkTarget(source, TrafficManager.getVirtualState(source, RESOURCE_ENERGY).used);
     }
 
     return nearest;
@@ -144,7 +146,7 @@ function findNearestEnergySink(pos, roomName, minFreeCapacity = 0) {
 
     for (let i = 0; i < sinks.length; i++) {
         const sink = sinks[i];
-        const free = sink.store.getFreeCapacity(RESOURCE_ENERGY);
+        const free = TrafficManager.getVirtualState(sink, RESOURCE_ENERGY).free;
         if (free <= minFreeCapacity) continue;
 
         const dist = Math.max(Math.abs(pos.x - sink.pos.x), Math.abs(pos.y - sink.pos.y));
