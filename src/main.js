@@ -1,14 +1,13 @@
 const { CacheRegistry } = require('./os/cache');
 const RawMemoryManager = require('./os/RawMemoryManager');
 const globalState = require('./state/globalState');
-const roomEventManager = require('./managers/RoomEventManager');
+const managersIntegration = require('./managers/index');
 const discoveryManager = require('./state/discoveryManager');
 const stateScanner = require('./state/stateScanner');
 const colonyManager = require('./colonies/colonyManager');
 const operationsManager = require('./operations/operationsManager'); // High-level orchestrator
 const trafficManager = require('./traffic/trafficManager');
 const movement = require('./utils/movement');
-const EnergyRequestManager = require('./managers/EnergyRequestManager');
 
 module.exports.loop = function () {
     // Initialize RawMemory segments
@@ -20,6 +19,9 @@ module.exports.loop = function () {
 
     // Rehydrate global state
     globalState.rehydrate();
+
+    // Initialize managers via integration layer
+    managersIntegration.init(globalState);
 
     // Initialize OS cache
     if (!global.Cache) {
@@ -56,6 +58,7 @@ module.exports.loop = function () {
     // Phase 2: State Scanner (Event-driven map updaters)
     if (!skipState) {
         try {
+            const roomEventManager = globalState.getManager('RoomEventManager');
             if (roomEventManager) roomEventManager();
         } catch (e) {
             console.log(`[Phase 2 Error] Room Event Manager: ${e.stack}`);
@@ -70,7 +73,10 @@ module.exports.loop = function () {
 
     // Phase 2.5: Execution Gates
     try {
-        EnergyRequestManager.handleSourceSleep();
+        const energyRequestManager = globalState.getManager('EnergyRequestManager');
+        if (energyRequestManager && energyRequestManager.handleSourceSleep) {
+            energyRequestManager.handleSourceSleep();
+        }
 
         if (global.State.creepsByRoom) {
             for (const roomCreeps of global.State.creepsByRoom.values()) {

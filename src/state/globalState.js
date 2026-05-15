@@ -2,6 +2,15 @@ class GlobalStateManager {
     constructor() {
         this.heapCache = new Map();
         this.isRehydrated = false;
+        this.managers = new Map();
+    }
+
+    registerManager(name, instance) {
+        this.managers.set(name, instance);
+    }
+
+    getManager(name) {
+        return this.managers.get(name);
     }
 
     rehydrate() {
