@@ -48,7 +48,7 @@ function garbageCollector() {
         }
 
     } catch (e) {
-        console.error(`[GarbageCollector Error]: ${e.stack}`);
+        console.log(`[GarbageCollector Error]: ${e.stack}`);
     }
 }
 

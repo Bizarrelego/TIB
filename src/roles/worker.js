@@ -4,6 +4,7 @@
  */
 
 const movement = require('../utils/movement');
+const TrafficManager = require('../traffic/trafficManager');
 
 module.exports = {
     /**
@@ -44,14 +45,17 @@ module.exports = {
                     }
 
                     if (target) {
-                        let res = OK;
-                        if (target instanceof Resource) {
-                            res = creep.pickup(target);
-                        } else {
-                            res = creep.withdraw(target, RESOURCE_ENERGY);
-                        }
-                        if (res === ERR_NOT_IN_RANGE) {
+                        if (!creep.pos.isNearTo(target)) {
                             movement.moveTo(creep, target);
+                        } else {
+                            const amountToTake = Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), target.amount || (target.store ? target.store.getUsedCapacity(RESOURCE_ENERGY) : 0));
+                            if (amountToTake > 0) {
+                                if (target instanceof Resource) {
+                                    TrafficManager.registerPickup(creep, target, RESOURCE_ENERGY, amountToTake);
+                                } else {
+                                    TrafficManager.registerWithdraw(creep, target, RESOURCE_ENERGY, amountToTake);
+                                }
+                            }
                         }
                     }
                     continue;
@@ -66,16 +70,23 @@ module.exports = {
                 }
 
                 if (state === 'harvest') {
-                    if (creep.harvest(target) === ERR_NOT_IN_RANGE) {
+                    if (!creep.pos.isNearTo(target)) {
                         movement.moveTo(creep, target);
+                    } else {
+                        TrafficManager.registerHarvest(creep, target);
                     }
                 } else if (state === 'repair') {
                     if (creep.repair(target) === ERR_NOT_IN_RANGE) {
                         movement.moveTo(creep, target);
                     }
                 } else if (state === 'refill') {
-                    if (creep.transfer(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                    if (!creep.pos.isNearTo(target)) {
                         movement.moveTo(creep, target);
+                    } else {
+                        const amountToGive = Math.min(creep.store.getUsedCapacity(RESOURCE_ENERGY), TrafficManager.getVirtualState(target, RESOURCE_ENERGY).free);
+                        if (amountToGive > 0) {
+                            TrafficManager.registerTransfer(creep, target, RESOURCE_ENERGY, amountToGive);
+                        }
                     }
                 } else if (state === 'build') {
                     if (creep.build(target) === ERR_NOT_IN_RANGE) {
@@ -88,7 +99,7 @@ module.exports = {
                 }
 
             } catch (e) {
-                console.error(`[worker Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
+                console.log(`[worker Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
             }
         }
     }

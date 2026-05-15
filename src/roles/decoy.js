@@ -58,7 +58,7 @@ module.exports = {
                     }
                 }
             } catch (e) {
-                console.error(`[decoy Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
+                console.log(`[decoy Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
             }
         }
     }

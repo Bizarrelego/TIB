@@ -50,7 +50,7 @@ class PubSub {
                 try {
                     callback(data);
                 } catch (e) {
-                    console.error(`Error in EventBus for event ${event}: ${e.stack}`);
+                    console.log(`[EventBus Error] Event ${event}: ${e.stack}`);
                 }
             }
         }

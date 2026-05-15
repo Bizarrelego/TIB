@@ -1,9 +1,10 @@
 Object.defineProperty(Creep.prototype, 'heap', {
     get() {
-        let memory = global.Cache.creeps.get(this.name);
+            const creepsCache = global.Cache ? global.Cache.get('creeps') : undefined;
+            let memory = creepsCache ? creepsCache.get(this.name) : undefined;
         if (memory === undefined) {
             memory = {};
-            global.Cache.creeps.set(this.name, memory);
+                if (creepsCache) creepsCache.set(this.name, memory);
         }
         return memory;
     },

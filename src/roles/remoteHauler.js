@@ -191,7 +191,7 @@ function run(room) {
             }
 
         } catch (e) {
-            console.error(`[remoteHauler Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
+            console.log(`[remoteHauler Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
         }
     }
 }

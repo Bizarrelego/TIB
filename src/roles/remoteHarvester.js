@@ -135,7 +135,7 @@ function run(room) {
             }
 
         } catch (e) {
-            console.error(`[remoteHarvester Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
+            console.log(`[remoteHarvester Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
         }
     }
 }

@@ -53,7 +53,7 @@ function run(room) {
             }
 
         } catch (e) {
-            console.error(`[Scout Role Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
+            console.log(`[Scout Role Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
         }
     }
 }

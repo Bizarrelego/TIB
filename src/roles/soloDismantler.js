@@ -70,7 +70,7 @@ module.exports = {
                 }
 
             } catch (e) {
-                console.error(`[soloDismantler Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
+                console.log(`[soloDismantler Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
             }
         }
     }

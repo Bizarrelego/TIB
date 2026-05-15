@@ -84,7 +84,7 @@ function run(room) {
             }
 
         } catch (e) {
-            console.error(`[reserver Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
+            console.log(`[reserver Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
         }
     }
 }

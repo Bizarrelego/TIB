@@ -47,7 +47,7 @@ module.exports = {
                 }
 
             } catch (e) {
-                console.error(`[quadAttacker Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
+                console.log(`[quadAttacker Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
             }
         }
     }

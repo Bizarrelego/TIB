@@ -36,7 +36,7 @@ class LabManager {
             this.assignCreepTasks(room, labConfig, labReaction);
 
         } catch (e) {
-            console.error(`[LabManager Error] Room ${room.name}: ${e.stack}`);
+            console.log(`[LabManager Error] Room ${room.name}: ${e.stack}`);
         }
     }
 
@@ -172,7 +172,6 @@ class LabManager {
         const terminal = room.terminal;
 
         for (const creep of labManagers) {
-            if (!creep.heap) creep.heap = new Map();
             // Priority 1: If carrying wrong mineral, deposit it to storage
             let carryingOther = false;
             let wrongResource = null;
@@ -185,15 +184,15 @@ class LabManager {
             }
 
             if (carryingOther) {
-                creep.heap.set('state', 'store_wrong');
-                creep.heap.set('targetId', storage ? storage.id : null);
-                creep.heap.set('resource', wrongResource);
+                creep.heap.state = 'store_wrong';
+                creep.heap.targetId = storage ? storage.id : null;
+                creep.heap.resource = wrongResource;
                 continue;
             }
 
             // If no reaction, just idle or clean up
             if (!labReaction) {
-                creep.heap.set('state', 'idle');
+                creep.heap.state = 'idle';
                 continue;
             }
 
@@ -219,14 +218,14 @@ class LabManager {
                     // Deadlock fix: drop whatever wrong item we are carrying first
                     const carriedRes = Object.keys(creep.store).find(k => k !== RESOURCE_ENERGY);
                     if (carriedRes) {
-                        creep.heap.set('state', 'store_output');
-                        creep.heap.set('targetId', storage ? storage.id : terminal ? terminal.id : null);
-                        creep.heap.set('resource', carriedRes);
+                        creep.heap.state = 'store_output';
+                        creep.heap.targetId = storage ? storage.id : terminal ? terminal.id : null;
+                        creep.heap.resource = carriedRes;
                     }
                 } else {
-                    creep.heap.set('state', 'empty_output');
-                    creep.heap.set('targetId', outputToEmpty.id);
-                    creep.heap.set('resource', outputResource);
+                    creep.heap.state = 'empty_output';
+                    creep.heap.targetId = outputToEmpty.id;
+                    creep.heap.resource = outputResource;
                 }
                 continue;
             }
@@ -237,14 +236,14 @@ class LabManager {
                 if (creep.store.getUsedCapacity() > 0) {
                     const carriedRes = Object.keys(creep.store).find(k => k !== RESOURCE_ENERGY);
                     if (carriedRes) {
-                        creep.heap.set('state', 'store_wrong');
-                        creep.heap.set('targetId', storage ? storage.id : null);
-                        creep.heap.set('resource', carriedRes);
+                        creep.heap.state = 'store_wrong';
+                        creep.heap.targetId = storage ? storage.id : null;
+                        creep.heap.resource = carriedRes;
                     }
                 } else {
-                    creep.heap.set('state', 'empty_wrong');
-                    creep.heap.set('targetId', input1.id);
-                    creep.heap.set('resource', in1Res);
+                    creep.heap.state = 'empty_wrong';
+                    creep.heap.targetId = input1.id;
+                    creep.heap.resource = in1Res;
                 }
                 continue;
             }
@@ -254,14 +253,14 @@ class LabManager {
                 if (creep.store.getUsedCapacity() > 0) {
                     const carriedRes = Object.keys(creep.store).find(k => k !== RESOURCE_ENERGY);
                     if (carriedRes) {
-                        creep.heap.set('state', 'store_wrong');
-                        creep.heap.set('targetId', storage ? storage.id : null);
-                        creep.heap.set('resource', carriedRes);
+                        creep.heap.state = 'store_wrong';
+                        creep.heap.targetId = storage ? storage.id : null;
+                        creep.heap.resource = carriedRes;
                     }
                 } else {
-                    creep.heap.set('state', 'empty_wrong');
-                    creep.heap.set('targetId', input2.id);
-                    creep.heap.set('resource', in2Res);
+                    creep.heap.state = 'empty_wrong';
+                    creep.heap.targetId = input2.id;
+                    creep.heap.resource = in2Res;
                 }
                 continue;
             }
@@ -269,31 +268,31 @@ class LabManager {
             // Priority 4: Fill input labs
             if (input1.store[labReaction.reagent1] < 2000) {
                 if (creep.store[labReaction.reagent1] > 0) {
-                    creep.heap.set('state', 'fill_input1');
-                    creep.heap.set('targetId', input1.id);
-                    creep.heap.set('resource', labReaction.reagent1);
+                    creep.heap.state = 'fill_input1';
+                    creep.heap.targetId = input1.id;
+                    creep.heap.resource = labReaction.reagent1;
                 } else {
-                    creep.heap.set('state', 'gather_input1');
-                    creep.heap.set('targetId', storage && storage.store[labReaction.reagent1] > 0 ? storage.id : terminal && terminal.store[labReaction.reagent1] > 0 ? terminal.id : null);
-                    creep.heap.set('resource', labReaction.reagent1);
+                    creep.heap.state = 'gather_input1';
+                    creep.heap.targetId = storage && storage.store[labReaction.reagent1] > 0 ? storage.id : terminal && terminal.store[labReaction.reagent1] > 0 ? terminal.id : null;
+                    creep.heap.resource = labReaction.reagent1;
                 }
                 continue;
             }
 
             if (input2.store[labReaction.reagent2] < 2000) {
                 if (creep.store[labReaction.reagent2] > 0) {
-                    creep.heap.set('state', 'fill_input2');
-                    creep.heap.set('targetId', input2.id);
-                    creep.heap.set('resource', labReaction.reagent2);
+                    creep.heap.state = 'fill_input2';
+                    creep.heap.targetId = input2.id;
+                    creep.heap.resource = labReaction.reagent2;
                 } else {
-                    creep.heap.set('state', 'gather_input2');
-                    creep.heap.set('targetId', storage && storage.store[labReaction.reagent2] > 0 ? storage.id : terminal && terminal.store[labReaction.reagent2] > 0 ? terminal.id : null);
-                    creep.heap.set('resource', labReaction.reagent2);
+                    creep.heap.state = 'gather_input2';
+                    creep.heap.targetId = storage && storage.store[labReaction.reagent2] > 0 ? storage.id : terminal && terminal.store[labReaction.reagent2] > 0 ? terminal.id : null;
+                    creep.heap.resource = labReaction.reagent2;
                 }
                 continue;
             }
 
-            creep.heap.set('state', 'idle');
+            creep.heap.state = 'idle';
         }
     }
 }

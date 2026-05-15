@@ -97,7 +97,7 @@ class RawMemoryManager {
                                 this.intelCache = JSON.parse(jsonStr);
                             }
                         } catch (e) {
-                            console.error(`[RawMemoryManager] Failed to parse intel data: ${e.message}`);
+                            console.log(`[RawMemoryManager] Failed to parse intel data: ${e.message}`);
                         }
                     }
                 }

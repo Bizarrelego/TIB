@@ -22,7 +22,7 @@ module.exports = {
 
                 // Implementation placeholder
             } catch (e) {
-                console.error(`[emergencyBuilder Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
+                console.log(`[emergencyBuilder Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
             }
         }
     }

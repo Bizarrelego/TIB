@@ -23,11 +23,11 @@ const CostMatrixCache = {
             const structuresMap = global.State.structuresByRoom.get(roomName);
             for (const [structureType, structures] of structuresMap.entries()) {
                 if (structureType === STRUCTURE_ROAD) {
-                    for (const structure of structures) {
+                    for (const structure of structures.values()) {
                         costMatrix.set(structure.pos.x, structure.pos.y, 1);
                     }
                 } else if (structureType !== STRUCTURE_CONTAINER && structureType !== STRUCTURE_RAMPART) {
-                    for (const structure of structures) {
+                    for (const structure of structures.values()) {
                         costMatrix.set(structure.pos.x, structure.pos.y, 255);
                     }
                 }

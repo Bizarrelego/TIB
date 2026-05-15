@@ -55,7 +55,7 @@ const TrafficManager = {
                 }
             }
         } catch (e) {
-            console.error(`TrafficManager CRITICAL: ${e.stack}`);
+            console.log(`[TrafficManager CRITICAL]: ${e.stack}`);
         }
     },
 
@@ -252,7 +252,7 @@ const TrafficManager = {
      * @param {object} [opts={}]
      */
     registerMoveIntent(creep, targetPos, opts = {}) {
-        if (!creep || creep.fatigue > 0 || this.checkPipeline(creep.id)) return;
+        if (!creep || creep.fatigue > 0) return;
         if (!global.State) global.State = {};
         if (!(global.State.trafficIntents instanceof Map)) global.State.trafficIntents = new Map();
 
@@ -310,7 +310,7 @@ const TrafficManager = {
                     break;
             }
         } catch (e) {
-            console.error(`[TrafficManager] FlushIntent Error on ${creep.name}: ${e.stack}`);
+            console.log(`[TrafficManager] FlushIntent Error on ${creep.name}: ${e.stack}`);
         }
     },
 
@@ -430,19 +430,24 @@ const TrafficManager = {
                     const blockingCreepName = currentPositions.get(posKey);
 
                     if (blockingCreepName && blockingCreepName !== creep.name) {
-                        if (!global.State.trafficIntents.has(blockingCreepName)) {
-                            // Blocked by a stationary creep, do not move
+                const blockingLive = global.State.creepLookup ? global.State.creepLookup.get(blockingCreepName) : Game.creeps[blockingCreepName];
+                if (!global.State.trafficIntents.has(blockingCreepName) && blockingLive && blockingLive.fatigue === 0) {
+                    // Blocked by a stationary creep
                             global.State.trafficIntents.delete(creep.name);
+                    if (creep.heap) creep.heap.path = null; // Force repath
                             continue;
                         }
                     }
                 }
 
-                movement.moveTo(creep, targetPos, opts);
+        if (intendedNextPos) {
+            const dir = creep.pos.getDirectionTo(intendedNextPos);
+            if (dir) creep.move(dir);
+        }
                 global.State.trafficIntents.delete(creep.name);
             }
         } catch (e) {
-            console.error(`[TrafficManager Execution Error]: ${e.stack}`);
+            console.log(`[TrafficManager Execution Error]: ${e.stack}`);
         }
     }
 };

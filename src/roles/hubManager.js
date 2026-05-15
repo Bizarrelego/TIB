@@ -13,12 +13,10 @@ function run(room) {
         try {
             if (creep.fatigue > 0) continue; // Fatigue gating
 
-            // Compatibility for both Map and standard object heap
-            const heapIsMap = creep.heap instanceof Map;
-            const parkPos = heapIsMap ? creep.heap.get('parkPos') : creep.heap.parkPos;
-            const state = heapIsMap ? creep.heap.get('state') : creep.heap.state;
-            const sourceId = heapIsMap ? creep.heap.get('sourceId') : creep.heap.sourceId;
-            const targetId = heapIsMap ? creep.heap.get('targetId') : creep.heap.targetId;
+            const parkPos = creep.heap.parkPos;
+            const state = creep.heap.state;
+            const sourceId = creep.heap.sourceId;
+            const targetId = creep.heap.targetId;
 
             // 1. Move to optimized park position
             if (parkPos) {

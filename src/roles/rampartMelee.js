@@ -112,7 +112,7 @@ module.exports = {
                 }
 
             } catch (e) {
-                console.error(`[rampartMelee Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
+                console.log(`[rampartMelee Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
             }
         }
     }

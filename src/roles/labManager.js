@@ -20,9 +20,9 @@ function run(room) {
         try {
             if (creep.fatigue > 0 || TrafficManager.checkPipeline(creep.id)) continue; // Fatigue gating and pipeline check
 
-            const state = creep.heap.get('state');
-            const targetId = creep.heap.get('targetId');
-            const resource = creep.heap.get('resource');
+            const state = creep.heap.state;
+            const targetId = creep.heap.targetId;
+            const resource = creep.heap.resource;
 
             if (!state || state === 'idle' || !targetId) continue;
 

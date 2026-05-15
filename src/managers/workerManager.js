@@ -1,4 +1,5 @@
 const STRUCTURE_PRIORITIES = require('../constants/structurePriorities');
+const TrafficManager = require('../traffic/trafficManager');
 
 module.exports = {
     /**
@@ -18,17 +19,22 @@ module.exports = {
         const sites = global.State.sitesByRoom.get(room.name);
 
         let refillTargets = [];
+        const refillLedger = new Map();
         if (structures) {
             const spawns = structures.get(STRUCTURE_SPAWN) || [];
             for (let i = 0; i < spawns.length; i++) {
-                if (spawns[i].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                const free = TrafficManager.getVirtualState(spawns[i], RESOURCE_ENERGY).free;
+                if (free > 0) {
                     refillTargets.push(spawns[i]);
+                    refillLedger.set(spawns[i].id, free);
                 }
             }
             const extensions = structures.get(STRUCTURE_EXTENSION) || [];
             for (let i = 0; i < extensions.length; i++) {
-                if (extensions[i].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                const free = TrafficManager.getVirtualState(extensions[i], RESOURCE_ENERGY).free;
+                if (free > 0) {
                     refillTargets.push(extensions[i]);
+                    refillLedger.set(extensions[i].id, free);
                 }
             }
         }
@@ -45,6 +51,14 @@ module.exports = {
             if (domesticHaulers) haulerCount += domesticHaulers.length;
         }
         const isBootstrapping = harvesterCount === 0 && haulerCount === 0;
+
+        // Cache supplies and their virtual capacities for assignment
+        const EnergyRequestManager = require('./EnergyRequestManager');
+        const supplies = EnergyRequestManager.getEnergySupplies(room.name, 'worker');
+        const supplyLedger = new Map();
+        for (let i = 0; i < supplies.length; i++) {
+            supplyLedger.set(supplies[i].target.id, supplies[i].amount);
+        }
 
         for (const creep of workers) {
             // Determine state based on capacity
@@ -65,11 +79,18 @@ module.exports = {
 
             // Assign targets based on state
             if (creep.heap.state === 'pickup') {
-                const EnergyRequestManager = require('./EnergyRequestManager');
-                const supplies = EnergyRequestManager.getEnergySupplies(room.name);
-                if (supplies.length > 0) {
-                    creep.heap.targetId = supplies[0].target.id;
-                } else {
+                let targetAssigned = false;
+                for (let i = 0; i < supplies.length; i++) {
+                    const supply = supplies[i];
+                    const available = supplyLedger.get(supply.target.id) || 0;
+                    if (available > 0) {
+                        creep.heap.targetId = supply.target.id;
+                        supplyLedger.set(supply.target.id, available - creep.store.getFreeCapacity());
+                        targetAssigned = true;
+                        break;
+                    }
+                }
+                if (!targetAssigned) {
                     creep.heap.targetId = null;
                 }
             } else if (creep.heap.state === 'repair') {
@@ -109,16 +130,25 @@ module.exports = {
                     }
                 }
             } else if (creep.heap.state === 'refill') {
-                if (refillTargets.length > 0) {
-                    creep.heap.targetId = refillTargets[0].id;
-                } else {
-                    creep.heap.state = room.memory.haltUpgrades ? 'idle' : 'upgrade'; // fallback
-                    if (creep.heap.state === 'upgrade' && room.controller) {
-                        creep.heap.targetId = room.controller.id;
-                    } else {
-                        creep.heap.targetId = null;
-                    }
+            let assigned = false;
+            for (let i = 0; i < refillTargets.length; i++) {
+                const target = refillTargets[i];
+                const virtualFree = refillLedger.get(target.id) || 0;
+                if (virtualFree > 0) {
+                    creep.heap.targetId = target.id;
+                    refillLedger.set(target.id, virtualFree - creep.store.getUsedCapacity(RESOURCE_ENERGY));
+                    assigned = true;
+                    break;
                 }
+            }
+            if (!assigned) {
+                creep.heap.state = room.memory.haltUpgrades ? 'idle' : 'upgrade'; // fallback
+                if (creep.heap.state === 'upgrade' && room.controller) {
+                    creep.heap.targetId = room.controller.id;
+                } else {
+                    creep.heap.targetId = null;
+                }
+            }
             } else if (creep.heap.state === 'build') {
                 if (sites && sites.length > 0) {
                     let highestPriority = -Infinity;

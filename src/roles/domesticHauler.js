@@ -55,7 +55,6 @@ module.exports = {
                     continue;
                 }
 
-                creep.heap = creep.heap || {};
                 let task = creep.heap.state || creep.heap.task;
 
                 // If the logisticsManager assigned a state, use it as task priority
@@ -239,7 +238,7 @@ module.exports = {
                     }
                 }
             } catch (e) {
-                console.error(`[domesticHauler Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
+                console.log(`[domesticHauler Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
             }
         }
     }
