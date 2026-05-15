@@ -1,10 +1,10 @@
 
 
 /* eslint-disable no-redeclare */
-/* global Game, PathFinder, TERRAIN_MASK_WALL, STRUCTURE_CONTAINER, STRUCTURE_ROAD, CONTROLLER_STRUCTURES, STRUCTURE_RAMPART */
+/* global Game, PathFinder, TERRAIN_MASK_WALL, STRUCTURE_CONTAINER, STRUCTURE_ROAD, CONTROLLER_STRUCTURES, STRUCTURE_RAMPART, STRUCTURE_FACTORY, STRUCTURE_LAB */
 const DistanceTransform = require('../algorithms/distanceTransform');
 const MinCut = require('../algorithms/minCut');
-const { BASE_LAYOUT_STAMP } = require('../constants/baseLayout');
+const { BASE_LAYOUT_STAMP, FAST_FILLER_SPOTS } = require('../constants/baseLayout');
 const roomPositionUtils = require('../utils/roomPositionUtils');
 
 module.exports = {
@@ -88,6 +88,15 @@ module.exports = {
             const anchor = plannerState.get('anchor');
             if (!anchor) return;
 
+            if (!plannerState.has('fastFillerPositions')) {
+                const ffs = [];
+                for (let i = 0; i < FAST_FILLER_SPOTS.length; i++) {
+                    const pos = roomPositionUtils.getAbsolutePosition(anchor, FAST_FILLER_SPOTS[i][0], FAST_FILLER_SPOTS[i][1], room.name);
+                    ffs.push(pos);
+                }
+                plannerState.set('fastFillerPositions', ffs);
+            }
+
             const rcl = room.controller.level;
             const lastRcl = plannerState.get('lastRcl');
 
@@ -103,10 +112,19 @@ module.exports = {
                     let rclLimit = 0;
                     let overrideStructureType = structureType;
 
-                    if (structureType === STRUCTURE_CONTAINER) {
+                    if (structureType === 'factory') {
+                        if (rcl < 7) continue;
+                        overrideStructureType = STRUCTURE_FACTORY;
+                        rclLimit = 1;
+                    } else if (structureType === 'lab') {
+                        if (rcl < 6) continue;
+                        overrideStructureType = STRUCTURE_LAB;
+                        rclLimit = CONTROLLER_STRUCTURES[STRUCTURE_LAB][rcl] || 0;
+                    } else if (structureType === STRUCTURE_CONTAINER) {
                         rclLimit = 5;
                     } else if (structureType === STRUCTURE_ROAD) {
-                        rclLimit = 2500;
+                        if (rcl < 3) continue;
+                        rclLimit = offsets.length;
                     } else if (CONTROLLER_STRUCTURES[structureType]) {
                         rclLimit = CONTROLLER_STRUCTURES[structureType][rcl] || 0;
                     }
@@ -222,7 +240,7 @@ module.exports = {
             }
 
             // Integrate road planning
-            if (plannedStructures) {
+            if (plannedStructures && room.controller && room.controller.level >= 3) {
                 const spawns = global.State.spawnsByRoom ? (global.State.spawnsByRoom.get(room.name) || []) : [];
                 if (spawns.length > 0) {
                     const spawn = spawns[0];
@@ -270,7 +288,6 @@ module.exports = {
                         );
 
                         for (let j = 0; j < pathInfo.path.length; j++) {
-                            if (roadCount >= 2500) break;
                             const pos = pathInfo.path[j];
 
                             if (pos.x === 0 || pos.x === 49 || pos.y === 0 || pos.y === 49) continue;
