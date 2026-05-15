@@ -2,8 +2,9 @@
  * @file RemoteEconomyManager.js
  * @description Executes Top-Down Assignment for remote economy roles.
  */
+const Profiler = require('../utils/profiler');
 
-module.exports = {
+const RemoteEconomyManager = {
     /**
      * Evaluates room state and assigns target sources and containers directly to creep memory/heap.
      * @param {Room} room
@@ -95,3 +96,5 @@ module.exports = {
         }
     }
 };
+
+module.exports = { run: Profiler.wrap('RemoteEconomyManager.run', RemoteEconomyManager.run) };

@@ -4,6 +4,7 @@
  */
 
 const ROLE_PRIORITIES = require('../constants/rolePriorities');
+const Profiler = require('../utils/profiler');
 
 /**
  * @class SpawnQueueManager
@@ -140,5 +141,17 @@ class SpawnQueueManager {
 
 SpawnQueueManager.ROLE_PRIORITIES = ROLE_PRIORITIES;
 SpawnQueueManager.globalQueue = new Map();
+
+// Note: SpawnQueueManager uses instance methods, but it's typically instantiated in global scope or within SpawnManager
+for (const method of Object.getOwnPropertyNames(SpawnQueueManager.prototype)) {
+    if (typeof SpawnQueueManager.prototype[method] === 'function' && method !== 'constructor') {
+        SpawnQueueManager.prototype[method] = Profiler.wrap(`SpawnQueueManager.${method}`, SpawnQueueManager.prototype[method]);
+    }
+}
+for (const method of Object.getOwnPropertyNames(SpawnQueueManager)) {
+    if (typeof SpawnQueueManager[method] === 'function' && method !== 'constructor' && method !== 'prototype' && method !== 'name' && method !== 'length') {
+        SpawnQueueManager[method] = Profiler.wrap(`SpawnQueueManager.${method}`, SpawnQueueManager[method]);
+    }
+}
 
 module.exports = SpawnQueueManager;

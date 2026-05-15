@@ -1,3 +1,5 @@
+const Profiler = require('../utils/profiler');
+
 /**
  * Handles terminal resource management and inter-room transfers.
  */
@@ -97,6 +99,12 @@ class TerminalManager {
                 }
             }
         }
+    }
+}
+
+for (const method of Object.getOwnPropertyNames(TerminalManager)) {
+    if (typeof TerminalManager[method] === 'function' && method !== 'constructor' && method !== 'prototype' && method !== 'name' && method !== 'length') {
+        TerminalManager[method] = Profiler.wrap(`TerminalManager.${method}`, TerminalManager[method]);
     }
 }
 

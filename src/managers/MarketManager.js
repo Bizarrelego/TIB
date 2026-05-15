@@ -1,4 +1,5 @@
 const MathUtils = require('../utils/math');
+const Profiler = require('../utils/profiler');
 
 /**
  * Handles global market trade execution based on EMA values.
@@ -91,6 +92,12 @@ class MarketManager {
                 }
             }
         }
+    }
+}
+
+for (const method of Object.getOwnPropertyNames(MarketManager)) {
+    if (typeof MarketManager[method] === 'function' && method !== 'constructor' && method !== 'prototype' && method !== 'name' && method !== 'length') {
+        MarketManager[method] = Profiler.wrap(`MarketManager.${method}`, MarketManager[method]);
     }
 }
 

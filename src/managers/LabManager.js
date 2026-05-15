@@ -1,5 +1,6 @@
 /* eslint-disable no-redeclare */
 /* global STRUCTURE_LAB, RESOURCE_ENERGY, REACTIONS */
+const Profiler = require('../utils/profiler');
 
 /**
  * Manages lab logistics and reactions.
@@ -295,6 +296,12 @@ class LabManager {
 
             creep.heap.set('state', 'idle');
         }
+    }
+}
+
+for (const method of Object.getOwnPropertyNames(LabManager)) {
+    if (typeof LabManager[method] === 'function' && method !== 'constructor' && method !== 'prototype' && method !== 'name' && method !== 'length') {
+        LabManager[method] = Profiler.wrap(`LabManager.${method}`, LabManager[method]);
     }
 }
 

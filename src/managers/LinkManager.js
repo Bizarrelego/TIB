@@ -1,3 +1,5 @@
+const Profiler = require('../utils/profiler');
+
 function run(room) {
     if (!room.controller || room.controller.level < 5) return;
 
@@ -84,4 +86,7 @@ function getControllerLink(roomName) {
     return roomLinks ? roomLinks.controllerLink : null;
 }
 
-module.exports = { run, getControllerLink };
+module.exports = {
+    run: Profiler.wrap('LinkManager.run', run),
+    getControllerLink: Profiler.wrap('LinkManager.getControllerLink', getControllerLink)
+};

@@ -6,6 +6,7 @@
  */
 
 const resourceUtils = require('../utils/resourceUtils');
+const Profiler = require('../utils/profiler');
 
 class EnergyRequestManager {
     /**
@@ -212,6 +213,12 @@ class EnergyRequestManager {
         supplies.sort((a, b) => b.priority - a.priority);
 
         return supplies;
+    }
+}
+
+for (const method of Object.getOwnPropertyNames(EnergyRequestManager)) {
+    if (typeof EnergyRequestManager[method] === 'function' && method !== 'constructor' && method !== 'prototype' && method !== 'name' && method !== 'length') {
+        EnergyRequestManager[method] = Profiler.wrap(`EnergyRequestManager.${method}`, EnergyRequestManager[method]);
     }
 }
 

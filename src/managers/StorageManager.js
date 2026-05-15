@@ -1,4 +1,5 @@
 const { determineDefcon, DEFCON } = require('../constants/defcon');
+const Profiler = require('../utils/profiler');
 
 function run(room) {
     try {
@@ -62,4 +63,4 @@ function run(room) {
     }
 }
 
-module.exports = { run };
+module.exports = { run: Profiler.wrap('StorageManager.run', run) };

@@ -1,5 +1,6 @@
 const upgrader = require('../roles/upgrader');
 const LinkManager = require('./LinkManager');
+const Profiler = require('../utils/profiler');
 
 class UpgraderManager {
     /**
@@ -107,6 +108,12 @@ class UpgraderManager {
         } catch (e) {
             console.log(`[UpgraderManager Error] Room ${room.name}: ${e.stack}`);
         }
+    }
+}
+
+for (const method of Object.getOwnPropertyNames(UpgraderManager)) {
+    if (typeof UpgraderManager[method] === 'function' && method !== 'constructor' && method !== 'prototype' && method !== 'name' && method !== 'length') {
+        UpgraderManager[method] = Profiler.wrap(`UpgraderManager.${method}`, UpgraderManager[method]);
     }
 }
 

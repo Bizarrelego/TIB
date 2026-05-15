@@ -1,6 +1,7 @@
 const STRUCTURE_PRIORITIES = require('../constants/structurePriorities');
+const Profiler = require('../utils/profiler');
 
-module.exports = {
+const workerManager = {
     /**
      * Executes Top-Down Assignment for workers.
      * Evaluates room state and assigns tasks directly to creep.heap.
@@ -109,3 +110,5 @@ module.exports = {
         }
     }
 };
+
+module.exports = { run: Profiler.wrap('workerManager.run', workerManager.run) };

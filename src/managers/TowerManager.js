@@ -1,5 +1,6 @@
 /* global DISMANTLE */
 const { determineDefcon, DEFCON } = require('../constants/defcon');
+const Profiler = require('../utils/profiler');
 
 function getDistance(pos1, pos2) {
     return Math.max(Math.abs(pos1.x - pos2.x), Math.abs(pos1.y - pos2.y));
@@ -119,4 +120,4 @@ function run(room, defenseRepairTarget = null) {
     }
 }
 
-module.exports = { run };
+module.exports = { run: Profiler.wrap('TowerManager.run', run) };

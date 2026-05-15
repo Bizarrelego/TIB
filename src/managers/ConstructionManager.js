@@ -1,8 +1,9 @@
 const STRUCTURE_PRIORITIES = require('../constants/structurePriorities');
+const Profiler = require('../utils/profiler');
 
 const MAX_CONSTRUCTION_SITES = 5;
 
-module.exports = {
+const ConstructionManager = {
     /**
      * Translates planned structures into actual ConstructionSites.
      * @param {Room} room
@@ -122,3 +123,5 @@ module.exports = {
         }
     }
 };
+
+module.exports = { run: Profiler.wrap('ConstructionManager.run', ConstructionManager.run) };
