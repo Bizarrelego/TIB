@@ -123,18 +123,18 @@ module.exports = {
                     let highestPriority = -Infinity;
 
                     // Priority Order: STRUCTURE_EXTENSION > STRUCTURE_CONTAINER > STRUCTURE_TOWER > STRUCTURE_STORAGE > STRUCTURE_RAMPART > STRUCTURE_ROAD
-                    const customPriorities = {
-                        [STRUCTURE_EXTENSION]: 100,
-                        [STRUCTURE_CONTAINER]: 90,
-                        [STRUCTURE_TOWER]: 80,
-                        [STRUCTURE_STORAGE]: 70,
-                        [STRUCTURE_RAMPART]: 60,
-                        [STRUCTURE_ROAD]: 50
-                    };
+                    const customPriorities = new Map([
+                        [STRUCTURE_EXTENSION, 100],
+                        [STRUCTURE_CONTAINER, 90],
+                        [STRUCTURE_TOWER, 80],
+                        [STRUCTURE_STORAGE, 70],
+                        [STRUCTURE_RAMPART, 60],
+                        [STRUCTURE_ROAD, 50]
+                    ]);
 
                     for (let i = 0; i < sites.length; i++) {
                         const site = sites[i];
-                        const priority = customPriorities[site.structureType] || STRUCTURE_PRIORITIES.get(site.structureType) || STRUCTURE_PRIORITIES.get('default');
+                        const priority = customPriorities.get(site.structureType) || STRUCTURE_PRIORITIES.get(site.structureType) || STRUCTURE_PRIORITIES.get('default');
                         if (priority > highestPriority) {
                             highestPriority = priority;
                         }
@@ -143,7 +143,7 @@ module.exports = {
                     let highestPrioritySites = [];
                     for (let i = 0; i < sites.length; i++) {
                         const site = sites[i];
-                        const priority = customPriorities[site.structureType] || STRUCTURE_PRIORITIES.get(site.structureType) || STRUCTURE_PRIORITIES.get('default');
+                        const priority = customPriorities.get(site.structureType) || STRUCTURE_PRIORITIES.get(site.structureType) || STRUCTURE_PRIORITIES.get('default');
                         if (priority === highestPriority) {
                             highestPrioritySites.push(site);
                         }
