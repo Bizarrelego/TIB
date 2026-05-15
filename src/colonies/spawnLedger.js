@@ -8,6 +8,7 @@ class SpawnLedger {
      */
     constructor(room) {
         this.availableEnergy = room.energyAvailable;
+        this.roomName = room.name;
     }
 
     /**
@@ -78,6 +79,30 @@ class SpawnLedger {
         }
         return false;
     }
+
+    /**
+     * Calculates the maximum number of walkable tiles around all sources in the room.
+     * Uses cached values from discoveryManager.
+     * @returns {number} The maximum number of harvesters that can be supported by available space.
+     */
+    calculateSourceCaps() {
+        let totalWalkable = 0;
+
+        if (global.State && global.State.sourceWalkableTiles) {
+            const roomTiles = global.State.sourceWalkableTiles.get(this.roomName);
+            if (roomTiles) {
+                for (const count of roomTiles.values()) {
+                    totalWalkable += count;
+                }
+                return totalWalkable;
+            }
+        }
+
+        // Fallback if not initialized in State
+        const sources = global.State.sourcesByRoom.get(this.roomName) || [];
+        return sources.length;
+    }
+
 }
 
 module.exports = SpawnLedger;

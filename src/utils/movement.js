@@ -10,27 +10,34 @@ module.exports = {
     },
 
     moveTo: function(creep, target, opts = {}) {
-        if (!creep.heap.path || !Array.isArray(creep.heap.path)) {
-            const targetPos = target.pos || target;
-            const pathInfo = PathFinder.search(creep.pos, targetPos, opts);
-            if (pathInfo && pathInfo.path) {
-                creep.heap.path = pathInfo.path;
+        // Anti-clustering / Stuck-detection logic
+        const currentPos = creep.pos;
+        if (creep.heap.lastPos) {
+            if (currentPos.x === creep.heap.lastPos.x &&
+                currentPos.y === creep.heap.lastPos.y &&
+                currentPos.roomName === creep.heap.lastPos.roomName) {
+                if (creep.fatigue === 0) {
+                    creep.heap.stuckTicks = (creep.heap.stuckTicks || 0) + 1;
+                }
             } else {
-                creep.heap.path = null;
+                creep.heap.stuckTicks = 0;
             }
+        } else {
+            creep.heap.stuckTicks = 0;
+        }
+        creep.heap.lastPos = { x: currentPos.x, y: currentPos.y, roomName: currentPos.roomName };
+
+        // Default pathing opts
+        const pathingOpts = { reusePath: 20, ignoreCreeps: true, ...opts };
+
+        if (creep.heap.stuckTicks > 2) {
+            pathingOpts.reusePath = 0;
+            pathingOpts.ignoreCreeps = false;
+            creep.heap.stuckTicks = 0; // Reset stuckTicks after forcing recalculation
         }
 
-        if (creep.heap.path && creep.heap.path.length > 0) {
-            const result = creep.moveByPath(creep.heap.path);
-
-            if (result === ERR_NOT_FOUND || result === ERR_INVALID_ARGS) {
-                creep.heap.path = null;
-            }
-
-            return result;
-        }
-
-        return ERR_NOT_FOUND;
+        // Delegate to the native move command
+        return creep.moveTo(target, pathingOpts);
     },
 
     /**
