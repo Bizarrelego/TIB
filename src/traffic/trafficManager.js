@@ -99,7 +99,7 @@ const TrafficManager = {
 
         if (ledger.has(target.id)) {
             const state = ledger.get(target.id);
-            return { used: state.used, free: state.cap - state.used, cap: state.cap };
+            return { used: state.used, free: Math.max(0, state.cap - state.used), cap: state.cap };
         }
 
         let used = 0;
@@ -111,6 +111,9 @@ const TrafficManager = {
         } else if (target.amount !== undefined) {
             used = target.amount;
             cap = target.amount; // For dropped resources, cap is amount
+        } else if (target.mineralAmount !== undefined) {
+            used = target.mineralAmount;
+            cap = target.mineralCapacity !== undefined ? target.mineralCapacity : target.mineralAmount;
         } else if (target.energyCapacity !== undefined) {
             used = target.energy;
             cap = target.energyCapacity;
@@ -145,18 +148,20 @@ const TrafficManager = {
         const ledger = global.State.ledger;
         if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
 
-        const targetState = this.getVirtualState(target, resourceType);
+        const resType = resourceType || target.resourceType || RESOURCE_ENERGY;
+        const targetState = this.getVirtualState(target, resType);
         if (targetState.used < amount) return ERR_NOT_ENOUGH_RESOURCES;
 
         ledger.set(target.id, { used: targetState.used - amount, cap: targetState.cap });
 
-        const creepState = this.getVirtualState(creep, resourceType);
+        const creepState = this.getVirtualState(creep, resType);
         ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
 
         return OK;
     },
 
     registerPickup(creep, target, resourceType, amount) {
+        if (this.checkPipeline(creep.id)) return ERR_BUSY;
         const ledger = global.State.ledger;
         if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
 
@@ -172,10 +177,12 @@ const TrafficManager = {
     },
 
     registerDrop(creep, resourceType, amount) {
+        if (this.checkPipeline(creep.id)) return ERR_BUSY;
         const ledger = global.State.ledger;
         if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
 
-        const creepState = this.getVirtualState(creep, resourceType);
+        const resType = resourceType || RESOURCE_ENERGY;
+        const creepState = this.getVirtualState(creep, resType);
         if (creepState.used < amount) return ERR_NOT_ENOUGH_RESOURCES;
 
         ledger.set(creep.id, { used: creepState.used - amount, cap: creepState.cap });
@@ -184,18 +191,26 @@ const TrafficManager = {
     },
 
     registerHarvest(creep, target) {
+        if (this.checkPipeline(creep.id)) return ERR_BUSY;
         const ledger = global.State.ledger;
         if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
 
-        const targetState = this.getVirtualState(target, RESOURCE_ENERGY);
+        const resType = target.mineralType || target.resourceType || RESOURCE_ENERGY;
+        const targetState = this.getVirtualState(target, resType);
         const workParts = creep.getActiveBodyparts(WORK);
-        const harvestAmount = Math.min(targetState.used, workParts * 2); // 2 energy per work part
+
+        let harvestAmount = 0;
+        if (target.mineralType) {
+            harvestAmount = Math.min(targetState.used, workParts * 1); // 1 mineral per work part
+        } else {
+            harvestAmount = Math.min(targetState.used, workParts * 2); // 2 energy per work part
+        }
 
         if (harvestAmount <= 0) return ERR_NOT_ENOUGH_RESOURCES;
 
         ledger.set(target.id, { used: targetState.used - harvestAmount, cap: targetState.cap });
 
-        const creepState = this.getVirtualState(creep, RESOURCE_ENERGY);
+        const creepState = this.getVirtualState(creep, resType);
         ledger.set(creep.id, { used: creepState.used + harvestAmount, cap: creepState.cap });
 
         return OK;
