@@ -10,22 +10,36 @@ const StorageManager = require('./StorageManager');
 const LinkManager = require('./LinkManager');
 const RemoteEconomyManager = require('./RemoteEconomyManager');
 const workerManager = require('./workerManager');
-const CombatManager = require('./CombatManager');
-const EnergyRequestManager = require('./EnergyRequestManager');
+
+/**
+ * @file managerOrchestrator.js
+ * @description Centralized execution module for standalone room managers.
+ * Implements CPU throttling and error isolation to safely execute manager logic
+ * without blocking the main execution loop.
+ */
 
 /**
  * Orchestrates the execution of standalone managers per room.
+ * Retrieves rooms safely from global.State.rooms to adhere to the Zero Native Polling constraint.
+ * Skips execution entirely if the CPU bucket falls below 500.
+ *
+ * @returns {void}
  */
 function managerOrchestrator() {
     // CPU Throttling: Skip manager execution if bucket is too low
     if (Game.cpu.bucket < 500) return;
 
-    for (const roomName in Game.rooms) {
-        const room = Game.rooms[roomName];
+    // Zero Native Polling: rely on global.State for room objects if available.
+    // Ensure discoveryManager has populated global.State.rooms
+    if (!global.State || !global.State.rooms) return;
+
+    for (const roomName of global.State.rooms.keys()) {
+        const room = global.State.rooms.get(roomName);
 
         // Only run managers in controlled rooms
-        if (!room.controller || !room.controller.my) continue;
+        if (!room || !room.controller || !room.controller.my) continue;
 
+        /** @type {Array<{run: function(Room): void, name?: string}>} */
         const managers = [
             ConstructionManager,
             LabManager,
@@ -35,9 +49,7 @@ function managerOrchestrator() {
             StorageManager,
             LinkManager,
             RemoteEconomyManager,
-            workerManager,
-            CombatManager,
-            EnergyRequestManager
+            workerManager
         ];
 
         for (const manager of managers) {
