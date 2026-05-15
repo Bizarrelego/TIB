@@ -1,5 +1,3 @@
-const TrafficManager = require('../traffic/trafficManager');
-
 module.exports = {
     /**
      * Checks if a creep is fatigued.
@@ -146,6 +144,7 @@ module.exports = {
         if (blocked) return;
 
         // 3. Synchronize intents
+        const TrafficManager = require('../traffic/trafficManager');
         for (const intent of intents) {
             TrafficManager.registerMove(intent.creep, direction);
         }
