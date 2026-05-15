@@ -23,51 +23,57 @@ module.exports = {
             const plannerState = global.State.roomPlanner.get(room.name);
 
             if (!plannerState.has('anchor')) {
-                const terrain = global.State.roomTerrain.get(room.name);
-                const cm = new PathFinder.CostMatrix();
-                for (let y = 0; y < 50; y++) {
-                    for (let x = 0; x < 50; x++) {
-                        if (terrain.get(x, y) === TERRAIN_MASK_WALL) {
-                            cm.set(x, y, 255);
-                        }
-                    }
-                }
-
-                if (room.controller) {
-                    for(let dx=-2; dx<=2; dx++) {
-                        for(let dy=-2; dy<=2; dy++) {
-                            const tx = room.controller.pos.x + dx;
-                            const ty = room.controller.pos.y + dy;
-                            if(tx >= 0 && tx <= 49 && ty >= 0 && ty <= 49) {
-                                cm.set(tx, ty, 255);
-                            }
-                        }
-                    }
-                }
-
-                const sources = global.State.sourcesByRoom.get(room.name) || [];
-                for(let s=0; s<sources.length; s++) {
-                    for(let dx=-2; dx<=2; dx++) {
-                        for(let dy=-2; dy<=2; dy++) {
-                            const tx = sources[s].pos.x + dx;
-                            const ty = sources[s].pos.y + dy;
-                            if(tx >= 0 && tx <= 49 && ty >= 0 && ty <= 49) {
-                                cm.set(tx, ty, 255);
-                            }
-                        }
-                    }
-                }
-
-                const dt = DistanceTransform.compute(room.name, cm);
-
-                let maxVal = 0;
+                const spawns = global.State.spawnsByRoom ? (global.State.spawnsByRoom.get(room.name) || []) : [];
                 let bestPos = null;
-                for (let y = 8; y < 42; y++) {
-                    for (let x = 8; x < 42; x++) {
-                        let val = dt.get(x, y);
-                        if (val > maxVal) {
-                            maxVal = val;
-                            bestPos = {x, y};
+
+                if (spawns.length > 0) {
+                    bestPos = { x: spawns[0].pos.x + 1, y: spawns[0].pos.y + 1 };
+                } else {
+                    const terrain = global.State.roomTerrain.get(room.name);
+                    const cm = new PathFinder.CostMatrix();
+                    for (let y = 0; y < 50; y++) {
+                        for (let x = 0; x < 50; x++) {
+                            if (terrain.get(x, y) === TERRAIN_MASK_WALL) {
+                                cm.set(x, y, 255);
+                            }
+                        }
+                    }
+
+                    if (room.controller) {
+                        for(let dx=-2; dx<=2; dx++) {
+                            for(let dy=-2; dy<=2; dy++) {
+                                const tx = room.controller.pos.x + dx;
+                                const ty = room.controller.pos.y + dy;
+                                if(tx >= 0 && tx <= 49 && ty >= 0 && ty <= 49) {
+                                    cm.set(tx, ty, 255);
+                                }
+                            }
+                        }
+                    }
+
+                    const sources = global.State.sourcesByRoom.get(room.name) || [];
+                    for(let s=0; s<sources.length; s++) {
+                        for(let dx=-2; dx<=2; dx++) {
+                            for(let dy=-2; dy<=2; dy++) {
+                                const tx = sources[s].pos.x + dx;
+                                const ty = sources[s].pos.y + dy;
+                                if(tx >= 0 && tx <= 49 && ty >= 0 && ty <= 49) {
+                                    cm.set(tx, ty, 255);
+                                }
+                            }
+                        }
+                    }
+
+                    const dt = DistanceTransform.compute(room.name, cm);
+
+                    let maxVal = 0;
+                    for (let y = 8; y < 42; y++) {
+                        for (let x = 8; x < 42; x++) {
+                            let val = dt.get(x, y);
+                            if (val > maxVal) {
+                                maxVal = val;
+                                bestPos = {x, y};
+                            }
                         }
                     }
                 }
@@ -95,12 +101,19 @@ module.exports = {
 
                 for (const [structureType, offsets] of BASE_LAYOUT_STAMP.entries()) {
                     let rclLimit = 0;
+                    let overrideStructureType = structureType;
+
                     if (structureType === STRUCTURE_CONTAINER) {
                         rclLimit = 5;
                     } else if (structureType === STRUCTURE_ROAD) {
                         rclLimit = 2500;
                     } else if (CONTROLLER_STRUCTURES[structureType]) {
                         rclLimit = CONTROLLER_STRUCTURES[structureType][rcl] || 0;
+                    }
+
+                    if (structureType === STRUCTURE_STORAGE && rcl < 4) {
+                        rclLimit = 1;
+                        overrideStructureType = STRUCTURE_CONTAINER;
                     }
 
                     if (rclLimit === 0) continue;
@@ -117,11 +130,11 @@ module.exports = {
 
                         const targetPos = roomPositionUtils.getAbsolutePosition(anchor, dx, dy, room.name);
 
-                        if (roomPositionUtils.isBuildable(room.name, targetPos.x, targetPos.y, structureType)) {
+                        if (roomPositionUtils.isBuildable(room.name, targetPos.x, targetPos.y, overrideStructureType)) {
                             let alreadyExists = false;
 
                             const structuresByType = global.State.structuresByRoom ? (global.State.structuresByRoom.get(room.name) || new Map()) : new Map();
-                            const structsOfSameType = structuresByType.get(structureType);
+                            const structsOfSameType = structuresByType.get(overrideStructureType);
                             if (structsOfSameType) {
                                 for (const struct of structsOfSameType.values()) {
                                     if (struct.pos.x === targetPos.x && struct.pos.y === targetPos.y) {
@@ -135,7 +148,7 @@ module.exports = {
                                 const sites = global.State.sitesByRoom ? (global.State.sitesByRoom.get(room.name) || []) : [];
                                 for (let i = 0; i < sites.length; i++) {
                                     const site = sites[i];
-                                    if (site.pos.x === targetPos.x && site.pos.y === targetPos.y && site.structureType === structureType) {
+                                    if (site.pos.x === targetPos.x && site.pos.y === targetPos.y && site.structureType === overrideStructureType) {
                                         alreadyExists = true;
                                         break;
                                     }
@@ -143,11 +156,11 @@ module.exports = {
                             }
 
                             if (!alreadyExists) {
-                                const id = `${structureType}-${plannedX}-${plannedY}`;
+                                const id = `${overrideStructureType}-${plannedX}-${plannedY}`;
                                 if (!plannedStructures.has(id)) {
                                     plannedStructures.set(id, {
                                         pos: targetPos,
-                                        type: structureType,
+                                        type: overrideStructureType,
                                         id: id
                                     });
                                 }
@@ -157,8 +170,58 @@ module.exports = {
                 }
             }
 
-            // Integrate road planning
+            // Dynamic Logistics Containers
             const plannedStructures = plannerState.get('plannedStructures');
+            if (plannedStructures) {
+                const sources = global.State.sourcesByRoom ? (global.State.sourcesByRoom.get(room.name) || []) : [];
+                for (let i = 0; i < sources.length; i++) {
+                    const source = sources[i];
+                    for (let dx = -1; dx <= 1; dx++) {
+                        for (let dy = -1; dy <= 1; dy++) {
+                            if (dx === 0 && dy === 0) continue;
+                            const tx = source.pos.x + dx;
+                            const ty = source.pos.y + dy;
+                            if (roomPositionUtils.isBuildable(room.name, tx, ty, STRUCTURE_CONTAINER)) {
+                                const id = `container-source-${source.id}`;
+                                if (!plannedStructures.has(id)) {
+                                    plannedStructures.set(id, {
+                                        pos: new RoomPosition(tx, ty, room.name),
+                                        type: STRUCTURE_CONTAINER,
+                                        id: id
+                                    });
+                                }
+                                break;
+                            }
+                        }
+                        if (plannedStructures.has(`container-source-${source.id}`)) break;
+                    }
+                }
+
+                if (room.controller) {
+                    const ctrl = room.controller;
+                    let found = false;
+                    for (let dx = -2; dx <= 2 && !found; dx++) {
+                        for (let dy = -2; dy <= 2 && !found; dy++) {
+                            if (Math.abs(dx) < 2 && Math.abs(dy) < 2) continue;
+                            const tx = ctrl.pos.x + dx;
+                            const ty = ctrl.pos.y + dy;
+                            if (roomPositionUtils.isBuildable(room.name, tx, ty, STRUCTURE_CONTAINER)) {
+                                const id = `container-controller-${ctrl.id}`;
+                                if (!plannedStructures.has(id)) {
+                                    plannedStructures.set(id, {
+                                        pos: new RoomPosition(tx, ty, room.name),
+                                        type: STRUCTURE_CONTAINER,
+                                        id: id
+                                    });
+                                }
+                                found = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Integrate road planning
             if (plannedStructures) {
                 const spawns = global.State.spawnsByRoom ? (global.State.spawnsByRoom.get(room.name) || []) : [];
                 if (spawns.length > 0) {
