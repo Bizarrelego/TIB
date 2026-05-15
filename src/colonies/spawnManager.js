@@ -63,7 +63,7 @@ module.exports = {
             const sources = global.State.sourcesByRoom.get(room.name);
             const sourceCount = sources ? sources.length : 1;
 
-            if (harvesterCount < sourceCount) {
+            if (harvesterCount < spawnLedger.calculateSourceCaps()) {
                 const energyAvailable = spawnLedger.getAvailableEnergy();
                 const calcCapacity = (haulerCount === 0 && energyAvailable < capacity && energyAvailable >= 200) ? energyAvailable : capacity;
                 const body = BodyCalc.calculateEarlyGameHarvester(calcCapacity);

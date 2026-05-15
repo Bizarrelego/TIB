@@ -24,6 +24,7 @@ module.exports = function discoveryManager() {
             tombstonesByRoom: new Map(),
             ruinsByRoom: new Map(),
             roomTerrain: new Map(),
+            sourceWalkableTiles: new Map(),
             getEvents: function(roomName) {
                 const room = Game.rooms[roomName];
                 if (!room) return [];
@@ -81,7 +82,35 @@ module.exports = function discoveryManager() {
                 state.droppedByRoom.set(roomName, room.find(FIND_DROPPED_RESOURCES));
                 state.tombstonesByRoom.set(roomName, room.find(FIND_TOMBSTONES));
                 state.ruinsByRoom.set(roomName, room.find(FIND_RUINS));
+
                 state.roomTerrain.set(roomName, new Room.Terrain(roomName));
+
+                // Cache walkable tiles around sources
+                const sources = room.find(FIND_SOURCES);
+                const terrain = state.roomTerrain.get(roomName);
+                const walkableTilesMap = new Map();
+
+                for (const source of sources) {
+                    let walkable = 0;
+                    const x = source.pos.x;
+                    const y = source.pos.y;
+
+                    for (let dx = -1; dx <= 1; dx++) {
+                        for (let dy = -1; dy <= 1; dy++) {
+                            if (dx === 0 && dy === 0) continue;
+                            const cx = x + dx;
+                            const cy = y + dy;
+                            if (cx >= 0 && cx <= 49 && cy >= 0 && cy <= 49) {
+                                if (terrain.get(cx, cy) !== TERRAIN_MASK_WALL) {
+                                    walkable++;
+                                }
+                            }
+                        }
+                    }
+                    walkableTilesMap.set(source.id, walkable);
+                }
+                state.sourceWalkableTiles.set(roomName, walkableTilesMap);
+
                 state.hostilesByRoom.set(roomName, new Map());
             }
 
