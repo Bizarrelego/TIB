@@ -36,74 +36,30 @@ function run(creep, room) {
             creep.upgradeController(controller);
         }
 
-        // Prioritize assigned source from UpgraderManager
-        let target = null;
-        if (creep.heap.sourceId) {
-            target = Game.getObjectById(creep.heap.sourceId);
-            if (target && (
-                (target.resourceType && target.amount > 0) ||
-                (target.store && target.store.getUsedCapacity(RESOURCE_ENERGY) > 0)
-            )) {
-                // Keep target
-            } else {
-                target = null;
+        let controllerContainer = null;
+        const structures = global.State.structuresByRoom.get(room.name);
+        const containers = structures ? (structures.get(STRUCTURE_CONTAINER) || new Map()) : new Map();
+
+        for (const container of containers.values()) {
+            if (container.pos.inRangeTo(controller, 3)) {
+                controllerContainer = container;
+                break;
             }
         }
 
-        if (!target) {
-            if (creep.heap.targetId) {
-                target = Game.getObjectById(creep.heap.targetId);
-                // Invalidate if missing or empty
-                if (!target ||
-                    (target.resourceType && target.amount === 0) ||
-                    (target.store && target.store.getUsedCapacity(RESOURCE_ENERGY) === 0)) {
-                    target = null;
-                    creep.heap.targetId = null;
-                }
-            }
-
-            if (!target) {
-                const structures = global.State.structuresByRoom.get(room.name);
-                const links = structures?.get(STRUCTURE_LINK) || [];
-                const containers = structures?.get(STRUCTURE_CONTAINER) || [];
-                const dropped = global.State.droppedByRoom.get(room.name) || [];
-
-                for (let i = 0; i < dropped.length; i++) {
-                    if (creep.pos.isNearTo(dropped[i].pos)) {
-                        target = dropped[i];
-                        break;
-                    }
-                }
-
-                if (!target) {
-                    for (let i = 0; i < links.length; i++) {
-                        if (creep.pos.isNearTo(links[i].pos)) {
-                            target = links[i];
-                            break;
-                        }
-                    }
-                }
-
-                if (!target) {
-                    for (let i = 0; i < containers.length; i++) {
-                        if (creep.pos.isNearTo(containers[i].pos)) {
-                            target = containers[i];
-                            break;
-                        }
-                    }
-                }
-
-                if (target) {
-                    creep.heap.targetId = target.id;
-                }
-            }
-        }
-
-        if (target && creep.store.getFreeCapacity() > 0) {
-            if (target.resourceType) {
-                creep.pickup(target);
+        if (controllerContainer) {
+            if (!creep.pos.isEqualTo(controllerContainer.pos)) {
+                movement.moveTo(creep, controllerContainer);
             } else {
-                creep.withdraw(target, RESOURCE_ENERGY);
+                // Once on the container, withdraw and upgrade simultaneously
+                if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0 && controllerContainer.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    creep.withdraw(controllerContainer, RESOURCE_ENERGY);
+                }
+            }
+        } else {
+            // Wait / Sleep if no container
+            if (creep.heap.rangeToController > 3) {
+                movement.moveTo(creep, controller);
             }
         }
     } catch (e) {
