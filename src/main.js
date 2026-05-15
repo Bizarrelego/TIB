@@ -6,8 +6,10 @@ const discoveryManager = require('./state/discoveryManager');
 const stateScanner = require('./state/stateScanner');
 const colonyManager = require('./colonies/colonyManager');
 const operationsManager = require('./operations/operationsManager'); // High-level orchestrator
+const managerOrchestrator = require('./managers/managerOrchestrator');
 const trafficManager = require('./traffic/trafficManager');
 const movement = require('./utils/movement');
+const eventBus = require('./os/eventBus');
 
 module.exports.loop = function () {
     // Initialize RawMemory segments
@@ -16,6 +18,9 @@ module.exports.loop = function () {
     } catch (e) {
         console.log(`[Phase 0 Error] RawMemoryManager: ${e.stack}`);
     }
+
+    // Initialize eventBus
+    eventBus.init();
 
     // Rehydrate global state
     globalState.rehydrate();
@@ -96,6 +101,14 @@ module.exports.loop = function () {
             if (colonyManager) colonyManager();
         } catch (e) {
             console.log(`[Phase 3 Error] Colonies: ${e.stack}`);
+        }
+
+        try {
+            if (managerOrchestrator && managerOrchestrator.run) {
+                managerOrchestrator.run();
+            }
+        } catch (e) {
+            console.log(`[Phase 3 Error] Manager Orchestrator: ${e.stack}`);
         }
     }
 

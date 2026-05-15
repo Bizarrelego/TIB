@@ -14,6 +14,14 @@ class PubSub {
     }
 
     /**
+     * Initializes the event bus.
+     */
+    init() {
+        // Initialization logic, if any, can be placed here.
+        // For now, it satisfies the required initialization step.
+    }
+
+    /**
      * Subscribes a callback to a specific event.
      * @param {string} event - The name of the event to subscribe to.
      * @param {Function} callback - The function to call when the event is published.
