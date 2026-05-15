@@ -48,13 +48,24 @@ module.exports = {
                 }
             }
 
+            const isBootstrapping = harvesterCount === 0 && haulerCount === 0;
+            if (isBootstrapping) {
+                const energyAvailable = spawnLedger.getAvailableEnergy();
+                const cost = energyAvailable >= 250 ? 250 : 200;
+                if (energyAvailable >= 200 && spawnLedger.canSpawn(cost)) {
+                    const body = cost >= 250 ? [WORK, CARRY, MOVE, MOVE] : [WORK, CARRY, MOVE];
+                    spawnLedger.requestSpawn(availableSpawns[0], body, 'bootstrap_' + Game.time, { memory: { role: 'harvester', colony: room.name } }, cost);
+                }
+                return; // suppress execution of all other spawning/queue logic (hubManager, fastFiller, upgrader, etc)
+            }
+
             // Spawn harvesters first
             const sources = global.State.sourcesByRoom.get(room.name);
             const sourceCount = sources ? sources.length : 1;
 
             if (harvesterCount < sourceCount) {
                 const energyAvailable = spawnLedger.getAvailableEnergy();
-                const calcCapacity = (harvesterCount === 0 && energyAvailable < capacity && energyAvailable >= 250) ? energyAvailable : capacity;
+                const calcCapacity = (haulerCount === 0 && energyAvailable < capacity && energyAvailable >= 200) ? energyAvailable : capacity;
                 const body = BodyCalc.calculateEarlyGameHarvester(calcCapacity);
                 const cost = BodyCalc.getCost(body);
                 SpawnQueueManager.requestSpawn(room.name, 'harvester', body, 'harvester_' + Game.time, { memory: { role: 'harvester', colony: room.name } }, cost);
@@ -62,7 +73,9 @@ module.exports = {
 
             // Spawn a domestic hauler to move energy from harvesters to spawn/extensions
             if (haulerCount < 2) {
-                const body = BodyCalc.calculateDomesticHauler(capacity);
+                const energyAvailable = spawnLedger.getAvailableEnergy();
+                const calcCapacity = (haulerCount === 0 && energyAvailable < capacity && energyAvailable >= 200) ? energyAvailable : capacity;
+                const body = BodyCalc.calculateDomesticHauler(calcCapacity);
                 const cost = BodyCalc.getCost(body);
                 SpawnQueueManager.requestSpawn(room.name, 'domesticHauler', body, 'domesticHauler_' + Game.time, { memory: { role: 'domesticHauler', colony: room.name } }, cost);
             }
