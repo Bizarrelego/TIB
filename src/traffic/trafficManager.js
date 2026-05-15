@@ -135,9 +135,10 @@ const TrafficManager = {
         const targetState = this.getVirtualState(target, resType);
         if (targetState.free < amount) return ERR_FULL;
 
-        ledger.set(target.id, { used: targetState.used + amount, cap: targetState.cap });
-
         const creepState = this.getVirtualState(creep, resType);
+        if (creepState.used < amount) return ERR_NOT_ENOUGH_RESOURCES;
+
+        ledger.set(target.id, { used: targetState.used + amount, cap: targetState.cap });
         ledger.set(creep.id, { used: creepState.used - amount, cap: creepState.cap });
 
         this.lockPipeline(creep.name, creep.id, target.id, resType, amount, 'TRANSFER');
@@ -155,9 +156,10 @@ const TrafficManager = {
         const targetState = this.getVirtualState(target, resType);
         if (targetState.used < amount) return ERR_NOT_ENOUGH_RESOURCES;
 
-        ledger.set(target.id, { used: targetState.used - amount, cap: targetState.cap });
-
         const creepState = this.getVirtualState(creep, resType);
+        if (creepState.free < amount) return ERR_FULL;
+
+        ledger.set(target.id, { used: targetState.used - amount, cap: targetState.cap });
         ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
 
         this.lockPipeline(creep.name, creep.id, target.id, resType, amount, 'WITHDRAW');
@@ -174,9 +176,10 @@ const TrafficManager = {
         const targetState = this.getVirtualState(target, resType);
         if (targetState.used < amount) return ERR_NOT_ENOUGH_RESOURCES;
 
-        ledger.set(target.id, { used: targetState.used - amount, cap: targetState.cap });
-
         const creepState = this.getVirtualState(creep, resType);
+        if (creepState.free < amount) return ERR_FULL;
+
+        ledger.set(target.id, { used: targetState.used - amount, cap: targetState.cap });
         ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
 
         this.lockPipeline(creep.name, creep.id, target.id, resType, amount, 'PICKUP');
@@ -216,11 +219,12 @@ const TrafficManager = {
             harvestAmount = Math.min(targetState.used, workParts * 2); // 2 energy per work part
         }
 
-        if (harvestAmount <= 0) return ERR_NOT_ENOUGH_RESOURCES;
+        const creepState = this.getVirtualState(creep, resType);
+        harvestAmount = Math.min(harvestAmount, creepState.free);
+
+        if (harvestAmount <= 0) return ERR_FULL;
 
         ledger.set(target.id, { used: targetState.used - harvestAmount, cap: targetState.cap });
-
-        const creepState = this.getVirtualState(creep, resType);
         ledger.set(creep.id, { used: creepState.used + harvestAmount, cap: creepState.cap });
 
         this.lockPipeline(creep.name, creep.id, target.id, resType, harvestAmount, 'HARVEST');
