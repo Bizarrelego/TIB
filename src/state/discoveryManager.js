@@ -6,6 +6,7 @@
 module.exports = function discoveryManager() {
     if (!global.State) {
         global.State = {
+            rooms: new Map(),
             structuresByRoom: new Map(),
             creepsByRoom: new Map(),
             hostilesByRoom: new Map(),
@@ -55,6 +56,7 @@ module.exports = function discoveryManager() {
         if (state.scannedRooms.has(roomName)) {
             // Only run the heavy native polling if the room isn't already initialized in State
             if (!state.structuresByRoom.has(roomName)) {
+                state.rooms.set(roomName, room);
                 // Cache event log to establish baseline during init. Should not be polled here after init.
                 state.eventCache.set(roomName, room.getEventLog());
 

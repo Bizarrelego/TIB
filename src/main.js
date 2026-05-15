@@ -10,6 +10,7 @@ const operationsManager = require('./operations/operationsManager'); // High-lev
 const managerOrchestrator = require('./managers/managerOrchestrator'); // Standalone Managers
 const trafficManager = require('./traffic/trafficManager');
 const movement = require('./utils/movement');
+const garbageCollector = require('./os/garbageCollector');
 
 module.exports.loop = function () {
     // Install memory proxy to bind heap to Creep prototypes
@@ -24,6 +25,9 @@ module.exports.loop = function () {
 
     // Rehydrate global state
     globalState.rehydrate();
+
+    // Run garbage collection for memory and intel
+    garbageCollector();
 
     // Initialize managers via integration layer
     managersIntegration.init(globalState);
