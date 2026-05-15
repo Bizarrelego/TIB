@@ -97,10 +97,31 @@ const TrafficManager = {
 
     getVirtualState(target, resourceType) {
         const ledger = global.State.ledger;
-        if (!ledger) return { used: 0, free: 0 };
+        if (!ledger) return { used: 0, free: 0, cap: 0 };
 
-        const state = ledger.get(target.id) || { used: target.store ? target.store.getUsedCapacity(resourceType) : 0, cap: target.store ? target.store.getCapacity(resourceType) : 0 };
-        return { used: state.used, free: state.cap - state.used };
+        if (ledger.has(target.id)) {
+            const state = ledger.get(target.id);
+            return { used: state.used, free: state.cap - state.used, cap: state.cap };
+        }
+
+        let used = 0;
+        let cap = 0;
+
+        if (target.store) {
+            used = target.store.getUsedCapacity(resourceType) || 0;
+            cap = target.store.getCapacity(resourceType) || 0;
+        } else if (target.amount !== undefined) {
+            used = target.amount;
+            cap = target.amount;
+        } else if (target.energy !== undefined && target.energyCapacity !== undefined) {
+            used = target.energy;
+            cap = target.energyCapacity;
+        } else if (target.progress !== undefined && target.progressTotal !== undefined) {
+            used = target.progress;
+            cap = target.progressTotal;
+        }
+
+        return { used, free: cap - used, cap };
     },
 
     registerTransfer(creep, target, resourceType, amount) {
@@ -129,6 +150,52 @@ const TrafficManager = {
 
         const creepState = this.getVirtualState(creep, resourceType);
         ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
+
+        return OK;
+    },
+
+    registerPickup(creep, target, amount) {
+        const ledger = global.State.ledger;
+        if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
+
+        const resourceType = target.resourceType || RESOURCE_ENERGY;
+
+        const targetState = this.getVirtualState(target, resourceType);
+        if (targetState.used < amount) return ERR_NOT_ENOUGH_RESOURCES;
+
+        ledger.set(target.id, { used: targetState.used - amount, cap: targetState.cap });
+
+        const creepState = this.getVirtualState(creep, resourceType);
+        ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
+
+        return OK;
+    },
+
+    registerHarvest(creep, target, amount) {
+        const ledger = global.State.ledger;
+        if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
+
+        const resourceType = RESOURCE_ENERGY; // Minerals or other not handled here
+
+        const targetState = this.getVirtualState(target, resourceType);
+        if (targetState.used < amount) return ERR_NOT_ENOUGH_RESOURCES;
+
+        ledger.set(target.id, { used: targetState.used - amount, cap: targetState.cap });
+
+        const creepState = this.getVirtualState(creep, resourceType);
+        ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
+
+        return OK;
+    },
+
+    registerDrop(creep, resourceType, amount) {
+        const ledger = global.State.ledger;
+        if (!ledger) return ERR_NOT_ENOUGH_RESOURCES;
+
+        const creepState = this.getVirtualState(creep, resourceType);
+        if (creepState.used < amount) return ERR_NOT_ENOUGH_RESOURCES;
+
+        ledger.set(creep.id, { used: creepState.used - amount, cap: creepState.cap });
 
         return OK;
     },
@@ -176,27 +243,45 @@ const TrafficManager = {
      * Executes pipeline ledger intents.
      * @param {object} creep - The target creep.
      * @param {Object} intent - The ledger intent data.
-     * @param {string} intent.type - 'TRANSFER' or 'WITHDRAW'.
-     * @param {string} intent.targetId - ID of target.
+     * @param {string} intent.type - 'TRANSFER', 'WITHDRAW', 'PICKUP', 'HARVEST', 'DROP'.
+     * @param {string} intent.targetId - ID of target (optional for DROP).
      * @param {string} intent.resourceType - Resource constant.
+     * @param {number} intent.amount - Amount (optional).
      * @returns {void}
      */
     flushIntent(creep, intent) {
         if (!creep || creep.fatigue > 0 || !intent) return;
 
         try {
-            // Ensure no conflicting movement intents exist
+            // Ensure no conflicting movement intents exist, prioritize resource intent by removing move intent
             if (global.State.trafficIntents && global.State.trafficIntents.has(creep.name)) {
-                return;
+                global.State.trafficIntents.delete(creep.name);
             }
 
-            const target = Game.getObjectById(intent.targetId);
-            if (!target) return;
+            let target = null;
+            if (intent.targetId) {
+                target = Game.getObjectById(intent.targetId);
+                if (!target) return;
+            }
 
             // Use intent.type instead of re-scanning creep.store
-            intent.type === 'TRANSFER'
-                ? creep.transfer(target, intent.resourceType)
-                : creep.withdraw(target, intent.resourceType);
+            switch (intent.type) {
+                case 'TRANSFER':
+                    creep.transfer(target, intent.resourceType, intent.amount);
+                    break;
+                case 'WITHDRAW':
+                    creep.withdraw(target, intent.resourceType, intent.amount);
+                    break;
+                case 'PICKUP':
+                    creep.pickup(target);
+                    break;
+                case 'HARVEST':
+                    creep.harvest(target);
+                    break;
+                case 'DROP':
+                    creep.drop(intent.resourceType, intent.amount);
+                    break;
+            }
         } catch (e) {
             console.error(`[TrafficManager] FlushIntent Error on ${creep.name}: ${e.stack}`);
         }
