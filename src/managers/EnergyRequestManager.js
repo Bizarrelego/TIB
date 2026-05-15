@@ -75,12 +75,23 @@ class EnergyRequestManager {
             requests.push({ target: extensions[i], priority: 100, amount: extensions[i].store.getFreeCapacity(RESOURCE_ENERGY) });
         }
 
-        // Priority 80: Towers (especially if empty)
+        // Priority 90: Towers with > 500 missing energy
         for (let i = 0; i < towers.length; i++) {
             const tower = towers[i];
             const free = tower.store.getFreeCapacity(RESOURCE_ENERGY);
             const priority = free > 500 ? 90 : 80;
             requests.push({ target: tower, priority: priority, amount: free });
+        }
+
+        // Priority 80: Controller Container
+        const controller = Game.rooms[roomName] ? Game.rooms[roomName].controller : null;
+        if (controller) {
+            const containers = resourceUtils.getStructuresWithFreeCapacity(roomName, [STRUCTURE_CONTAINER]);
+            for (let i = 0; i < containers.length; i++) {
+                if (containers[i].pos.inRangeTo(controller, 3)) {
+                    requests.push({ target: containers[i], priority: 80, amount: containers[i].store.getFreeCapacity(RESOURCE_ENERGY) });
+                }
+            }
         }
 
         // Priority 60: Labs
@@ -129,7 +140,31 @@ class EnergyRequestManager {
     static getEnergySupplies(roomName) {
         const supplies = [];
 
-        // Dropped Energy
+        // Containers (Priority 100 if Source Container with > 200 energy)
+        const containers = resourceUtils.getStructuresWithUsedCapacity(roomName, [STRUCTURE_CONTAINER]);
+        const sources = global.State.sourcesByRoom ? global.State.sourcesByRoom.get(roomName) || [] : [];
+        for (let i = 0; i < containers.length; i++) {
+            const container = containers[i];
+            const amount = container.store.getUsedCapacity(RESOURCE_ENERGY);
+
+            let isSourceContainer = false;
+            for (let j = 0; j < sources.length; j++) {
+                if (container.pos.inRangeTo(sources[j], 2)) {
+                    isSourceContainer = true;
+                    break;
+                }
+            }
+
+            if (isSourceContainer && amount > 200) {
+                supplies.push({ target: container, priority: 100, amount: amount });
+            } else {
+                // Priority 70: other containers
+                const priority = amount > 1500 ? 75 : 70;
+                supplies.push({ target: container, priority: priority, amount: amount });
+            }
+        }
+
+        // Dropped Energy (Priority 90 if > 100)
         let dropped = [];
         if (global.State.droppedEnergyByRoom && global.State.droppedEnergyByRoom.has(roomName)) {
             dropped = global.State.droppedEnergyByRoom.get(roomName) || [];
@@ -139,45 +174,34 @@ class EnergyRequestManager {
 
         for (let i = 0; i < dropped.length; i++) {
             const resource = dropped[i];
-            if ((resource.resourceType === undefined || resource.resourceType === RESOURCE_ENERGY) && resource.amount > 50) {
-                // Priority 100: Large dropped energy piles
-                const priority = resource.amount > 500 ? 100 : 80;
-                supplies.push({ target: resource, priority: priority, amount: resource.amount });
+            if ((resource.resourceType === undefined || resource.resourceType === RESOURCE_ENERGY) && resource.amount > 100) {
+                supplies.push({ target: resource, priority: 90, amount: resource.amount });
+            } else if ((resource.resourceType === undefined || resource.resourceType === RESOURCE_ENERGY) && resource.amount > 50) {
+                supplies.push({ target: resource, priority: 80, amount: resource.amount });
             }
         }
 
-        // Tombstones
+        // Tombstones and Ruins (Priority 85)
         const tombstones = (global.State.tombstonesByRoom && global.State.tombstonesByRoom.get(roomName)) || [];
         for (let i = 0; i < tombstones.length; i++) {
             const tombstone = tombstones[i];
             if (tombstone.store) {
                 const amount = tombstone.store.getUsedCapacity(RESOURCE_ENERGY);
                 if (amount > 0) {
-                    supplies.push({ target: tombstone, priority: 90, amount: amount });
+                    supplies.push({ target: tombstone, priority: 85, amount: amount });
                 }
             }
         }
 
-        // Ruins
         const ruins = (global.State.ruinsByRoom && global.State.ruinsByRoom.get(roomName)) || [];
         for (let i = 0; i < ruins.length; i++) {
             const ruin = ruins[i];
             if (ruin.store) {
                 const amount = ruin.store.getUsedCapacity(RESOURCE_ENERGY);
                 if (amount > 0) {
-                    supplies.push({ target: ruin, priority: 90, amount: amount });
+                    supplies.push({ target: ruin, priority: 85, amount: amount });
                 }
             }
-        }
-
-        // Containers
-        const containers = resourceUtils.getStructuresWithUsedCapacity(roomName, [STRUCTURE_CONTAINER]);
-        for (let i = 0; i < containers.length; i++) {
-            const container = containers[i];
-            const amount = container.store.getUsedCapacity(RESOURCE_ENERGY);
-            // Priority 70: Full containers
-            const priority = amount > 1500 ? 75 : 70;
-            supplies.push({ target: container, priority: priority, amount: amount });
         }
 
         // Links (only withdraw from non-hub links if needed, though usually haulers don't withdraw from hub links directly unless acting as hubManager)

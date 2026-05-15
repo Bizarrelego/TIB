@@ -55,50 +55,81 @@ module.exports = {
                 if (targetId) {
                     const target = Game.getObjectById(targetId);
                     if (target) {
-                        if (creep.store.getFreeCapacity() === 0) {
-                            if (haulerCount === 0) {
-                                const roomStructures = global.State.structuresByRoom.get(room.name);
-                                const targets = [];
-                                if (roomStructures) {
-                                    const spawns = roomStructures.get(STRUCTURE_SPAWN);
-                                    if (spawns) {
-                                        for (const spawn of spawns.values()) {
-                                            if (spawn.store.getFreeCapacity(RESOURCE_ENERGY) > 0) targets.push(spawn);
-                                        }
-                                    }
-                                    const extensions = roomStructures.get(STRUCTURE_EXTENSION);
-                                    if (extensions) {
-                                        for (const ext of extensions.values()) {
-                                            if (ext.store.getFreeCapacity(RESOURCE_ENERGY) > 0) targets.push(ext);
-                                        }
-                                    }
-                                }
-                                if (targets.length > 0) {
-                                    let nearest = null;
-                                    let minPathLen = Infinity;
-                                    for (let i = 0; i < targets.length; i++) {
-                                        const dist = creep.pos.getRangeTo(targets[i]);
-                                        if (dist < minPathLen) {
-                                            minPathLen = dist;
-                                            nearest = targets[i];
-                                        }
-                                    }
-                                    if (nearest) {
-                                        if (!creep.pos.isNearTo(nearest)) {
-                                            movement.moveTo(creep, nearest);
-                                        } else {
-                                            TrafficManager.registerTransfer(creep, nearest, RESOURCE_ENERGY, creep.store.getUsedCapacity(RESOURCE_ENERGY));
-                                        }
-                                    }
-                                }
-                            } else {
-                                TrafficManager.registerDrop(creep, RESOURCE_ENERGY, creep.store.getUsedCapacity(RESOURCE_ENERGY));
+                        let parkingSpot = null;
+
+                        // Find a container or container site near the source
+                        const structures = global.State.structuresByRoom.get(room.name);
+                        const containers = structures ? (structures.get(STRUCTURE_CONTAINER) || new Map()) : new Map();
+                        const sites = global.State.sitesByRoom.get(room.name) || [];
+
+                        for (const container of containers.values()) {
+                            if (container.pos.isNearTo(target)) {
+                                parkingSpot = container;
+                                break;
                             }
+                        }
+
+                        if (!parkingSpot) {
+                            for (let i = 0; i < sites.length; i++) {
+                                if (sites[i].structureType === STRUCTURE_CONTAINER && sites[i].pos.isNearTo(target)) {
+                                    parkingSpot = sites[i];
+                                    break;
+                                }
+                            }
+                        }
+
+                        // If parking spot exists and we are not on it, move to it.
+                        if (parkingSpot && !creep.pos.isEqualTo(parkingSpot.pos)) {
+                            movement.moveTo(creep, parkingSpot);
+                        } else if (!creep.pos.isNearTo(target)) {
+                            movement.moveTo(creep, target);
                         } else {
-                            if (!creep.pos.isNearTo(target)) {
-                                movement.moveTo(creep, target);
+                            if (creep.store.getFreeCapacity() === 0) {
+                                if (parkingSpot && parkingSpot.structureType === STRUCTURE_CONTAINER) {
+                                    // if sitting on container, do not drop or transfer. the engine drops when full if we try to harvest.
+                                    creep.harvest(target);
+                                } else if (haulerCount === 0) {
+                                    const roomStructures = global.State.structuresByRoom.get(room.name);
+                                    const targets = [];
+                                    if (roomStructures) {
+                                        const spawns = roomStructures.get(STRUCTURE_SPAWN);
+                                        if (spawns) {
+                                            for (const spawn of spawns.values()) {
+                                                if (spawn.store.getFreeCapacity(RESOURCE_ENERGY) > 0) targets.push(spawn);
+                                            }
+                                        }
+                                        const extensions = roomStructures.get(STRUCTURE_EXTENSION);
+                                        if (extensions) {
+                                            for (const ext of extensions.values()) {
+                                                if (ext.store.getFreeCapacity(RESOURCE_ENERGY) > 0) targets.push(ext);
+                                            }
+                                        }
+                                    }
+                                    if (targets.length > 0) {
+                                        let nearest = null;
+                                        let minPathLen = Infinity;
+                                        for (let i = 0; i < targets.length; i++) {
+                                            const dist = creep.pos.getRangeTo(targets[i]);
+                                            if (dist < minPathLen) {
+                                                minPathLen = dist;
+                                                nearest = targets[i];
+                                            }
+                                        }
+                                        if (nearest) {
+                                            if (!creep.pos.isNearTo(nearest)) {
+                                                movement.moveTo(creep, nearest);
+                                            } else {
+                                                creep.transfer(nearest, RESOURCE_ENERGY, creep.store.getUsedCapacity(RESOURCE_ENERGY));
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    // Just drop it if no container and haulers exist
+                                    creep.drop(RESOURCE_ENERGY, creep.store.getUsedCapacity(RESOURCE_ENERGY));
+                                    creep.harvest(target);
+                                }
                             } else {
-                                TrafficManager.registerHarvest(creep, target);
+                                creep.harvest(target);
                             }
                         }
                     } else {
