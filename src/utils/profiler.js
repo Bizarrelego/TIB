@@ -175,9 +175,18 @@ class Profiler {
 
     /**
      * Alias for logBottlenecks to match main.js invocation.
+     * Also displays the 1000-tick average CPU usage for all orchestrated managers.
      */
     static report() {
         this.logBottlenecks();
+
+        if (this.metrics) {
+            console.log(`[Profiler] 1000-tick Averages:`);
+            for (const name of this.metrics.keys()) {
+                const avg = this.getAverage(name);
+                console.log(`  - ${name}: ${avg.toFixed(3)} CPU / tick`);
+            }
+        }
     }
 }
 
