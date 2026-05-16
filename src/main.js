@@ -9,6 +9,7 @@ const stateScanner = require('./state/stateScanner');
 const colonyManager = require('./colonies/colonyManager');
 const operationsManager = require('./operations/operationsManager'); // High-level orchestrator
 const managerOrchestrator = require('./managers/managerOrchestrator'); // Standalone Managers
+const eventLogRadar = require('./os/eventLogRadar');
 const trafficManager = require('./traffic/trafficManager');
 const movement = require('./utils/movement');
 const garbageCollector = require('./os/garbageCollector');
@@ -78,10 +79,9 @@ module.exports.loop = function () {
     if (!skipState) {
         Logger.debug('Phase 2: Running State Scanner');
         try {
-            const roomEventManager = globalState.getManager('RoomEventManager');
-            if (roomEventManager) roomEventManager();
+            if (eventLogRadar) eventLogRadar();
         } catch (e) {
-            Logger.error(`[Phase 2 Error] Room Event Manager: ${e.stack}`);
+            Logger.error(`[Phase 2 Error] Event Log Radar: ${e.stack}`);
         }
 
         try {
