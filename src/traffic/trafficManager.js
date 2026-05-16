@@ -2,6 +2,7 @@ const DeadlockEngine = require('./deadlock');
 const movement = require('../utils/movement');
 const ROLE_PRIORITIES = require('../constants/rolePriorities');
 const Logger = require('../utils/logger');
+const { PipelineLock, PIPELINES } = require('../os/PipelineLock');
 
 
 /**
@@ -23,6 +24,7 @@ const TrafficManager = {
         if (!(global.State.ledger instanceof Map)) global.State.ledger = new Map();
         if (!(global.State.swapRegistry instanceof Map)) global.State.swapRegistry = new Map();
         if (!(global.State.pipelineLedger instanceof Map)) global.State.pipelineLedger = new Map();
+        if (!(global.State.pipelineLock instanceof PipelineLock)) global.State.pipelineLock = new PipelineLock();
     },
 
     /**
@@ -48,6 +50,7 @@ const TrafficManager = {
             global.State.trafficIntents.clear();
             global.State.ledger.clear();
             global.State.swapRegistry.clear();
+            if (global.State.pipelineLock) global.State.pipelineLock.clear();
 
             // Clean pipeline locks every tick
             for (const [id, lock] of global.State.pipelineLedger) {
@@ -421,13 +424,19 @@ const TrafficManager = {
 
 
                     if (blockingCreep) {
+                        const creepHasLock = global.State.pipelineLock.hasLock(creep.id, PIPELINES.MOVEMENT);
+                        const blockingHasLock = global.State.pipelineLock.hasLock(blockingCreep.id, PIPELINES.MOVEMENT);
 
-                        const dir = creep.pos.getDirectionTo(blockingCreep.pos); // Alternative logic
+                        if (!creepHasLock && !blockingHasLock) {
+                            const dir = creep.pos.getDirectionTo(blockingCreep.pos); // Alternative logic
 
-                        // Custom getDirection logic if needed since getDirectionTo exists in Screeps API
-                        if (dir) {
-                           creep.move(dir);
-                           blockingCreep.move(((dir + 3) % 8) + 1);
+                            // Custom getDirection logic if needed since getDirectionTo exists in Screeps API
+                            if (dir) {
+                               global.State.pipelineLock.acquireLock(creep.id, PIPELINES.MOVEMENT);
+                               global.State.pipelineLock.acquireLock(blockingCreep.id, PIPELINES.MOVEMENT);
+                               creep.move(dir);
+                               blockingCreep.move(((dir + 3) % 8) + 1);
+                            }
                         }
                     }
 
@@ -448,10 +457,17 @@ const TrafficManager = {
                         if (blockingLive && blockingLive.fatigue === 0) { // check if friendly (it is friendly since it's in our lookups, though game creeps could be hostile but our lookups are only my creeps normally)
                             if (!global.State.trafficIntents.has(blockingCreepName)) {
                                 // Swap with stationary friendly creep
-                                const dir = creep.pos.getDirectionTo(intendedNextPos);
-                                if (dir) {
-                                    creep.move(dir);
-                                    blockingLive.move(((dir + 3) % 8) + 1);
+                                const creepHasLock = global.State.pipelineLock.hasLock(creep.id, PIPELINES.MOVEMENT);
+                                const blockingHasLock = global.State.pipelineLock.hasLock(blockingLive.id, PIPELINES.MOVEMENT);
+
+                                if (!creepHasLock && !blockingHasLock) {
+                                    const dir = creep.pos.getDirectionTo(intendedNextPos);
+                                    if (dir) {
+                                        global.State.pipelineLock.acquireLock(creep.id, PIPELINES.MOVEMENT);
+                                        global.State.pipelineLock.acquireLock(blockingLive.id, PIPELINES.MOVEMENT);
+                                        creep.move(dir);
+                                        blockingLive.move(((dir + 3) % 8) + 1);
+                                    }
                                 }
                                 global.State.trafficIntents.delete(creep.name);
                                 continue;
@@ -460,10 +476,13 @@ const TrafficManager = {
                     }
                 }
 
-        if (intendedNextPos) {
-            const dir = creep.pos.getDirectionTo(intendedNextPos);
-            if (dir) creep.move(dir);
-        }
+                if (intendedNextPos) {
+                    const dir = creep.pos.getDirectionTo(intendedNextPos);
+                    if (dir && !global.State.pipelineLock.hasLock(creep.id, PIPELINES.MOVEMENT)) {
+                        global.State.pipelineLock.acquireLock(creep.id, PIPELINES.MOVEMENT);
+                        creep.move(dir);
+                    }
+                }
                 global.State.trafficIntents.delete(creep.name);
             }
         } catch (e) {
