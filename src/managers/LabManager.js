@@ -16,15 +16,19 @@ class LabManager {
 
             const labs = Array.from(labMap.values());
 
-            // Re-identify labs occasionally or if heap is missing
-            if (!room.heap) room.heap = new Map();
-            let labConfig = room.heap.get('labConfig');
-            if (!labConfig || Game.time % 100 === 0) {
-                labConfig = this.identifyLabs(labs);
-                room.heap.set('labConfig', labConfig);
+            // Pre-compute O(1) static lab roles
+            if (!global.State.labCache) global.State.labCache = new Map();
+            let labCache = global.State.labCache.get(room.name);
+
+            if (!labCache || labCache.count !== labs.length) {
+                const config = this.identifyLabs(labs);
+                if (config) {
+                    labCache = { reagentLab1Id: config.reagentLab1Id, reagentLab2Id: config.reagentLab2Id, outputLabIds: config.outputLabIds, count: labs.length };
+                    global.State.labCache.set(room.name, labCache);
+                }
             }
 
-            if (!labConfig) return;
+            if (!labCache) return;
 
             let labReaction = room.heap.get('labReaction');
             if (!labReaction || Game.time % 50 === 0) {
@@ -32,8 +36,8 @@ class LabManager {
                 room.heap.set('labReaction', labReaction);
             }
 
-            this.runReactions(labConfig, labReaction);
-            this.assignCreepTasks(room, labConfig, labReaction);
+            this.runReactions(labCache, labReaction);
+            this.assignCreepTasks(room, labCache, labReaction);
 
         } catch (e) {
             console.log(`[LabManager Error] Room ${room.name}: ${e.stack}`);
@@ -77,9 +81,9 @@ class LabManager {
         }
 
         return {
-            input1: input1.id,
-            input2: input2.id,
-            outputs: outputs.map(l => l.id)
+            reagentLab1Id: input1.id,
+            reagentLab2Id: input2.id,
+            outputLabIds: outputs.map(l => l.id)
         };
     }
 
@@ -117,14 +121,14 @@ class LabManager {
 
     /**
      * Triggers the runReaction command on all valid output labs.
-     * @param {{input1: string, input2: string, outputs: string[]}} labConfig - The lab configuration.
+     * @param {{reagentLab1Id: string, reagentLab2Id: string, outputLabIds: string[]}} labCache - The lab configuration.
      * @param {{reagent1: string, reagent2: string, product: string}} labReaction - The reaction to run.
      */
-    static runReactions(labConfig, labReaction) {
+    static runReactions(labCache, labReaction) {
         if (!labReaction) return;
 
-        const input1 = Game.getObjectById(labConfig.input1);
-        const input2 = Game.getObjectById(labConfig.input2);
+        const input1 = Game.getObjectById(labCache.reagentLab1Id);
+        const input2 = Game.getObjectById(labCache.reagentLab2Id);
 
         if (!input1 || !input2) return;
 
@@ -135,7 +139,7 @@ class LabManager {
         if (in1Resource !== labReaction.reagent1 || in2Resource !== labReaction.reagent2) return;
         if (input1.store[in1Resource] < 5 || input2.store[in2Resource] < 5) return;
 
-        for (const outId of labConfig.outputs) {
+        for (const outId of labCache.outputLabIds) {
             const outLab = Game.getObjectById(outId);
             if (outLab && outLab.cooldown === 0) {
                 const outResource = Object.keys(outLab.store).find(k => k !== RESOURCE_ENERGY);
@@ -152,18 +156,18 @@ class LabManager {
     /**
      * Assigns top-down transport tasks to labManager creeps.
      * @param {Room} room - The room object.
-     * @param {{input1: string, input2: string, outputs: string[]}} labConfig - The lab configuration.
+     * @param {{reagentLab1Id: string, reagentLab2Id: string, outputLabIds: string[]}} labCache - The lab configuration.
      * @param {{reagent1: string, reagent2: string, product: string}} labReaction - The reaction to run.
      */
-    static assignCreepTasks(room, labConfig, labReaction) {
+    static assignCreepTasks(room, labCache, labReaction) {
         const roomCreeps = global.State.creepsByRoom.get(room.name);
         if (!roomCreeps) return;
 
         const labManagers = roomCreeps.get('labManager');
         if (!labManagers || labManagers.length === 0) return;
 
-        const input1 = Game.getObjectById(labConfig.input1);
-        const input2 = Game.getObjectById(labConfig.input2);
+        const input1 = Game.getObjectById(labCache.reagentLab1Id);
+        const input2 = Game.getObjectById(labCache.reagentLab2Id);
 
         // Ensure labs exist
         if (!input1 || !input2) return;
@@ -199,7 +203,7 @@ class LabManager {
             // Priority 2: Empty output labs if full or wrong mineral
             let outputToEmpty = null;
             let outputResource = null;
-            for (const outId of labConfig.outputs) {
+            for (const outId of labCache.outputLabIds) {
                 const outLab = Game.getObjectById(outId);
                 if (outLab) {
                     const outRes = Object.keys(outLab.store).find(k => k !== RESOURCE_ENERGY);

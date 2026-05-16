@@ -87,13 +87,22 @@ function run(room, defenseRepairTarget = null) {
                     repairTarget = defenseRepairTarget;
                 }
             } else if (defconLevel > DEFCON.ALERT) {
-                // Only repair roads if DEFCON is not high
-                const roads = structuresMap.get(STRUCTURE_ROAD) || [];
-                for (let i = 0; i < roads.length; i++) {
-                    const road = roads[i];
-                    if (road.hits < road.hitsMax * 0.1) { // Strictly below 10% HP
-                        repairTarget = road;
-                        break;
+                // O(1) Event-Driven Road Repair Queue (Bottom 10%)
+                if (global.State.repairQueues && global.State.repairQueues.has(room.name)) {
+                    const queue = global.State.repairQueues.get(room.name);
+                    for (let i = 0; i < 10; i++) {
+                        if (queue[i].size > 0) {
+                            for (const id of queue[i]) {
+                                const target = Game.getObjectById(id);
+                                if (target && target.structureType === STRUCTURE_ROAD && target.hits < target.hitsMax * 0.1) {
+                                    repairTarget = target;
+                                    break;
+                                } else if (!target) {
+                                    queue[i].delete(id);
+                                }
+                            }
+                            if (repairTarget) break;
+                        }
                     }
                 }
             }

@@ -4,9 +4,9 @@
  */
 
 const { determineDefcon, DEFCON } = require('../constants/defcon');
-const eventBus = require('../os/eventBus');
+const TowerManager = require('../managers/TowerManager');
+const SpawnQueueManager = require('../managers/SpawnQueueManager');
 const rampartMelee = require('../roles/rampartMelee');
-// SpawnQueueManager is now accessed indirectly via eventBus for decoupling
 
 module.exports = {
     /**
@@ -24,33 +24,27 @@ module.exports = {
             }
 
             let defenseRepairTarget = null;
-            const structuresMap = global.State.structuresByRoom ? global.State.structuresByRoom.get(room.name) : null;
 
-            // Basic logic for repairing critical structures (ramparts, then walls)
-            if (structuresMap) {
-                const ramparts = structuresMap.get(STRUCTURE_RAMPART) || [];
-                const walls = structuresMap.get(STRUCTURE_WALL) || [];
-
-                let lowestHits = Infinity;
-
-                for (const rampart of ramparts) {
-                    if (rampart.hits < rampart.hitsMax && rampart.hits < lowestHits) {
-                        lowestHits = rampart.hits;
-                        defenseRepairTarget = rampart;
-                    }
-                }
-
-                if (!defenseRepairTarget || defconLevel > DEFCON.CRITICAL) {
-                    for (const wall of walls) {
-                        if (wall.hits < wall.hitsMax && wall.hits < lowestHits) {
-                            lowestHits = wall.hits;
-                            defenseRepairTarget = wall;
+            // Event-Driven O(1) Repair Queue lookup
+            if (global.State.repairQueues && global.State.repairQueues.has(room.name)) {
+                const queue = global.State.repairQueues.get(room.name);
+                for (let i = 0; i < 100; i++) {
+                    if (queue[i].size > 0) {
+                        for (const id of queue[i]) {
+                            const target = Game.getObjectById(id);
+                            if (target && (target.structureType === STRUCTURE_RAMPART || target.structureType === STRUCTURE_WALL) && target.hits < target.hitsMax) {
+                                defenseRepairTarget = target;
+                                break;
+                            } else if (!target) {
+                                queue[i].delete(id);
+                            }
                         }
+                        if (defenseRepairTarget) break;
                     }
                 }
             }
 
-            eventBus.publish('DEFENSE_REPAIR_REQUEST', { room, defenseRepairTarget });
+            TowerManager.run(room, defenseRepairTarget);
 
             if (defconLevel <= DEFCON.ALERT) {
                 // Request rampartMelee creeps when under attack
@@ -64,15 +58,21 @@ module.exports = {
                     }
                 }
 
-                // We must use a proxy or global memory map if we want to decouple completely, but since
-                // SpawnQueueManager.globalQueue isn't available, we rely on room memory or just publish blindly
-                // and let the Queue handle duplicates (SpawnQueueManager already prevents duplicates natively).
+                // Add pending requests to the count
+                if (SpawnQueueManager.globalQueue.has(room.name)) {
+                    const requests = SpawnQueueManager.globalQueue.get(room.name);
+                    for (const req of requests) {
+                        if (req.role === 'rampartMelee') {
+                            rampartMeleeCount++;
+                        }
+                    }
+                }
 
-                // Assuming we aim for 1-2 rampartMelee creeps based on DEFCON severity
+                // Aim for 1-2 rampartMelee creeps based on DEFCON severity
                 const targetCount = defconLevel <= DEFCON.CRITICAL ? 2 : 1;
 
                 if (rampartMeleeCount < targetCount) {
-                    eventBus.publish('REQUEST_RAMPART_MELEE', { room });
+                    SpawnQueueManager.requestRampartMelee(room);
                 }
             }
 

@@ -11,6 +11,14 @@ class MarketManager {
     static run(room) {
         if (Game.cpu.bucket < 2000) return; // CPU Throttling
 
+        if (!global.State) global.State = {};
+        if (!global.State.marketOrders) global.State.marketOrders = new Map();
+
+        // Throttle API calls to every 50 ticks
+        if (Game.time % 50 === 0 || global.State.marketOrders.size === 0) {
+            this.updateMarketCache();
+        }
+
         // Execute market operations occasionally to save CPU
         if (Game.time % 10 !== 0) return;
 
@@ -20,6 +28,24 @@ class MarketManager {
             this.executeTrades(room);
         } catch (e) {
             console.log(`[MarketManager Error] Room ${room.name}: ${e.stack}`);
+        }
+    }
+
+    /**
+     * Fetches all market orders and caches them globally to bypass native polling.
+     */
+    static updateMarketCache() {
+        if (global.State.lastMarketFetch === Game.time) return; // Only once per tick globally
+        global.State.lastMarketFetch = Game.time;
+        global.State.marketOrders.clear();
+
+        const orders = Game.market.getAllOrders({ type: ORDER_BUY });
+        for (let i = 0; i < orders.length; i++) {
+            const order = orders[i];
+            if (!global.State.marketOrders.has(order.resourceType)) {
+                global.State.marketOrders.set(order.resourceType, []);
+            }
+            global.State.marketOrders.get(order.resourceType).push(order);
         }
     }
 
@@ -38,7 +64,7 @@ class MarketManager {
             const amount = terminal.store[resourceType];
             if (amount < MIN_SELL_AMOUNT) continue;
 
-            const orders = Game.market.getAllOrders({ type: ORDER_BUY, resourceType: resourceType });
+            const orders = global.State.marketOrders.get(resourceType) || [];
             if (orders.length === 0) continue;
 
             const prices = orders.map(o => o.price);

@@ -27,6 +27,33 @@ function cacheEnemyProfile(creep) {
     }
 }
 
+/**
+ * Updates the structure's bucket in the O(1) repair queue.
+ * @param {Structure} struct
+ */
+function updateStructureBucket(struct) {
+    if (!struct || (struct.structureType !== STRUCTURE_RAMPART && struct.structureType !== STRUCTURE_WALL && struct.structureType !== STRUCTURE_ROAD)) return;
+    const roomName = struct.pos.roomName;
+
+    if (!global.State.repairQueues) global.State.repairQueues = new Map();
+    let queue = global.State.repairQueues.get(roomName);
+    if (!queue) {
+        queue = new Array(100);
+        for (let i = 0; i < 100; i++) queue[i] = new Set();
+        global.State.repairQueues.set(roomName, queue);
+    }
+
+    const newBucket = Math.floor((struct.hits / struct.hitsMax) * 99);
+    if (!global.State.structureBucketMap) global.State.structureBucketMap = new Map();
+    const oldBucket = global.State.structureBucketMap.get(struct.id);
+
+    if (oldBucket !== newBucket) {
+        if (oldBucket !== undefined && queue[oldBucket]) queue[oldBucket].delete(struct.id);
+        if (queue[newBucket]) queue[newBucket].add(struct.id);
+        global.State.structureBucketMap.set(struct.id, newBucket);
+    }
+}
+
 module.exports = function stateScanner() {
     if (!global.State?.scannedRooms) return;
 
@@ -91,6 +118,14 @@ module.exports = function stateScanner() {
             roomRuins.clear();
             const ruins = roomObj.find(FIND_RUINS);
             for (let i = 0; i < ruins.length; i++) roomRuins.set(ruins[i].id, ruins[i]);
+
+            // Bootstrap repair queue logic
+            if (!global.State.repairQueues) global.State.repairQueues = new Map();
+            let queue = new Array(100);
+            for (let i = 0; i < 100; i++) queue[i] = new Set();
+            global.State.repairQueues.set(roomName, queue);
+            const structs = roomObj.find(FIND_STRUCTURES);
+            for (let i = 0; i < structs.length; i++) updateStructureBucket(structs[i]);
         }
 
         for (const event of events) {
@@ -119,6 +154,13 @@ module.exports = function stateScanner() {
                 roomDropped.delete(event.objectId);
                 roomTombstones.delete(event.objectId);
                 roomRuins.delete(event.objectId);
+
+                if (global.State.structureBucketMap && global.State.structureBucketMap.has(event.objectId)) {
+                    const oldBucket = global.State.structureBucketMap.get(event.objectId);
+                    const queue = global.State.repairQueues.get(roomName);
+                    if (queue && queue[oldBucket]) queue[oldBucket].delete(event.objectId);
+                    global.State.structureBucketMap.delete(event.objectId);
+                }
 
                 if (event.data && event.data.type === 'creep') {
                     const creepName = event.data.name;
@@ -150,6 +192,9 @@ module.exports = function stateScanner() {
                 if (target && target.my === false && target.owner && target.owner.username !== 'Invader') {
                     roomHostiles.set(target.id, target);
                     cacheEnemyProfile(target);
+                }
+                if (target && target.hits !== undefined) {
+                    updateStructureBucket(target);
                 }
             } else if (event.event === EVENT_CREATE_CREEP) {
                 let newCreep = Game.getObjectById(event.objectId);
@@ -221,6 +266,11 @@ module.exports = function stateScanner() {
                         roomDropped.set(dropObj.id, dropObj);
                     }
                     roomDropped.set(dropObj.id, dropObj);
+                }
+            } else if (typeof EVENT_REPAIR !== 'undefined' && event.event === EVENT_REPAIR) {
+                let target = event.data && event.data.targetId ? Game.getObjectById(event.data.targetId) : null;
+                if (target && target.hits !== undefined) {
+                    updateStructureBucket(target);
                 }
             }
         }
