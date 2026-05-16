@@ -87,6 +87,32 @@ class SpawnLedger {
     }
 
     /**
+     * Mathematically forces the minimum worker target count.
+     * @param {Room} room The room.
+     * @returns {number} The target worker count.
+     */
+    calculateWorkerTarget(room) {
+        if (room.controller && room.controller.level === 1) {
+            return 2;
+        }
+        return 2; // Default minimum
+    }
+
+    /**
+     * Caps the harvester target based on RCL and living workers.
+     * @param {Room} room The room.
+     * @param {number} workerCount The number of living workers.
+     * @returns {number} The target harvester count.
+     */
+    calculateHarvesterTarget(room, workerCount) {
+        if (room.controller && room.controller.level === 1 && workerCount === 0) {
+            const sources = global.State.sourcesByRoom.get(room.name) || [];
+            return sources.length || 1;
+        }
+        return this.calculateSourceCaps();
+    }
+
+    /**
      * Calculates the maximum number of walkable tiles around all sources in the room.
      * Uses cached values from discoveryManager.
      * @returns {number} The maximum number of harvesters that can be supported by available space.

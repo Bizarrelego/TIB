@@ -63,7 +63,7 @@ module.exports = {
             const sources = global.State.sourcesByRoom.get(room.name);
             const sourceCount = sources ? sources.length : 1;
 
-            if (harvesterCount < spawnLedger.calculateSourceCaps()) {
+            if (harvesterCount < spawnLedger.calculateHarvesterTarget(room, workerCount)) {
                 const energyAvailable = spawnLedger.getAvailableEnergy();
                 const calcCapacity = (haulerCount === 0 && energyAvailable < capacity && energyAvailable >= 200) ? energyAvailable : capacity;
                 const body = BodyCalc.calculateEarlyGameHarvester(calcCapacity);
@@ -81,7 +81,7 @@ module.exports = {
             }
 
             // Spawn a worker to act as multi-purpose builder/upgrader
-            if (workerCount < 2) {
+            if (workerCount < spawnLedger.calculateWorkerTarget(room)) {
                 const body = BodyCalc.calculateWorker(capacity);
                 const cost = BodyCalc.getCost(body);
                 SpawnQueueManager.requestSpawn(room.name, 'worker', body, 'worker_' + Game.time, { memory: { role: 'worker', colony: room.name } }, cost);

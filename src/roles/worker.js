@@ -143,13 +143,19 @@ module.exports = {
                         }
 
                         if (targetSpawn) {
-                            if (creep.pos.isNearTo(targetSpawn)) {
+                            if (targetSpawn.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+                                if (creep.pos.getRangeTo(room.controller) <= 3) {
+                                    creep.upgradeController(room.controller);
+                                } else {
+                                    movement.moveTo(creep, room.controller);
+                                }
+                            } else if (creep.pos.isNearTo(targetSpawn)) {
                                 TrafficManager.registerTransfer(creep, targetSpawn, RESOURCE_ENERGY, creep.store.getUsedCapacity(RESOURCE_ENERGY));
                             } else {
                                 movement.moveTo(creep, targetSpawn);
                             }
                         } else if (room.controller) {
-                            if (creep.pos.isNearTo(room.controller)) {
+                            if (creep.pos.getRangeTo(room.controller) <= 3) {
                                 creep.upgradeController(room.controller);
                             } else {
                                 movement.moveTo(creep, room.controller);
@@ -186,13 +192,19 @@ module.exports = {
                             }
 
                             if (targetSpawn) {
-                                if (creep.pos.isNearTo(targetSpawn)) {
+                                if (targetSpawn.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+                                    if (creep.pos.getRangeTo(room.controller) <= 3) {
+                                        creep.upgradeController(room.controller);
+                                    } else {
+                                        movement.moveTo(creep, room.controller);
+                                    }
+                                } else if (creep.pos.isNearTo(targetSpawn)) {
                                     TrafficManager.registerTransfer(creep, targetSpawn, RESOURCE_ENERGY, creep.store.getUsedCapacity(RESOURCE_ENERGY));
                                 } else {
                                     movement.moveTo(creep, targetSpawn);
                                 }
                             } else if (room.controller) {
-                                if (creep.pos.isNearTo(room.controller)) {
+                                if (creep.pos.getRangeTo(room.controller) <= 3) {
                                     creep.upgradeController(room.controller);
                                 } else {
                                     movement.moveTo(creep, room.controller);
