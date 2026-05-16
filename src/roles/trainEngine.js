@@ -21,7 +21,7 @@ function run(room) {
 
             // 1. Find a cart to pair with
             let pairedCartId = creep.heap.get('cartId');
-            let cart = pairedCartId ? Game.getObjectById(pairedCartId) : null;
+            let cart = pairedCartId ? (global.State.creepLookup && global.State.creepLookup.get(pairedCartId)) : null;
 
             if (!cart) {
                 if (trainCarts && trainCarts.length > 0) {
@@ -34,7 +34,9 @@ function run(room) {
                         const cartHeap = potentialCart.heap;
                         const cartEngineId = cartHeap.get('engineId');
 
-                        if (!cartEngineId || cartEngineId === creep.id || !Game.getObjectById(cartEngineId)) {
+                        const engineIsDead = cartEngineId && (!global.State.creepLookup || !global.State.creepLookup.get(cartEngineId));
+
+                        if (!cartEngineId || cartEngineId === creep.id || engineIsDead) {
                             cart = potentialCart;
                             pairedCartId = cart.id;
                             creep.heap.set('cartId', cart.id);
@@ -77,41 +79,27 @@ function run(room) {
                 if (destinationId === 'controller') {
                     if (room.controller) targetPos = room.controller.pos;
                 } else {
-                    const target = Game.getObjectById(destinationId);
+                    let target = (global.State.structureCache && global.State.structureCache.get(destinationId)) ||
+                                 (global.State.creepLookup && global.State.creepLookup.get(destinationId));
+
+                    if (!target && state === 'pickup' && global.State.droppedByRoom) {
+                        const dropped = global.State.droppedByRoom.get(room.name) || [];
+                        for (let k = 0; k < dropped.length; k++) {
+                            if (dropped[k].id === destinationId) {
+                                target = dropped[k];
+                                break;
+                            }
+                        }
+                    }
+
                     if (target) targetPos = target.pos;
                 }
 
                 if (targetPos) {
                     if (!cart.pos.isNearTo(targetPos)) {
                         if (creep.pos.isNearTo(targetPos)) {
-                            // Engine is adjacent but cart is not. Find another empty adjacent tile.
-                            const terrain = global.State.roomTerrain && global.State.roomTerrain.get(room.name);
-                            const costMatrix = global.State.costMatrices && global.State.costMatrices.get(room.name);
-
-                            let moved = false;
-                            for (let dx = -1; dx <= 1; dx++) {
-                                for (let dy = -1; dy <= 1; dy++) {
-                                    if (dx === 0 && dy === 0) continue;
-                                    const tx = targetPos.x + dx;
-                                    const ty = targetPos.y + dy;
-                                    if (tx < 0 || tx > 49 || ty < 0 || ty > 49) continue;
-
-                                    if (terrain && terrain.get(tx, ty) === TERRAIN_MASK_WALL) continue;
-
-                                    // Make sure we aren't picking the tile we are already standing on
-                                    if (tx === creep.pos.x && ty === creep.pos.y) continue;
-
-                                    // Check CostMatrix to avoid solid structures (cost 255) in O(1)
-                                    if (costMatrix && costMatrix.get(tx, ty) === 255) continue;
-
-                                    movement.moveTo(creep, new RoomPosition(tx, ty, room.name));
-                                    moved = true;
-                                    break;
-                                }
-                                if (moved) break;
-                            }
-                            // Fallback if no specific tile was found
-                            if (!moved) movement.moveTo(creep, targetPos);
+                            // Engine is adjacent but cart is not. Swap with cart to pull it into range.
+                            movement.moveTo(creep, cart);
                         } else {
                             // Neither are near, standard move
                             movement.moveTo(creep, targetPos);
