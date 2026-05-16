@@ -10,56 +10,61 @@ function run(creep, room) {
     try {
         if (creep.fatigue > 0) return;
 
-        if (!creep.heap.rangeToController) {
-            creep.heap.rangeToController = creep.pos.getRangeTo(controller);
-        }
-
-        // Move to assigned park position
-        if (creep.heap.parkPos) {
-            // Need to create RoomPosition object if it's deserialized as a simple object
-            const targetPos = new RoomPosition(creep.heap.parkPos.x, creep.heap.parkPos.y, creep.heap.parkPos.roomName);
-            if (!creep.pos.isEqualTo(targetPos)) {
-                movement.moveTo(creep, targetPos);
-                creep.heap.rangeToController = creep.pos.getRangeTo(controller);
-                return;
-            }
-        } else if (creep.heap.rangeToController > 3) {
-            // Ensure we are parked on the static spot.
-            movement.moveTo(creep, controller);
-            // Update range cache only while moving
-            creep.heap.rangeToController = creep.pos.getRangeTo(controller);
-            return;
-        }
-
-        // Static logic: Only work if energy is present (delivered by Haulers)
-        if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-            creep.upgradeController(controller);
-        }
-
         let controllerContainer = null;
         const structures = global.State.structuresByRoom.get(room.name);
-        const containers = structures ? (structures.get(STRUCTURE_CONTAINER) || new Map()) : new Map();
+        const containers = structures ? (structures.get(STRUCTURE_CONTAINER) || []) : [];
 
-        for (const container of containers.values()) {
-            if (container.pos.inRangeTo(controller, 3)) {
-                controllerContainer = container;
-                break;
+        // Query the room for the Controller Container only if not cached
+        if (creep.heap.controllerContainerId) {
+            controllerContainer = Game.getObjectById(creep.heap.controllerContainerId);
+            if (!controllerContainer) {
+                creep.heap.controllerContainerId = null; // Invalidate cache if destroyed
+            }
+        }
+
+        if (!controllerContainer) {
+            for (const container of containers) {
+                if (container.pos.inRangeTo(controller, 3)) {
+                    controllerContainer = container;
+                    creep.heap.controllerContainerId = container.id;
+                    break;
+                }
             }
         }
 
         if (controllerContainer) {
+            // 1. If the container exists, the creep must move to it
             if (!creep.pos.isEqualTo(controllerContainer.pos)) {
                 movement.moveTo(creep, controllerContainer);
             } else {
-                // Once on the container, withdraw and upgrade simultaneously
-                if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0 && controllerContainer.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                    creep.withdraw(controllerContainer, RESOURCE_ENERGY);
+                // 2. Once creep.pos.isEqualTo(container.pos), permanently stop moving.
+                // 3. Every tick, if container has energy, withdraw and upgrade simultaneously
+                const hasEnergy = controllerContainer.store.getUsedCapacity(RESOURCE_ENERGY) > 0;
+
+                if (hasEnergy) {
+                    if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                        creep.withdraw(controllerContainer, RESOURCE_ENERGY);
+                    }
+                    if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                        creep.upgradeController(controller);
+                    }
+                } else {
+                    // 4. If container is completely empty, sleep and wait for haulers. Do not walk away to harvest.
+                    if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                        creep.upgradeController(controller);
+                    }
                 }
             }
         } else {
-            // Wait / Sleep if no container
-            if (creep.heap.rangeToController > 3) {
+            // Fallback if no container yet: move to controller and upgrade if it has energy
+            if (creep.pos.getRangeTo(controller) > 3) {
                 movement.moveTo(creep, controller);
+            } else if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                creep.upgradeController(controller);
+            } else {
+                // Emergency fallback: wait for hauler drops or harvest if strictly needed
+                // But prompt says: "Upgraders must not wander or pull from sources unless in emergency fallback."
+                // Wait/Sleep if no container.
             }
         }
     } catch (e) {
@@ -67,5 +72,4 @@ function run(creep, room) {
     }
 }
 
-// Export the module
 module.exports = { run };

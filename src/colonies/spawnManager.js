@@ -105,107 +105,70 @@ module.exports = {
         }
 
         // RCL 5 Logic: hubManager & upgrader
+        // Upgrader Spawning
+        let upgraderCount = 0;
+        if (roomCreeps) {
+            const upgraders = roomCreeps.get('upgrader');
+            if (upgraders) upgraderCount = upgraders.length;
+        }
+
+        let desiredUpgraders = spawnLedger.calculateUpgraderTarget(room, harvesterCount);
+        if (room.controller.level >= 5) {
+            desiredUpgraders = UpgraderManager.getDesiredCount(room);
+        }
+
+        if (upgraderCount < desiredUpgraders) {
+            const body = BodyCalc.calculateUpgrader(capacity);
+            const cost = BodyCalc.getCost(body);
+            if (spawnLedger.canSpawn(cost)) {
+                SpawnQueueManager.requestSpawn(room.name, 'upgrader', body, 'upgrader_' + Game.time, {
+                    memory: { role: 'upgrader', colony: room.name }
+                }, cost);
+            }
+        }
+
+        // RCL 5 Logic: hubManager
         if (room.controller.level >= 5) {
             if (spawnLedger.isLinkNetworkPresent(room)) {
                 let hubManagerCount = 0;
-                let upgraderCount = 0;
                 if (roomCreeps) {
                     const hubManagers = roomCreeps.get('hubManager');
-                    if (hubManagers) {
-                        hubManagerCount = hubManagers.length;
-                    }
-
-                    const upgraders = roomCreeps.get('upgrader');
-                    if (upgraders) {
-                        upgraderCount = upgraders.length;
-                    }
+                    if (hubManagers) hubManagerCount = hubManagers.length;
                 }
 
                 if (hubManagerCount < 1) {
-                    // Optimized body for hub transfer: 800 capacity
                     const body = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE];
-                    const cost = (16 * BODYPART_COST[CARRY]) + BODYPART_COST[MOVE]; // 16 * 50 + 50 = 850
+                    const cost = (16 * BODYPART_COST[CARRY]) + BODYPART_COST[MOVE];
                     if (spawnLedger.canSpawn(cost)) {
-                    SpawnQueueManager.requestSpawn(room.name, 'hubManager', body, 'hubManager_' + Game.time, {
-                        memory: { role: 'hubManager', colony: room.name }
-                    }, cost);
-                }
-                }
-
-                const desiredUpgraders = UpgraderManager.getDesiredCount(room);
-
-                // Income-Based Upgrader Scaling: Total Active Harvesters * 2 energy/tick
-                const energyPerTick = harvesterCount * 2;
-                const upkeep = 1; // Assuming 1 energy/tick upkeep for continuous spawning as rough estimate
-                const sustainedUpgraders = Math.max(1, energyPerTick - upkeep);
-
-                if (upgraderCount < Math.min(desiredUpgraders, sustainedUpgraders)) {
-                    const body = BodyCalc.calculateUpgrader(capacity);
-                    const cost = BodyCalc.getCost(body);
-                    if (spawnLedger.canSpawn(cost)) {
-                    SpawnQueueManager.requestSpawn(room.name, 'upgrader', body, 'upgrader_' + Game.time, {
-                        memory: { role: 'upgrader', colony: room.name }
-                    }, cost);
-                }
+                        SpawnQueueManager.requestSpawn(room.name, 'hubManager', body, 'hubManager_' + Game.time, {
+                            memory: { role: 'hubManager', colony: room.name }
+                        }, cost);
+                    }
                 }
             }
         }
 
-        // RCL 4 Logic: fastFiller
-        if (room.controller.level >= 4) {
-            let storageExists = false;
-            let storageCloseToCompletion = false;
+        // Fast Filler Spawning
+        let fastFillerCount = 0;
+        if (roomCreeps) {
+            const fastFillers = roomCreeps.get('fastFiller');
+            if (fastFillers) fastFillerCount = fastFillers.length;
+        }
+        const desiredFastFillers = spawnLedger.calculateFastFillerTarget(room);
 
-            const structures = global.State.structuresByRoom.get(room.name);
-            if (structures) {
-                const storages = structures.get(STRUCTURE_STORAGE) || [];
-                if (storages.length > 0) {
-                    storageExists = true;
-                }
+        if (fastFillerCount < desiredFastFillers) {
+            let body = [];
+            let cost = 0;
+            const pairCost = BODYPART_COST[CARRY] + BODYPART_COST[MOVE];
+            while (cost + pairCost <= capacity && body.length < 50) {
+                body.push(CARRY, MOVE);
+                cost += pairCost;
             }
 
-            if (!storageExists) {
-                const sites = global.State.sitesByRoom.get(room.name);
-                if (sites) {
-                    for (let i = 0; i < sites.length; i++) {
-                        if (sites[i].structureType === STRUCTURE_STORAGE) {
-                            const buildPower = planner.getBuildPower(room.name);
-                            if (sites[i].progress >= sites[i].progressTotal - buildPower) {
-                                storageCloseToCompletion = true;
-                            }
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (storageExists || storageCloseToCompletion) {
-                let fastFillerCount = 0;
-                if (roomCreeps) {
-                    const fastFillers = roomCreeps.get('fastFiller');
-                    if (fastFillers) {
-                        fastFillerCount = fastFillers.length;
-                    }
-                }
-
-                if (fastFillerCount < 2) { // Target amount of fastFillers
-                    // Calculate 1:1 CARRY:MOVE body up to room.energyCapacityAvailable
-                    let body = [];
-                    let cost = 0;
-                    const pairCost = BODYPART_COST[CARRY] + BODYPART_COST[MOVE];
-                    while (cost + pairCost <= capacity && body.length < 50) {
-                        body.push(CARRY, MOVE);
-                        cost += pairCost;
-                    }
-
-                    if (body.length > 0) {
-                        if (spawnLedger.canSpawn(cost)) {
-                            SpawnQueueManager.requestSpawn(room.name, 'fastFiller', body, 'fastFiller_' + Game.time, {
-                                memory: { role: 'fastFiller', colony: room.name }
-                            }, cost);
-                        }
-                    }
-                }
+            if (body.length > 0 && spawnLedger.canSpawn(cost)) {
+                SpawnQueueManager.requestSpawn(room.name, 'fastFiller', body, 'fastFiller_' + Game.time, {
+                    memory: { role: 'fastFiller', colony: room.name }
+                }, cost);
             }
         }
 

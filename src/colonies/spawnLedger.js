@@ -42,7 +42,6 @@ class SpawnLedger {
      * @param {number} amount The energy amount to reserve.
      */
     reserveEnergy(amount) {
-        // Subtracts from this.availableEnergy so subsequent requests in the same tick know the remaining budget
         this.availableEnergy -= amount;
     }
 
@@ -87,11 +86,73 @@ class SpawnLedger {
     }
 
     /**
+     * Calculates the target Fast Filler count.
+     * Fast fillers active if room.storage exists OR active STRUCTURE_CONTAINER exactly at anchor [0,0] coordinate.
+     * @param {Room} room
+     * @returns {number}
+     */
+    calculateFastFillerTarget(room) {
+        let storageExists = false;
+        if (room.storage && room.storage.isActive()) {
+            storageExists = true;
+        }
+
+        let coreContainerExists = false;
+        if (!storageExists) {
+            const plannerState = global.State.roomPlanner ? global.State.roomPlanner.get(room.name) : null;
+            if (plannerState && plannerState.has('anchor')) {
+                const anchor = plannerState.get('anchor');
+                if (anchor) {
+                    const structures = global.State.structuresByRoom.get(room.name);
+                    const containers = structures ? structures.get(STRUCTURE_CONTAINER) || [] : [];
+                    for (const container of containers) {
+                        if (container.pos.x === anchor.x && container.pos.y === anchor.y && container.isActive()) {
+                            coreContainerExists = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (storageExists || coreContainerExists) {
+            return 2;
+        }
+        return 0;
+    }
+
+    /**
+     * Checks if there's at least one active source container.
+     * @param {Room} room
+     * @returns {boolean}
+     */
+    hasActiveSourceContainer(room) {
+        const structures = global.State.structuresByRoom.get(room.name);
+        const containers = structures ? structures.get(STRUCTURE_CONTAINER) || [] : [];
+        if (containers.length === 0) return false;
+
+        const sources = global.State.sourcesByRoom.get(room.name) || [];
+        for (const container of containers) {
+            for (const source of sources) {
+                if (container.pos.isNearTo(source)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * Mathematically forces the minimum worker target count.
+     * Ends swarm logic at RCL 2 once basic infrastructure is built.
      * @param {Room} room The room.
      * @returns {number} The target worker count.
      */
     calculateWorkerTarget(room) {
+        if (room.controller && room.controller.level >= 2 && this.hasActiveSourceContainer(room)) {
+            return 2; // Strictly for building/maintenance once infrastructure is established
+        }
+
         if (room.controller && room.controller.level < 3) {
             return Math.max(8, Math.ceil(this.calculateSourceCaps() * 1.5));
         }
@@ -105,16 +166,28 @@ class SpawnLedger {
      * @returns {number} The target harvester count.
      */
     calculateHarvesterTarget(room, workerCount) {
-        if (room.controller && room.controller.level < 3) {
-            return this.calculateSourceCaps();
-        }
         return this.calculateSourceCaps();
     }
 
     /**
+     * Calculates the target Upgrader count.
+     * @param {Room} room
+     * @param {number} harvesterCount
+     * @returns {number}
+     */
+    calculateUpgraderTarget(room, harvesterCount) {
+        if (room.controller && room.controller.level >= 2 && this.hasActiveSourceContainer(room)) {
+            // Shift population capacity to upgraders based on dynamic income math
+            const energyPerTick = harvesterCount * 2;
+            const upkeep = 1;
+            return Math.max(1, energyPerTick - upkeep);
+        }
+        return 0;
+    }
+
+    /**
      * Calculates the maximum number of walkable tiles around all sources in the room.
-     * Uses cached values from discoveryManager.
-     * @returns {number} The maximum number of harvesters that can be supported by available space.
+     * @returns {number}
      */
     calculateSourceCaps() {
         let totalWalkable = 0;
@@ -129,11 +202,9 @@ class SpawnLedger {
             }
         }
 
-        // Fallback if not initialized in State
         const sources = global.State.sourcesByRoom.get(this.roomName) || [];
         return sources.length;
     }
-
 }
 
 module.exports = SpawnLedger;
