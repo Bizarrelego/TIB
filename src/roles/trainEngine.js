@@ -16,32 +16,29 @@ function run(room) {
             if (creep.fatigue > 0) continue; // Fatigue gating
 
             if (!(creep.heap instanceof Map)) {
-                creep.heap = creep.heap || {};
+                creep.heap = new Map();
             }
 
             // 1. Find a cart to pair with
-            let pairedCartId = creep.heap.cartId || (creep.heap instanceof Map ? creep.heap.get('cartId') : null);
+            let pairedCartId = creep.heap.get('cartId');
             let cart = pairedCartId ? Game.getObjectById(pairedCartId) : null;
 
             if (!cart) {
                 if (trainCarts && trainCarts.length > 0) {
                     for (let j = 0; j < trainCarts.length; j++) {
                         const potentialCart = trainCarts[j];
-                        const cartHeap = potentialCart.heap instanceof Map ? potentialCart.heap : (potentialCart.heap || {});
-                        const cartEngineId = cartHeap instanceof Map ? cartHeap.get('engineId') : cartHeap.engineId;
-                        if (!cartEngineId || cartEngineId === creep.id) {
+
+                        if (!(potentialCart.heap instanceof Map)) {
+                            potentialCart.heap = new Map();
+                        }
+                        const cartHeap = potentialCart.heap;
+                        const cartEngineId = cartHeap.get('engineId');
+
+                        if (!cartEngineId || cartEngineId === creep.id || !Game.getObjectById(cartEngineId)) {
                             cart = potentialCart;
                             pairedCartId = cart.id;
-                            if (creep.heap instanceof Map) {
-                                creep.heap.set('cartId', cart.id);
-                            } else {
-                                creep.heap.cartId = cart.id;
-                            }
-                            if (cart.heap instanceof Map) {
-                                cart.heap.set('engineId', creep.id);
-                            } else {
-                                cart.heap.engineId = creep.id;
-                            }
+                            creep.heap.set('cartId', cart.id);
+                            cartHeap.set('engineId', creep.id);
                             break;
                         }
                     }
@@ -63,20 +60,16 @@ function run(room) {
             creep.pull(cart);
 
             // Signal cart that it is being pulled this tick
-            if (cart.heap instanceof Map) {
-                cart.heap.set('pulledBy', creep.id);
-            } else {
-                cart.heap.pulledBy = creep.id;
-            }
+            cart.heap.set('pulledBy', creep.id);
 
             // 4. Move to cart's destination
             let destinationId = null;
-            const state = cart.heap instanceof Map ? cart.heap.get('state') : cart.heap.state;
+            const state = cart.heap.get('state');
 
             if (state === 'pickup') {
-                destinationId = cart.heap instanceof Map ? cart.heap.get('dropId') : cart.heap.dropId;
+                destinationId = cart.heap.get('dropId');
             } else if (state === 'transfer') {
-                destinationId = cart.heap instanceof Map ? cart.heap.get('targetId') : cart.heap.targetId;
+                destinationId = cart.heap.get('targetId');
             }
 
             if (destinationId) {
@@ -89,18 +82,52 @@ function run(room) {
                 }
 
                 if (targetPos) {
-                    // Engine must position cart adjacent to target.
-                    // If cart is not adjacent to target, engine must keep moving towards it,
-                    // or move ONTO the target if it's a structure (unless obstacle)
-                    // Simplest fix: The engine paths until the CART is near the target.
                     if (!cart.pos.isNearTo(targetPos)) {
-                        movement.moveTo(creep, targetPos);
-                    } else if (creep.pos.isNearTo(targetPos)) {
-                        // Cart is near target, but engine is also near.
-                        // We must swap or let the cart do its job.
-                        // Actually, if the cart is near the target, it can execute its action!
-                        // So if cart is near, we just stop moving the engine.
-                        // Cart will execute transfer/withdraw in trainCart.js.
+                        if (creep.pos.isNearTo(targetPos)) {
+                            // Engine is adjacent but cart is not. Find another empty adjacent tile.
+                            const terrain = Game.map.getRoomTerrain(room.name);
+                            let moved = false;
+                            for (let dx = -1; dx <= 1; dx++) {
+                                for (let dy = -1; dy <= 1; dy++) {
+                                    if (dx === 0 && dy === 0) continue;
+                                    const tx = targetPos.x + dx;
+                                    const ty = targetPos.y + dy;
+                                    if (tx < 0 || tx > 49 || ty < 0 || ty > 49) continue;
+                                    if (terrain.get(tx, ty) === TERRAIN_MASK_WALL) continue;
+
+                                    // Make sure we aren't picking the tile we are already standing on
+                                    if (tx === creep.pos.x && ty === creep.pos.y) continue;
+
+                                    // Avoid structures if possible
+                                    let hasSolid = false;
+                                    if (global.State && global.State.structuresByRoom) {
+                                        const structuresMap = global.State.structuresByRoom.get(room.name);
+                                        if (structuresMap) {
+                                            for (const structs of structuresMap.values()) {
+                                                for (const s of structs) {
+                                                    if (s.pos.x === tx && s.pos.y === ty && OBSTACLE_OBJECT_TYPES.includes(s.structureType)) {
+                                                        hasSolid = true;
+                                                        break;
+                                                    }
+                                                }
+                                                if (hasSolid) break;
+                                            }
+                                        }
+                                    }
+                                    if (!hasSolid) {
+                                        movement.moveTo(creep, new RoomPosition(tx, ty, room.name));
+                                        moved = true;
+                                        break;
+                                    }
+                                }
+                                if (moved) break;
+                            }
+                            // Fallback if no specific tile was found
+                            if (!moved) movement.moveTo(creep, targetPos);
+                        } else {
+                            // Neither are near, standard move
+                            movement.moveTo(creep, targetPos);
+                        }
                     }
                 }
             }
