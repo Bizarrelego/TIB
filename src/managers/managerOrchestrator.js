@@ -48,8 +48,14 @@ function managerOrchestrator() {
         for (const config of managersConfig) {
             if (Game.time % config.slice !== 0) continue;
 
-            const manager = globalState.getManager(config.name);
+            let manager = globalState.getManager(config.name);
             if (manager && typeof manager.run === 'function') {
+                // Ensure the manager's methods are wrapped by the profiler
+                if (!manager.__profilerWrapped) {
+                    manager = Profiler.wrap(config.name, manager);
+                    manager.__profilerWrapped = true;
+                }
+
                 Logger.debug(`Running manager ${config.name} in room ${room.name}`);
                 const cpuAvailable = typeof Game !== 'undefined' && Game.cpu && typeof Game.cpu.getUsed === 'function';
                 const startCpu = cpuAvailable ? Game.cpu.getUsed() : Date.now();

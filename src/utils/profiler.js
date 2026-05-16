@@ -190,4 +190,8 @@ class Profiler {
     }
 }
 
+if (typeof global !== 'undefined') {
+    global.Profiler = Profiler;
+}
+
 module.exports = Profiler;
