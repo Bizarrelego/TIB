@@ -56,9 +56,6 @@ module.exports = {
                     continue;
                 }
 
-                if (creep.store.getFreeCapacity() === 0) {
-                    TrafficManager.registerDrop(creep, RESOURCE_ENERGY, creep.store.getUsedCapacity(RESOURCE_ENERGY));
-                }
                 TrafficManager.registerHarvest(creep, target);
             } catch (e) {
                 console.log(`[Harvester Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
