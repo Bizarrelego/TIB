@@ -430,12 +430,18 @@ const TrafficManager = {
                     const blockingCreepName = currentPositions.get(posKey);
 
                     if (blockingCreepName && blockingCreepName !== creep.name) {
-                const blockingLive = global.State.creepLookup ? global.State.creepLookup.get(blockingCreepName) : Game.creeps[blockingCreepName];
-                if (!global.State.trafficIntents.has(blockingCreepName) && blockingLive && blockingLive.fatigue === 0) {
-                    // Blocked by a stationary creep
-                            global.State.trafficIntents.delete(creep.name);
-                    if (creep.heap) creep.heap.path = null; // Force repath
-                            continue;
+                        const blockingLive = global.State.creepLookup ? global.State.creepLookup.get(blockingCreepName) : Game.creeps[blockingCreepName];
+                        if (blockingLive && blockingLive.fatigue === 0) { // check if friendly (it is friendly since it's in our lookups, though game creeps could be hostile but our lookups are only my creeps normally)
+                            if (!global.State.trafficIntents.has(blockingCreepName)) {
+                                // Swap with stationary friendly creep
+                                const dir = creep.pos.getDirectionTo(intendedNextPos);
+                                if (dir) {
+                                    creep.move(dir);
+                                    blockingLive.move(((dir + 3) % 8) + 1);
+                                }
+                                global.State.trafficIntents.delete(creep.name);
+                                continue;
+                            }
                         }
                     }
                 }

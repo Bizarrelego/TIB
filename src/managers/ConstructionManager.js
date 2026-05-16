@@ -77,10 +77,20 @@ module.exports = {
                 }
             }
 
+            const anchor = plannerState.get('anchor') || (room.controller ? room.controller.pos : null);
+
             toBuild.sort((a, b) => {
                 const pA = STRUCTURE_PRIORITIES.get(a.type) || STRUCTURE_PRIORITIES.get('default');
                 const pB = STRUCTURE_PRIORITIES.get(b.type) || STRUCTURE_PRIORITIES.get('default');
-                return pB - pA; // Descending order
+                if (pB !== pA) {
+                    return pB - pA; // Descending order
+                }
+                if (anchor) {
+                    const distA = Math.max(Math.abs(a.pos.x - anchor.x), Math.abs(a.pos.y - anchor.y));
+                    const distB = Math.max(Math.abs(b.pos.x - anchor.x), Math.abs(b.pos.y - anchor.y));
+                    return distA - distB; // Ascending order of distance
+                }
+                return 0;
             });
 
             // Sort existing sites ascending by priority to find lowest priority site easily

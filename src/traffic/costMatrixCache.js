@@ -2,18 +2,35 @@ const eventBus = require('../os/eventBus');
 
 const CostMatrixCache = {
     get: (roomName) => {
+        if (!global.State) global.State = {};
+        if (!global.State.costMatrices) global.State.costMatrices = new Map();
+
+        if (global.State.costMatrices.has(roomName)) {
+            return PathFinder.CostMatrix.deserialize(global.State.costMatrices.get(roomName));
+        }
+
         const matrices = global.Cache.get('costMatrices');
         if (matrices.has(roomName)) {
             const serialized = matrices.get(roomName);
+            global.State.costMatrices.set(roomName, serialized);
             return PathFinder.CostMatrix.deserialize(serialized);
         }
         return CostMatrixCache.generate(roomName);
     },
     set: (roomName, costMatrix) => {
+        if (!global.State) global.State = {};
+        if (!global.State.costMatrices) global.State.costMatrices = new Map();
+
+        const serialized = costMatrix.serialize();
+        global.State.costMatrices.set(roomName, serialized);
+
         const matrices = global.Cache.get('costMatrices');
-        matrices.set(roomName, costMatrix.serialize());
+        matrices.set(roomName, serialized);
     },
     invalidate: (roomName) => {
+        if (global.State && global.State.costMatrices) {
+            global.State.costMatrices.delete(roomName);
+        }
         eventBus.publish('INVALIDATE_COSTMATRIX', { roomName });
     },
     generate: (roomName) => {
