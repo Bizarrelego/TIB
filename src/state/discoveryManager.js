@@ -127,6 +127,11 @@ module.exports = function discoveryManager() {
     for (let i = 0; i < creeps.length; i++) {
         const creepName = creeps[i];
         const creep = Game.creeps[creepName];
+
+        if (!creep.heap) {
+            creep.heap = { state: 'init' };
+        }
+
         state.creepLookup.set(creepName, creep);
 
         const roomName = creep.pos.roomName;

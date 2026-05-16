@@ -57,6 +57,12 @@ class SpawnLedger {
      */
     requestSpawn(spawn, body, name, opts, cost) {
         if (!this.isSpawnBusy(spawn)) {
+            if (opts && opts.memory) {
+                opts.memory = {
+                    role: opts.memory.role,
+                    colony: opts.memory.colony
+                };
+            }
             const result = spawn.spawnCreep(body, name, opts);
             if (result === OK) {
                 this.reserveEnergy(cost);

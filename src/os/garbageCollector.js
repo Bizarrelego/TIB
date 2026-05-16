@@ -1,13 +1,40 @@
 const RawMemoryManager = require('./RawMemoryManager');
 
 function garbageCollector() {
-    if (Game.time % 100 !== 0) return;
-
     try {
         // Clean up dead creeps
         for (const name in Memory.creeps) {
             if (!Game.creeps[name]) {
                 delete Memory.creeps[name];
+            }
+        }
+
+        if (global.State && global.State.creepLookup) {
+            for (const name of global.State.creepLookup.keys()) {
+                if (!Game.creeps[name]) {
+                    global.State.creepLookup.delete(name);
+
+                    // Remove from creepsByRoom
+                    if (global.State.creepsByRoom) {
+                        for (const roomCreeps of global.State.creepsByRoom.values()) {
+                            for (const creepsArray of roomCreeps.values()) {
+                                const index = creepsArray.findIndex(c => c.name === name);
+                                if (index !== -1) {
+                                    creepsArray.splice(index, 1);
+                                }
+                            }
+                        }
+                    }
+
+                    // Clear associated locked pipelines
+                    if (global.State.pipelineLedger) {
+                        for (const [lockId, lock] of global.State.pipelineLedger.entries()) {
+                            if (lock.creepName === name) {
+                                global.State.pipelineLedger.delete(lockId);
+                            }
+                        }
+                    }
+                }
             }
         }
 
