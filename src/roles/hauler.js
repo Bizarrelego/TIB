@@ -30,6 +30,12 @@ module.exports = {
                     let target = dropId ? Game.getObjectById(dropId) : null;
 
                     if (target) {
+                        if ((target.amount !== undefined && target.amount === 0) || (target.store && target.store.getUsedCapacity(RESOURCE_ENERGY) === 0)) {
+                            creep.heap.dropId = null;
+                            target = null;
+                        }
+                    }
+                    if (target) {
                         if (target.amount !== undefined) {
                             // Target is a dropped resource
                             if (creep.pickup(target) === ERR_NOT_IN_RANGE) {
@@ -63,6 +69,10 @@ module.exports = {
                         }
                     } else {
                         let target = targetId ? Game.getObjectById(targetId) : null;
+                        if (target && target.store && target.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+                            creep.heap.targetId = null;
+                            target = null;
+                        }
                         if (target) {
                             const result = creep.transfer(target, RESOURCE_ENERGY);
                             if (result === ERR_NOT_IN_RANGE) {

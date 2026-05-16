@@ -96,6 +96,10 @@ function run(room) {
                     }
                 }
 
+                if (target && target.store && target.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+                    if (creep.heap) creep.heap.targetId = null;
+                    target = null;
+                }
                 if (target) {
                     creep.transfer(target, RESOURCE_ENERGY);
                 } else {

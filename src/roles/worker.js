@@ -144,6 +144,8 @@ module.exports = {
 
                         if (targetSpawn) {
                             if (targetSpawn.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+                                creep.heap.blitzTarget = null;
+                                targetSpawn = null;
                                 if (creep.pos.getRangeTo(room.controller) <= 3) {
                                     creep.upgradeController(room.controller);
                                 } else {
@@ -193,6 +195,8 @@ module.exports = {
 
                             if (targetSpawn) {
                                 if (targetSpawn.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+                                    creep.heap.blitzTarget = null;
+                                    targetSpawn = null;
                                     if (creep.pos.getRangeTo(room.controller) <= 3) {
                                         creep.upgradeController(room.controller);
                                     } else {
@@ -268,9 +272,18 @@ module.exports = {
 
                 if (!state || !targetId) continue;
 
-                const target = Game.getObjectById(targetId);
+                let target = Game.getObjectById(targetId);
+                if (target && target.store && target.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+                    creep.heap.targetId = null;
+                    target = null;
+                }
                 if (!target) {
                     creep.heap.targetId = null;
+                    if (creep.store && creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0 && room.controller) {
+                        if (creep.upgradeController(room.controller) === ERR_NOT_IN_RANGE) {
+                            movement.moveTo(creep, room.controller);
+                        }
+                    }
                     continue;
                 }
 
