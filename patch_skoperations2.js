@@ -1,4 +1,10 @@
-const Profiler = require('../utils/profiler');
+const fs = require('fs');
+const filepath = 'src/operations/skOperations.js';
+let content = fs.readFileSync(filepath, 'utf8');
+
+// I seem to have replaced the 'highway' logic with 'sk' logic because my previous search and replace script was incorrect! Let's completely rewrite the file with the correct logic.
+
+const correctContent = `const Profiler = require('../utils/profiler');
 const SpawnQueueManager = require('../managers/SpawnQueueManager');
 
 /**
@@ -196,3 +202,6 @@ function runSKOperations() {
 }
 
 module.exports = Profiler.wrap('skOperations', runSKOperations);
+`;
+
+fs.writeFileSync(filepath, correctContent);

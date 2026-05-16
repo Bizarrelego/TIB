@@ -252,6 +252,37 @@ class BodyCalc {
      * @param {string} roomName
      * @returns {number} Total build power
      */
+
+    /**
+     * Calculates optimal body for powerHauler based on capacity and distance.
+     * @param {number} energyCapacity
+     * @param {number} distance
+     * @param {number} powerAmount
+     * @returns {string[]}
+     */
+    static calculatePowerHauler(energyCapacity, distance, powerAmount) {
+        const carryNeeded = Math.ceil(powerAmount / 50);
+        let carry = 0;
+        let move = 0;
+        let cost = 0;
+
+        while (carry < carryNeeded && carry + move < 50) {
+            if (cost + BODYPART_COST[CARRY] + BODYPART_COST[MOVE] <= energyCapacity) {
+                carry++;
+                move++;
+                cost += BODYPART_COST[CARRY] + BODYPART_COST[MOVE];
+            } else {
+                break;
+            }
+        }
+
+        if (carry === 0 && energyCapacity >= 100) {
+            carry = 1; move = 1;
+        }
+
+        return this.buildArray({ [CARRY]: carry, [MOVE]: move });
+    }
+
     static getBuildPower(roomName) {
         let buildPower = 0;
         const roomCreeps = global.State.creepsByRoom.get(roomName);
