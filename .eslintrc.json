@@ -6,7 +6,8 @@
         "node": true
     },
     "globals": {
-        "FIND_TOMBSTONES": "readonly"
+        "FIND_TOMBSTONES": "readonly",
+        "InterShardMemory": "readonly"
     },
     "extends": "eslint:recommended",
     "rules": {
