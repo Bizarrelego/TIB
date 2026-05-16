@@ -45,15 +45,63 @@ function manageEarlyProgression(room, spawnLedger) {
     const sources = global.State.sourcesByRoom.get(room.name) || [];
     const droppedArrays = global.State.droppedByRoom.get(room.name) || [];
     const structures = global.State.structuresByRoom.get(room.name) || new Map();
-    const spawnStructures = structures.get(STRUCTURE_SPAWN) ? Array.from(structures.get(STRUCTURE_SPAWN).values()) : [];
-    const extensions = structures.get(STRUCTURE_EXTENSION) ? Array.from(structures.get(STRUCTURE_EXTENSION).values()) : [];
     const sites = global.State.sitesByRoom.get(room.name) || [];
+
+    // Pre-calculate O(1) arrays for fast popping later
+    let freeSpawns = [];
+    if (structures.get(STRUCTURE_SPAWN)) {
+        for (const s of structures.get(STRUCTURE_SPAWN).values()) {
+            if (s.store.getFreeCapacity(RESOURCE_ENERGY) > 0) freeSpawns.push(s);
+        }
+    }
+    
+    let freeExtensions = [];
+    if (structures.get(STRUCTURE_EXTENSION)) {
+        for (const e of structures.get(STRUCTURE_EXTENSION).values()) {
+            if (e.store.getFreeCapacity(RESOURCE_ENERGY) > 0) freeExtensions.push(e);
+        }
+    }
 
     let massiveDrop = null;
     for (let i = 0; i < droppedArrays.length; i++) {
         if (droppedArrays[i].amount >= 300 && (!droppedArrays[i].resourceType || droppedArrays[i].resourceType === RESOURCE_ENERGY)) {
             massiveDrop = droppedArrays[i];
             break;
+        }
+    }
+
+    if (!room.heap) room.heap = new Map();
+    let harvesterSpots = room.heap.get('harvesterSpots');
+    if (!harvesterSpots && sources.length > 0) {
+        harvesterSpots = new Map();
+        const containers = structures.get(STRUCTURE_CONTAINER) ? Array.from(structures.get(STRUCTURE_CONTAINER).values()) : [];
+        for (let i = 0; i < sources.length; i++) {
+            const source = sources[i];
+            let bestContainer = null;
+            for (let j = 0; j < containers.length; j++) {
+                if (containers[j].pos.isNearTo(source)) {
+                    bestContainer = containers[j];
+                    break;
+                }
+            }
+            if (bestContainer) {
+                // Pack it: 50x + y
+                harvesterSpots.set(source.id, bestContainer.pos.x * 50 + bestContainer.pos.y);
+            }
+        }
+        room.heap.set('harvesterSpots', harvesterSpots);
+    }
+
+    // Distribute exact harvester assignments
+    const harvesters = roomCreeps.get('harvester') || [];
+    for (let i = 0; i < harvesters.length; i++) {
+        const creep = harvesters[i];
+        if (!creep.heap) creep.heap = {};
+        if (!creep.heap.targetId && sources.length > 0) {
+            creep.heap.targetId = sources[i % sources.length].id;
+        }
+        if (creep.heap.targetId && !creep.heap.dropId && harvesterSpots && harvesterSpots.has(creep.heap.targetId)) {
+            creep.heap.dropId = harvesterSpots.get(creep.heap.targetId);
         }
     }
 
@@ -91,10 +139,8 @@ function manageEarlyProgression(room, spawnLedger) {
                 }
             }
         } else if (freeCap === 0 || creep.heap.state === 'refill' || creep.heap.state === 'build' || creep.heap.state === 'upgrade') {
-            let targetSpawn = spawnStructures.find(s => s.store.getFreeCapacity(RESOURCE_ENERGY) > 0);
-            if (!targetSpawn) {
-                targetSpawn = extensions.find(e => e.store.getFreeCapacity(RESOURCE_ENERGY) > 0);
-            }
+            // O(1) array pop instead of .find() iterations
+            let targetSpawn = freeSpawns.length > 0 ? freeSpawns.pop() : (freeExtensions.length > 0 ? freeExtensions.pop() : null);
 
             if (targetSpawn) {
                 creep.heap.state = 'refill';

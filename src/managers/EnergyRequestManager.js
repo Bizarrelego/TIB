@@ -55,9 +55,9 @@ class EnergyRequestManager {
      * @returns {Array<{target: Structure, priority: number, amount: number}>} Prioritized list of energy requests.
      */
     static getEnergyRequests(roomName) {
-        const requests = [];
         const room = Game.rooms[roomName];
         const hasStorage = room && room.storage && room.storage.isActive();
+        const buckets = new Array(101);
 
         const spawns = resourceUtils.getStructuresWithFreeCapacity(roomName, [STRUCTURE_SPAWN]);
         const extensions = resourceUtils.getStructuresWithFreeCapacity(roomName, [STRUCTURE_EXTENSION]);
@@ -70,10 +70,12 @@ class EnergyRequestManager {
 
         // Priority 100: Spawns and Extensions
         for (let i = 0; i < spawns.length; i++) {
-            requests.push({ target: spawns[i], priority: 100, amount: spawns[i].store.getFreeCapacity(RESOURCE_ENERGY) });
+            const bucket = buckets[100] = buckets[100] || [];
+            bucket.push({ target: spawns[i], amount: spawns[i].store.getFreeCapacity(RESOURCE_ENERGY) });
         }
         for (let i = 0; i < extensions.length; i++) {
-            requests.push({ target: extensions[i], priority: 100, amount: extensions[i].store.getFreeCapacity(RESOURCE_ENERGY) });
+            const bucket = buckets[100] = buckets[100] || [];
+            bucket.push({ target: extensions[i], amount: extensions[i].store.getFreeCapacity(RESOURCE_ENERGY) });
         }
 
         // Priority 90: Towers with > 500 missing energy
@@ -81,7 +83,8 @@ class EnergyRequestManager {
             const tower = towers[i];
             const free = tower.store.getFreeCapacity(RESOURCE_ENERGY);
             const priority = free > 500 ? 90 : 80;
-            requests.push({ target: tower, priority: priority, amount: free });
+            const bucket = buckets[priority] = buckets[priority] || [];
+            bucket.push({ target: tower, amount: free });
         }
 
         // Priority 80: Controller Container
@@ -91,25 +94,29 @@ class EnergyRequestManager {
             const priority = hasStorage ? 90 : 80;
             for (let i = 0; i < containers.length; i++) {
                 if (containers[i].pos.inRangeTo(controller, 3)) {
-                    requests.push({ target: containers[i], priority: priority, amount: containers[i].store.getFreeCapacity(RESOURCE_ENERGY) });
+                    const bucket = buckets[priority] = buckets[priority] || [];
+                    bucket.push({ target: containers[i], amount: containers[i].store.getFreeCapacity(RESOURCE_ENERGY) });
                 }
             }
         }
 
         // Priority 60: Labs
         for (let i = 0; i < labs.length; i++) {
-            requests.push({ target: labs[i], priority: 60, amount: labs[i].store.getFreeCapacity(RESOURCE_ENERGY) });
+            const bucket = buckets[60] = buckets[60] || [];
+            bucket.push({ target: labs[i], amount: labs[i].store.getFreeCapacity(RESOURCE_ENERGY) });
         }
 
         // Priority 50: Power Spawn
         for (let i = 0; i < powerSpawn.length; i++) {
-            requests.push({ target: powerSpawn[i], priority: 50, amount: powerSpawn[i].store.getFreeCapacity(RESOURCE_ENERGY) });
+            const bucket = buckets[50] = buckets[50] || [];
+            bucket.push({ target: powerSpawn[i], amount: powerSpawn[i].store.getFreeCapacity(RESOURCE_ENERGY) });
         }
 
         // Priority 40: Factory
         for (let i = 0; i < factory.length; i++) {
             if (factory[i].store.getUsedCapacity(RESOURCE_ENERGY) < 10000) {
-                requests.push({ target: factory[i], priority: 40, amount: Math.min(10000 - factory[i].store.getUsedCapacity(RESOURCE_ENERGY), factory[i].store.getFreeCapacity(RESOURCE_ENERGY)) });
+                const bucket = buckets[40] = buckets[40] || [];
+                bucket.push({ target: factory[i], amount: Math.min(10000 - factory[i].store.getUsedCapacity(RESOURCE_ENERGY), factory[i].store.getFreeCapacity(RESOURCE_ENERGY)) });
             }
         }
 
@@ -118,20 +125,29 @@ class EnergyRequestManager {
             const term = terminal[i];
             const energy = term.store.getUsedCapacity(RESOURCE_ENERGY);
             if (energy < 50000) {
-                requests.push({ target: term, priority: 20, amount: 50000 - energy });
+                const bucket = buckets[20] = buckets[20] || [];
+                bucket.push({ target: term, amount: 50000 - energy });
             }
         }
 
         // Priority 10: Storage
         const storagePriority = hasStorage ? 100 : 10;
         for (let i = 0; i < storage.length; i++) {
-            requests.push({ target: storage[i], priority: storagePriority, amount: storage[i].store.getFreeCapacity(RESOURCE_ENERGY) });
+            const bucket = buckets[storagePriority] = buckets[storagePriority] || [];
+            bucket.push({ target: storage[i], amount: storage[i].store.getFreeCapacity(RESOURCE_ENERGY) });
         }
 
-        // Sort requests by priority (descending)
-        requests.sort((a, b) => b.priority - a.priority);
-
-        return requests;
+        // Flatten bucked queue O(1)
+        const flattened = [];
+        for (let i = 100; i >= 0; i--) {
+            if (buckets[i]) {
+                for (let j = 0; j < buckets[i].length; j++) {
+                    flattened.push(buckets[i][j]);
+                }
+            }
+        }
+        
+        return flattened;
     }
 
     /**
@@ -141,9 +157,9 @@ class EnergyRequestManager {
      * @returns {Array<{target: Resource|Structure|Tombstone|Ruin, priority: number, amount: number}>} Prioritized list of energy supplies.
      */
     static getEnergySupplies(roomName) {
-        const supplies = [];
         const room = Game.rooms[roomName];
         const hasStorage = room && room.storage && room.storage.isActive();
+        const buckets = new Array(101);
 
         // Containers (Priority 100 if Source Container with > 200 energy)
         const containers = resourceUtils.getStructuresWithUsedCapacity(roomName, [STRUCTURE_CONTAINER]);
@@ -161,11 +177,13 @@ class EnergyRequestManager {
             }
 
             if (isSourceContainer && amount > 200) {
-                supplies.push({ target: container, priority: 100, amount: amount });
+                const bucket = buckets[100] = buckets[100] || [];
+                bucket.push({ target: container, amount: amount });
             } else {
                 // Priority 70: other containers
                 const priority = amount > 1500 ? 75 : 70;
-                supplies.push({ target: container, priority: priority, amount: amount });
+                const bucket = buckets[priority] = buckets[priority] || [];
+                bucket.push({ target: container, amount: amount });
             }
         }
 
@@ -180,9 +198,11 @@ class EnergyRequestManager {
         for (let i = 0; i < dropped.length; i++) {
             const resource = dropped[i];
             if ((resource.resourceType === undefined || resource.resourceType === RESOURCE_ENERGY) && resource.amount > 100) {
-                supplies.push({ target: resource, priority: 90, amount: resource.amount });
+                const bucket = buckets[90] = buckets[90] || [];
+                bucket.push({ target: resource, amount: resource.amount });
             } else if ((resource.resourceType === undefined || resource.resourceType === RESOURCE_ENERGY) && resource.amount > 50) {
-                supplies.push({ target: resource, priority: 80, amount: resource.amount });
+                const bucket = buckets[80] = buckets[80] || [];
+                bucket.push({ target: resource, amount: resource.amount });
             }
         }
 
@@ -193,7 +213,8 @@ class EnergyRequestManager {
             if (tombstone.store) {
                 const amount = tombstone.store.getUsedCapacity(RESOURCE_ENERGY);
                 if (amount > 0) {
-                    supplies.push({ target: tombstone, priority: 85, amount: amount });
+                    const bucket = buckets[85] = buckets[85] || [];
+                    bucket.push({ target: tombstone, amount: amount });
                 }
             }
         }
@@ -204,7 +225,8 @@ class EnergyRequestManager {
             if (ruin.store) {
                 const amount = ruin.store.getUsedCapacity(RESOURCE_ENERGY);
                 if (amount > 0) {
-                    supplies.push({ target: ruin, priority: 85, amount: amount });
+                    const bucket = buckets[85] = buckets[85] || [];
+                    bucket.push({ target: ruin, amount: amount });
                 }
             }
         }
@@ -216,7 +238,8 @@ class EnergyRequestManager {
              // Let's deprioritize links for general haulers to avoid conflicts with hubManager/upgrader link logic
             const link = links[i];
             const amount = link.store.getUsedCapacity(RESOURCE_ENERGY);
-            supplies.push({ target: link, priority: 30, amount: amount });
+            const bucket = buckets[30] = buckets[30] || [];
+            bucket.push({ target: link, amount: amount });
         }
 
         // Terminal (if it has excess energy, we can use it)
@@ -225,7 +248,8 @@ class EnergyRequestManager {
             const term = terminal[i];
             const energy = term.store.getUsedCapacity(RESOURCE_ENERGY);
             if (energy > 55000) {
-                supplies.push({ target: term, priority: 20, amount: energy - 50000 });
+                const bucket = buckets[20] = buckets[20] || [];
+                bucket.push({ target: term, amount: energy - 50000 });
             }
         }
 
@@ -235,13 +259,21 @@ class EnergyRequestManager {
         for (let i = 0; i < storage.length; i++) {
             const store = storage[i];
             const amount = store.store.getUsedCapacity(RESOURCE_ENERGY);
-            supplies.push({ target: store, priority: storagePriority, amount: amount });
+            const bucket = buckets[storagePriority] = buckets[storagePriority] || [];
+            bucket.push({ target: store, amount: amount });
         }
 
-        // Sort supplies by priority (descending)
-        supplies.sort((a, b) => b.priority - a.priority);
-
-        return supplies;
+        // Flatten bucked queue O(1)
+        const flattened = [];
+        for (let i = 100; i >= 0; i--) {
+            if (buckets[i]) {
+                for (let j = 0; j < buckets[i].length; j++) {
+                    flattened.push(buckets[i][j]);
+                }
+            }
+        }
+        
+        return flattened;
     }
 }
 

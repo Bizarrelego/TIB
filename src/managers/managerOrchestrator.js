@@ -30,6 +30,30 @@ function managerOrchestrator() {
         // Only run managers in controlled rooms
         if (!room || !room.controller || !room.controller.my) continue;
 
+        // Top-Down Emergency Override
+        const roomCreeps = global.State.creepsByRoom.get(room.name);
+        if (roomCreeps) {
+            const haulers = roomCreeps.get('hauler') || [];
+            const domHaulers = roomCreeps.get('domesticHauler') || [];
+            const harvesters = roomCreeps.get('harvester') || [];
+            
+            // If room starvation and no haulers exist, dynamically overwrite harvesters to domesticHauler
+            if (room.energyAvailable < 300 && haulers.length === 0 && domHaulers.length === 0 && harvesters.length > 0) {
+                const overridden = [];
+                for (let i = harvesters.length - 1; i >= 0; i--) {
+                    const h = harvesters[i];
+                    if (h.store.getUsedCapacity() > 0) {
+                        h.heap.state = 'transfer';
+                    } else {
+                        h.heap.state = 'pickup';
+                    }
+                    overridden.push(h);
+                    harvesters.splice(i, 1);
+                }
+                roomCreeps.set('domesticHauler', domHaulers.concat(overridden));
+            }
+        }
+
         // Managers configuration for tick-slicing
         const managersConfig = [
             { name: 'NukeEvacuationManager', slice: 1 },
