@@ -2,6 +2,7 @@ const SpawnLedger = require('./spawnLedger');
 const spawnManager = require('./spawnManager');
 const planner = require('./planner');
 const defense = require('./defense');
+const scavengingManager = require('./scavengingManager');
 
 /**
  * Executes core colony management loop.
@@ -17,6 +18,7 @@ module.exports = function colonyManager() {
             try {
                 planner.run(room);
                 defense.run(room);
+                scavengingManager.run(room);
 
                 // IMPROVEMENT: Removed all direct role executions (worker.run, hauler.run, etc.).
                 // Reason: Consolidates execution hierarchy. Roles are now exclusively ticked via managerOrchestrator.js to respect tick-slicing and CPU bucket constraints.

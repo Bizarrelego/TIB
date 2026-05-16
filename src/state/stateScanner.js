@@ -1,4 +1,4 @@
-/* global EVENT_OBJECT_DESTROYED, EVENT_ATTACK, EVENT_HEAL, EVENT_BUILD, EVENT_CREATE_CREEP, EVENT_DROP */
+/* global EVENT_CREATE_CREEP, EVENT_DROP */
 const globalState = require('./globalState');
 
 module.exports = function stateScanner() {
