@@ -36,11 +36,10 @@ const TrafficManager = {
     },
 
     /**
-     * TrafficManager must operate on global.State.
-     * State is persistent across ticks, allowing the logic to persist.
+     * Setup clears states at the beginning of the tick.
      * @returns {void}
      */
-    run() {
+    setup() {
         try {
             this.init();
 
@@ -48,6 +47,7 @@ const TrafficManager = {
             global.State.trafficIntents.clear();
             global.State.ledger.clear();
             global.State.swapRegistry.clear();
+            global.State.currentPositions = new Map();
 
             // Clean pipeline locks every tick
             for (const [id, lock] of global.State.pipelineLedger) {
@@ -55,6 +55,85 @@ const TrafficManager = {
                     global.State.pipelineLedger.delete(id);
                 }
             }
+        } catch (e) {
+            console.log(`[TrafficManager CRITICAL]: ${e.stack}`);
+        }
+    },
+
+    /**
+     * TrafficManager must operate on global.State.
+     * State is persistent across ticks, allowing the logic to persist.
+     * Resolves collisions and deadlocks before intent execution.
+     * @returns {void}
+     */
+    run() {
+        try {
+            if (!global.State || !global.State.trafficIntents || global.State.trafficIntents.size === 0) return;
+
+            // Phase 1: Build Dependency Graph & Identify Swaps
+            const dependencyGraph = new Map();
+            if (!(global.State.swapRegistry instanceof Map)) global.State.swapRegistry = new Map();
+            global.State.swapRegistry.clear();
+
+            // IMPROVEMENT: Replace string keys with integer bitwise keys.
+            // Reason: Optimizes performance. Bitwise operations and integer Map keys are significantly faster and reduce garbage collector overhead compared to string allocation.
+            const currentPositions = new Map(); // Map<roomName, Map<int, string>>
+
+            for (const roomName of global.State.scannedRooms || []) {
+                const roomCreeps = global.State.creepsByRoom.get(roomName);
+                if (!roomCreeps) continue;
+
+                let roomMap = currentPositions.get(roomName);
+                if (!roomMap) {
+                    roomMap = new Map();
+                    currentPositions.set(roomName, roomMap);
+                }
+
+                for (const roleCreeps of roomCreeps.values()) {
+                    if (Array.isArray(roleCreeps)) {
+                        for (const creep of roleCreeps) {
+                            const posKey = (creep.pos.x << 6) | creep.pos.y;
+                            roomMap.set(posKey, creep.name);
+                        }
+                    }
+                }
+            }
+
+            global.State.currentPositions = currentPositions;
+
+            for (const [creepName, intent] of global.State.trafficIntents.entries()) {
+                const { creep, targetPos } = intent;
+                if (!creep || !targetPos) continue;
+
+                let intendedNextPos = null;
+                const dx = Math.abs(creep.pos.x - targetPos.x);
+                const dy = Math.abs(creep.pos.y - targetPos.y);
+
+                if (dx <= 1 && dy <= 1 && creep.pos.roomName === targetPos.roomName) {
+                    intendedNextPos = targetPos;
+                } else if (creep.heap && creep.heap.path && creep.heap.path.length > 0) {
+                    // Pull from pre-calculated CostMatrix path if available
+                    intendedNextPos = creep.heap.path[0];
+                } else {
+                     // Provide default intendedNextPos to skip heavy PathFinder inside loop
+                     // Since PathFinder is forbidden here.
+                     continue;
+                }
+
+                if (!intendedNextPos) continue;
+                intent.intendedNextPos = intendedNextPos;
+
+                const posKey = (intendedNextPos.x << 6) | intendedNextPos.y;
+                const roomMap = currentPositions.get(intendedNextPos.roomName);
+                const blockingCreepName = roomMap ? roomMap.get(posKey) : undefined;
+
+                if (blockingCreepName && blockingCreepName !== creepName) {
+                    dependencyGraph.set(creepName, blockingCreepName);
+                }
+            }
+
+            // Phase 2: Resolve Deadlocks
+            DeadlockEngine.detectAndResolve(global.State.trafficIntents, dependencyGraph);
         } catch (e) {
             console.log(`[TrafficManager CRITICAL]: ${e.stack}`);
         }
@@ -331,73 +410,6 @@ const TrafficManager = {
 
             if (!global.State || !global.State.trafficIntents || global.State.trafficIntents.size === 0) return;
 
-            // Phase 1: Build Dependency Graph & Identify Swaps
-            const dependencyGraph = new Map();
-            if (!(global.State.swapRegistry instanceof Map)) global.State.swapRegistry = new Map();
-            global.State.swapRegistry.clear();
-
-
-            // IMPROVEMENT: Replace string keys with integer bitwise keys.
-            // Reason: Optimizes performance. Bitwise operations and integer Map keys are significantly faster and reduce garbage collector overhead compared to string allocation.
-            const currentPositions = new Map(); // Map<roomName, Map<int, string>>
-
-            for (const roomName of global.State.scannedRooms || []) {
-                const roomCreeps = global.State.creepsByRoom.get(roomName);
-                if (!roomCreeps) continue;
-
-                let roomMap = currentPositions.get(roomName);
-                if (!roomMap) {
-                    roomMap = new Map();
-                    currentPositions.set(roomName, roomMap);
-                }
-
-                for (const roleCreeps of roomCreeps.values()) {
-                    if (Array.isArray(roleCreeps)) {
-                        for (const creep of roleCreeps) {
-                            const posKey = (creep.pos.x << 6) | creep.pos.y;
-                            roomMap.set(posKey, creep.name);
-                        }
-                    }
-                }
-            }
-
-
-
-            for (const [creepName, intent] of global.State.trafficIntents.entries()) {
-                const { creep, targetPos } = intent;
-                if (!creep || !targetPos) continue;
-
-                let intendedNextPos = null;
-                const dx = Math.abs(creep.pos.x - targetPos.x);
-                const dy = Math.abs(creep.pos.y - targetPos.y);
-
-                if (dx <= 1 && dy <= 1 && creep.pos.roomName === targetPos.roomName) {
-                    intendedNextPos = targetPos;
-                } else if (creep.heap && creep.heap.path && creep.heap.path.length > 0) {
-                    // Pull from pre-calculated CostMatrix path if available
-                    intendedNextPos = creep.heap.path[0];
-                } else {
-                     // Provide default intendedNextPos to skip heavy PathFinder inside loop
-                     // Since PathFinder is forbidden here.
-                     continue;
-                }
-
-
-                if (!intendedNextPos) continue;
-                intent.intendedNextPos = intendedNextPos;
-
-                const posKey = (intendedNextPos.x << 6) | intendedNextPos.y;
-                const roomMap = currentPositions.get(intendedNextPos.roomName);
-                const blockingCreepName = roomMap ? roomMap.get(posKey) : undefined;
-
-                if (blockingCreepName && blockingCreepName !== creepName) {
-                    dependencyGraph.set(creepName, blockingCreepName);
-                }
-            }
-
-            // Phase 2: Resolve Deadlocks
-            DeadlockEngine.detectAndResolve(global.State.trafficIntents, dependencyGraph);
-
             // Phase 3: Execute Moves
             const remainingIntents = Array.from(global.State.trafficIntents.values());
             remainingIntents.sort((a, b) => {
@@ -407,12 +419,13 @@ const TrafficManager = {
             });
 
             const processedSwaps = new Set();
+            const currentPositions = global.State.currentPositions || new Map();
 
             for (const intent of remainingIntents) {
                 const { creep, targetPos, opts, intendedNextPos } = intent;
                 if (!creep) continue;
 
-                if (global.State.swapRegistry.has(creep.name)) {
+                if (global.State.swapRegistry && global.State.swapRegistry.has(creep.name)) {
                     if (processedSwaps.has(creep.name)) continue;
 
 
