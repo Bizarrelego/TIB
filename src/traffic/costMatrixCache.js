@@ -1,4 +1,5 @@
 const eventBus = require('../os/eventBus');
+const RoomHasher = require('../os/roomHasher');
 
 const CostMatrixCache = {
     get: (roomName) => {
@@ -20,17 +21,24 @@ const CostMatrixCache = {
     set: (roomName, costMatrix) => {
         if (!global.State) global.State = {};
         if (!global.State.costMatrices) global.State.costMatrices = new Map();
+        if (!global.State.roomHashes) global.State.roomHashes = new Map();
 
         const serialized = costMatrix.serialize();
         global.State.costMatrices.set(roomName, serialized);
 
+        const hash = RoomHasher.generate(roomName);
+        global.State.roomHashes.set(roomName, hash);
+
         const matrices = global.Cache.get('costMatrices');
         matrices.set(roomName, serialized);
+
+        if (!global.Cache.has('roomHashes')) {
+            global.Cache.set('roomHashes', new Map());
+        }
+        global.Cache.get('roomHashes').set(roomName, hash);
     },
     invalidate: (roomName) => {
-        if (global.State && global.State.costMatrices) {
-            global.State.costMatrices.delete(roomName);
-        }
+        // Strictly defer cache deletion to the eventBus handler, preserving caching behavior
         eventBus.publish('INVALIDATE_COSTMATRIX', { roomName });
     },
     generate: (roomName) => {
