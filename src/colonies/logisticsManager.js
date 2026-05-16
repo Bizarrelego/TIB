@@ -152,14 +152,14 @@ const LogisticsManager = {
         const haulers = roomCreeps.get('hauler') || [];
         const hubManagers = roomCreeps.get('hubManager') || [];
 
+        const needsEmergencyRefill = storages.length > 0 && (spawns.every(s => TrafficManager.getVirtualState(s, RESOURCE_ENERGY).used === 0));
+
         // FAST FILLER ASSIGNMENT LOGIC
         if (fastFillers.length > 0) {
             const cacheData = getFastFillerCache(storage, spawns, extensions, links, room);
             const parkPos = cacheData ? cacheData.pos : null;
             const adjacentIds = cacheData ? cacheData.adjacentIds : [];
             const adjacentLinks = cacheData ? cacheData.adjacentLinks : [];
-
-            const needsEmergencyRefill = storages.length > 0 && (spawns.every(s => TrafficManager.getVirtualState(s, RESOURCE_ENERGY).used === 0));
 
             for (let i = 0; i < fastFillers.length; i++) {
                 const creep = fastFillers[i];

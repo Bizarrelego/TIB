@@ -23,6 +23,10 @@ const TrafficManager = {
         if (!(global.State.ledger instanceof Map)) global.State.ledger = new Map();
         if (!(global.State.swapRegistry instanceof Map)) global.State.swapRegistry = new Map();
         if (!(global.State.pipelineLedger instanceof Map)) global.State.pipelineLedger = new Map();
+        if (!global.State.intentBuckets) {
+            global.State.intentBuckets = new Array(101);
+            for (let i = 0; i <= 100; i++) global.State.intentBuckets[i] = [];
+        }
     },
 
     /**
@@ -47,7 +51,14 @@ const TrafficManager = {
             global.State.trafficIntents.clear();
             global.State.ledger.clear();
             global.State.swapRegistry.clear();
-            global.State.currentPositions = new Map();
+
+            if (global.State.currentPositions) {
+                for (const roomMap of global.State.currentPositions.values()) {
+                    roomMap.clear();
+                }
+            } else {
+                global.State.currentPositions = new Map();
+            }
 
             // Clean pipeline locks every tick
             for (const [id, lock] of global.State.pipelineLedger) {
@@ -77,7 +88,14 @@ const TrafficManager = {
 
             // IMPROVEMENT: Replace string keys with integer bitwise keys.
             // Reason: Optimizes performance. Bitwise operations and integer Map keys are significantly faster and reduce garbage collector overhead compared to string allocation.
-            const currentPositions = new Map(); // Map<roomName, Map<int, string>>
+            if (!global.State.currentPositions) {
+                global.State.currentPositions = new Map();
+            } else {
+                for (const roomMap of global.State.currentPositions.values()) {
+                    roomMap.clear();
+                }
+            }
+            const currentPositions = global.State.currentPositions;
 
             for (const roomName of global.State.scannedRooms || []) {
                 const roomCreeps = global.State.creepsByRoom.get(roomName);
@@ -98,8 +116,6 @@ const TrafficManager = {
                     }
                 }
             }
-
-            global.State.currentPositions = currentPositions;
 
             for (const [creepName, intent] of global.State.trafficIntents.entries()) {
                 const { creep, targetPos } = intent;
@@ -411,8 +427,10 @@ const TrafficManager = {
             if (!global.State || !global.State.trafficIntents || global.State.trafficIntents.size === 0) return;
 
             // Phase 3: Execute Moves (O(1) Priority Buckets)
-            const buckets = new Array(101);
-            for (let i = 0; i <= 100; i++) buckets[i] = [];
+            const buckets = global.State.intentBuckets;
+            for (let i = 0; i <= 100; i++) {
+                buckets[i].length = 0;
+            }
 
             for (const intent of global.State.trafficIntents.values()) {
                 let priority = (intent.creep && intent.creep.memory && intent.creep.memory.role) ? (ROLE_PRIORITIES.get(intent.creep.memory.role) || 0) : 0;
