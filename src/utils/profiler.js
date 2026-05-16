@@ -62,6 +62,11 @@ class Profiler {
      */
     static _wrapFunction(name, func) {
         return function (...args) {
+            const profilerEnabled = global.PROFILER_ENABLED || (typeof Memory !== 'undefined' && Memory.PROFILER_ENABLED);
+            if (!profilerEnabled) {
+                return func.apply(this, args);
+            }
+
             const cpuAvailable = typeof Game !== 'undefined' && Game.cpu && typeof Game.cpu.getUsed === 'function';
             const start = cpuAvailable ? Game.cpu.getUsed() : Date.now();
 
@@ -104,6 +109,9 @@ class Profiler {
      * @param {number} cpuUsed - Amount of CPU utilized.
      */
     static record(name, cpuUsed) {
+        const profilerEnabled = global.PROFILER_ENABLED || (typeof Memory !== 'undefined' && Memory.PROFILER_ENABLED);
+        if (!profilerEnabled) return;
+
         if (!this.metrics) this.metrics = new Map();
         let metric = this.metrics.get(name);
         if (!metric) {
