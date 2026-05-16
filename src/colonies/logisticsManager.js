@@ -10,11 +10,43 @@ const Profiler = require('../utils/profiler');
 const trainEngine = require('../roles/trainEngine');
 const trainCart = require('../roles/trainCart');
 
-function findHubParkPos(hubLink, storage, terminal, room) {
+/**
+ * Returns the immediate 0-indexed quadrant of a position for fast spatial sorting.
+ * @param {RoomPosition|Object} pos 
+ * @returns {number} 0-3 Quadrant
+ */
+function getQuadrant(pos) {
+    if (!pos) return 0;
+    return (pos.x < 25 ? 0 : 1) + (pos.y < 25 ? 0 : 2);
+}
+
+/**
+ * Calculates and caches Hub Park Data including the optimal position and strictly adjacent structure IDs.
+ */
+function getHubCache(storage, terminal, links, room) {
+    if (!global.State.layoutCache) global.State.layoutCache = new Map();
+    let roomCache = global.State.layoutCache.get(room.name);
+    if (!roomCache) {
+        roomCache = {};
+        global.State.layoutCache.set(room.name, roomCache);
+    }
+    if (roomCache.hubParkData) return roomCache.hubParkData;
+
+    let hubLink = null;
+    let controllerLink = null;
+
+    for (let i = 0; i < links.length; i++) {
+        if (storage && Math.max(Math.abs(links[i].pos.x - storage.pos.x), Math.abs(links[i].pos.y - storage.pos.y)) <= 1) {
+            hubLink = links[i];
+        } else if (room.controller && Math.max(Math.abs(links[i].pos.x - room.controller.pos.x), Math.abs(links[i].pos.y - room.controller.pos.y)) <= 3) {
+            controllerLink = links[i];
+        }
+    }
+
     if (!storage) return null;
     const terrain = global.State.roomTerrain.get(room.name);
     let bestPos = null;
-    let maxAdjacency = 0;
+    let maxAdjacency = -1;
 
     const structs = [hubLink, storage, terminal].filter(s => s != null);
 
@@ -22,14 +54,11 @@ function findHubParkPos(hubLink, storage, terminal, room) {
         for (let dy = -1; dy <= 1; dy++) {
             const tx = storage.pos.x + dx;
             const ty = storage.pos.y + dy;
-
             if (terrain && terrain.get(tx, ty) === TERRAIN_MASK_WALL) continue;
 
             let adjacency = 0;
             for (let i = 0; i < structs.length; i++) {
-                if (Math.abs(structs[i].pos.x - tx) <= 1 && Math.abs(structs[i].pos.y - ty) <= 1) {
-                    adjacency++;
-                }
+                if (Math.abs(structs[i].pos.x - tx) <= 1 && Math.abs(structs[i].pos.y - ty) <= 1) adjacency++;
             }
 
             if (adjacency > maxAdjacency) {
@@ -39,13 +68,26 @@ function findHubParkPos(hubLink, storage, terminal, room) {
         }
     }
 
-    return bestPos || { x: storage.pos.x, y: storage.pos.y, roomName: room.name };
+    bestPos = bestPos || { x: storage.pos.x, y: storage.pos.y, roomName: room.name };
+    roomCache.hubParkData = { pos: bestPos, hubLinkId: hubLink ? hubLink.id : null, controllerLinkId: controllerLink ? controllerLink.id : null };
+    return roomCache.hubParkData;
 }
 
-function findFastFillerParkPos(storage, spawns, extensions, room) {
+/**
+ * Calculates and caches Fast Filler Park Data including optimal position and strictly adjacent structure IDs.
+ */
+function getFastFillerCache(storage, spawns, extensions, links, room) {
+    if (!global.State.layoutCache) global.State.layoutCache = new Map();
+    let roomCache = global.State.layoutCache.get(room.name);
+    if (!roomCache) {
+        roomCache = {};
+        global.State.layoutCache.set(room.name, roomCache);
+    }
+    if (roomCache.fastFillerParkData) return roomCache.fastFillerParkData;
+
     const terrain = global.State.roomTerrain.get(room.name);
     let bestPos = null;
-    let maxAdjacency = 0;
+    let maxAdjacency = -1;
 
     const centerObj = storage || (spawns.length > 0 ? spawns[0] : null);
     if (!centerObj) return null;
@@ -56,17 +98,12 @@ function findFastFillerParkPos(storage, spawns, extensions, room) {
         for (let dy = -2; dy <= 2; dy++) {
             const tx = centerObj.pos.x + dx;
             const ty = centerObj.pos.y + dy;
-
             if (terrain && terrain.get(tx, ty) === TERRAIN_MASK_WALL) continue;
-
-            // Fast filler needs to be adjacent to storage if it exists to withdraw efficiently
             if (storage && (Math.abs(storage.pos.x - tx) > 1 || Math.abs(storage.pos.y - ty) > 1)) continue;
 
             let adjacency = 0;
             for (let i = 0; i < structs.length; i++) {
-                if (Math.abs(structs[i].pos.x - tx) <= 1 && Math.abs(structs[i].pos.y - ty) <= 1) {
-                    adjacency++;
-                }
+                if (Math.abs(structs[i].pos.x - tx) <= 1 && Math.abs(structs[i].pos.y - ty) <= 1) adjacency++;
             }
 
             if (adjacency > maxAdjacency) {
@@ -76,7 +113,20 @@ function findFastFillerParkPos(storage, spawns, extensions, room) {
         }
     }
 
-    return bestPos || { x: centerObj.pos.x + 1, y: centerObj.pos.y, roomName: room.name };
+    bestPos = bestPos || { x: centerObj.pos.x + 1, y: centerObj.pos.y, roomName: room.name };
+
+    const adjacentIds = [];
+    for (let i = 0; i < structs.length; i++) {
+        if (Math.abs(structs[i].pos.x - bestPos.x) <= 1 && Math.abs(structs[i].pos.y - bestPos.y) <= 1) adjacentIds.push(structs[i].id);
+    }
+    
+    const adjacentLinks = [];
+    for (let i = 0; i < links.length; i++) {
+        if (Math.abs(links[i].pos.x - bestPos.x) <= 1 && Math.abs(links[i].pos.y - bestPos.y) <= 1) adjacentLinks.push(links[i].id);
+    }
+
+    roomCache.fastFillerParkData = { pos: bestPos, adjacentIds, adjacentLinks };
+    return roomCache.fastFillerParkData;
 }
 
 const LogisticsManager = {
@@ -104,17 +154,12 @@ const LogisticsManager = {
 
         // FAST FILLER ASSIGNMENT LOGIC
         if (fastFillers.length > 0) {
-            const parkPos = findFastFillerParkPos(storage, spawns, extensions, room);
+            const cacheData = getFastFillerCache(storage, spawns, extensions, links, room);
+            const parkPos = cacheData ? cacheData.pos : null;
+            const adjacentIds = cacheData ? cacheData.adjacentIds : [];
+            const adjacentLinks = cacheData ? cacheData.adjacentLinks : [];
 
-            const needyStructures = [];
-            for (let i = 0; i < spawns.length; i++) {
-                if (spawns[i].store.getFreeCapacity(RESOURCE_ENERGY) > 0) { needyStructures.push(spawns[i]); }
-            }
-            for (let i = 0; i < extensions.length; i++) {
-                if (extensions[i].store.getFreeCapacity(RESOURCE_ENERGY) > 0) { needyStructures.push(extensions[i]); }
-            }
-
-            const needsEmergencyRefill = needyStructures.length > 0 && storages.length > 0 && (spawns.every(s => s.store.getUsedCapacity(RESOURCE_ENERGY) === 0));
+            const needsEmergencyRefill = storages.length > 0 && (spawns.every(s => TrafficManager.getVirtualState(s, RESOURCE_ENERGY).used === 0));
 
             for (let i = 0; i < fastFillers.length; i++) {
                 const creep = fastFillers[i];
@@ -145,22 +190,23 @@ const LogisticsManager = {
 
                 if (state === 'emptying') {
                     let target = null;
-                    for (let j = 0; j < needyStructures.length; j++) {
-                        const struct = needyStructures[j];
-                        const structState = TrafficManager.getVirtualState(struct, RESOURCE_ENERGY);
-                        if (structState.free > 0 && creep.pos.isNearTo(struct)) {
-                            target = struct;
+                    let targetAmount = 0;
+                    
+                    // O(1) Execution lookup skipping isNearTo
+                    for (let j = 0; j < adjacentIds.length; j++) {
+                        const structObj = Game.getObjectById(adjacentIds[j]);
+                        if (!structObj) continue;
+                        const structState = TrafficManager.getVirtualState(structObj, RESOURCE_ENERGY);
+                        if (structState.free > 0) {
+                            target = structObj;
+                            targetAmount = Math.min(creepState.used, structState.free);
                             break;
                         }
                     }
 
-                    if (!target && needyStructures.length > 0) target = needyStructures[0];
-
                     if (target) {
-                        const structState = TrafficManager.getVirtualState(target, RESOURCE_ENERGY);
-                        const amount = Math.min(creepState.used, structState.free);
-                        if (amount > 0 && TrafficManager.registerTransfer(creep, target, RESOURCE_ENERGY, amount) === OK) {
-                            TrafficManager.lockPipeline(creep.name, creep.id, target.id, RESOURCE_ENERGY, amount, 'TRANSFER');
+                        if (targetAmount > 0 && TrafficManager.registerTransfer(creep, target, RESOURCE_ENERGY, targetAmount) === OK) {
+                            TrafficManager.lockPipeline(creep.name, creep.id, target.id, RESOURCE_ENERGY, targetAmount, 'TRANSFER');
                             setHeap(creep, 'targetId', target.id);
                         }
                     }
@@ -172,12 +218,14 @@ const LogisticsManager = {
                         source = terminal;
                     }
 
-                    // Allow links if needed
-                    if (!source && links.length > 0) {
-                        for(let j=0; j < links.length; j++) {
-                            const linkState = TrafficManager.getVirtualState(links[j], RESOURCE_ENERGY);
-                            if (linkState.used > 0 && creep.pos.isNearTo(links[j])) {
-                                source = links[j];
+                    // Pre-computed adjacent link check
+                    if (!source && adjacentLinks.length > 0) {
+                        for (let j = 0; j < adjacentLinks.length; j++) {
+                            const linkObj = Game.getObjectById(adjacentLinks[j]);
+                            if (!linkObj) continue;
+                            const linkState = TrafficManager.getVirtualState(linkObj, RESOURCE_ENERGY);
+                            if (linkState.used > 0) {
+                                source = linkObj;
                                 break;
                             }
                         }
@@ -215,50 +263,61 @@ const LogisticsManager = {
                 creep.heap = creep.heap || {};
 
                 const creepState = TrafficManager.getVirtualState(creep, RESOURCE_ENERGY);
+                const creepQuad = getQuadrant(creep.pos);
 
                 if (creepState.used === 0 || (creepState.free > 0 && creep.heap.state !== 'transfer' && supplyIndex < supplies.length)) {
                     // Needs energy -> pickup
                     creep.heap.state = 'pickup';
                     creep.heap.targetId = null;
 
-                    while (supplyIndex < supplies.length) {
-                        const supply = supplies[supplyIndex];
+                    let selectedSupply = null;
+                    let selectedIdx = -1;
+
+                    for (let j = supplyIndex; j < supplies.length; j++) {
+                        const supply = supplies[j];
                         const supplyState = TrafficManager.getVirtualState(supply.target, RESOURCE_ENERGY);
 
                         if (supplyState.used > 0) {
-                            const amountToTake = Math.min(creepState.free, supplyState.used);
-                            let status;
-
-                            if (supply.target instanceof Resource) {
-                                status = TrafficManager.registerPickup(creep, supply.target, RESOURCE_ENERGY, amountToTake);
-                                if (status === OK) {
-                                    TrafficManager.lockPipeline(creep.name, creep.id, supply.target.id, RESOURCE_ENERGY, amountToTake, 'PICKUP');
-                                }
-                            } else {
-                                status = TrafficManager.registerWithdraw(creep, supply.target, RESOURCE_ENERGY, amountToTake);
-                                if (status === OK) {
-                                    TrafficManager.lockPipeline(creep.name, creep.id, supply.target.id, RESOURCE_ENERGY, amountToTake, 'WITHDRAW');
-                                }
-                            }
-
-                            if (status === OK) {
-                                creep.heap.dropId = supply.target.id;
-                                creep.heap.resourceType = RESOURCE_ENERGY;
-
-                                const updatedSupplyState = TrafficManager.getVirtualState(supply.target, RESOURCE_ENERGY);
-                                if (updatedSupplyState.used <= 0) {
-                                    supplyIndex++;
-                                }
+                            if (!selectedSupply) { selectedSupply = supply; selectedIdx = j; }
+                            
+                            // Fast Spatial Filter: Lock targets in immediate quadrant if available
+                            if (getQuadrant(supply.target.pos) === creepQuad) {
+                                selectedSupply = supply;
+                                selectedIdx = j;
                                 break;
-                            } else {
-                                supplyIndex++;
                             }
-                        } else {
+                            if (j - supplyIndex > 4) break;
+                        } else if (j === supplyIndex) {
                             supplyIndex++;
                         }
                     }
 
-                    if (supplyIndex >= supplies.length && !creep.heap.dropId) {
+                    if (selectedSupply) {
+                        const amountToTake = Math.min(creepState.free, TrafficManager.getVirtualState(selectedSupply.target, RESOURCE_ENERGY).used);
+                        let status;
+
+                        if (selectedSupply.target instanceof Resource) {
+                            status = TrafficManager.registerPickup(creep, selectedSupply.target, RESOURCE_ENERGY, amountToTake);
+                            if (status === OK) {
+                                TrafficManager.lockPipeline(creep.name, creep.id, selectedSupply.target.id, RESOURCE_ENERGY, amountToTake, 'PICKUP');
+                            }
+                        } else {
+                            status = TrafficManager.registerWithdraw(creep, selectedSupply.target, RESOURCE_ENERGY, amountToTake);
+                            if (status === OK) {
+                                TrafficManager.lockPipeline(creep.name, creep.id, selectedSupply.target.id, RESOURCE_ENERGY, amountToTake, 'WITHDRAW');
+                            }
+                        }
+
+                        if (status === OK) {
+                            creep.heap.dropId = selectedSupply.target.id;
+                            creep.heap.resourceType = RESOURCE_ENERGY;
+
+                            const updatedSupplyState = TrafficManager.getVirtualState(selectedSupply.target, RESOURCE_ENERGY);
+                            if (updatedSupplyState.used <= 0 && selectedIdx === supplyIndex) {
+                                supplyIndex++;
+                            }
+                        }
+                    } else {
                         creep.heap.dropId = null;
                     }
 
@@ -267,34 +326,43 @@ const LogisticsManager = {
                     creep.heap.state = 'transfer';
                     creep.heap.dropId = null;
 
-                    while (requestIndex < requests.length) {
-                        const request = requests[requestIndex];
+                    let selectedReq = null;
+                    let selectedIdx = -1;
+
+                    for (let j = requestIndex; j < requests.length; j++) {
+                        const request = requests[j];
                         const requestState = TrafficManager.getVirtualState(request.target, RESOURCE_ENERGY);
 
                         if (requestState.free > 0) {
-                            const amountToTransfer = Math.min(creepState.used, requestState.free);
-                            if (TrafficManager.registerTransfer(creep, request.target, RESOURCE_ENERGY, amountToTransfer) === OK) {
-                                TrafficManager.lockPipeline(creep.name, creep.id, request.target.id, RESOURCE_ENERGY, amountToTransfer, 'TRANSFER');
-
-                                creep.heap.targetId = request.target.id;
-                                creep.heap.resourceType = RESOURCE_ENERGY;
-
-                                const updatedRequestState = TrafficManager.getVirtualState(request.target, RESOURCE_ENERGY);
-                                if (updatedRequestState.free <= 0) {
-                                    requestIndex++;
-                                }
+                            if (!selectedReq) { selectedReq = request; selectedIdx = j; }
+                            
+                            // Fast Spatial Filter: Lock targets in immediate quadrant if available
+                            if (getQuadrant(request.target.pos) === creepQuad) {
+                                selectedReq = request;
+                                selectedIdx = j;
                                 break;
-                            } else {
-                                requestIndex++;
                             }
-                        } else {
+                            if (j - requestIndex > 4) break;
+                        } else if (j === requestIndex) {
                             requestIndex++;
                         }
                     }
 
-                    if (requestIndex >= requests.length && !creep.heap.targetId) {
+                    if (selectedReq) {
+                        const amountToTransfer = Math.min(creepState.used, TrafficManager.getVirtualState(selectedReq.target, RESOURCE_ENERGY).free);
+                        if (TrafficManager.registerTransfer(creep, selectedReq.target, RESOURCE_ENERGY, amountToTransfer) === OK) {
+                            TrafficManager.lockPipeline(creep.name, creep.id, selectedReq.target.id, RESOURCE_ENERGY, amountToTransfer, 'TRANSFER');
+
+                            creep.heap.targetId = selectedReq.target.id;
+                            creep.heap.resourceType = RESOURCE_ENERGY;
+
+                            const updatedRequestState = TrafficManager.getVirtualState(selectedReq.target, RESOURCE_ENERGY);
+                            if (updatedRequestState.free <= 0 && selectedIdx === requestIndex) {
+                                requestIndex++;
+                            }
+                        }
+                    } else {
                         if (room.controller) {
-                            // Fallback to controller if no requests
                             creep.heap.targetId = 'controller';
                         } else {
                             creep.heap.targetId = null;
@@ -305,17 +373,13 @@ const LogisticsManager = {
         }
 
         // HUB MANAGER ASSIGNMENT LOGIC
-        if (hubManagers.length > 0 && links.length > 0 && storage) {
-            let hubLink = null;
-            let controllerLink = null;
-
-            for (let i = 0; i < links.length; i++) {
-                if (links[i].pos.isNearTo(storage)) {
-                    hubLink = links[i];
-                } else if (room.controller && links[i].pos.inRangeTo(room.controller, 3)) {
-                    controllerLink = links[i];
-                }
-            }
+        if (hubManagers.length > 0 && storage) {
+            const hubCache = getHubCache(storage, terminal, links, room);
+            if (!hubCache) return;
+            
+            const hubLink = hubCache.hubLinkId ? Game.getObjectById(hubCache.hubLinkId) : null;
+            const controllerLink = hubCache.controllerLinkId ? Game.getObjectById(hubCache.controllerLinkId) : null;
+            const parkPos = hubCache.pos;
 
             if (hubLink) {
                 if (controllerLink) {
@@ -324,8 +388,6 @@ const LogisticsManager = {
 
                 const controllerState = controllerLink ? TrafficManager.getVirtualState(controllerLink, RESOURCE_ENERGY) : null;
                 const controllerNeedsEnergy = controllerState && controllerState.used < 400;
-
-                const parkPos = findHubParkPos(hubLink, storage, terminal, room);
 
                 for (let i = 0; i < hubManagers.length; i++) {
                     const creep = hubManagers[i];
