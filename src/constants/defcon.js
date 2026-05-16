@@ -9,7 +9,16 @@ const DEFCON = {
 };
 
 function determineDefcon(roomName) {
-    if (!global.State || !global.State.hostilesByRoom) return DEFCON.NORMAL;
+    if (!global.State) return DEFCON.NORMAL;
+
+    if (global.State.nukesByRoom) {
+        const nukes = global.State.nukesByRoom.get(roomName);
+        if (nukes && nukes.length > 0) {
+            return DEFCON.EMERGENCY;
+        }
+    }
+
+    if (!global.State.hostilesByRoom) return DEFCON.NORMAL;
 
     const hostiles = global.State.hostilesByRoom.get(roomName) || [];
 
