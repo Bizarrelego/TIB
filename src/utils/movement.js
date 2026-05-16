@@ -45,25 +45,12 @@ module.exports = {
             const targetPos = target.pos || target;
 
             // Inject DirectionalCostMatrix for hub routing
-            const TrafficManager = require('../traffic/trafficManager');
             const DirectionalCostMatrixGenerator = require('../traffic/directionalCostMatrixGenerator');
             const originalRoomCallback = pathingOpts.roomCallback;
             pathingOpts.roomCallback = function(roomName) {
                 let matrix;
                 if (originalRoomCallback) {
                     matrix = originalRoomCallback(roomName);
-                }
-                const directionalMatrix = TrafficManager.getCostMatrix(roomName, creep);
-                if (directionalMatrix) {
-                    // Combine or override with directional logic
-                    // If no existing matrix, use the directional one
-                    if (!matrix) {
-                        return directionalMatrix;
-                    }
-                    // Otherwise, we would need to merge them, but returning the directional
-                    // one handles the backward tile. A proper merge would be better, but
-                    // directional matrix generator accepts a baseMatrix! Let's pass it.
-                    // Actually, directional matrix is already generated from a base if passed.
                 }
 
                 // Let's regenerate it properly using the base matrix.
@@ -91,8 +78,15 @@ module.exports = {
                 creep.heap.path.shift(); // Advance path
             }
             if (creep.heap.path.length > 0) {
-                const getTrafficManager = () => require('../traffic/trafficManager');
-                getTrafficManager().registerMoveIntent(creep, creep.heap.path[0], pathingOpts);
+                if (!global.State) global.State = {};
+                if (!(global.State.trafficIntents instanceof Map)) global.State.trafficIntents = new Map();
+
+                global.State.trafficIntents.set(creep.name, {
+                    creep: creep,
+                    targetPos: creep.heap.path[0],
+                    opts: pathingOpts,
+                    originalPos: creep.pos
+                });
             }
         }
     },
@@ -193,9 +187,22 @@ module.exports = {
         if (blocked) return;
 
         // 3. Synchronize intents
-        const TrafficManager = require('../traffic/trafficManager');
+        if (!global.State) global.State = {};
+        if (!(global.State.trafficIntents instanceof Map)) global.State.trafficIntents = new Map();
+
         for (const intent of intents) {
-            TrafficManager.registerMove(intent.creep, direction);
+            const creepToMove = intent.creep;
+            const lock = global.State.pipelineLedger ? global.State.pipelineLedger.get(creepToMove.id) : null;
+            if (!creepToMove || creepToMove.fatigue > 0 || (lock && lock.creepName)) continue;
+
+            global.State.trafficIntents.set(creepToMove.name, { 
+                creep: creepToMove, 
+                targetPos: intent.targetPos, 
+                opts: intent.opts,
+                originalPos: creepToMove.pos,
+                direction: direction, 
+                priority: creepToMove.heap.priority || 0 
+            });
         }
     }
 };

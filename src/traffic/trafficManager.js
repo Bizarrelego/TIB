@@ -1,5 +1,4 @@
 const DeadlockEngine = require('./deadlock');
-const movement = require('../utils/movement');
 const ROLE_PRIORITIES = require('../constants/rolePriorities');
 const Logger = require('../utils/logger');
 
@@ -327,38 +326,6 @@ const TrafficManager = {
         this.lockPipeline(creep.name, creep.id, target.id, resType, harvestAmount, 'HARVEST');
 
         return OK;
-    },
-
-    /**
-     * @param {object} creep
-     * @param {number} direction
-     */
-    registerMove(creep, direction) {
-        // Fatigue Gating: Ensure only the specific creep is gated.
-        // The TrafficManager should only process creeps that are capable of moving.
-        if (!creep || creep.fatigue > 0 || this.checkPipeline(creep.id)) return;
-
-        if (global.State && global.State.trafficIntents) {
-            global.State.trafficIntents.set(creep.name, { direction, priority: creep.heap.priority || 0 });
-        }
-    },
-
-    /**
-     * @param {object} creep
-     * @param {object} targetPos
-     * @param {object} [opts={}]
-     */
-    registerMoveIntent(creep, targetPos, opts = {}) {
-        if (!creep || creep.fatigue > 0) return;
-        if (!global.State) global.State = {};
-        if (!(global.State.trafficIntents instanceof Map)) global.State.trafficIntents = new Map();
-
-        global.State.trafficIntents.set(creep.name, {
-            creep,
-            targetPos,
-            opts,
-            originalPos: creep.pos
-        });
     },
 
     registerSwap(creepA, creepB) {
