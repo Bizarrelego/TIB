@@ -26,7 +26,6 @@ module.exports = function discoveryManager() {
             nukesByRoom: new Map(),
             roomTerrain: new Map(),
             sourceWalkableTiles: new Map(),
-            nukesByRoom: new Map(),
             getEvents: function(roomName) {
                 const room = Game.rooms[roomName];
                 if (!room) return [];
