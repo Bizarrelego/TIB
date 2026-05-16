@@ -26,6 +26,7 @@ module.exports = function discoveryManager() {
             nukesByRoom: new Map(),
             roomTerrain: new Map(),
             sourceWalkableTiles: new Map(),
+            nukesByRoom: new Map(),
             getEvents: function(roomName) {
                 const room = Game.rooms[roomName];
                 if (!room) return [];
@@ -114,6 +115,7 @@ module.exports = function discoveryManager() {
                 state.sourceWalkableTiles.set(roomName, walkableTilesMap);
 
                 state.hostilesByRoom.set(roomName, new Map());
+                state.nukesByRoom.set(roomName, room.find(FIND_NUKES));
             }
 
             if (!state.logisticsByRoom.has(roomName)) {
