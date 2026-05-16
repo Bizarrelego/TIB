@@ -4,6 +4,45 @@ const SpawnQueueManager = require('../managers/SpawnQueueManager');
 const UpgraderManager = require('../managers/UpgraderManager');
 const Profiler = require('../utils/profiler');
 
+let lastCensusTick = 0;
+const remoteCensus = new Map();
+
+/**
+ * Executes an empire-wide O(N) sweep exactly once per tick to tally remote creeps by colony.
+ * Prevents O(R*C) iteration scaling when multiple rooms request spawns.
+ */
+function buildRemoteCensus() {
+    if (Game.time === lastCensusTick) return;
+    remoteCensus.clear();
+    for (const rmCreeps of global.State.creepsByRoom.values()) {
+        const rHarvesters = rmCreeps.get('remoteHarvester') || [];
+        for (let i = 0; i < rHarvesters.length; i++) {
+            const c = rHarvesters[i];
+            if (c.memory.colony) {
+                if (!remoteCensus.has(c.memory.colony)) remoteCensus.set(c.memory.colony, { remoteHarvester: [], remoteHauler: [], reserver: [] });
+                remoteCensus.get(c.memory.colony).remoteHarvester.push(c);
+            }
+        }
+        const rHaulers = rmCreeps.get('remoteHauler') || [];
+        for (let i = 0; i < rHaulers.length; i++) {
+            const c = rHaulers[i];
+            if (c.memory.colony) {
+                if (!remoteCensus.has(c.memory.colony)) remoteCensus.set(c.memory.colony, { remoteHarvester: [], remoteHauler: [], reserver: [] });
+                remoteCensus.get(c.memory.colony).remoteHauler.push(c);
+            }
+        }
+        const rReservers = rmCreeps.get('reserver') || [];
+        for (let i = 0; i < rReservers.length; i++) {
+            const c = rReservers[i];
+            if (c.memory.colony) {
+                if (!remoteCensus.has(c.memory.colony)) remoteCensus.set(c.memory.colony, { remoteHarvester: [], remoteHauler: [], reserver: [] });
+                remoteCensus.get(c.memory.colony).reserver.push(c);
+            }
+        }
+    }
+    lastCensusTick = Game.time;
+}
+
 module.exports = {
     /**
      * Runs the spawn manager.
@@ -12,6 +51,9 @@ module.exports = {
      */
     run: Profiler.wrap('SpawnManager.run', function(room, spawnLedger) {
         try {
+            // Empire-wide census check (O(N) executed once per tick globally)
+            buildRemoteCensus();
+
             // Retrieve spawn via O(1) lookup
             const spawns = global.State.spawnsByRoom.get(room.name);
             if (!spawns || spawns.length === 0) {
@@ -176,26 +218,11 @@ module.exports = {
         if (room.controller.level >= 3 && global.State.intel) {
             const exits = Game.map.describeExits(room.name);
             if (exits) {
-                let colonyRemoteHarvesters = [];
-                let colonyRemoteHaulers = [];
-                let colonyReservers = [];
-
-                for (const rmCreeps of global.State.creepsByRoom.values()) {
-                    const rHarvesters = rmCreeps.get('remoteHarvester') || [];
-                    for (let i = 0; i < rHarvesters.length; i++) {
-                        if (rHarvesters[i].memory.colony === room.name) colonyRemoteHarvesters.push(rHarvesters[i]);
-                    }
-
-                    const rHaulers = rmCreeps.get('remoteHauler') || [];
-                    for (let i = 0; i < rHaulers.length; i++) {
-                        if (rHaulers[i].memory.colony === room.name) colonyRemoteHaulers.push(rHaulers[i]);
-                    }
-
-                    const rReservers = rmCreeps.get('reserver') || [];
-                    for (let i = 0; i < rReservers.length; i++) {
-                        if (rReservers[i].memory.colony === room.name) colonyReservers.push(rReservers[i]);
-                    }
-                }
+                // O(1) lookup for remote operations scaling
+                const census = remoteCensus.get(room.name) || { remoteHarvester: [], remoteHauler: [], reserver: [] };
+                let colonyRemoteHarvesters = census.remoteHarvester;
+                let colonyRemoteHaulers = census.remoteHauler;
+                let colonyReservers = census.reserver;
 
                 for (const direction in exits) {
                     const targetRoomName = exits[direction];

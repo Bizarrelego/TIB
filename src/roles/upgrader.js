@@ -11,24 +11,12 @@ function run(creep, room) {
         if (creep.fatigue > 0) return;
 
         let controllerContainer = null;
-        const structures = global.State.structuresByRoom.get(room.name);
-        const containers = structures ? (structures.get(STRUCTURE_CONTAINER) || []) : [];
 
-        // Query the room for the Controller Container only if not cached
+        // Strictly blind top-down execution: read ID assigned by UpgraderManager
         if (creep.heap.controllerContainerId) {
             controllerContainer = Game.getObjectById(creep.heap.controllerContainerId);
             if (!controllerContainer) {
                 creep.heap.controllerContainerId = null; // Invalidate cache if destroyed
-            }
-        }
-
-        if (!controllerContainer) {
-            for (const container of containers) {
-                if (container.pos.inRangeTo(controller, 3)) {
-                    controllerContainer = container;
-                    creep.heap.controllerContainerId = container.id;
-                    break;
-                }
             }
         }
 

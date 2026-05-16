@@ -26,20 +26,24 @@ class SpawnQueueManager {
      */
     static requestSpawn(roomName, role, body, name, opts, cost) {
         if (!SpawnQueueManager.globalQueue.has(roomName)) {
-            SpawnQueueManager.globalQueue.set(roomName, []);
+            const buckets = new Array(120);
+            for (let i = 0; i < 120; i++) buckets[i] = [];
+            SpawnQueueManager.globalQueue.set(roomName, buckets);
         }
 
-        const queue = SpawnQueueManager.globalQueue.get(roomName);
+        const buckets = SpawnQueueManager.globalQueue.get(roomName);
         const targetRoom = opts && opts.memory ? opts.memory.targetRoom : undefined;
+        const priority = ROLE_PRIORITIES.has(role) ? ROLE_PRIORITIES.get(role) : (ROLE_PRIORITIES.get('default') || 0);
+        const bucket = buckets[priority];
 
-        // Prevent duplicate requests
-        const isDuplicate = queue.some(req =>
+        // Prevent duplicate requests in O(1) priority bucket
+        const isDuplicate = bucket.some(req =>
             req.role === role &&
             (req.opts && req.opts.memory ? req.opts.memory.targetRoom : undefined) === targetRoom
         );
 
         if (!isDuplicate) {
-            queue.push({ role, body, name, opts, cost });
+            bucket.push({ role, body, name, opts, cost });
         }
     }
 
@@ -99,40 +103,34 @@ class SpawnQueueManager {
             return;
         }
 
-        let queue = SpawnQueueManager.globalQueue.get(roomName);
-        if (queue.length === 0) return;
-
-        queue.sort((a, b) => {
-            const prioA = ROLE_PRIORITIES.has(a.role) ? ROLE_PRIORITIES.get(a.role) : (ROLE_PRIORITIES.get('default') || 0);
-            const prioB = ROLE_PRIORITIES.has(b.role) ? ROLE_PRIORITIES.get(b.role) : (ROLE_PRIORITIES.get('default') || 0);
-            return prioB - prioA;
-        });
+        const buckets = SpawnQueueManager.globalQueue.get(roomName);
+        if (!buckets) return;
 
         let availableSpawns = spawns.filter(s => !spawnLedger.isSpawnBusy(s));
         if (availableSpawns.length === 0) return;
 
-        let i = 0;
-        while (i < queue.length && availableSpawns.length > 0) {
-            const request = queue[i];
+        for (let p = 119; p >= 0; p--) {
+            const bucket = buckets[p];
+            let i = 0;
+            while (i < bucket.length && availableSpawns.length > 0) {
+                const request = bucket[i];
 
-            if (!spawnLedger.canSpawn(request.cost)) {
-                // If we cannot afford the highest priority request, skip and return to prevent lower-priority
-                // from taking its budget and causing a spawn stall.
-                i++;
-                continue;
+                if (!spawnLedger.canSpawn(request.cost)) {
+                    // Prevent lower-priority requests from taking the budget of a stalled high-priority creep
+                    return;
+                }
+
+                const spawn = availableSpawns[0];
+                const result = spawnLedger.requestSpawn(spawn, request.body, request.name, request.opts, request.cost);
+
+                if (result === OK) {
+                    bucket.splice(i, 1);
+                    availableSpawns.shift();
+                } else {
+                    i++;
+                }
             }
-
-            const spawn = availableSpawns[0];
-            const result = spawnLedger.requestSpawn(spawn, request.body, request.name, request.opts, request.cost);
-
-            if (result === OK) {
-                queue.splice(i, 1); // remove from queue
-                availableSpawns.shift(); // remove from available spawns
-            } else {
-                // if it failed for some reason other than energy (e.g. invalid body), maybe skip it,
-                // but for now let's just increment to prevent infinite loops if something goes wrong.
-                i++;
-            }
+            if (availableSpawns.length === 0) break;
         }
     }
 }
