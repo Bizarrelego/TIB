@@ -11,8 +11,11 @@ const managerOrchestrator = require('./managers/managerOrchestrator'); // Standa
 const trafficManager = require('./traffic/trafficManager');
 const movement = require('./utils/movement');
 const garbageCollector = require('./os/garbageCollector');
+const Logger = require('./utils/logger');
 
 module.exports.loop = function () {
+    Logger.info(`--- Starting Tick ${Game.time} ---`);
+
     // Install memory proxy to bind heap to Creep prototypes
     installMemoryProxy();
 
@@ -20,7 +23,7 @@ module.exports.loop = function () {
     try {
         RawMemoryManager.init();
     } catch (e) {
-        console.log(`[Phase 0 Error] RawMemoryManager: ${e.stack}`);
+        Logger.error(`[Phase 0 Error] RawMemoryManager: ${e.stack}`);
     }
 
     // Rehydrate global state
@@ -38,10 +41,11 @@ module.exports.loop = function () {
     }
 
     // Phase 1: Discovery Manager (Raw Engine API execution & global.State Bootstrapping)
+    Logger.debug('Phase 1: Running Discovery Manager');
     try {
         if (discoveryManager) discoveryManager();
     } catch (e) {
-        console.log(`[Phase 1 Error] Discovery Manager: ${e.stack}`);
+        Logger.error(`[Phase 1 Error] Discovery Manager: ${e.stack}`);
         return; // Fatal OS crash
     }
 
@@ -68,28 +72,30 @@ module.exports.loop = function () {
 
     // Phase 2: State Scanner (Event-driven map updaters)
     if (!skipState) {
+        Logger.debug('Phase 2: Running State Scanner');
         try {
             const roomEventManager = globalState.getManager('RoomEventManager');
             if (roomEventManager) roomEventManager();
         } catch (e) {
-            console.log(`[Phase 2 Error] Room Event Manager: ${e.stack}`);
+            Logger.error(`[Phase 2 Error] Room Event Manager: ${e.stack}`);
         }
 
         try {
             if (stateScanner) stateScanner();
         } catch (e) {
-            console.log(`[Phase 2 Error] Global State Scanner: ${e.stack}`);
+            Logger.error(`[Phase 2 Error] Global State Scanner: ${e.stack}`);
         }
     }
 
     // Phase 2.5: Execution Gates
+    Logger.debug('Phase 2.5: Running Execution Gates');
     try {
         const energyRequestManager = globalState.getManager('EnergyRequestManager');
         if (energyRequestManager && energyRequestManager.handleSourceSleep) {
             energyRequestManager.handleSourceSleep();
         }
     } catch (e) {
-        console.log(`[Phase 2.5 Error] EnergyRequestManager: ${e.stack}`);
+        Logger.error(`[Phase 2.5 Error] EnergyRequestManager: ${e.stack}`);
     }
 
     try {
@@ -102,50 +108,55 @@ module.exports.loop = function () {
             }
         }
     } catch (e) {
-        console.log(`[Phase 2.5 Error] Execution Gates: ${e.stack}`);
+        Logger.error(`[Phase 2.5 Error] Execution Gates: ${e.stack}`);
     }
 
     // Phase 3: Colonies
     if (!skipColonies) {
+        Logger.debug('Phase 3: Running Colonies');
         try {
             if (colonyManager) colonyManager();
         } catch (e) {
-            console.log(`[Phase 3 Error] Colonies: ${e.stack}`);
+            Logger.error(`[Phase 3 Error] Colonies: ${e.stack}`);
         }
     }
 
     // Phase 3.5: Standalone Managers
     if (!skipManagers) {
+        Logger.debug('Phase 3.5: Running Standalone Managers');
         try {
             if (managerOrchestrator && managerOrchestrator.run) managerOrchestrator.run();
         } catch (e) {
-            console.log(`[Phase 3.5 Error] Managers: ${e.stack}`);
+            Logger.error(`[Phase 3.5 Error] Managers: ${e.stack}`);
         }
     }
 
     // Phase 4: Operations Orchestration Module
     if (!skipOperations) {
+        Logger.debug('Phase 4: Running Operations');
         try {
             if (operationsManager) operationsManager();
         } catch (e) {
-            console.log(`[Phase 4 Error] Operations: ${e.stack}`);
+            Logger.error(`[Phase 4 Error] Operations: ${e.stack}`);
         }
     }
 
     // Phase 5: Traffic Control
+    Logger.debug('Phase 5: Running Traffic Control');
     try {
         if (trafficManager && trafficManager.run) trafficManager.run();
     } catch (e) {
-        console.log(`[Phase 5 Error] Traffic Control: ${e.stack}`);
+        Logger.error(`[Phase 5 Error] Traffic Control: ${e.stack}`);
     }
 
     // Phase 6: Intents & Sleep
+    Logger.debug('Phase 6: Executing Intents & Sleep');
     try {
         if (trafficManager && trafficManager.executeIntents) {
             trafficManager.executeIntents();
         }
     } catch (e) {
-        console.log(`[Phase 6 Error] Intents & Sleep: ${e.stack}`);
+        Logger.error(`[Phase 6 Error] Intents & Sleep: ${e.stack}`);
     }
 
     // Profiler output

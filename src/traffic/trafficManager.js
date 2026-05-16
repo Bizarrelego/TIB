@@ -1,6 +1,7 @@
 const DeadlockEngine = require('./deadlock');
 const movement = require('../utils/movement');
 const ROLE_PRIORITIES = require('../constants/rolePriorities');
+const Logger = require('../utils/logger');
 
 
 /**
@@ -227,6 +228,7 @@ const TrafficManager = {
         ledger.set(target.id, { used: targetState.used - harvestAmount, cap: targetState.cap });
         ledger.set(creep.id, { used: creepState.used + harvestAmount, cap: creepState.cap });
 
+        Logger.debug(`Creep ${creep.name} registered HARVEST intent of ${harvestAmount} ${resType} on ${target.id}`);
         this.lockPipeline(creep.name, creep.id, target.id, resType, harvestAmount, 'HARVEST');
 
         return OK;
