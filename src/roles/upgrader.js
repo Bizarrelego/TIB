@@ -12,13 +12,23 @@ function run(creep, room) {
 
         let controllerContainer = null;
         const structures = global.State.structuresByRoom.get(room.name);
-        const containers = structures ? (structures.get(STRUCTURE_CONTAINER) || new Map()) : new Map();
+        const containers = structures ? (structures.get(STRUCTURE_CONTAINER) || []) : [];
 
-        // Query the room for the Controller Container (within 3 tiles of the controller)
-        for (const container of containers.values()) {
-            if (container.pos.inRangeTo(controller, 3)) {
-                controllerContainer = container;
-                break;
+        // Query the room for the Controller Container only if not cached
+        if (creep.heap.controllerContainerId) {
+            controllerContainer = Game.getObjectById(creep.heap.controllerContainerId);
+            if (!controllerContainer) {
+                creep.heap.controllerContainerId = null; // Invalidate cache if destroyed
+            }
+        }
+
+        if (!controllerContainer) {
+            for (const container of containers) {
+                if (container.pos.inRangeTo(controller, 3)) {
+                    controllerContainer = container;
+                    creep.heap.controllerContainerId = container.id;
+                    break;
+                }
             }
         }
 

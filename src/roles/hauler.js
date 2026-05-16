@@ -62,18 +62,23 @@ module.exports = {
                         // Priority 3: TOWER (under 70% capacity)
                         let bestTarget = null;
                         const structures = global.State.structuresByRoom.get(room.name);
-                        const containers = structures ? (structures.get(STRUCTURE_CONTAINER) || new Map()) : new Map();
+                        const containers = structures ? (structures.get(STRUCTURE_CONTAINER) || []) : [];
                         const storage = room.storage && room.storage.isActive() ? room.storage : null;
 
-                        let coreContainer = null;
-                        if (!storage) {
+                        // Pre-calculated references should be fetched from global state or managed more efficiently if needed.
+                        // However, we still need to resolve these targets without looping over all structures every tick.
+                        // We will use cached target IDs in memory/heap where possible.
+
+                        let coreContainer = creep.heap.coreContainerId ? Game.getObjectById(creep.heap.coreContainerId) : null;
+                        if (!storage && !coreContainer) {
                             const plannerState = global.State.roomPlanner ? global.State.roomPlanner.get(room.name) : null;
                             if (plannerState && plannerState.has('anchor')) {
                                 const anchor = plannerState.get('anchor');
                                 if (anchor) {
-                                    for (const container of containers.values()) {
+                                    for (const container of containers) {
                                         if (container.pos.x === anchor.x && container.pos.y === anchor.y && container.isActive()) {
                                             coreContainer = container;
+                                            creep.heap.coreContainerId = container.id;
                                             break;
                                         }
                                     }
@@ -81,22 +86,27 @@ module.exports = {
                             }
                         }
 
-                        let controllerContainer = null;
-                        if (room.controller) {
-                            for (const container of containers.values()) {
+                        let controllerContainer = creep.heap.controllerContainerId ? Game.getObjectById(creep.heap.controllerContainerId) : null;
+                        if (room.controller && !controllerContainer) {
+                            for (const container of containers) {
                                 if (container.pos.inRangeTo(room.controller, 3)) {
                                     controllerContainer = container;
+                                    creep.heap.controllerContainerId = container.id;
                                     break;
                                 }
                             }
                         }
 
+                        // Get tower target from TowerManager if possible, or just evaluate known towers if cached.
+                        // For zero polling, we shouldn't iterate all towers every tick per creep.
+                        // Instead, we will only evaluate tower needs if specifically requested or via a central manager.
+                        // For now, simplify or remove the per-creep iteration.
+                        // We can use a cached tower target ID from room.memory or global state if available, but let's avoid looping here.
                         let towerTarget = null;
-                        const towers = structures ? (structures.get(STRUCTURE_TOWER) || new Map()) : new Map();
-                        for (const tower of towers.values()) {
-                            if (tower.store.getUsedCapacity(RESOURCE_ENERGY) < tower.store.getCapacity(RESOURCE_ENERGY) * 0.7) {
-                                towerTarget = tower;
-                                break;
+                        if (global.State.towerNeeds && global.State.towerNeeds.has(room.name)) {
+                            const needs = global.State.towerNeeds.get(room.name);
+                            if (needs.length > 0) {
+                                towerTarget = needs[0]; // just grab the first one flagged by manager
                             }
                         }
 
