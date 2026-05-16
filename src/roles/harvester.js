@@ -68,6 +68,16 @@ module.exports = {
                         }
 
                         if (creep.heap.deliveryMode) {
+                            const isRoomFull = room.energyAvailable >= room.energyCapacityAvailable;
+                            if (creep.store.getFreeCapacity() === 0 && isRoomFull) {
+                                if (creep.pos.getRangeTo(room.controller) > 3) {
+                                    movement.moveTo(creep, room.controller);
+                                } else {
+                                    creep.upgradeController(room.controller);
+                                }
+                                continue;
+                            }
+
                             const roomStructures = global.State.structuresByRoom.get(room.name);
                             const targets = [];
                             if (roomStructures) {
