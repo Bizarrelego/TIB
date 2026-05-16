@@ -1,3 +1,5 @@
+const CostMatrixCache = require('../cache/costMatrixCache');
+
 module.exports = {
     /**
      * Checks if a creep is fatigued.
@@ -178,26 +180,11 @@ module.exports = {
                 break;
             }
 
-            if (global.State && global.State.structuresByRoom) {
-                const roomStructures = global.State.structuresByRoom.get(creep.pos.roomName);
-                if (roomStructures) {
-                    let structureBlocked = false;
-                    for (const [structType, structs] of roomStructures.entries()) {
-                        if (typeof OBSTACLE_OBJECT_TYPES !== "undefined" && OBSTACLE_OBJECT_TYPES.includes(structType)) {
-                            for (const struct of structs.values()) {
-                                if (struct.pos.x === nextX && struct.pos.y === nextY) {
-                                    structureBlocked = true;
-                                    break;
-                                }
-                            }
-                        }
-                        if (structureBlocked) break;
-                    }
-                    if (structureBlocked) {
-                        blocked = true;
-                        break;
-                    }
-                }
+            // O(1) Spatial Check
+            const cm = CostMatrixCache.get(creep.pos.roomName);
+            if (cm && cm.get(nextX, nextY) === 255) {
+                blocked = true;
+                break;
             }
 
             intents.push({ creep, targetPos: nextPos, opts });

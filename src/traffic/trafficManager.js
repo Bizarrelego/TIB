@@ -1,5 +1,4 @@
 const DeadlockEngine = require('./deadlock');
-const DirectionalCostMatrixGenerator = require('./directionalCostMatrixGenerator');
 const movement = require('../utils/movement');
 const ROLE_PRIORITIES = require('../constants/rolePriorities');
 const Logger = require('../utils/logger');
@@ -396,24 +395,6 @@ const TrafficManager = {
         }
     },
 
-    /**
-     * Generates a directional cost matrix to enforce one-way traffic in hubs.
-     * @param {string} roomName - The room name.
-     * @param {object} creep - The creep for which the matrix is generated.
-     * @returns {PathFinder.CostMatrix|undefined}
-     */
-    getCostMatrix(roomName, creep) {
-        if (!global.State || !global.State.roomPlanner) return undefined;
-        const planner = global.State.roomPlanner.get(roomName);
-        if (!planner) return undefined;
-
-        const anchor = planner.get('anchor');
-        if (anchor && creep && creep.pos.inRangeTo(anchor, 5)) {
-            return DirectionalCostMatrixGenerator.generate(roomName, anchor, creep.pos, 'clockwise', 1);
-        }
-        return undefined;
-    },
-
     executeIntents() {
         try {
             // Process pipeline ledger first
@@ -429,20 +410,25 @@ const TrafficManager = {
 
             if (!global.State || !global.State.trafficIntents || global.State.trafficIntents.size === 0) return;
 
-            // Phase 3: Execute Moves
-            const remainingIntents = Array.from(global.State.trafficIntents.values());
-            remainingIntents.sort((a, b) => {
-                const priorityA = (a.creep && a.creep.memory && a.creep.memory.role) ? (ROLE_PRIORITIES.get(a.creep.memory.role) || 0) : 0;
-                const priorityB = (b.creep && b.creep.memory && b.creep.memory.role) ? (ROLE_PRIORITIES.get(b.creep.memory.role) || 0) : 0;
-                return priorityB - priorityA; // Descending priority
-            });
+            // Phase 3: Execute Moves (O(1) Priority Buckets)
+            const buckets = new Array(101);
+            for (let i = 0; i <= 100; i++) buckets[i] = [];
+
+            for (const intent of global.State.trafficIntents.values()) {
+                let priority = (intent.creep && intent.creep.memory && intent.creep.memory.role) ? (ROLE_PRIORITIES.get(intent.creep.memory.role) || 0) : 0;
+                priority = Math.max(0, Math.min(100, priority));
+                buckets[priority].push(intent);
+            }
 
             const processedSwaps = new Set();
             const currentPositions = global.State.currentPositions || new Map();
 
-            for (const intent of remainingIntents) {
-                const { creep, targetPos, opts, intendedNextPos } = intent;
-                if (!creep) continue;
+            for (let p = 100; p >= 0; p--) {
+                const bucket = buckets[p];
+                for (let i = 0; i < bucket.length; i++) {
+                    const intent = bucket[i];
+                    const { creep, targetPos, opts, intendedNextPos } = intent;
+                    if (!creep) continue;
 
                 if (global.State.swapRegistry && global.State.swapRegistry.has(creep.name)) {
                     if (processedSwaps.has(creep.name)) continue;
@@ -497,6 +483,7 @@ const TrafficManager = {
             if (dir) creep.move(dir);
         }
                 global.State.trafficIntents.delete(creep.name);
+            }
             }
         } catch (e) {
             console.log(`[TrafficManager Execution Error]: ${e.stack}`);

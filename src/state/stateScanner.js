@@ -22,11 +22,29 @@ module.exports = function stateScanner() {
             global.State.hostilesByRoom.set(roomName, roomHostiles);
         }
 
-        const roomDropped = global.State.droppedByRoom.get(roomName);
+        let roomDropped = global.State.droppedByRoom.get(roomName);
+        if (!roomDropped) {
+            roomDropped = new Map();
+            global.State.droppedByRoom.set(roomName, roomDropped);
+        }
 
-        const roomSites = global.State.sitesByRoom.get(roomName);
-        const roomTombstones = global.State.tombstonesByRoom.get(roomName);
-        const roomRuins = global.State.ruinsByRoom.get(roomName);
+        let roomSites = global.State.sitesByRoom.get(roomName);
+        if (!roomSites) {
+            roomSites = new Map();
+            global.State.sitesByRoom.set(roomName, roomSites);
+        }
+
+        let roomTombstones = global.State.tombstonesByRoom.get(roomName);
+        if (!roomTombstones) {
+            roomTombstones = new Map();
+            global.State.tombstonesByRoom.set(roomName, roomTombstones);
+        }
+
+        let roomRuins = global.State.ruinsByRoom.get(roomName);
+        if (!roomRuins) {
+            roomRuins = new Map();
+            global.State.ruinsByRoom.set(roomName, roomRuins);
+        }
 
         for (const event of events) {
             let object = Game.getObjectById(event.objectId);
@@ -43,52 +61,14 @@ module.exports = function stateScanner() {
                 roomLogistics.delete(event.objectId);
 
                 if (typeToRemove) {
-                    let structMapOrArr = roomStructures.get(typeToRemove);
-                    if (structMapOrArr) {
-                        if (structMapOrArr instanceof Map) {
-                            structMapOrArr.delete(event.objectId);
-                        } else if (Array.isArray(structMapOrArr)) {
-                            const idx = structMapOrArr.findIndex(s => s.id === event.objectId);
-                            if (idx !== -1) structMapOrArr.splice(idx, 1);
-                        }
-                    }
+                    let structMap = roomStructures.get(typeToRemove);
+                    if (structMap) structMap.delete(event.objectId);
                 }
 
-                if (roomSites) {
-                    if (roomSites instanceof Map) {
-                        roomSites.delete(event.objectId);
-                    } else if (Array.isArray(roomSites)) {
-                        const idx = roomSites.findIndex(s => s.id === event.objectId);
-                        if (idx !== -1) roomSites.splice(idx, 1);
-                    }
-                }
-
-                if (roomDropped) {
-                    if (Array.isArray(roomDropped)) {
-                        const idx = roomDropped.findIndex(r => r.id === event.objectId);
-                        if (idx !== -1) roomDropped.splice(idx, 1);
-                    } else if (roomDropped instanceof Map) {
-                        roomDropped.delete(event.objectId);
-                    }
-                }
-
-                if (roomTombstones) {
-                    if (Array.isArray(roomTombstones)) {
-                        const idx = roomTombstones.findIndex(s => s.id === event.objectId);
-                        if (idx !== -1) roomTombstones.splice(idx, 1);
-                    } else if (roomTombstones instanceof Map) {
-                        roomTombstones.delete(event.objectId);
-                    }
-                }
-
-                if (roomRuins) {
-                    if (Array.isArray(roomRuins)) {
-                        const idx = roomRuins.findIndex(s => s.id === event.objectId);
-                        if (idx !== -1) roomRuins.splice(idx, 1);
-                    } else if (roomRuins instanceof Map) {
-                        roomRuins.delete(event.objectId);
-                    }
-                }
+                roomSites.delete(event.objectId);
+                roomDropped.delete(event.objectId);
+                roomTombstones.delete(event.objectId);
+                roomRuins.delete(event.objectId);
 
                 if (event.data && event.data.type === 'creep') {
                     const creepName = event.data.name;
@@ -157,6 +137,8 @@ module.exports = function stateScanner() {
                             const siteIdToRemove = event.data && event.data.targetId ? event.data.targetId : event.objectId;
                             roomSites.delete(siteIdToRemove);
                         }
+                        const siteIdToRemove = event.data && event.data.targetId ? event.data.targetId : event.objectId;
+                        roomSites.delete(siteIdToRemove);
 
                         let structsOfType = roomStructures.get(buildObj.structureType);
                         if (!structsOfType) {
@@ -173,6 +155,7 @@ module.exports = function stateScanner() {
                             }
                         }
 
+                        structsOfType.set(buildObj.id, buildObj);
                         global.State.structureCache.set(buildObj.id, buildObj);
                     }
                 }
@@ -184,6 +167,7 @@ module.exports = function stateScanner() {
                     } else if (roomDropped instanceof Map) {
                         roomDropped.set(dropObj.id, dropObj);
                     }
+                    roomDropped.set(dropObj.id, dropObj);
                 }
             }
         }
