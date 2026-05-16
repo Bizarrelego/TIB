@@ -45,6 +45,13 @@ module.exports.loop = function () {
     // Attempt global reset recovery
     resetRecovery.checkAndRecover();
 
+    // TrafficManager setup before intents are registered
+    try {
+        if (trafficManager && trafficManager.setup) trafficManager.setup();
+    } catch (e) {
+        Logger.error(`[Phase 0 Error] TrafficManager Setup: ${e.stack}`);
+    }
+
     // Phase 1: Discovery Manager (Raw Engine API execution & global.State Bootstrapping)
     Logger.debug('Phase 1: Running Discovery Manager');
     try {
