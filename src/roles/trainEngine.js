@@ -85,7 +85,9 @@ function run(room) {
                     if (!cart.pos.isNearTo(targetPos)) {
                         if (creep.pos.isNearTo(targetPos)) {
                             // Engine is adjacent but cart is not. Find another empty adjacent tile.
-                            const terrain = Game.map.getRoomTerrain(room.name);
+                            const terrain = global.State.roomTerrain && global.State.roomTerrain.get(room.name);
+                            const costMatrix = global.State.costMatrices && global.State.costMatrices.get(room.name);
+
                             let moved = false;
                             for (let dx = -1; dx <= 1; dx++) {
                                 for (let dy = -1; dy <= 1; dy++) {
@@ -93,32 +95,18 @@ function run(room) {
                                     const tx = targetPos.x + dx;
                                     const ty = targetPos.y + dy;
                                     if (tx < 0 || tx > 49 || ty < 0 || ty > 49) continue;
-                                    if (terrain.get(tx, ty) === TERRAIN_MASK_WALL) continue;
+
+                                    if (terrain && terrain.get(tx, ty) === TERRAIN_MASK_WALL) continue;
 
                                     // Make sure we aren't picking the tile we are already standing on
                                     if (tx === creep.pos.x && ty === creep.pos.y) continue;
 
-                                    // Avoid structures if possible
-                                    let hasSolid = false;
-                                    if (global.State && global.State.structuresByRoom) {
-                                        const structuresMap = global.State.structuresByRoom.get(room.name);
-                                        if (structuresMap) {
-                                            for (const structs of structuresMap.values()) {
-                                                for (const s of structs) {
-                                                    if (s.pos.x === tx && s.pos.y === ty && OBSTACLE_OBJECT_TYPES.includes(s.structureType)) {
-                                                        hasSolid = true;
-                                                        break;
-                                                    }
-                                                }
-                                                if (hasSolid) break;
-                                            }
-                                        }
-                                    }
-                                    if (!hasSolid) {
-                                        movement.moveTo(creep, new RoomPosition(tx, ty, room.name));
-                                        moved = true;
-                                        break;
-                                    }
+                                    // Check CostMatrix to avoid solid structures (cost 255) in O(1)
+                                    if (costMatrix && costMatrix.get(tx, ty) === 255) continue;
+
+                                    movement.moveTo(creep, new RoomPosition(tx, ty, room.name));
+                                    moved = true;
+                                    break;
                                 }
                                 if (moved) break;
                             }
