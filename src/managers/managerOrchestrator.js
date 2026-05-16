@@ -57,15 +57,23 @@ function managerOrchestrator() {
                 }
 
                 Logger.debug(`Running manager ${config.name} in room ${room.name}`);
+                const profilerEnabled = global.PROFILER_ENABLED || (typeof Memory !== 'undefined' && Memory.PROFILER_ENABLED);
                 const cpuAvailable = typeof Game !== 'undefined' && Game.cpu && typeof Game.cpu.getUsed === 'function';
-                const startCpu = cpuAvailable ? Game.cpu.getUsed() : Date.now();
+                let startCpu;
+                if (profilerEnabled) {
+                    startCpu = cpuAvailable ? Game.cpu.getUsed() : Date.now();
+                }
+
                 try {
                     manager.run(room);
                 } catch (e) {
                     Logger.error(`[ManagerOrchestrator Error] ${config.name} in Room ${room.name}: ${e.stack}`);
                 }
-                const endCpu = cpuAvailable ? Game.cpu.getUsed() : Date.now();
-                Profiler.record(config.name, endCpu - startCpu);
+
+                if (profilerEnabled) {
+                    const endCpu = cpuAvailable ? Game.cpu.getUsed() : Date.now();
+                    Profiler.record(config.name, endCpu - startCpu);
+                }
             }
         }
     }
