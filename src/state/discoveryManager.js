@@ -23,6 +23,7 @@ module.exports = function discoveryManager() {
             droppedByRoom: new Map(),
             tombstonesByRoom: new Map(),
             ruinsByRoom: new Map(),
+            nukesByRoom: new Map(),
             roomTerrain: new Map(),
             sourceWalkableTiles: new Map(),
             getEvents: function(roomName) {
@@ -82,6 +83,7 @@ module.exports = function discoveryManager() {
                 state.droppedByRoom.set(roomName, room.find(FIND_DROPPED_RESOURCES));
                 state.tombstonesByRoom.set(roomName, room.find(FIND_TOMBSTONES));
                 state.ruinsByRoom.set(roomName, room.find(FIND_RUINS));
+                state.nukesByRoom.set(roomName, room.find(FIND_NUKES));
 
                 state.roomTerrain.set(roomName, new Room.Terrain(roomName));
 
