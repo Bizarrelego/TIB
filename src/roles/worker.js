@@ -22,15 +22,54 @@ module.exports = {
         const storage = room.storage && room.storage.isActive() ? room.storage : null;
 
 
-        // RCL 1 Blitz Mode
-        if (room.controller && room.controller.level === 1) {
+        // RCL 1 & 2 Blitz/Transition Mode
+        if (room.controller && (room.controller.level === 1 || room.controller.level === 2)) {
             const sources = global.State.sourcesByRoom.get(room.name) || [];
+
+            // Check for massive dropped energy piles (decaying)
+            let massiveDrop = null;
+            let dropped = [];
+            if (global.State.droppedEnergyByRoom && global.State.droppedEnergyByRoom.has(room.name)) {
+                dropped = global.State.droppedEnergyByRoom.get(room.name) || [];
+            } else if (global.State.droppedByRoom && global.State.droppedByRoom.has(room.name)) {
+                dropped = global.State.droppedByRoom.get(room.name) || [];
+            }
+
+            for (let i = 0; i < dropped.length; i++) {
+                if (dropped[i].amount >= 300 && (!dropped[i].resourceType || dropped[i].resourceType === RESOURCE_ENERGY)) {
+                    massiveDrop = dropped[i];
+                    break;
+                }
+            }
+
+            // Find nearest worker to the massive drop
+            let nearestWorker = null;
+            let minDropDist = Infinity;
+            if (massiveDrop) {
+                for (const creep of workers) {
+                    if (creep.fatigue === 0 && creep.store.getFreeCapacity() > 0) {
+                        const dist = creep.pos.getRangeTo(massiveDrop);
+                        if (dist < minDropDist) {
+                            minDropDist = dist;
+                            nearestWorker = creep;
+                        }
+                    }
+                }
+            }
 
             for (const creep of workers) {
                 try {
                     if (creep.fatigue > 0) continue; // Fatigue gating
 
-                    if (creep.store.getUsedCapacity() === 0) {
+                    if (nearestWorker && creep.name === nearestWorker.name) {
+                        creep.heap.blitzTarget = massiveDrop.id;
+                        if (creep.pos.isNearTo(massiveDrop)) {
+                            TrafficManager.registerPickup(creep, massiveDrop, RESOURCE_ENERGY, Math.min(creep.store.getFreeCapacity(), massiveDrop.amount));
+                        } else {
+                            movement.moveTo(creep, massiveDrop);
+                        }
+                        creep.heap.blitzProcessed = true; // prevent RCL2 overwrite
+                    } else if (creep.store.getUsedCapacity() === 0) {
                         // Find the source with the fewest creeps currently targeting it, respecting its walkable tiles
                         let bestSource = null;
                         let minRatio = Infinity;
@@ -165,13 +204,19 @@ module.exports = {
                     console.log(`[worker Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
                 }
             }
-            return; // Skip RCL > 1 logic
+            if (room.controller.level === 1) {
+                return; // Skip standard RCL > 1 logic for RCL 1 entirely
+            }
         }
 
-        // RCL > 1 Logic
+        // RCL > 1 Standard Logic (RCL 2 runs both blitz decay recovery and this if no decay)
         for (const creep of workers) {
             try {
                 if (creep.fatigue > 0) continue; // Fatigue gating
+                if (creep.heap.blitzProcessed) {
+                    creep.heap.blitzProcessed = false; // Reset for next tick
+                    continue; // Skip standard logic if we already processed blitz action this tick
+                }
 
                 const state = creep.heap.state;
                 let targetId = creep.heap.targetId;

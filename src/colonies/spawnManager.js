@@ -133,7 +133,13 @@ module.exports = {
                 }
 
                 const desiredUpgraders = UpgraderManager.getDesiredCount(room);
-                if (upgraderCount < desiredUpgraders) {
+
+                // Income-Based Upgrader Scaling: Total Active Harvesters * 2 energy/tick
+                const energyPerTick = harvesterCount * 2;
+                const upkeep = 1; // Assuming 1 energy/tick upkeep for continuous spawning as rough estimate
+                const sustainedUpgraders = Math.max(1, energyPerTick - upkeep);
+
+                if (upgraderCount < Math.min(desiredUpgraders, sustainedUpgraders)) {
                     const body = BodyCalc.calculateUpgrader(capacity);
                     const cost = BodyCalc.getCost(body);
                     if (spawnLedger.canSpawn(cost)) {
