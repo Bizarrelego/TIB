@@ -1,28 +1,66 @@
 name: Issue Dispatcher (Jules)
 on:
-  issues:
-    types: [labeled]
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: jules-dispatcher
+  cancel-in-progress: false
 
 jobs:
   dispatch-jules:
-    if: github.event.label.name == 'jules-approved'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Enforce Single-Thread Pipeline
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          OPEN_PRS=$(gh pr list --state open --json number -q 'length')
+          if [ "$OPEN_PRS" -gt 0 ]; then
+            echo "An open PR already exists. Halting to prevent concurrent merge conflicts."
+            exit 0
+          fi
+
+      - name: Fetch Next Issue
+        id: get-issue
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          # Pulls exactly 1 issue to ensure sequential processing
+          ISSUE_JSON=$(gh issue list --state open --label "jules-approved" --limit 1 --json number,title,body)
+          ISSUE_NUM=$(echo "$ISSUE_JSON" | jq -r '.[0].number // empty')
+          
+          if [ -z "$ISSUE_NUM" ]; then
+            echo "No approved issues pending execution."
+            exit 0
+          fi
+          
+          echo "issue_number=$ISSUE_NUM" >> "$GITHUB_OUTPUT"
+          
+          # Safely dump text to disk to avoid Bash string interpolation crashes
+          echo "$ISSUE_JSON" | jq -r '.[0].title' > issue_title.txt
+          echo "$ISSUE_JSON" | jq -r '.[0].body' > issue_body.txt
+
       - name: Build Jules Prompt
+        if: steps.get-issue.outputs.issue_number != ''
         run: |
           (
             echo "SYSTEM CONSTRAINTS - STRICTLY ENFORCED:"
-            echo "Follow all rules in AGENTS.md. Zero Native Polling in tick loops."
+            cat AGENTS.md 2>/dev/null || echo "[AGENTS.md missing]"
             echo "========================================="
             echo "YOUR EXACT TASK IS TO RESOLVE THIS ISSUE:"
-            echo "Title: ${{ github.event.issue.title }}"
+            echo "Title: $(cat issue_title.txt)"
             echo ""
-            echo "${{ github.event.issue.body }}"
+            cat issue_body.txt
             echo ""
-            echo "Create the required files to satisfy these acceptance criteria."
+            echo "Create or edit the required files to satisfy these acceptance criteria."
           ) > full_jules_prompt.txt
 
       - name: Trigger Jules Execution
+        if: steps.get-issue.outputs.issue_number != ''
         run: |
           jq -n --rawfile prompt full_jules_prompt.txt '{
             prompt: $prompt,
@@ -41,13 +79,13 @@ jobs:
           -d @jules_payload.json
 
       - name: Acknowledge Dispatch
+        if: steps.get-issue.outputs.issue_number != ''
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          gh issue comment ${{ github.event.issue.number }} \
-            --repo ${{ github.repository }} \
-            --body "🚀 Task dispatched to Jules. A PR will be opened shortly."
+          ISSUE_NUM=${{ steps.get-issue.outputs.issue_number }}
           
-          gh issue edit ${{ github.event.issue.number }} \
-            --repo ${{ github.repository }} \
-            --add-label "in-progress"
+          gh issue comment $ISSUE_NUM --repo ${{ github.repository }} --body "🚀 Task dispatched to Jules. A PR will be opened shortly."
+          
+          # Remove the queue label and mark in-progress so it isn't fetched again
+          gh issue edit $ISSUE_NUM --repo ${{ github.repository }} --remove-label "jules-approved" --add-label "in-progress"
