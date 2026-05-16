@@ -2,7 +2,7 @@
 
 /* eslint-disable no-redeclare */
 /* global Game, PathFinder, TERRAIN_MASK_WALL, STRUCTURE_CONTAINER, STRUCTURE_ROAD, CONTROLLER_STRUCTURES, STRUCTURE_RAMPART, STRUCTURE_FACTORY, STRUCTURE_LAB */
-const DistanceTransform = require('../algorithms/distanceTransform');
+const BucketGatedDT = require('../os/BucketGatedDT');
 const rampartPlanner = require('./rampartPlanner');
 const { BASE_LAYOUT_STAMP, FAST_FILLER_SPOTS } = require('../constants/baseLayout');
 const roomPositionUtils = require('../utils/roomPositionUtils');
@@ -64,7 +64,10 @@ module.exports = {
                         }
                     }
 
-                    const dt = DistanceTransform.compute(room.name, cm);
+                    const dt = BucketGatedDT.compute(room.name, cm);
+                    if (dt === 'deferred') {
+                        return;
+                    }
 
                     let maxVal = 0;
                     for (let y = 8; y < 42; y++) {

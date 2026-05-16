@@ -1,4 +1,4 @@
-const MinCut = require('../algorithms/minCut');
+const BucketGatedDT = require('../os/BucketGatedDT');
 
 module.exports = {
     /**
@@ -42,7 +42,10 @@ module.exports = {
                     }
                 }
 
-                const cutTiles = MinCut.getCutTiles(room.name, sources, cm);
+                const cutTiles = BucketGatedDT.getCutTiles(room.name, sources, cm);
+                if (cutTiles === 'deferred') {
+                    return;
+                }
 
                 if (cutTiles && cutTiles.length > 0) {
                     for (let i = 0; i < cutTiles.length; i++) {
