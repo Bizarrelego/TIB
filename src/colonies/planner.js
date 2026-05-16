@@ -3,7 +3,7 @@
 /* eslint-disable no-redeclare */
 /* global Game, PathFinder, TERRAIN_MASK_WALL, STRUCTURE_CONTAINER, STRUCTURE_ROAD, CONTROLLER_STRUCTURES, STRUCTURE_RAMPART, STRUCTURE_FACTORY, STRUCTURE_LAB */
 const DistanceTransform = require('../algorithms/distanceTransform');
-const MinCut = require('../algorithms/minCut');
+const rampartPlanner = require('./rampartPlanner');
 const { BASE_LAYOUT_STAMP, FAST_FILLER_SPOTS } = require('../constants/baseLayout');
 const roomPositionUtils = require('../utils/roomPositionUtils');
 
@@ -261,15 +261,12 @@ module.exports = {
                     }
 
                     const occupiedCoords = new Set();
-                    let roadCount = 0;
 
                     const cm = new PathFinder.CostMatrix();
                     for (const struct of plannedStructures.values()) {
                         if (struct.type !== STRUCTURE_ROAD && struct.type !== STRUCTURE_CONTAINER && struct.type !== STRUCTURE_RAMPART) {
                             cm.set(struct.pos.x, struct.pos.y, 255);
                             occupiedCoords.add(`${struct.pos.x},${struct.pos.y}`);
-                        } else if (struct.type === STRUCTURE_ROAD) {
-                            roadCount++;
                         }
                     }
 
@@ -301,7 +298,7 @@ module.exports = {
                                         type: STRUCTURE_ROAD,
                                         id: uniqueId
                                     });
-                                    roadCount++;
+
                                 }
                             }
                         }
@@ -310,59 +307,7 @@ module.exports = {
             }
 
             // Rampart Planning
-            if (plannedStructures && !plannerState.has('rampartsPlanned')) {
-                let minX = 50, minY = 50, maxX = 0, maxY = 0;
-                let hasCoreStructures = false;
-
-                // Find bounding box of core base structures
-                for (const struct of plannedStructures.values()) {
-                    if (struct.type !== STRUCTURE_ROAD && struct.type !== STRUCTURE_CONTAINER && struct.type !== STRUCTURE_RAMPART) {
-                        hasCoreStructures = true;
-                        if (struct.pos.x < minX) minX = struct.pos.x;
-                        if (struct.pos.y < minY) minY = struct.pos.y;
-                        if (struct.pos.x > maxX) maxX = struct.pos.x;
-                        if (struct.pos.y > maxY) maxY = struct.pos.y;
-                    }
-                }
-
-                if (hasCoreStructures) {
-                    // Expand bounding box by 2 tiles to safely encapsulate the base
-                    minX = Math.max(2, minX - 2);
-                    minY = Math.max(2, minY - 2);
-                    maxX = Math.min(47, maxX + 2);
-                    maxY = Math.min(47, maxY + 2);
-
-                    const sources = [{ x1: minX, y1: minY, x2: maxX, y2: maxY }];
-
-                    // Rebuild CostMatrix specifically for minCut (needs walls marked)
-                    const cm = new PathFinder.CostMatrix();
-                    const terrain = global.State.roomTerrain.get(room.name);
-                    for (let y = 0; y < 50; y++) {
-                        for (let x = 0; x < 50; x++) {
-                            if (terrain.get(x, y) === TERRAIN_MASK_WALL) {
-                                cm.set(x, y, 255);
-                            }
-                        }
-                    }
-
-                    const cutTiles = MinCut.getCutTiles(room.name, sources, cm);
-
-                    if (cutTiles && cutTiles.length > 0) {
-                        for (let i = 0; i < cutTiles.length; i++) {
-                            const pos = cutTiles[i];
-                            const uniqueId = `${STRUCTURE_RAMPART}-${pos.x}-${pos.y}`;
-                            if (!plannedStructures.has(uniqueId)) {
-                                plannedStructures.set(uniqueId, {
-                                    pos: pos,
-                                    type: STRUCTURE_RAMPART,
-                                    id: uniqueId
-                                });
-                            }
-                        }
-                    }
-                }
-                plannerState.set('rampartsPlanned', true);
-            }
+            rampartPlanner.run(room, plannerState, plannedStructures);
 
         } catch (e) {
             console.log(`[Planner Error] Room ${room.name}: ${e.stack}`);
