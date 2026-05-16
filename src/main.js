@@ -1,4 +1,5 @@
 const { CacheRegistry } = require('./os/cache');
+const resetRecovery = require('./os/resetRecovery');
 const RawMemoryManager = require('./os/RawMemoryManager');
 const installMemoryProxy = require('./os/memoryProxy');
 const globalState = require('./state/globalState');
@@ -36,6 +37,9 @@ module.exports.loop = function () {
     if (!global.Cache) {
         CacheRegistry.init();
     }
+
+    // Attempt global reset recovery
+    resetRecovery.checkAndRecover();
 
     // Phase 1: Discovery Manager (Raw Engine API execution & global.State Bootstrapping)
     try {
@@ -151,4 +155,7 @@ module.exports.loop = function () {
     // Profiler output
     const Profiler = require('./utils/profiler');
     Profiler.report();
+
+    // Save caches state for reset recovery
+    resetRecovery.saveState();
 };
