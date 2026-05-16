@@ -21,23 +21,20 @@ module.exports = {
             try {
                 if (creep.fatigue > 0) continue; // Fatigue gating
 
-                // Retreat logic
-                if (creep.hits < creep.hitsMax * 0.3) {
-                    const spawns = global.State.spawnsByRoom.get(room.name) || [];
-                    if (spawns.length > 0) {
-                        movement.moveTo(creep, spawns[0].pos);
-                    }
-                    continue;
+                // If retreating, clear memory.parkPos so defense.js doesn't immediately assign a new one,
+                // and skip the move-to-parkPos logic.
+                if (creep.heap.retreating) {
+                    delete creep.memory.parkPos; // Ensure it doesn't get rehydrated
                 }
 
                 // State machine assigned by defense.js top-down.
                 // We should expect creep.heap.parkPos to be assigned if missing
-                if (!creep.heap.parkPos && creep.memory.parkPos) {
+                if (!creep.heap.retreating && !creep.heap.parkPos && creep.memory.parkPos) {
                     creep.heap.parkPos = creep.memory.parkPos;
                 }
 
                 let parked = false;
-                if (creep.heap.parkPos) {
+                if (!creep.heap.retreating && creep.heap.parkPos) {
                     if (creep.pos.x !== creep.heap.parkPos.x || creep.pos.y !== creep.heap.parkPos.y) {
                         movement.moveTo(creep, creep.heap.parkPos);
                     } else {

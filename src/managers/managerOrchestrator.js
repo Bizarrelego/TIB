@@ -33,6 +33,7 @@ function managerOrchestrator() {
         // Managers configuration for tick-slicing
         const managersConfig = [
             { name: 'NukeEvacuationManager', slice: 1 },
+            { name: 'RampartDefenseManager', slice: 1 },
             { name: 'TowerManager', slice: 1 },
             { name: 'ConstructionManager', slice: 1 },
             { name: 'workerManager', slice: 1 },
