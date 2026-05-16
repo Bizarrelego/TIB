@@ -1,4 +1,4 @@
-const CostMatrixCache = require('../cache/costMatrixCache');
+const CostMatrixCache = require('../traffic/costMatrixCache');
 
 module.exports = {
     /**
