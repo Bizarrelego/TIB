@@ -1,4 +1,5 @@
 const DeadlockEngine = require('./deadlock');
+const DirectionalCostMatrixGenerator = require('./directionalCostMatrixGenerator');
 const movement = require('../utils/movement');
 const ROLE_PRIORITIES = require('../constants/rolePriorities');
 const Logger = require('../utils/logger');
@@ -393,6 +394,24 @@ const TrafficManager = {
         } catch (e) {
             console.log(`[TrafficManager] FlushIntent Error on ${creep.name}: ${e.stack}`);
         }
+    },
+
+    /**
+     * Generates a directional cost matrix to enforce one-way traffic in hubs.
+     * @param {string} roomName - The room name.
+     * @param {object} creep - The creep for which the matrix is generated.
+     * @returns {PathFinder.CostMatrix|undefined}
+     */
+    getCostMatrix(roomName, creep) {
+        if (!global.State || !global.State.roomPlanner) return undefined;
+        const planner = global.State.roomPlanner.get(roomName);
+        if (!planner) return undefined;
+
+        const anchor = planner.get('anchor');
+        if (anchor && creep && creep.pos.inRangeTo(anchor, 5)) {
+            return DirectionalCostMatrixGenerator.generate(roomName, anchor, creep.pos, 'clockwise', 1);
+        }
+        return undefined;
     },
 
     executeIntents() {
