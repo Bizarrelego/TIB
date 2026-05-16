@@ -3,3 +3,5 @@ node_modules
 /scripts
 /scripts
 scripts/deploy-local.js
+/server
+oc.js
