@@ -261,15 +261,12 @@ module.exports = {
                     }
 
                     const occupiedCoords = new Set();
-                    let roadCount = 0;
 
                     const cm = new PathFinder.CostMatrix();
                     for (const struct of plannedStructures.values()) {
                         if (struct.type !== STRUCTURE_ROAD && struct.type !== STRUCTURE_CONTAINER && struct.type !== STRUCTURE_RAMPART) {
                             cm.set(struct.pos.x, struct.pos.y, 255);
                             occupiedCoords.add(`${struct.pos.x},${struct.pos.y}`);
-                        } else if (struct.type === STRUCTURE_ROAD) {
-                            roadCount++;
                         }
                     }
 
@@ -301,7 +298,7 @@ module.exports = {
                                         type: STRUCTURE_ROAD,
                                         id: uniqueId
                                     });
-                                    roadCount++;
+
                                 }
                             }
                         }
