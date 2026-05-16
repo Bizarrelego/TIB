@@ -46,6 +46,21 @@ function manageEarlyProgression(room, spawnLedger) {
     const droppedArrays = global.State.droppedByRoom.get(room.name) || [];
     const structures = global.State.structuresByRoom.get(room.name) || new Map();
     const sites = global.State.sitesByRoom.get(room.name) || [];
+    const tombstones = global.State.tombstonesByRoom.get(room.name) || [];
+
+    // Filter structures to PREVENT Parasitic Worker Drain
+    const validWithdrawTargets = [];
+    for (const [type, structs] of structures.entries()) {
+        if (type === STRUCTURE_SPAWN || type === STRUCTURE_EXTENSION) continue; // MUST NOT be assigned
+        if (type === STRUCTURE_CONTAINER) {
+            for (const s of structs.values()) {
+                if (s.store.getUsedCapacity(RESOURCE_ENERGY) > 0) validWithdrawTargets.push(s);
+            }
+        }
+    }
+    for (let i = 0; i < tombstones.length; i++) {
+        if (tombstones[i].store.getUsedCapacity(RESOURCE_ENERGY) > 0) validWithdrawTargets.push(tombstones[i]);
+    }
 
     // Pre-calculate O(1) arrays and track remaining capacities
     let freeSpawns = [];
@@ -125,7 +140,18 @@ function manageEarlyProgression(room, spawnLedger) {
             creep.heap.targetId = sources[i % sources.length].id;
         }
         if (creep.heap.targetId && !creep.heap.dropId && harvesterSpots && harvesterSpots.has(creep.heap.targetId)) {
-            creep.heap.dropId = harvesterSpots.get(creep.heap.targetId);
+            const packedPos = harvesterSpots.get(creep.heap.targetId);
+            creep.heap.dropId = packedPos;
+            
+            // Top-Down Harvester Container Building
+            const x = Math.floor(packedPos / 50);
+            const y = packedPos % 50;
+            for (let s = 0; s < sites.length; s++) {
+                if (sites[s].structureType === STRUCTURE_CONTAINER && sites[s].pos.x === x && sites[s].pos.y === y) {
+                    creep.heap.siteId = sites[s].id;
+                    break;
+                }
+            }
         }
     }
 
@@ -144,7 +170,9 @@ function manageEarlyProgression(room, spawnLedger) {
 
         // First block: State transition logic
         if (usedCap === 0) {
-            creep.heap.state = massiveDrop ? 'pickup' : 'harvest';
+            if (massiveDrop) creep.heap.state = 'pickup';
+            else if (validWithdrawTargets.length > 0) creep.heap.state = 'withdraw';
+            else creep.heap.state = 'harvest';
         } else if (freeCap === 0) {
             if (spawnIndex < freeSpawns.length || extIndex < freeExtensions.length) {
                 creep.heap.state = 'refill';
@@ -154,7 +182,9 @@ function manageEarlyProgression(room, spawnLedger) {
                 creep.heap.state = 'upgrade';
             }
         } else if (!creep.heap.state) {
-            creep.heap.state = massiveDrop ? 'pickup' : 'harvest';
+            if (massiveDrop) creep.heap.state = 'pickup';
+            else if (validWithdrawTargets.length > 0) creep.heap.state = 'withdraw';
+            else creep.heap.state = 'harvest';
         }
 
         // State exhaustion fallbacks
@@ -165,13 +195,19 @@ function manageEarlyProgression(room, spawnLedger) {
             creep.heap.state = 'upgrade';
         }
         if (creep.heap.state === 'pickup' && !massiveDrop) {
-            creep.heap.state = 'harvest';
+            if (validWithdrawTargets.length > 0) creep.heap.state = 'withdraw';
+            else creep.heap.state = 'harvest';
+        }
+        if (creep.heap.state === 'withdraw' && validWithdrawTargets.length === 0) {
+            creep.heap.state = massiveDrop ? 'pickup' : 'harvest';
         }
 
         // Second block: Target assignment logic
         const state = creep.heap.state;
         if (state === 'pickup') {
             creep.heap.targetId = massiveDrop.id;
+        } else if (state === 'withdraw') {
+            creep.heap.targetId = validWithdrawTargets[0].id;
         } else if (state === 'harvest') {
             let bestSource = sources[0];
             let minSat = Infinity;

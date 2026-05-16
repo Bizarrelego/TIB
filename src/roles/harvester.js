@@ -60,6 +60,17 @@ module.exports = {
                     continue;
                 }
 
+                // Top-Down Harvester Container Building
+                if (creep.heap.siteId) {
+                    const site = Game.getObjectById(creep.heap.siteId);
+                    if (site && creep.store.getFreeCapacity() === 0) {
+                        creep.build(site);
+                        continue;
+                    } else if (!site) {
+                        creep.heap.siteId = null;
+                    }
+                }
+
                 TrafficManager.registerHarvest(creep, target);
             } catch (e) {
                 console.log(`[Harvester Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);

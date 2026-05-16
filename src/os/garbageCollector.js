@@ -6,6 +6,11 @@ function garbageCollector() {
         for (const name in Memory.creeps) {
             if (!Game.creeps[name]) {
                 delete Memory.creeps[name];
+
+                // Clear the creep's heap memory proxy to prevent leaks
+                if (global.Cache && global.Cache.has('creeps')) {
+                    global.Cache.get('creeps').delete(name);
+                }
             }
         }
 
@@ -70,6 +75,15 @@ function garbageCollector() {
             for (const [roomName, intelData] of global.State.intel.entries()) {
                 if (Game.time - (intelData.lastSeen || 0) > 1000) {
                     global.State.intel.delete(roomName);
+                }
+            }
+        }
+
+        // Clean up stale enemy profiles
+        if (global.State && global.State.enemyProfiles) {
+            for (const id of global.State.enemyProfiles.keys()) {
+                if (!Game.getObjectById(id)) {
+                    global.State.enemyProfiles.delete(id);
                 }
             }
         }

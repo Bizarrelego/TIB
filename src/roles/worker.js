@@ -30,7 +30,7 @@ module.exports = {
                 if (!state || !targetId) continue;
 
                 const target = Game.getObjectById(targetId);
-                if (!target) {
+                if (target === null || target === undefined) {
                     creep.heap.state = null;
                     creep.heap.targetId = null;
                     continue;
@@ -45,6 +45,12 @@ module.exports = {
                 } else if (state === 'pickup') {
                     if (creep.pos.isNearTo(target)) {
                         TrafficManager.registerPickup(creep, target, RESOURCE_ENERGY, Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), target.amount));
+                    } else {
+                        movement.moveTo(creep, target);
+                    }
+                } else if (state === 'withdraw') {
+                    if (creep.pos.isNearTo(target)) {
+                        TrafficManager.registerWithdraw(creep, target, RESOURCE_ENERGY, Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), TrafficManager.getVirtualState(target, RESOURCE_ENERGY).used));
                     } else {
                         movement.moveTo(creep, target);
                     }
