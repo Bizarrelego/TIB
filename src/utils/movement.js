@@ -34,10 +34,28 @@ module.exports = {
             pathingOpts.reusePath = 0;
             pathingOpts.ignoreCreeps = false;
             creep.heap.stuckTicks = 0; // Reset stuckTicks after forcing recalculation
+            delete creep.heap.path; // Force repath
         }
 
-        // Delegate to the native move command
-        return creep.moveTo(target, pathingOpts);
+        // IMPROVEMENT: Eliminate native moveTo. Route all moves through TrafficManager.
+        // Reason: Enforces atomic lockstep execution and prevents native pathing from bypassing the swap/deadlock registry.
+        if (!creep.heap.path || creep.heap.path.length === 0) {
+            const targetPos = target.pos || target;
+            const pathInfo = PathFinder.search(creep.pos, targetPos, pathingOpts);
+            if (pathInfo.path.length > 0) creep.heap.path = pathInfo.path;
+        }
+
+        if (creep.heap.path && creep.heap.path.length > 0) {
+            if (creep.pos.x === creep.heap.path[0].x &&
+                creep.pos.y === creep.heap.path[0].y &&
+                creep.pos.roomName === creep.heap.path[0].roomName) {
+                creep.heap.path.shift(); // Advance path
+            }
+            if (creep.heap.path.length > 0) {
+                const getTrafficManager = () => require('../traffic/trafficManager');
+                getTrafficManager().registerMoveIntent(creep, creep.heap.path[0], pathingOpts);
+            }
+        }
     },
 
     /**

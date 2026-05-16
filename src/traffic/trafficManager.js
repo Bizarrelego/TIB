@@ -335,15 +335,25 @@ const TrafficManager = {
             global.State.swapRegistry.clear();
 
 
-            const currentPositions = new Map();
+            // IMPROVEMENT: Replace string keys with integer bitwise keys.
+            // Reason: Optimizes performance. Bitwise operations and integer Map keys are significantly faster and reduce garbage collector overhead compared to string allocation.
+            const currentPositions = new Map(); // Map<roomName, Map<int, string>>
+
             for (const roomName of global.State.scannedRooms || []) {
                 const roomCreeps = global.State.creepsByRoom.get(roomName);
-                if (roomCreeps) {
-                    for (const roleCreeps of roomCreeps.values()) {
-                        if (Array.isArray(roleCreeps)) {
-                            for (const creep of roleCreeps) {
-                                currentPositions.set(`${creep.pos.roomName}_${creep.pos.x}_${creep.pos.y}`, creep.name);
-                            }
+                if (!roomCreeps) continue;
+
+                let roomMap = currentPositions.get(roomName);
+                if (!roomMap) {
+                    roomMap = new Map();
+                    currentPositions.set(roomName, roomMap);
+                }
+
+                for (const roleCreeps of roomCreeps.values()) {
+                    if (Array.isArray(roleCreeps)) {
+                        for (const creep of roleCreeps) {
+                            const posKey = (creep.pos.x << 6) | creep.pos.y;
+                            roomMap.set(posKey, creep.name);
                         }
                     }
                 }
@@ -374,8 +384,9 @@ const TrafficManager = {
                 if (!intendedNextPos) continue;
                 intent.intendedNextPos = intendedNextPos;
 
-                const posKey = `${intendedNextPos.roomName}_${intendedNextPos.x}_${intendedNextPos.y}`;
-                const blockingCreepName = currentPositions.get(posKey);
+                const posKey = (intendedNextPos.x << 6) | intendedNextPos.y;
+                const roomMap = currentPositions.get(intendedNextPos.roomName);
+                const blockingCreepName = roomMap ? roomMap.get(posKey) : undefined;
 
                 if (blockingCreepName && blockingCreepName !== creepName) {
                     dependencyGraph.set(creepName, blockingCreepName);
@@ -426,8 +437,9 @@ const TrafficManager = {
                 }
 
                 if (intendedNextPos) {
-                    const posKey = `${intendedNextPos.roomName}_${intendedNextPos.x}_${intendedNextPos.y}`;
-                    const blockingCreepName = currentPositions.get(posKey);
+                    const posKey = (intendedNextPos.x << 6) | intendedNextPos.y;
+                    const roomMap = currentPositions.get(intendedNextPos.roomName);
+                    const blockingCreepName = roomMap ? roomMap.get(posKey) : undefined;
 
                     if (blockingCreepName && blockingCreepName !== creep.name) {
                         const blockingLive = global.State.creepLookup ? global.State.creepLookup.get(blockingCreepName) : Game.creeps[blockingCreepName];
