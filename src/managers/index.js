@@ -5,6 +5,7 @@ const LabManager = require('./LabManager');
 const LinkManager = require('./LinkManager');
 const MarketManager = require('./MarketManager');
 const NukeEvacuationManager = require('./NukeEvacuationManager');
+const RampartDefenseManager = require('./RampartDefenseManager');
 const RemoteEconomyManager = require('./RemoteEconomyManager');
 const RoomEventManager = require('./RoomEventManager');
 const SpawnQueueManager = require('./SpawnQueueManager');
@@ -22,6 +23,7 @@ const managers = {
     LinkManager,
     MarketManager,
     NukeEvacuationManager,
+    RampartDefenseManager,
     RemoteEconomyManager,
     RoomEventManager,
     SpawnQueueManager,
