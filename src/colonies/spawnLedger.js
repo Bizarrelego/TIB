@@ -92,8 +92,8 @@ class SpawnLedger {
      * @returns {number} The target worker count.
      */
     calculateWorkerTarget(room) {
-        if (room.controller && room.controller.level === 1) {
-            return 2;
+        if (room.controller && room.controller.level < 3) {
+            return Math.max(8, Math.ceil(this.calculateSourceCaps() * 1.5));
         }
         return 2; // Default minimum
     }
@@ -105,9 +105,8 @@ class SpawnLedger {
      * @returns {number} The target harvester count.
      */
     calculateHarvesterTarget(room, workerCount) {
-        if (room.controller && room.controller.level === 1 && workerCount === 0) {
-            const sources = global.State.sourcesByRoom.get(room.name) || [];
-            return sources.length || 1;
+        if (room.controller && room.controller.level < 3) {
+            return this.calculateSourceCaps();
         }
         return this.calculateSourceCaps();
     }

@@ -105,7 +105,13 @@ module.exports = {
                                     }
                                 }
                                 if (nearest) {
-                                    if (!creep.pos.isNearTo(nearest)) {
+                                    if (nearest.store && nearest.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+                                        if (creep.pos.getRangeTo(room.controller) > 3) {
+                                            movement.moveTo(creep, room.controller);
+                                        } else {
+                                            creep.upgradeController(room.controller);
+                                        }
+                                    } else if (!creep.pos.isNearTo(nearest)) {
                                         movement.moveTo(creep, nearest);
                                     } else {
                                         const amount = Math.min(creep.store.getUsedCapacity(RESOURCE_ENERGY), TrafficManager.getVirtualState(nearest, RESOURCE_ENERGY).free);
