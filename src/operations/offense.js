@@ -1,3 +1,4 @@
+const QuadSquadManager = require('../managers/QuadSquadManager');
 const Profiler = require('../utils/profiler');
 /**
  * @file offense.js
@@ -20,7 +21,7 @@ function runAtomicQuads() {
         // Find direction (placeholder logic, usually fetched from quadObj.target or pathing)
         const direction = quadObj.direction || TOP;
 
-        CombatManager.atomicQuadMove(quadObj.creeps, direction);
+        QuadSquadManager.atomicQuadMove(quadObj.creeps, direction);
     }
 }
 

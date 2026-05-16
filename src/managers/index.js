@@ -1,4 +1,5 @@
 const CombatManager = require('./CombatManager');
+const QuadSquadManager = require('./QuadSquadManager');
 const ConstructionManager = require('./ConstructionManager');
 const EnergyRequestManager = require('./EnergyRequestManager');
 const LabManager = require('./LabManager');
@@ -16,6 +17,7 @@ const workerManager = require('./workerManager');
 
 const managers = {
     CombatManager,
+    QuadSquadManager,
     ConstructionManager,
     EnergyRequestManager,
     LabManager,

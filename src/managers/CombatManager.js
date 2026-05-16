@@ -1,5 +1,6 @@
 const movement = require('../utils/movement');
 const Profiler = require('../utils/profiler');
+const QuadSquadManager = require('./QuadSquadManager');
 
 /**
  * @file CombatManager.js
@@ -127,7 +128,7 @@ class CombatManager {
      * @param {number} direction
      */
     static atomicQuadMove(quad, direction) {
-        movement.atomicQuadMove(quad, direction);
+        QuadSquadManager.atomicQuadMove(quad, direction);
     }
 
     /**
