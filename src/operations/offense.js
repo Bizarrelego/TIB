@@ -5,6 +5,7 @@ const Profiler = require('../utils/profiler');
  */
 
 const CombatManager = require('../managers/CombatManager');
+const coreSniper = require('../roles/coreSniper');
 
 /**
  * Drives all active quads. Implements 4-creep lockstep chain-pulling.
@@ -80,6 +81,18 @@ function runTowerDrain() {
 }
 
 /**
+ * Orchestrates core sniping operations to block or kill enemy upgraders.
+ * @returns {void}
+ */
+function runCoreSnipers() {
+    // Rely on Game.rooms to iterate valid visible rooms for snipers
+    const rooms = Object.values(Game.rooms);
+    for (const room of rooms) {
+        coreSniper.run(room);
+    }
+}
+
+/**
  * Main offense loop executing atomic combat intents.
  * @returns {void}
  */
@@ -89,6 +102,7 @@ module.exports = Profiler.wrap('offenseManager', function offenseManager() {
         runAtomicQuads();
         runSynchronizedBurst();
         runTowerDrain();
+        runCoreSnipers();
     } catch (e) {
         console.error(`[OffenseManager Error] ${e.stack}`);
     }
