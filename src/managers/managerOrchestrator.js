@@ -42,7 +42,8 @@ function managerOrchestrator() {
             { name: 'LabManager', slice: 5 },
             { name: 'RemoteEconomyManager', slice: 5 },
             { name: 'MarketManager', slice: 10 },
-            { name: 'TerminalManager', slice: 10 }
+            { name: 'TerminalManager', slice: 10 },
+            { name: 'QuadSquadManager', slice: 1 }
         ];
 
         for (const config of managersConfig) {
