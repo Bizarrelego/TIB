@@ -55,6 +55,14 @@ class PubSub {
             }
         }
     }
+
+    /**
+     * Clears all subscriptions. Useful for resetting state between tests.
+     * @returns {void}
+     */
+    clear() {
+        this.events.clear();
+    }
 }
 
 const eventBus = new PubSub();

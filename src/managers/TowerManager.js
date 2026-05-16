@@ -1,5 +1,6 @@
 /* global DISMANTLE */
 const { determineDefcon, DEFCON } = require('../constants/defcon');
+const eventBus = require('../os/eventBus');
 
 function getDistance(pos1, pos2) {
     return Math.max(Math.abs(pos1.x - pos2.x), Math.abs(pos1.y - pos2.y));
@@ -127,4 +128,28 @@ function run(room, defenseRepairTarget = null) {
     }
 }
 
-module.exports = { run };
+const runTicks = new Map();
+
+function executeRun(room, defenseRepairTarget = null) {
+    const key = room.name + (defenseRepairTarget ? '_repair' : '_attack');
+    if (runTicks.get(key) === Game.time) return;
+    runTicks.set(key, Game.time);
+
+    run(room, defenseRepairTarget);
+}
+
+eventBus.subscribe('HOSTILE_SPOTTED', (payload) => {
+    const roomName = payload.roomName;
+    const room = global.State && global.State.rooms ? global.State.rooms.get(roomName) : (typeof Game !== 'undefined' && Game.rooms ? Game.rooms[roomName] : null);
+    if (room) {
+        executeRun(room);
+    }
+});
+
+eventBus.subscribe('DEFENSE_REPAIR_REQUEST', (payload) => {
+    if (payload && payload.room) {
+        executeRun(payload.room, payload.defenseRepairTarget);
+    }
+});
+
+module.exports = { run: executeRun };

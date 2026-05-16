@@ -4,6 +4,7 @@
  */
 
 const ROLE_PRIORITIES = require('../constants/rolePriorities');
+const eventBus = require('../os/eventBus');
 
 /**
  * @class SpawnQueueManager
@@ -138,5 +139,11 @@ class SpawnQueueManager {
 
 SpawnQueueManager.ROLE_PRIORITIES = ROLE_PRIORITIES;
 SpawnQueueManager.globalQueue = new Map();
+
+eventBus.subscribe('REQUEST_RAMPART_MELEE', (payload) => {
+    if (payload && payload.room) {
+        SpawnQueueManager.requestRampartMelee(payload.room);
+    }
+});
 
 module.exports = SpawnQueueManager;
