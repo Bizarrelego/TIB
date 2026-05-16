@@ -48,10 +48,13 @@ module.exports = function stateScanner() {
             global.State.hostilesByRoom.set(roomName, roomHostiles);
         }
 
+        let requiresSync = false;
+
         let roomDropped = global.State.droppedByRoom.get(roomName);
         if (!roomDropped) {
             roomDropped = new Map();
             global.State.droppedByRoom.set(roomName, roomDropped);
+            requiresSync = true;
         }
 
         let roomSites = global.State.sitesByRoom.get(roomName);
@@ -64,12 +67,30 @@ module.exports = function stateScanner() {
         if (!roomTombstones) {
             roomTombstones = new Map();
             global.State.tombstonesByRoom.set(roomName, roomTombstones);
+            requiresSync = true;
         }
 
         let roomRuins = global.State.ruinsByRoom.get(roomName);
         if (!roomRuins) {
             roomRuins = new Map();
             global.State.ruinsByRoom.set(roomName, roomRuins);
+            requiresSync = true;
+        }
+
+        if (requiresSync && typeof Game !== 'undefined' && Game.rooms[roomName]) {
+            const roomObj = Game.rooms[roomName];
+            
+            roomDropped.clear();
+            const dropped = roomObj.find(FIND_DROPPED_RESOURCES);
+            for (let i = 0; i < dropped.length; i++) roomDropped.set(dropped[i].id, dropped[i]);
+
+            roomTombstones.clear();
+            const tombstones = roomObj.find(FIND_TOMBSTONES);
+            for (let i = 0; i < tombstones.length; i++) roomTombstones.set(tombstones[i].id, tombstones[i]);
+
+            roomRuins.clear();
+            const ruins = roomObj.find(FIND_RUINS);
+            for (let i = 0; i < ruins.length; i++) roomRuins.set(ruins[i].id, ruins[i]);
         }
 
         for (const event of events) {

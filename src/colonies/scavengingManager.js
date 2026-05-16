@@ -11,37 +11,69 @@ const scavengingManager = {
      * @param {Room} room The room to execute logic in.
      */
     run(room) {
-        if (!global.State || !global.State.ruinsByRoom || !global.State.tombstonesByRoom || !global.State.creepsByRoom) {
-            return;
-        }
+        if (!global.State || !global.State.creepsByRoom) return;
 
         const roomName = room.name;
-        const ruins = global.State.ruinsByRoom.get(roomName) || [];
-        const tombstones = global.State.tombstonesByRoom.get(roomName) || [];
+        const buckets = new Array(101);
+        let targetsFound = false;
+
+        // 1. Process Ruins
+        if (global.State.ruinsByRoom && global.State.ruinsByRoom.has(roomName)) {
+            const ruins = global.State.ruinsByRoom.get(roomName);
+            for (const ruin of ruins.values()) {
+                if (ruin.store) {
+                    const amount = ruin.store.getUsedCapacity();
+                    if (amount > 0) {
+                        let priority = Math.min(100, Math.floor(amount / 20));
+                        if (ruin.ticksToDecay && ruin.ticksToDecay < 200) priority = Math.min(100, priority + 40);
+                        const bucket = buckets[priority] = buckets[priority] || [];
+                        bucket.push(ruin);
+                        targetsFound = true;
+                    }
+                }
+            }
+        }
+
+        // 2. Process Tombstones
+        if (global.State.tombstonesByRoom && global.State.tombstonesByRoom.has(roomName)) {
+            const tombstones = global.State.tombstonesByRoom.get(roomName);
+            for (const tombstone of tombstones.values()) {
+                if (tombstone.store) {
+                    const amount = tombstone.store.getUsedCapacity();
+                    if (amount > 0) {
+                        let priority = Math.min(100, Math.floor(amount / 20));
+                        if (tombstone.ticksToDecay && tombstone.ticksToDecay < 200) priority = Math.min(100, priority + 40);
+                        const bucket = buckets[priority] = buckets[priority] || [];
+                        bucket.push(tombstone);
+                        targetsFound = true;
+                    }
+                }
+            }
+        }
+
+        // 3. Process Dropped Resources
+        if (global.State.droppedByRoom && global.State.droppedByRoom.has(roomName)) {
+            const dropped = global.State.droppedByRoom.get(roomName);
+            for (const drop of dropped.values()) {
+                if (drop.amount > 0 && (!drop.resourceType || drop.resourceType === RESOURCE_ENERGY)) {
+                    let priority = Math.min(100, Math.floor(drop.amount / 20));
+                    const bucket = buckets[priority] = buckets[priority] || [];
+                    bucket.push(drop);
+                    targetsFound = true;
+                }
+            }
+        }
+
+        if (!targetsFound) return;
 
         const targets = [];
-
-        for (let i = 0; i < ruins.length; i++) {
-            const ruin = ruins[i];
-            if (ruin.store) {
-                const totalUsed = ruin.store.getUsedCapacity();
-                if (totalUsed > 0) {
-                    targets.push(ruin);
+        for (let i = 100; i >= 0; i--) {
+            if (buckets[i]) {
+                for (let j = 0; j < buckets[i].length; j++) {
+                    targets.push(buckets[i][j]);
                 }
             }
         }
-
-        for (let i = 0; i < tombstones.length; i++) {
-            const tombstone = tombstones[i];
-            if (tombstone.store) {
-                const totalUsed = tombstone.store.getUsedCapacity();
-                if (totalUsed > 0) {
-                    targets.push(tombstone);
-                }
-            }
-        }
-
-        if (targets.length === 0) return;
 
         const roomCreeps = global.State.creepsByRoom.get(roomName);
         if (!roomCreeps) return;
@@ -55,12 +87,17 @@ const scavengingManager = {
         for (let i = 0; i < targets.length; i++) {
             const target = targets[i];
             let targetState = null;
-            // Iterate over all resource types in the store
-            for (const resourceType in target.store) {
-                const amount = target.store[resourceType];
-                if (amount > 0) {
-                    targetState = { resourceType, amount };
-                    break; // Just pick the first available resource for now
+            
+            // Identify target type and extract resource info
+            if (target instanceof Resource || target.amount !== undefined) {
+                targetState = { resourceType: target.resourceType || RESOURCE_ENERGY, amount: target.amount };
+            } else if (target.store) {
+                for (const resourceType in target.store) {
+                    const amount = target.store[resourceType];
+                    if (amount > 0) {
+                        targetState = { resourceType, amount };
+                        break; 
+                    }
                 }
             }
 
@@ -98,11 +135,20 @@ const scavengingManager = {
                 const amountToWithdraw = Math.min(creepVirtualState.free, availableAmount);
                 if (amountToWithdraw <= 0) continue;
 
-                const status = TrafficManager.registerWithdraw(creep, target, resType, amountToWithdraw);
+                let status;
+                if (target instanceof Resource || target.amount !== undefined) {
+                    status = TrafficManager.registerPickup(creep, target, resType, amountToWithdraw);
+                    if (status === OK) {
+                        TrafficManager.lockPipeline(creep.name, creep.id, target.id, resType, amountToWithdraw, 'PICKUP');
+                    }
+                } else {
+                    status = TrafficManager.registerWithdraw(creep, target, resType, amountToWithdraw);
+                    if (status === OK) {
+                        TrafficManager.lockPipeline(creep.name, creep.id, target.id, resType, amountToWithdraw, 'WITHDRAW');
+                    }
+                }
 
                 if (status === OK) {
-                    TrafficManager.lockPipeline(creep.name, creep.id, target.id, resType, amountToWithdraw, 'WITHDRAW');
-
                     creep.heap.set('state', 'pickup');
                     creep.heap.set('dropId', target.id);
                     creep.heap.set('resourceType', resType);
