@@ -26,8 +26,8 @@ class CombatManager {
         for (const hostile of hostiles) {
             // Check danger (ATTACK or RANGED_ATTACK parts). If no body info, assume dangerous.
             let isDangerous = true;
-            if (hostile.body) {
-                isDangerous = hostile.body.some(p => p.type === ATTACK || p.type === RANGED_ATTACK);
+            if (global.State && global.State.enemyProfiles && global.State.enemyProfiles.has(hostile.id)) {
+                isDangerous = global.State.enemyProfiles.get(hostile.id).isDangerous;
             }
 
             if (isDangerous) {
@@ -102,8 +102,8 @@ class CombatManager {
         if (enemyCreeps) {
             for (const hostile of enemyCreeps) {
                 let isDangerous = true;
-                if (hostile.body) {
-                    isDangerous = hostile.body.some(p => p.type === ATTACK || p.type === RANGED_ATTACK);
+                if (global.State && global.State.enemyProfiles && global.State.enemyProfiles.has(hostile.id)) {
+                    isDangerous = global.State.enemyProfiles.get(hostile.id).isDangerous;
                 }
                 if (isDangerous) {
                     if (creep.pos.getRangeTo(hostile) <= 3) {
@@ -155,16 +155,25 @@ class CombatManager {
      */
     static borderBounce(creep, retreatRoomName) {
         if (creep.fatigue > 0) return;
+        
+        if (!global.State) global.State = {};
+        if (!global.State.retreatPosCache) global.State.retreatPosCache = new Map();
+        
+        let retreatPos = global.State.retreatPosCache.get(retreatRoomName);
+        if (!retreatPos) {
+            retreatPos = new RoomPosition(25, 25, retreatRoomName);
+            global.State.retreatPosCache.set(retreatRoomName, retreatPos);
+        }
 
         // If HP is low, step to the retreat room
         if (creep.hits < creep.hitsMax * 0.5) {
             if (creep.room.name !== retreatRoomName) {
                 // Move towards center of retreat room to step off exit tile quickly
-                movement.moveTo(creep, new RoomPosition(25, 25, retreatRoomName));
+                movement.moveTo(creep, retreatPos);
             } else {
                 // Already in retreat room, step off edge and heal
                 if (creep.pos.x === 0 || creep.pos.x === 49 || creep.pos.y === 0 || creep.pos.y === 49) {
-                    movement.moveTo(creep, new RoomPosition(25, 25, retreatRoomName));
+                    movement.moveTo(creep, retreatPos);
                 }
                 creep.heal(creep);
             }
@@ -190,10 +199,11 @@ class CombatManager {
             let score = 100 - range * 2; // Closer is better
 
             // HEAL parts are high priority
-            if (hostile.body) {
-                const healParts = hostile.body.filter(p => p.type === HEAL).length;
-                score += healParts * 10;
+            let healParts = 0;
+            if (global.State && global.State.enemyProfiles && global.State.enemyProfiles.has(hostile.id)) {
+                healParts = global.State.enemyProfiles.get(hostile.id).healParts;
             }
+            score += healParts * 10;
 
             if (score > bestScore) {
                 bestScore = score;

@@ -109,19 +109,6 @@ module.exports.loop = function () {
         Logger.error(`[Phase 2.5 Error] EnergyRequestManager: ${e.stack}`);
     }
 
-    try {
-        if (global.State.creepsByRoom) {
-            for (const roomCreeps of global.State.creepsByRoom.values()) {
-                for (const [role, creepsArray] of roomCreeps.entries()) {
-                    const activeCreeps = creepsArray.filter(creep => !movement.checkFatigue(creep));
-                    roomCreeps.set(role, activeCreeps);
-                }
-            }
-        }
-    } catch (e) {
-        Logger.error(`[Phase 2.5 Error] Execution Gates: ${e.stack}`);
-    }
-
     // Phase 3: Colonies
     if (!skipColonies) {
         Logger.debug('Phase 3: Running Colonies');

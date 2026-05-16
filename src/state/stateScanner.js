@@ -1,6 +1,32 @@
 /* global EVENT_CREATE_CREEP, EVENT_DROP */
 const globalState = require('./globalState');
 
+/**
+ * Caches enemy combat profile to prevent O(N) array scans during tick loops.
+ * @param {Creep} creep - The hostile creep to cache
+ */
+function cacheEnemyProfile(creep) {
+    if (!global.State.enemyProfiles) global.State.enemyProfiles = new Map();
+    if (!global.State.enemyProfiles.has(creep.id)) {
+        let isDangerous = true;
+        let healParts = 0;
+        let attackParts = 0;
+        if (creep.body) {
+            isDangerous = false;
+            for (let i = 0; i < creep.body.length; i++) {
+                const type = creep.body[i].type;
+                if (type === ATTACK || type === RANGED_ATTACK) {
+                    isDangerous = true;
+                    attackParts++;
+                } else if (type === HEAL) {
+                    healParts++;
+                }
+            }
+        }
+        global.State.enemyProfiles.set(creep.id, { isDangerous, healParts, attackParts });
+    }
+}
+
 module.exports = function stateScanner() {
     if (!global.State?.scannedRooms) return;
 
@@ -58,6 +84,9 @@ module.exports = function stateScanner() {
 
                 global.State.structureCache.delete(event.objectId);
                 roomHostiles.delete(event.objectId);
+                if (global.State.enemyProfiles) {
+                    global.State.enemyProfiles.delete(event.objectId);
+                }
                 roomLogistics.delete(event.objectId);
 
                 if (typeToRemove) {
@@ -95,15 +124,18 @@ module.exports = function stateScanner() {
 
                 if (actor && actor.my === false && actor.owner && actor.owner.username !== 'Invader') {
                     roomHostiles.set(actor.id, actor);
+                    cacheEnemyProfile(actor);
                 }
                 if (target && target.my === false && target.owner && target.owner.username !== 'Invader') {
                     roomHostiles.set(target.id, target);
+                    cacheEnemyProfile(target);
                 }
             } else if (event.event === EVENT_CREATE_CREEP) {
                 let newCreep = Game.getObjectById(event.objectId);
                 if (newCreep) {
                     if (newCreep.my === false) {
                         roomHostiles.set(newCreep.id, newCreep);
+                        cacheEnemyProfile(newCreep);
                     } else {
                         global.State.creepLookup.set(newCreep.name, newCreep);
                         const roomName = newCreep.pos.roomName;
