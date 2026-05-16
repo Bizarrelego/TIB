@@ -57,7 +57,10 @@ class CombatManager {
             targetY = Math.max(1, Math.min(48, targetY));
 
             const fleePos = new RoomPosition(Math.floor(targetX), Math.floor(targetY), creep.room.name);
-            movement.moveTo(creep, fleePos);
+            const CostMatrixCache = require('../traffic/costMatrixCache');
+            const heatmap = CostMatrixCache.getHeatmap(creep.room.name);
+
+            movement.moveTo(creep, fleePos, { roomCallback: () => heatmap });
             return true;
         }
 
