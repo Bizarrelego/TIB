@@ -79,13 +79,20 @@ const scavengingManager = {
                 const creepVirtualState = TrafficManager.getVirtualState(creep, resType);
                 if (creepVirtualState.free <= 0) continue;
 
-                // Ensure heap exists
-                if (!(creep.heap instanceof Map) && !creep.heap) {
-                    creep.heap = {};
+                // Ensure heap exists using Map() per memory proxy design pattern
+                if (!creep.heap) {
+                    creep.heap = new Map();
+                } else if (!(creep.heap instanceof Map)) {
+                    // Normalize to Map if it's currently a standard object
+                    const newHeap = new Map();
+                    for (const key in creep.heap) {
+                        newHeap.set(key, creep.heap[key]);
+                    }
+                    creep.heap = newHeap;
                 }
 
                 // Skip if already transferring or explicitly picking up a different target (that wasn't just assigned)
-                const state = creep.heap instanceof Map ? creep.heap.get('state') : creep.heap.state;
+                const state = creep.heap.get('state');
                 if (state === 'transfer') continue;
 
                 const amountToWithdraw = Math.min(creepVirtualState.free, availableAmount);
@@ -96,15 +103,9 @@ const scavengingManager = {
                 if (status === OK) {
                     TrafficManager.lockPipeline(creep.name, creep.id, target.id, resType, amountToWithdraw, 'WITHDRAW');
 
-                    if (creep.heap instanceof Map) {
-                        creep.heap.set('state', 'pickup');
-                        creep.heap.set('dropId', target.id);
-                        creep.heap.set('resourceType', resType);
-                    } else {
-                        creep.heap.state = 'pickup';
-                        creep.heap.dropId = target.id;
-                        creep.heap.resourceType = resType;
-                    }
+                    creep.heap.set('state', 'pickup');
+                    creep.heap.set('dropId', target.id);
+                    creep.heap.set('resourceType', resType);
 
                     availableAmount -= amountToWithdraw;
                     if (availableAmount <= 0) break; // Target depleted
