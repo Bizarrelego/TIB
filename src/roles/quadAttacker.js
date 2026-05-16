@@ -1,13 +1,14 @@
 /**
  * @file quadAttacker.js
- * @description Atomic lockstep movement. Works with quadHealer.
+ * @description Integrates with QuadSquadManager to define targets and track health for rotation.
  */
 
-const movement = require('../utils/movement');
+const CombatManager = require('../managers/CombatManager');
 
 module.exports = {
     /**
      * Executes logic for quadAttacker role.
+     * Delegates actual movement and attacking to QuadSquadManager.
      * @param {Room} room
      */
     run(room) {
@@ -17,19 +18,12 @@ module.exports = {
         const quadAttackers = roomCreeps.get('quadAttacker');
         if (!quadAttackers || quadAttackers.length === 0) return;
 
-        // Implementation of individual logic or ensuring quads move if not managed globally.
-        // Actually, if the reviewer complained about incomplete role implementation:
-        // "The prompt specifically requested targeting src/roles/quadAttacker.js. The agent only added comments to this file rather than integrating the new movement controller logic into the attacker's actual role loop."
-
-        // We will execute the movement here as requested, checking activeQuads.
-
         if (!global.State.activeQuads) return;
 
         for (const creep of quadAttackers) {
             try {
-                if (creep.fatigue > 0) continue; // Fatigue gating
+                if (creep.fatigue > 0) continue;
 
-                // Find which quad this creep belongs to
                 let myQuadObj = null;
                 for (const [, quadObj] of global.State.activeQuads) {
                     if (quadObj.creeps && quadObj.creeps.includes(creep)) {
@@ -38,14 +32,27 @@ module.exports = {
                     }
                 }
 
-                if (myQuadObj && myQuadObj.creeps[0] === creep) {
-                    // Only the leader executes the movement for the whole quad
-                    const direction = myQuadObj.direction || TOP;
-                    const target = myQuadObj.target || direction;
+                if (!myQuadObj) continue;
 
-                    movement.atomicQuadMove(myQuadObj.creeps, target);
+                // Only leader sets the target
+                if (myQuadObj.creeps[0] === creep) {
+                    const hostiles = global.State.hostilesByRoom ? global.State.hostilesByRoom.get(room.name) : null;
+                    const target = CombatManager.getBestTarget(creep, hostiles);
+
+                    if (target) {
+                        myQuadObj.target = target;
+                        myQuadObj.action = 'attack';
+                    } else {
+                        // Fallback: move to middle of room or rally point
+                        myQuadObj.target = new RoomPosition(25, 25, room.name);
+                        myQuadObj.action = 'move';
+                    }
+
+                    // Check for rotation if front line takes heavy damage
+                    if (creep.hits < creep.hitsMax * 0.8) {
+                        myQuadObj.needsRotation = true;
+                    }
                 }
-
             } catch (e) {
                 console.log(`[quadAttacker Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
             }
