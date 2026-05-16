@@ -6,20 +6,6 @@ function getDistance(pos1, pos2) {
     return Math.max(Math.abs(pos1.x - pos2.x), Math.abs(pos1.y - pos2.y));
 }
 
-function getDangerScore(creep) {
-    let score = 0;
-    if (!creep.body) return 10; // Assume base danger if body is not visible
-
-    for (let i = 0; i < creep.body.length; i++) {
-        const type = creep.body[i].type;
-        if (type === HEAL) score += 4;
-        else if (type === RANGED_ATTACK) score += 3;
-        else if (type === ATTACK) score += 2;
-        else if (type === DISMANTLE) score += 1;
-    }
-    return score;
-}
-
 function run(room, defenseRepairTarget = null) {
     if (Game.cpu.bucket < 500) return; // Cascading CPU Throttling: gating tower operations
 
@@ -48,7 +34,15 @@ function run(room, defenseRepairTarget = null) {
 
             for (let i = 0; i < hostiles.length; i++) {
                 const hostile = hostiles[i];
-                const danger = getDangerScore(hostile);
+                
+                // O(1) Threat Caching Lookup
+                let danger = 10; // Default base danger
+                if (global.State && global.State.enemyProfiles && global.State.enemyProfiles.has(hostile.id)) {
+                    const profile = global.State.enemyProfiles.get(hostile.id);
+                    danger = (profile.healParts * 4) + (profile.attackParts * 3);
+                    if (danger === 0 && profile.isDangerous) danger = 5; // Floor for unclassified danger
+                }
+                
                 const dist = getDistance(referencePos, hostile.pos);
 
                 if (danger > maxDanger || (danger === maxDanger && dist < minDistance)) {

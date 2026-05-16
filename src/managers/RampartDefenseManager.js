@@ -36,6 +36,20 @@ class RampartDefenseManager {
 
         const ramparts = structuresMap.get(STRUCTURE_RAMPART) || [];
 
+        // Pre-compute O(1) Rampart Lookups
+        if (!global.State.rampartPosCache) global.State.rampartPosCache = new Map();
+        let cacheObj = global.State.rampartPosCache.get(room.name);
+        
+        if (!cacheObj || cacheObj.count !== ramparts.length) {
+            const coords = new Set();
+            for (let i = 0; i < ramparts.length; i++) {
+                coords.add(ramparts[i].pos.x * 50 + ramparts[i].pos.y);
+            }
+            cacheObj = { count: ramparts.length, coords: coords };
+            global.State.rampartPosCache.set(room.name, cacheObj);
+        }
+        const rampartCoords = cacheObj.coords;
+
         // Identify damaged and backup creeps
         const damagedCreeps = [];
         const backupCreeps = [];
@@ -44,7 +58,8 @@ class RampartDefenseManager {
             // Ensure heap is initialized
             if (!creep.heap) creep.heap = {};
 
-            const isOnRampart = ramparts.some(r => r.pos.x === creep.pos.x && r.pos.y === creep.pos.y);
+            const packedPos = creep.pos.x * 50 + creep.pos.y;
+            const isOnRampart = rampartCoords.has(packedPos);
 
             if (isOnRampart && creep.hits < creep.hitsMax * 0.3) {
                 damagedCreeps.push(creep);
