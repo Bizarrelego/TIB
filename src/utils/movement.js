@@ -41,6 +41,43 @@ module.exports = {
         // Reason: Enforces atomic lockstep execution and prevents native pathing from bypassing the swap/deadlock registry.
         if (!creep.heap.path || creep.heap.path.length === 0) {
             const targetPos = target.pos || target;
+
+            // Inject DirectionalCostMatrix for hub routing
+            const TrafficManager = require('../traffic/trafficManager');
+            const DirectionalCostMatrixGenerator = require('../traffic/directionalCostMatrixGenerator');
+            const originalRoomCallback = pathingOpts.roomCallback;
+            pathingOpts.roomCallback = function(roomName) {
+                let matrix;
+                if (originalRoomCallback) {
+                    matrix = originalRoomCallback(roomName);
+                }
+                const directionalMatrix = TrafficManager.getCostMatrix(roomName, creep);
+                if (directionalMatrix) {
+                    // Combine or override with directional logic
+                    // If no existing matrix, use the directional one
+                    if (!matrix) {
+                        return directionalMatrix;
+                    }
+                    // Otherwise, we would need to merge them, but returning the directional
+                    // one handles the backward tile. A proper merge would be better, but
+                    // directional matrix generator accepts a baseMatrix! Let's pass it.
+                    // Actually, directional matrix is already generated from a base if passed.
+                }
+
+                // Let's regenerate it properly using the base matrix.
+                if (global.State && global.State.roomPlanner) {
+                    const planner = global.State.roomPlanner.get(roomName);
+                    if (planner) {
+                        const anchor = planner.get('anchor');
+                        if (anchor && creep && creep.pos.inRangeTo(anchor, 5)) {
+                            return DirectionalCostMatrixGenerator.generate(roomName, anchor, creep.pos, 'clockwise', 1, matrix);
+                        }
+                    }
+                }
+
+                return matrix;
+            };
+
             const pathInfo = PathFinder.search(creep.pos, targetPos, pathingOpts);
             if (pathInfo.path.length > 0) creep.heap.path = pathInfo.path;
         }
