@@ -1,4 +1,4 @@
-/* global EVENT_ATTACK, EVENT_BUILD, EVENT_OBJECT_DESTROYED, EVENT_HARVEST, EVENT_REPAIR */
+
 const eventBus = require('../os/eventBus');
 const Profiler = require('../utils/profiler');
 
