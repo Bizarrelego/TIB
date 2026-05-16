@@ -3,6 +3,7 @@ const intelManager = require('./intel');
 const expansionManager = require('./expansion');
 const offenseManager = require('./offense');
 const scoutManager = require('./scoutManager');
+const skOperationsManager = require('./skOperations');
 
 /**
  * The main entry point for the Operations module, acting as a high-level orchestrator.
@@ -14,6 +15,7 @@ module.exports = Profiler.wrap('operationsManager', function operationsManager()
         scoutManager();
         expansionManager();
         offenseManager();
+        skOperationsManager();
     } catch (e) {
         console.error(`[OperationsManager Main Error] ${e.stack}`);
     }

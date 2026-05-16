@@ -91,13 +91,14 @@ function manageEarlyProgression(room, spawnLedger) {
         for (let i = 0; i < sources.length; i++) {
             const source = sources[i];
             let bestContainer = null;
+            let bestPos = null;
             for (let j = 0; j < containers.length; j++) {
                 if (containers[j].pos.isNearTo(source)) {
                     bestContainer = containers[j];
                     break;
                 }
             }
-            if (!bestPos && sites.length > 0) {
+            if (!bestContainer && sites.length > 0) {
                 for (let j = 0; j < sites.length; j++) {
                     if (sites[j].structureType === STRUCTURE_CONTAINER && sites[j].pos.isNearTo(source)) {
                         bestPos = sites[j].pos;
@@ -108,6 +109,8 @@ function manageEarlyProgression(room, spawnLedger) {
             if (bestContainer) {
                 // Pack it: 50x + y
                 harvesterSpots.set(source.id, bestContainer.pos.x * 50 + bestContainer.pos.y);
+            } else if (bestPos) {
+                harvesterSpots.set(source.id, bestPos.x * 50 + bestPos.y);
             }
         }
         room.heap.set('harvesterSpots', harvesterSpots);
