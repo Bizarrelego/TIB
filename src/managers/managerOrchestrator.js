@@ -1,5 +1,6 @@
 const Profiler = require('../utils/profiler');
 const globalState = require('../state/globalState');
+const Logger = require('../utils/logger');
 
 /**
  * @file managerOrchestrator.js
@@ -48,10 +49,11 @@ function managerOrchestrator() {
 
             const manager = globalState.getManager(config.name);
             if (manager && typeof manager.run === 'function') {
+                Logger.debug(`Running manager ${config.name} in room ${room.name}`);
                 try {
                     manager.run(room);
                 } catch (e) {
-                    console.log(`[ManagerOrchestrator Error] ${config.name} in Room ${room.name}: ${e.stack}`);
+                    Logger.error(`[ManagerOrchestrator Error] ${config.name} in Room ${room.name}: ${e.stack}`);
                 }
             }
         }

@@ -1,5 +1,6 @@
 const STRUCTURE_PRIORITIES = require('../constants/structurePriorities');
 const TrafficManager = require('../traffic/trafficManager');
+const Logger = require('../utils/logger');
 
 module.exports = {
     /**
@@ -216,6 +217,8 @@ module.exports = {
                     creep.heap.targetId = room.controller.id;
                 }
             }
+
+            Logger.debug(`Worker ${creep.name} assigned state: ${creep.heap.state}, target: ${creep.heap.targetId}`);
         }
     }
 };
