@@ -1,4 +1,4 @@
-/* global EVENT_OBJECT_SPAWN, EVENT_OBJECT_DESTROYED */
+/* global EVENT_OBJECT_SPAWN */
 const Scanner = {
     updateHostiles(room) {
         const log = room.getEventLog();
