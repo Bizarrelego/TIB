@@ -134,6 +134,59 @@ const TrafficManager = {
 
             // Phase 2: Resolve Deadlocks
             DeadlockEngine.detectAndResolve(global.State.trafficIntents, dependencyGraph);
+
+            // Phase 3: Collision Resolution & Shoving Logic
+            const processedSwaps = new Set();
+            for (const [creepName, intent] of global.State.trafficIntents.entries()) {
+                const { creep, intendedNextPos } = intent;
+                if (!creep) continue;
+
+                if (global.State.swapRegistry.has(creepName)) {
+                    if (processedSwaps.has(creepName)) continue;
+
+                    const blockingCreepName = global.State.swapRegistry.get(creepName);
+                    const blockingCreep = global.State.creepLookup ? global.State.creepLookup.get(blockingCreepName) : Game.creeps[blockingCreepName];
+
+                    if (blockingCreep) {
+                        const dir = creep.pos.getDirectionTo(blockingCreep.pos);
+                        if (dir) {
+                            intent.direction = dir;
+                            global.State.trafficIntents.set(blockingCreepName, {
+                                creep: blockingCreep,
+                                direction: ((dir + 3) % 8) + 1
+                            });
+                        }
+                    }
+
+                    processedSwaps.add(creepName);
+                    processedSwaps.add(blockingCreepName);
+                    continue;
+                }
+
+                if (intendedNextPos) {
+                    const posKey = (intendedNextPos.x << 6) | intendedNextPos.y;
+                    const roomMap = currentPositions.get(intendedNextPos.roomName);
+                    const blockingCreepName = roomMap ? roomMap.get(posKey) : undefined;
+
+                    if (blockingCreepName && blockingCreepName !== creepName) {
+                        const blockingLive = global.State.creepLookup ? global.State.creepLookup.get(blockingCreepName) : Game.creeps[blockingCreepName];
+                        if (blockingLive && blockingLive.fatigue === 0 && !global.State.trafficIntents.has(blockingCreepName)) {
+                            const dir = creep.pos.getDirectionTo(intendedNextPos);
+                            if (dir) {
+                                intent.direction = dir;
+                                global.State.trafficIntents.set(blockingCreepName, {
+                                    creep: blockingLive,
+                                    direction: ((dir + 3) % 8) + 1
+                                });
+                            }
+                        }
+                    }
+                }
+
+                if (intendedNextPos && !intent.direction) {
+                    intent.direction = creep.pos.getDirectionTo(intendedNextPos);
+                }
+            }
         } catch (e) {
             console.log(`[TrafficManager CRITICAL]: ${e.stack}`);
         }
@@ -410,7 +463,7 @@ const TrafficManager = {
 
             if (!global.State || !global.State.trafficIntents || global.State.trafficIntents.size === 0) return;
 
-            // Phase 3: Execute Moves (O(1) Priority Buckets)
+            // Phase 4: Execute Moves (O(1) Priority Buckets)
             const buckets = new Array(101);
             for (let i = 0; i <= 100; i++) buckets[i] = [];
 
@@ -420,70 +473,18 @@ const TrafficManager = {
                 buckets[priority].push(intent);
             }
 
-            const processedSwaps = new Set();
-            const currentPositions = global.State.currentPositions || new Map();
-
             for (let p = 100; p >= 0; p--) {
                 const bucket = buckets[p];
                 for (let i = 0; i < bucket.length; i++) {
                     const intent = bucket[i];
-                    const { creep, targetPos, opts, intendedNextPos } = intent;
+                    const { creep, direction, intendedNextPos } = intent;
                     if (!creep) continue;
 
-                if (global.State.swapRegistry && global.State.swapRegistry.has(creep.name)) {
-                    if (processedSwaps.has(creep.name)) continue;
+                    const dir = direction || (intendedNextPos ? creep.pos.getDirectionTo(intendedNextPos) : null);
+                    if (dir) creep.move(dir);
 
-
-                    const blockingCreepName = global.State.swapRegistry.get(creep.name);
-                    const blockingCreep = global.State.creepLookup ? global.State.creepLookup.get(blockingCreepName) : Game.creeps[blockingCreepName];
-
-
-                    if (blockingCreep) {
-
-                        const dir = creep.pos.getDirectionTo(blockingCreep.pos); // Alternative logic
-
-                        // Custom getDirection logic if needed since getDirectionTo exists in Screeps API
-                        if (dir) {
-                           creep.move(dir);
-                           blockingCreep.move(((dir + 3) % 8) + 1);
-                        }
-                    }
-
-                    processedSwaps.add(creep.name);
-                    processedSwaps.add(blockingCreepName);
                     global.State.trafficIntents.delete(creep.name);
-                    global.State.trafficIntents.delete(blockingCreepName);
-                    continue;
                 }
-
-                if (intendedNextPos) {
-                    const posKey = (intendedNextPos.x << 6) | intendedNextPos.y;
-                    const roomMap = currentPositions.get(intendedNextPos.roomName);
-                    const blockingCreepName = roomMap ? roomMap.get(posKey) : undefined;
-
-                    if (blockingCreepName && blockingCreepName !== creep.name) {
-                        const blockingLive = global.State.creepLookup ? global.State.creepLookup.get(blockingCreepName) : Game.creeps[blockingCreepName];
-                        if (blockingLive && blockingLive.fatigue === 0) { // check if friendly (it is friendly since it's in our lookups, though game creeps could be hostile but our lookups are only my creeps normally)
-                            if (!global.State.trafficIntents.has(blockingCreepName)) {
-                                // Swap with stationary friendly creep
-                                const dir = creep.pos.getDirectionTo(intendedNextPos);
-                                if (dir) {
-                                    creep.move(dir);
-                                    blockingLive.move(((dir + 3) % 8) + 1);
-                                }
-                                global.State.trafficIntents.delete(creep.name);
-                                continue;
-                            }
-                        }
-                    }
-                }
-
-        if (intendedNextPos) {
-            const dir = creep.pos.getDirectionTo(intendedNextPos);
-            if (dir) creep.move(dir);
-        }
-                global.State.trafficIntents.delete(creep.name);
-            }
             }
         } catch (e) {
             console.log(`[TrafficManager Execution Error]: ${e.stack}`);
