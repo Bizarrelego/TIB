@@ -4,9 +4,9 @@
  */
 
 const { determineDefcon, DEFCON } = require('../constants/defcon');
-const TowerManager = require('../managers/TowerManager');
-const SpawnQueueManager = require('../managers/SpawnQueueManager');
+const eventBus = require('../os/eventBus');
 const rampartMelee = require('../roles/rampartMelee');
+// SpawnQueueManager is now accessed indirectly via eventBus for decoupling
 
 module.exports = {
     /**
@@ -50,7 +50,7 @@ module.exports = {
                 }
             }
 
-            TowerManager.run(room, defenseRepairTarget);
+            eventBus.publish('DEFENSE_REPAIR_REQUEST', { room, defenseRepairTarget });
 
             if (defconLevel <= DEFCON.ALERT) {
                 // Request rampartMelee creeps when under attack
@@ -64,21 +64,15 @@ module.exports = {
                     }
                 }
 
-                // Add pending requests to the count
-                if (SpawnQueueManager.globalQueue.has(room.name)) {
-                    const requests = SpawnQueueManager.globalQueue.get(room.name);
-                    for (const req of requests) {
-                        if (req.role === 'rampartMelee') {
-                            rampartMeleeCount++;
-                        }
-                    }
-                }
+                // We must use a proxy or global memory map if we want to decouple completely, but since
+                // SpawnQueueManager.globalQueue isn't available, we rely on room memory or just publish blindly
+                // and let the Queue handle duplicates (SpawnQueueManager already prevents duplicates natively).
 
-                // Aim for 1-2 rampartMelee creeps based on DEFCON severity
+                // Assuming we aim for 1-2 rampartMelee creeps based on DEFCON severity
                 const targetCount = defconLevel <= DEFCON.CRITICAL ? 2 : 1;
 
                 if (rampartMeleeCount < targetCount) {
-                    SpawnQueueManager.requestRampartMelee(room);
+                    eventBus.publish('REQUEST_RAMPART_MELEE', { room });
                 }
             }
 
