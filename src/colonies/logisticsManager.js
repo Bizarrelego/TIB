@@ -7,6 +7,9 @@ const TrafficManager = require('../traffic/trafficManager');
 const EnergyRequestManager = require('../managers/EnergyRequestManager');
 const Profiler = require('../utils/profiler');
 
+const trainEngine = require('../roles/trainEngine');
+const trainCart = require('../roles/trainCart');
+
 function findHubParkPos(hubLink, storage, terminal, room) {
     if (!storage) return null;
     const terrain = global.State.roomTerrain.get(room.name);
@@ -194,7 +197,8 @@ const LogisticsManager = {
 
         // HAULER AND DOMESTIC HAULER ASSIGNMENT LOGIC via EnergyRequestManager
         const domesticHaulers = roomCreeps.get('domesticHauler') || [];
-        const allHaulers = [...haulers, ...domesticHaulers];
+        const trainCarts = roomCreeps.get('trainCart') || [];
+        const allHaulers = [...haulers, ...domesticHaulers, ...trainCarts];
 
         if (allHaulers.length > 0) {
             const requests = EnergyRequestManager.getEnergyRequests(room.name);
@@ -426,6 +430,9 @@ const LogisticsManager = {
                 }
             }
         }
+
+        trainEngine.run(room);
+        trainCart.run(room);
     }
 };
 
