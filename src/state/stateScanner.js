@@ -246,16 +246,6 @@ module.exports = function stateScanner() {
 
                 if (buildObj && buildObj.structureType) {
                     if (!(buildObj instanceof ConstructionSite)) {
-                        if (roomSites && Array.isArray(roomSites)) {
-                            const siteIdToRemove = event.data && event.data.targetId ? event.data.targetId : event.objectId;
-                            const siteIdx = roomSites.findIndex(s => s.id === siteIdToRemove);
-                            if (siteIdx !== -1) {
-                                roomSites.splice(siteIdx, 1);
-                            }
-                        } else if (roomSites instanceof Map) {
-                            const siteIdToRemove = event.data && event.data.targetId ? event.data.targetId : event.objectId;
-                            roomSites.delete(siteIdToRemove);
-                        }
                         const siteIdToRemove = event.data && event.data.targetId ? event.data.targetId : event.objectId;
                         roomSites.delete(siteIdToRemove);
 
@@ -265,15 +255,6 @@ module.exports = function stateScanner() {
                             roomStructures.set(buildObj.structureType, structsOfType);
                         }
 
-                        if (structsOfType instanceof Map) {
-                            structsOfType.set(buildObj.id, buildObj);
-                        } else if (Array.isArray(structsOfType)) {
-                            // Fallback just in case array logic is active, but Map should be the standard.
-                            if (!structsOfType.some(s => s.id === buildObj.id)) {
-                                structsOfType.push(buildObj);
-                            }
-                        }
-
                         structsOfType.set(buildObj.id, buildObj);
                         global.State.structureCache.set(buildObj.id, buildObj);
                     }
@@ -281,11 +262,6 @@ module.exports = function stateScanner() {
             } else if (event.event === EVENT_DROP) {
                 let dropObj = Game.getObjectById(event.objectId);
                 if (dropObj && dropObj.resourceType) {
-                    if (roomDropped && Array.isArray(roomDropped)) {
-                        roomDropped.push(dropObj);
-                    } else if (roomDropped instanceof Map) {
-                        roomDropped.set(dropObj.id, dropObj);
-                    }
                     roomDropped.set(dropObj.id, dropObj);
                 }
             } else if (typeof EVENT_REPAIR !== 'undefined' && event.event === EVENT_REPAIR) {

@@ -30,10 +30,10 @@ module.exports = {
                 if (!state || !targetId) continue;
 
                 const target = Game.getObjectById(targetId);
-                if (target === null || target === undefined) {
-                    creep.heap.state = null;
+                if (!target) {
                     creep.heap.targetId = null;
-                    continue; // Skip further processing for this creep; delegates reassignment to the manager next tick
+                    creep.heap.state = null;
+                    continue;
                 }
 
                 if (state === 'harvest') {
@@ -86,7 +86,7 @@ module.exports = {
                     } else {
                         movement.moveTo(creep, target);
                     }
-                } else if (state === 'refill') {
+                } else if (state === 'fill') {
                     if (creep.pos.isNearTo(target)) {
                         TrafficManager.registerTransfer(creep, target, RESOURCE_ENERGY, Math.min(creep.store.getUsedCapacity(RESOURCE_ENERGY), TrafficManager.getVirtualState(target, RESOURCE_ENERGY).free));
                     } else {

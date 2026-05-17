@@ -74,7 +74,7 @@ module.exports = {
                 creep.heap.state = isBootstrapping ? 'harvest' : 'pickup';
             } else if (creep.store.getFreeCapacity() === 0) {
                 if (room.energyAvailable < room.energyCapacityAvailable) {
-                    creep.heap.state = 'refill';
+                    creep.heap.state = 'fill';
                 } else if (sites && sites.length > 0) {
                     creep.heap.state = 'build';
                 } else {
@@ -140,7 +140,7 @@ module.exports = {
                         creep.heap.targetId = bestSource.id;
                     }
                 }
-            } else if (creep.heap.state === 'refill') {
+            } else if (creep.heap.state === 'fill') {
             let assigned = false;
             for (let i = 0; i < refillTargets.length; i++) {
                 const target = refillTargets[i];
