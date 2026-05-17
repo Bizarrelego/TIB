@@ -5,6 +5,7 @@
  */
 
 const Logger = require('../utils/logger');
+const cpuBucketForecaster = require('./cpuBucketForecaster');
 
 /**
  * @typedef {Object} ThrottlingConfig
@@ -28,6 +29,13 @@ function run() {
 
     // Ensure Game and Game.cpu are available (important for mock environments)
     if (typeof Game !== 'undefined' && Game.cpu) {
+        // Update Bucket Forecaster
+        try {
+            cpuBucketForecaster.update();
+        } catch (e) {
+            Logger.error(`[CPU Throttler] Error updating forecaster: ${e.stack}`);
+        }
+
         // Pixel Generation
         if (Game.cpu.bucket === 10000 && typeof Game.cpu.generatePixel === 'function') {
             try {
@@ -39,11 +47,18 @@ function run() {
         }
 
         // Cascading CPU Throttling based on Game.cpu.bucket
+        let forceAusterity = false;
+        try {
+            forceAusterity = cpuBucketForecaster.shouldTriggerAusterity();
+        } catch (e) {
+            Logger.error(`[CPU Throttler] Error checking austerity: ${e.stack}`);
+        }
+
         switch (true) {
             case Game.cpu.bucket < 100:
                 skipState = true;
                 // fallthrough
-            case Game.cpu.bucket < 500:
+            case Game.cpu.bucket < 500 || forceAusterity:
                 skipColonies = true;
                 skipManagers = true;
                 // fallthrough
