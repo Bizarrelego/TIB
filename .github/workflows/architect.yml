@@ -47,9 +47,9 @@ jobs:
             echo "2. NO DUPLICATES: DO NOT propose new issues for anything already in CURRENT OPEN ISSUES."
             echo "3. DECOUPLED PARALLELISM: When proposing new work, NEVER ask to modify central files like 'src/main.js' or 'src/colonies/colonyManager.js' across multiple issues. Parallel issues must ONLY create isolated, standalone modules."
             echo "4. INTEGRATION: If standalone modules exist but aren't being called, propose a SINGLE 'Integration' issue to wire them into main.js or other central managers."
-            echo "5. Identify up to 3 distinct, independent missing modules or 1 integration task."
+            echo "5. Identify up to 5 distinct, independent missing modules or 1 integration task."
             echo "**CRITICAL CONSTRAINTS:**"
-            echo "- Keep the scope of each new issue limited to 1-3 files maximum."
+            echo "- Keep the scope of each new issue limited to 1-5 files maximum."
             echo "- Provide strict acceptance criteria for each."
             echo "--- OPEN ISSUES ---"
             cat open_issues.json
