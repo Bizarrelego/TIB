@@ -1,5 +1,4 @@
 const CostMatrixCache = require('../traffic/costMatrixCache');
-const DirectionalCostMatrixGenerator = require('../traffic/directionalCostMatrixGenerator');
 const InterRoomRouter = require('../traffic/InterRoomRouter');
 
 module.exports = {

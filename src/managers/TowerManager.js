@@ -1,4 +1,3 @@
-/* global DISMANTLE */
 const { determineDefcon, DEFCON } = require('../constants/defcon');
 const eventBus = require('../os/eventBus');
 

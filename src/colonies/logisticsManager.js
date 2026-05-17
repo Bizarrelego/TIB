@@ -213,7 +213,8 @@ const LogisticsManager = {
                     }
                 } else if (state === 'filling') {
                     let source = null;
-                    if (storage && storageState.used > 0 && !(room.memory.restrictStorageOutflow && !needsEmergencyRefill)) {
+                    const isEmergencyRefill = room.energyAvailable < room.energyCapacityAvailable * 0.5;
+                    if (storage && storageState.used > 0 && !(room.memory.restrictStorageOutflow && !isEmergencyRefill)) {
                         source = storage;
                     } else if (terminal && terminalState && terminalState.used > 0) {
                         source = terminal;
