@@ -2,6 +2,7 @@ const Profiler = require('../utils/profiler');
 const globalState = require('../state/globalState');
 const Logger = require('../utils/logger');
 const { executeManager } = require('../utils/errorHandler');
+const { wrapModuleFunctions } = require('../utils/moduleWrapper');
 
 /**
  * @file managerOrchestrator.js
@@ -81,6 +82,15 @@ function managerOrchestrator() {
 
             let manager = globalState.getManager(config.name);
             if (manager && typeof manager.run === 'function') {
+                // Ensure the manager's methods are wrapped by the error handler
+                if (!manager.__errorWrapped) {
+                    manager = wrapModuleFunctions(manager, (funcName, originalFunc, ...args) => {
+                        return executeManager(`${config.name}.${funcName}`, originalFunc, ...args);
+                    });
+                    manager.__errorWrapped = true;
+                    // Note: In globalState, it's stored by reference, but we assign it locally too
+                }
+
                 // Ensure the manager's methods are wrapped by the profiler
                 if (!manager.__profilerWrapped) {
                     manager = Profiler.wrap(config.name, manager);
@@ -95,7 +105,8 @@ function managerOrchestrator() {
                     startCpu = cpuAvailable ? Game.cpu.getUsed() : Date.now();
                 }
 
-                executeManager(`${config.name} in Room ${room.name}`, manager.run.bind(manager), room);
+                // Call directly since wrapModuleFunctions provides the error boundary now
+                manager.run(room);
 
                 if (profilerEnabled) {
                     const endCpu = cpuAvailable ? Game.cpu.getUsed() : Date.now();

@@ -8,17 +8,17 @@ const Logger = require('./logger');
  */
 
 /**
- * Wraps the execution of a manager's function in a try/catch block.
- * @param {string} managerName - The name of the manager for logging purposes.
+ * Wraps the execution of a module's or manager's function in a try/catch block.
+ * @param {string} moduleName - The name of the module/manager or function for logging purposes.
  * @param {Function} fn - The function to execute.
  * @param {...any} args - The arguments to pass to the function.
  * @returns {any} The result of the function execution, or undefined if an error occurred.
  */
-function executeManager(managerName, fn, ...args) {
+function executeManager(moduleName, fn, ...args) {
     try {
         return fn(...args);
     } catch (e) {
-        Logger.error(`[ManagerOrchestrator Error] ${managerName}: ${e.stack}`);
+        Logger.error(`[Execution Error] ${moduleName}: ${e.stack}`);
         return undefined;
     }
 }
