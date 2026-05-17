@@ -15,6 +15,10 @@ const trafficManager = require('./traffic/trafficManager');
 const garbageCollector = require('./os/garbageCollector');
 const Logger = require('./utils/logger');
 const IntentManager = require('./os/IntentManager');
+const VirtualLedger = require('./utils/VirtualLedger');
+const spawnManager = require('./colonies/spawnManager');
+const planner = require('./colonies/planner');
+const SpawnLedger = require('./colonies/spawnLedger');
 
 module.exports.loop = function () {
     Logger.info(`--- Starting Tick ${Game.time} ---`);
@@ -40,6 +44,9 @@ module.exports.loop = function () {
     if (!global.State.intentManager) {
         global.State.intentManager = new IntentManager();
     }
+    
+    // Clear Virtual Ledger
+    VirtualLedger.clear();
 
     // Run garbage collection for memory and intel
     garbageCollector();
@@ -87,6 +94,11 @@ module.exports.loop = function () {
         } catch (e) {
             Logger.error(`[Phase 2 Error] Global State Scanner: ${e.stack}`);
         }
+        try {
+            if (globalState && globalState.scan) globalState.scan();
+        } catch (e) {
+            Logger.error(`[Phase 2 Error] Global State Scan: ${e.stack}`);
+        }
 
         try {
             const energyRequestManager = globalState.getManager('EnergyRequestManager');
@@ -105,6 +117,26 @@ module.exports.loop = function () {
             if (colonyManager) colonyManager();
         } catch (e) {
             Logger.error(`[Phase 3 Error] Colonies: ${e.stack}`);
+        }
+    }
+    
+    // Tick Slicing
+    if (Game.time % 10 === 0) {
+        for (const roomName in Game.rooms) {
+            const room = Game.rooms[roomName];
+            if (room.controller && room.controller.my && spawnManager && typeof spawnManager.run === 'function') {
+                const ledger = new SpawnLedger(room);
+                spawnManager.run(room, ledger);
+            }
+        }
+    }
+    
+    if (Game.time % 1000 === 0) {
+        for (const roomName in Game.rooms) {
+            const room = Game.rooms[roomName];
+            if (room.controller && room.controller.my && planner && typeof planner.run === 'function') {
+                planner.run(room);
+            }
         }
     }
 

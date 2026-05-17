@@ -3,6 +3,17 @@ class GlobalStateManager {
         this.heapCache = new Map();
         this.isRehydrated = false;
         this.managers = new Map();
+        this.creepsByRole = new Map();
+        this.creepsByRoom = new Map();
+        this.structuresByRoom = new Map();
+        this.hostilesByRoom = new Map();
+        this.logisticsByRoom = new Map();
+        this.creepLookup = new Map();
+        this.sourcesByRoom = new Map();
+        this.spawnsByRoom = new Map();
+        this.controllersByRoom = new Map();
+        this.sitesByRoom = new Map();
+        this.mineralsByRoom = new Map();
     }
 
     registerManager(name, instance) {
@@ -57,6 +68,26 @@ class GlobalStateManager {
 
     write(key, data) {
         this.heapCache.set(key, data);
+    }
+
+    get(key) {
+        return this.heapCache.get(key);
+    }
+
+    set(key, value) {
+        this.heapCache.set(key, value);
+    }
+
+    has(key) {
+        return this.heapCache.has(key);
+    }
+
+    delete(key) {
+        this.heapCache.delete(key);
+    }
+
+    scan() {
+        // Tick slicing state scanner entry point
     }
 }
 

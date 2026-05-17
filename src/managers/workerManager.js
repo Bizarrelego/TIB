@@ -1,13 +1,9 @@
 const STRUCTURE_PRIORITIES = require('../constants/structurePriorities');
 const TrafficManager = require('../traffic/trafficManager');
 const Logger = require('../utils/logger');
+const VirtualLedger = require('../utils/VirtualLedger');
 
 module.exports = {
-    /**
-     * Executes Top-Down Assignment for workers.
-     * Evaluates room state and assigns tasks directly to creep.heap.
-     * @param {Room} room
-     */
     run(room) {
         const roomCreeps = global.State.creepsByRoom.get(room.name);
         if (!roomCreeps) return;
@@ -19,235 +15,97 @@ module.exports = {
         const structures = global.State.structuresByRoom.get(room.name);
         const sites = global.State.sitesByRoom.get(room.name);
 
-        let refillTargets = [];
-        const refillLedger = new Map();
+        let tasks = [];
+
         if (structures) {
             const spawns = structures.get(STRUCTURE_SPAWN) || [];
             for (let i = 0; i < spawns.length; i++) {
                 const free = TrafficManager.getVirtualState(spawns[i], RESOURCE_ENERGY).free;
                 if (free > 0) {
-                    refillTargets.push(spawns[i]);
-                    refillLedger.set(spawns[i].id, free);
+                    tasks.push({ target: spawns[i], type: 'fill', priority: 100, free });
                 }
             }
             const extensions = structures.get(STRUCTURE_EXTENSION) || [];
             for (let i = 0; i < extensions.length; i++) {
                 const free = TrafficManager.getVirtualState(extensions[i], RESOURCE_ENERGY).free;
                 if (free > 0) {
-                    refillTargets.push(extensions[i]);
-                    refillLedger.set(extensions[i].id, free);
+                    tasks.push({ target: extensions[i], type: 'fill', priority: 90, free });
+                }
+            }
+            const ramparts = structures.get(STRUCTURE_RAMPART) || [];
+            for (let i = 0; i < ramparts.length; i++) {
+                if (ramparts[i].hits < 5000) {
+                    tasks.push({ target: ramparts[i], type: 'repair', priority: 70 });
                 }
             }
         }
 
-        const roomCreepsAll = global.State.creepsByRoom.get(room.name);
-        let harvesterCount = 0;
-        let haulerCount = 0;
-        if (roomCreepsAll) {
-            const harvesters = roomCreepsAll.get('harvester');
-            if (harvesters) harvesterCount = harvesters.length;
-            const haulers = roomCreepsAll.get('hauler');
-            if (haulers) haulerCount += haulers.length;
-            const domesticHaulers = roomCreepsAll.get('domesticHauler');
-            if (domesticHaulers) haulerCount += domesticHaulers.length;
+        for (let i = 0; i < sites.length; i++) {
+            tasks.push({ target: sites[i], type: 'build', priority: 80 });
         }
-        const isBootstrapping = harvesterCount === 0 && haulerCount === 0;
-
-        // Cache supplies and their virtual capacities for assignment
+        
+        if (room.controller) {
+            tasks.push({ target: room.controller, type: 'upgrade', priority: 10 });
+        }
+        
+        tasks.sort((a, b) => b.priority - a.priority);
+        
         const EnergyRequestManager = require('./EnergyRequestManager');
-        const supplies = EnergyRequestManager.getEnergySupplies(room.name, 'worker');
-        const supplyLedger = new Map();
-        for (let i = 0; i < supplies.length; i++) {
-            const liveTarget = Game.getObjectById(supplies[i].target.id);
-            if (liveTarget) {
-                if (liveTarget.amount !== undefined && liveTarget.amount > 0) {
-                    supplyLedger.set(liveTarget.id, liveTarget.amount);
-                } else if (liveTarget.store && liveTarget.store[RESOURCE_ENERGY] > 0) {
-                    supplyLedger.set(liveTarget.id, liveTarget.store[RESOURCE_ENERGY]);
+        const supplies = EnergyRequestManager.getEnergySupplies(room.name, 'worker') || [];
+        let supplyTasks = supplies.map(s => ({ target: Game.getObjectById(s.target.id), type: 'pickup', priority: s.priority }));
+        for (let i = 0; i < sources.length; i++) {
+            supplyTasks.push({ target: sources[i], type: 'harvest', priority: 50 });
+        }
+        supplyTasks.sort((a, b) => b.priority - a.priority);
+        
+        let idleCreeps = workers.filter(c => !c.heap.state || !c.heap.targetId);
+        
+        for (const task of tasks) {
+            if (idleCreeps.length === 0) break;
+            
+            let nearestCreepIdx = -1;
+            let minDistance = Infinity;
+            
+            for (let i = 0; i < idleCreeps.length; i++) {
+                const creep = idleCreeps[i];
+                if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) continue;
+                
+                const dist = Math.max(Math.abs(creep.pos.x - task.target.pos.x), Math.abs(creep.pos.y - task.target.pos.y));
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    nearestCreepIdx = i;
                 }
+            }
+            if (nearestCreepIdx !== -1) {
+                const creep = idleCreeps[nearestCreepIdx];
+                creep.heap.state = task.type;
+                creep.heap.targetId = task.target.id;
+                idleCreeps.splice(nearestCreepIdx, 1);
             }
         }
-
-        for (const creep of workers) {
-            // Determine state based on capacity
-            if (creep.store.getUsedCapacity() === 0) {
-                creep.heap.state = isBootstrapping ? 'harvest' : 'pickup';
-            } else if (creep.store.getFreeCapacity() === 0) {
+        
+        for (const task of supplyTasks) {
+            if (!task.target) continue;
+            if (idleCreeps.length === 0) break;
+            
+            let nearestCreepIdx = -1;
+            let minDistance = Infinity;
+            for (let i = 0; i < idleCreeps.length; i++) {
+                const creep = idleCreeps[i];
+                if (creep.store.getFreeCapacity() === 0) continue;
                 
-                const workerCount = global.State.creepsByRoom.get(room.name)?.get('worker')?.length || 0;
-                if (workerCount < 15 && room.energyAvailable < room.energyCapacityAvailable) {
-                    creep.heap.state = 'fill';
-                    let assigned = false;
-                    for (let j = 0; j < refillTargets.length; j++) {
-                        const target = refillTargets[j];
-                        const virtualFree = refillLedger.get(target.id) || 0;
-                        if (virtualFree > 0) {
-                            creep.heap.targetId = target.id;
-                            refillLedger.set(target.id, virtualFree - creep.store.getUsedCapacity(RESOURCE_ENERGY));
-                            assigned = true;
-                            break;
-                        }
-                    }
-                    if (!assigned && refillTargets.length > 0) creep.heap.targetId = refillTargets[0].id;
-                    continue;
-                }
-
-                if (room.energyAvailable < room.energyCapacityAvailable) {
-                    creep.heap.state = 'fill';
-                } else if (sites && sites.length > 0) {
-                    creep.heap.state = 'build';
-                } else {
-                    creep.heap.state = 'repair';
-                }
-            } else if (!creep.heap.state) {
-                // Fallback for global reset
-                creep.heap.state = isBootstrapping ? 'harvest' : 'pickup';
-            }
-
-            // Assign targets based on state
-            if (creep.heap.state === 'pickup') {
-                let targetAssigned = false;
-                for (let i = 0; i < supplies.length; i++) {
-                    const supply = supplies[i];
-                    const liveTarget = Game.getObjectById(supply.target.id);
-                    if (liveTarget && ((liveTarget.store && liveTarget.store[RESOURCE_ENERGY] > 0) || (liveTarget.amount !== undefined && liveTarget.amount > 0))) {
-                        const available = supplyLedger.get(liveTarget.id) || 0;
-                        if (available > 0) {
-                            creep.heap.targetId = liveTarget.id;
-                            supplyLedger.set(liveTarget.id, available - creep.store.getFreeCapacity());
-                            targetAssigned = true;
-                            break;
-                        }
-                    }
-                }
-                if (!targetAssigned) {
-                    creep.heap.targetId = null;
-                }
-            } else if (creep.heap.state === 'repair') {
-                const ramparts = structures ? (structures.get(STRUCTURE_RAMPART) || []) : [];
-                let target = null;
-                for (let i = 0; i < ramparts.length; i++) {
-                    if (ramparts[i].hits < 5000) {
-                        target = ramparts[i];
-                        break;
-                    }
-                }
-                if (target) {
-                    creep.heap.targetId = target.id;
-                } else {
-                    creep.heap.state = room.memory.haltUpgrades ? 'idle' : 'upgrade'; // fallback to upgrade if nothing to repair
-                    if (creep.heap.state === 'upgrade' && room.controller) {
-                        creep.heap.targetId = room.controller.id;
-                    } else {
-                        creep.heap.targetId = null;
-                    }
-                }
-            } else if (creep.heap.state === 'harvest') {
-                if (sources.length > 0) {
-                    // O(N) Chebyshev distance for target selection
-                    let bestSource = null;
-                    let minDistance = Infinity;
-                    for (let i = 0; i < sources.length; i++) {
-                        if (sources[i].energy === 0) continue;
-                        const dist = Math.max(Math.abs(creep.pos.x - sources[i].pos.x), Math.abs(creep.pos.y - sources[i].pos.y));
-                        if (dist < minDistance) {
-                            minDistance = dist;
-                            bestSource = sources[i];
-                        }
-                    }
-                    if (bestSource) {
-                        creep.heap.targetId = bestSource.id;
-                    }
-                }
-            } else if (creep.heap.state === 'fill') {
-            let assigned = false;
-            for (let i = 0; i < refillTargets.length; i++) {
-                const target = refillTargets[i];
-                const virtualFree = refillLedger.get(target.id) || 0;
-                if (virtualFree > 0) {
-                    creep.heap.targetId = target.id;
-                    refillLedger.set(target.id, virtualFree - creep.store.getUsedCapacity(RESOURCE_ENERGY));
-                    assigned = true;
-                    break;
+                const dist = Math.max(Math.abs(creep.pos.x - task.target.pos.x), Math.abs(creep.pos.y - task.target.pos.y));
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    nearestCreepIdx = i;
                 }
             }
-            if (!assigned) {
-                creep.heap.state = room.memory.haltUpgrades ? 'idle' : 'upgrade'; // fallback
-                if (creep.heap.state === 'upgrade' && room.controller) {
-                    creep.heap.targetId = room.controller.id;
-                } else {
-                    creep.heap.targetId = null;
-                }
+            if (nearestCreepIdx !== -1) {
+                const creep = idleCreeps[nearestCreepIdx];
+                creep.heap.state = task.type;
+                creep.heap.targetId = task.target.id;
+                idleCreeps.splice(nearestCreepIdx, 1);
             }
-            } else if (creep.heap.state === 'build') {
-                if (sites && sites.length > 0) {
-                    let highestPriority = -Infinity;
-
-                    // Priority Order: STRUCTURE_EXTENSION > STRUCTURE_CONTAINER > STRUCTURE_TOWER > STRUCTURE_STORAGE > STRUCTURE_RAMPART > STRUCTURE_ROAD
-                    const customPriorities = new Map([
-                        [STRUCTURE_EXTENSION, 100],
-                        [STRUCTURE_CONTAINER, 90],
-                        [STRUCTURE_TOWER, 80],
-                        [STRUCTURE_STORAGE, 70],
-                        [STRUCTURE_RAMPART, 60],
-                        [STRUCTURE_ROAD, 50]
-                    ]);
-
-                    for (let i = 0; i < sites.length; i++) {
-                        const site = sites[i];
-                        const priority = customPriorities.get(site.structureType) || STRUCTURE_PRIORITIES.get(site.structureType) || STRUCTURE_PRIORITIES.get('default');
-                        if (priority > highestPriority) {
-                            highestPriority = priority;
-                        }
-                    }
-
-                    let highestPrioritySites = [];
-                    for (let i = 0; i < sites.length; i++) {
-                        const site = sites[i];
-                        const priority = customPriorities.get(site.structureType) || STRUCTURE_PRIORITIES.get(site.structureType) || STRUCTURE_PRIORITIES.get('default');
-                        if (priority === highestPriority) {
-                            highestPrioritySites.push(site);
-                        }
-                    }
-
-                    let bestSite = null;
-                    let minDistance = Infinity;
-
-                    // Calculate closest highest priority site to a central point (spawns[0] or controller) to group workers
-                    let referencePos = room.controller ? room.controller.pos : creep.pos;
-                    if (structures && structures.get(STRUCTURE_SPAWN) && structures.get(STRUCTURE_SPAWN).length > 0) {
-                        referencePos = structures.get(STRUCTURE_SPAWN)[0].pos;
-                    }
-
-                    for (let i = 0; i < highestPrioritySites.length; i++) {
-                        const site = highestPrioritySites[i];
-                        const dist = Math.max(Math.abs(referencePos.x - site.pos.x), Math.abs(referencePos.y - site.pos.y));
-                        if (dist < minDistance) {
-                            minDistance = dist;
-                            bestSite = site;
-                        }
-                    }
-
-                    if (bestSite) {
-                        creep.heap.targetId = bestSite.id;
-                    } else {
-                        creep.heap.targetId = sites[0].id;
-                    }
-                } else {
-                    creep.heap.state = room.memory.haltUpgrades ? 'idle' : 'upgrade'; // fallback
-                    if (creep.heap.state === 'upgrade' && room.controller) {
-                        creep.heap.targetId = room.controller.id;
-                    } else {
-                        creep.heap.targetId = null;
-                    }
-                }
-            } else if (creep.heap.state === 'upgrade') {
-                if (room.controller) {
-                    creep.heap.targetId = room.controller.id;
-                }
-            }
-
-            Logger.debug(`Worker ${creep.name} assigned state: ${creep.heap.state}, target: ${creep.heap.targetId}`);
         }
     }
 };

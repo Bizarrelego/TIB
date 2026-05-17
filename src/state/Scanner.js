@@ -9,14 +9,20 @@ const Scanner = {
             cache.hostileIds = new Set();
         }
 
+        let hasAttack = false;
         for (let i = 0; i < log.length; i++) {
             const event = log[i];
-            if (typeof EVENT_OBJECT_SPAWN !== 'undefined' && event.event === EVENT_OBJECT_SPAWN) {
-                const obj = Game.getObjectById(event.objectId);
-                if (obj && obj.my === false) cache.hostileIds.add(event.objectId);
+            if (event.event === EVENT_ATTACK) {
+                hasAttack = true;
+                break;
             }
-            if (event.event === EVENT_OBJECT_DESTROYED) {
-                cache.hostileIds.delete(event.objectId);
+        }
+        
+        if (hasAttack) {
+            const hostiles = room.find(FIND_HOSTILE_CREEPS);
+            cache.hostileIds.clear();
+            for (let i = 0; i < hostiles.length; i++) {
+                cache.hostileIds.add(hostiles[i].id);
             }
         }
 
