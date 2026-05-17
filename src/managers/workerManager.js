@@ -1,7 +1,4 @@
-const STRUCTURE_PRIORITIES = require('../constants/structurePriorities');
 const TrafficManager = require('../traffic/trafficManager');
-const Logger = require('../utils/logger');
-const VirtualLedger = require('../utils/VirtualLedger');
 
 module.exports = {
     run(room) {

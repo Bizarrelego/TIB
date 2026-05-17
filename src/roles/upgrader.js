@@ -35,7 +35,7 @@ function run(creep, room) {
                 }
 
                 if (targetDrop && creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                    TrafficManager.registerPickup(creep, targetDrop, RESOURCE_ENERGY, creep.store.getFreeCapacity());
+                    TrafficManager.registerPickup(creep, targetDrop, RESOURCE_ENERGY, creep.store.getFreeCapacity(RESOURCE_ENERGY));
                 }
             }
 

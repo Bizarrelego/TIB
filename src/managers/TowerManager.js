@@ -4,7 +4,7 @@ function getDistance(pos1, pos2) {
     return Math.max(Math.abs(pos1.x - pos2.x), Math.abs(pos1.y - pos2.y));
 }
 
-function run(room, defenseRepairTarget = null) {
+function run(room) {
     if (Game.cpu.bucket < 500) return;
 
     try {
