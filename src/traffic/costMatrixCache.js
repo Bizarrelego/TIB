@@ -70,6 +70,23 @@ const CostMatrixCache = {
         // Strictly defer cache deletion to the eventBus handler, preserving caching behavior
         eventBus.publish('INVALIDATE_COSTMATRIX', { roomName });
     },
+    setDynamic: (roomName, costMatrix) => {
+        if (!global.State) global.State = {};
+        if (!global.State.dynamicCostMatrices) global.State.dynamicCostMatrices = new Map();
+
+        global.State.dynamicCostMatrices.set(roomName, costMatrix);
+    },
+    getDynamic: (roomName) => {
+        if (global.State && global.State.dynamicCostMatrices && global.State.dynamicCostMatrices.has(roomName)) {
+            return global.State.dynamicCostMatrices.get(roomName);
+        }
+        return CostMatrixCache.get(roomName);
+    },
+    deleteDynamic: (roomName) => {
+        if (global.State && global.State.dynamicCostMatrices) {
+            global.State.dynamicCostMatrices.delete(roomName);
+        }
+    },
     generate: (roomName) => {
         const costMatrix = new PathFinder.CostMatrix();
 
