@@ -135,6 +135,13 @@ module.exports.loop = function () {
         } catch (e) {
             Logger.error(`[Phase 3.5 Error] Managers: ${e.stack}`);
         }
+
+        try {
+            const RoleManager = require('./colonies/RoleManager');
+            RoleManager.runAll();
+        } catch (e) {
+            Logger.error(`[Phase 3.5 Error] RoleManager: ${e.stack}`);
+        }
     }
 
     // Phase 4: Operations Orchestration Module

@@ -58,6 +58,7 @@ class SpawnLedger {
         if (!this.isSpawnBusy(spawn)) {
             if (opts && opts.memory) {
                 opts.memory = {
+                    ...opts.memory,
                     role: opts.memory.role,
                     colony: opts.memory.colony
                 };

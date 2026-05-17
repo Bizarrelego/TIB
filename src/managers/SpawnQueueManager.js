@@ -114,20 +114,30 @@ class SpawnQueueManager {
             let i = 0;
             while (i < bucket.length && availableSpawns.length > 0) {
                 const request = bucket[i];
+                const spawn = availableSpawns[0];
+
+                // Purge requests that exceed the room's absolute maximum capacity (e.g. extension destroyed)
+                if (request.cost > spawn.room.energyCapacityAvailable) {
+                    bucket.splice(i, 1);
+                    continue;
+                }
 
                 if (!spawnLedger.canSpawn(request.cost)) {
-                    // Prevent lower-priority requests from taking the budget of a stalled high-priority creep
+                    // STALL the queue to prevent lower-priority creeps from stealing energy
+                    // and causing an infinite spawn lock for expensive high-priority creeps.
                     return;
                 }
 
-                const spawn = availableSpawns[0];
                 const result = spawnLedger.requestSpawn(spawn, request.body, request.name, request.opts, request.cost);
 
                 if (result === OK) {
                     bucket.splice(i, 1);
                     availableSpawns.shift();
+                } else if (result === ERR_NOT_ENOUGH_ENERGY || result === ERR_BUSY) {
+                    return; // Stall if actual engine rejects due to energy or busy state
                 } else {
-                    i++;
+                    // Purge invalid requests (e.g. ERR_INVALID_ARGS, ERR_NAME_EXISTS) to prevent permanent blocking
+                    bucket.splice(i, 1);
                 }
             }
             if (availableSpawns.length === 0) break;

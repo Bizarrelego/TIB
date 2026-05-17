@@ -30,7 +30,7 @@ function manageEarlyProgression(room, spawnLedger) {
             SpawnQueueManager.requestSpawn(room.name, 'emergencyBuilder', [WORK, CARRY, MOVE], 'eb_' + Game.time, { memory: { role: 'emergencyBuilder', colony: room.name } }, 200);
             spawnLedger.reserveEnergy(200);
         }
-    } else if (workers.length < 15 && energyAvailable >= 200) {
+    } else if (workers.length < 20 && energyAvailable >= 200) {
         const body = BodyCalc.calculateWorker(room.energyCapacityAvailable);
         const cost = BodyCalc.getCost(body);
         if (spawnLedger.canSpawn(cost)) {
@@ -39,14 +39,83 @@ function manageEarlyProgression(room, spawnLedger) {
         }
     }
 
-    if (workers.length === 0) return;
-
     // Extract global state (0-CPU cost lookups)
     const sources = global.State.sourcesByRoom.get(room.name) || [];
     const droppedArrays = global.State.droppedByRoom.get(room.name) || [];
     const structures = global.State.structuresByRoom.get(room.name) || new Map();
     const sites = global.State.sitesByRoom.get(room.name) || [];
     const tombstones = global.State.tombstonesByRoom.get(room.name) || [];
+
+    if (!room.heap) room.heap = new Map();
+    let harvesterSpots = room.heap.get('harvesterSpots');
+    if (!harvesterSpots && sources.length > 0) {
+        harvesterSpots = new Map();
+        const containers = structures.get(STRUCTURE_CONTAINER) ? Array.from(structures.get(STRUCTURE_CONTAINER).values()) : [];
+        for (let i = 0; i < sources.length; i++) {
+            const source = sources[i];
+            let bestContainer = null;
+            let bestPos = null;
+            for (let j = 0; j < containers.length; j++) {
+                if (containers[j].pos.isNearTo(source)) {
+                    bestContainer = containers[j];
+                    break;
+                }
+            }
+            if (!bestContainer && sites.length > 0) {
+                for (let j = 0; j < sites.length; j++) {
+                    if (sites[j].structureType === STRUCTURE_CONTAINER && sites[j].pos.isNearTo(source)) {
+                        bestPos = sites[j].pos;
+                        break;
+                    }
+                }
+            }
+            if (bestContainer) {
+                // Pack it: 50x + y
+                harvesterSpots.set(source.id, bestContainer.pos.x * 50 + bestContainer.pos.y);
+            } else if (bestPos) {
+                harvesterSpots.set(source.id, bestPos.x * 50 + bestPos.y);
+            }
+        }
+        room.heap.set('harvesterSpots', harvesterSpots);
+    }
+
+    // Distribute exact harvester assignments
+    const harvesters = roomCreeps.get('harvester') || [];
+    const assignedSpots = new Set();
+    // Pass 1: Claim already assigned spots
+    for (let i = 0; i < harvesters.length; i++) {
+        const creep = harvesters[i];
+        if (creep.heap && creep.heap.dropId !== undefined) {
+            assignedSpots.add(creep.heap.dropId);
+        }
+    }
+
+    for (let i = 0; i < harvesters.length; i++) {
+        const creep = harvesters[i];
+        if (!creep.heap) creep.heap = {};
+        if (!creep.heap.targetId && sources.length > 0) {
+            creep.heap.targetId = sources[i % sources.length].id;
+        }
+        if (creep.heap.targetId && creep.heap.dropId === undefined && harvesterSpots && harvesterSpots.has(creep.heap.targetId)) {
+            const packedPos = harvesterSpots.get(creep.heap.targetId);
+            if (!assignedSpots.has(packedPos)) {
+                creep.heap.dropId = packedPos;
+                assignedSpots.add(packedPos);
+                
+                // Top-Down Harvester Container Building
+                const x = Math.floor(packedPos / 50);
+                const y = packedPos % 50;
+                for (let s = 0; s < sites.length; s++) {
+                    if (sites[s].structureType === STRUCTURE_CONTAINER && sites[s].pos.x === x && sites[s].pos.y === y) {
+                        creep.heap.siteId = sites[s].id;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if (workers.length === 0) return;
 
     // Filter structures to PREVENT Parasitic Worker Drain
     const validWithdrawTargets = [];
@@ -95,63 +164,6 @@ function manageEarlyProgression(room, spawnLedger) {
         if (droppedArrays[i].amount >= 300 && (!droppedArrays[i].resourceType || droppedArrays[i].resourceType === RESOURCE_ENERGY)) {
             massiveDrop = droppedArrays[i];
             break;
-        }
-    }
-
-    if (!room.heap) room.heap = new Map();
-    let harvesterSpots = room.heap.get('harvesterSpots');
-    if (!harvesterSpots && sources.length > 0) {
-        harvesterSpots = new Map();
-        const containers = structures.get(STRUCTURE_CONTAINER) ? Array.from(structures.get(STRUCTURE_CONTAINER).values()) : [];
-        for (let i = 0; i < sources.length; i++) {
-            const source = sources[i];
-            let bestContainer = null;
-            let bestPos = null;
-            for (let j = 0; j < containers.length; j++) {
-                if (containers[j].pos.isNearTo(source)) {
-                    bestContainer = containers[j];
-                    break;
-                }
-            }
-            if (!bestContainer && sites.length > 0) {
-                for (let j = 0; j < sites.length; j++) {
-                    if (sites[j].structureType === STRUCTURE_CONTAINER && sites[j].pos.isNearTo(source)) {
-                        bestPos = sites[j].pos;
-                        break;
-                    }
-                }
-            }
-            if (bestContainer) {
-                // Pack it: 50x + y
-                harvesterSpots.set(source.id, bestContainer.pos.x * 50 + bestContainer.pos.y);
-            } else if (bestPos) {
-                harvesterSpots.set(source.id, bestPos.x * 50 + bestPos.y);
-            }
-        }
-        room.heap.set('harvesterSpots', harvesterSpots);
-    }
-
-    // Distribute exact harvester assignments
-    const harvesters = roomCreeps.get('harvester') || [];
-    for (let i = 0; i < harvesters.length; i++) {
-        const creep = harvesters[i];
-        if (!creep.heap) creep.heap = {};
-        if (!creep.heap.targetId && sources.length > 0) {
-            creep.heap.targetId = sources[i % sources.length].id;
-        }
-        if (creep.heap.targetId && !creep.heap.dropId && harvesterSpots && harvesterSpots.has(creep.heap.targetId)) {
-            const packedPos = harvesterSpots.get(creep.heap.targetId);
-            creep.heap.dropId = packedPos;
-            
-            // Top-Down Harvester Container Building
-            const x = Math.floor(packedPos / 50);
-            const y = packedPos % 50;
-            for (let s = 0; s < sites.length; s++) {
-                if (sites[s].structureType === STRUCTURE_CONTAINER && sites[s].pos.x === x && sites[s].pos.y === y) {
-                    creep.heap.siteId = sites[s].id;
-                    break;
-                }
-            }
         }
     }
 

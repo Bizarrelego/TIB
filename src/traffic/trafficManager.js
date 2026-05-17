@@ -1,4 +1,5 @@
 const DeadlockEngine = require('./deadlock');
+const movement = require('../utils/movement');
 const ROLE_PRIORITIES = require('../constants/rolePriorities');
 const Logger = require('../utils/logger');
 
@@ -22,10 +23,6 @@ const TrafficManager = {
         if (!(global.State.ledger instanceof Map)) global.State.ledger = new Map();
         if (!(global.State.swapRegistry instanceof Map)) global.State.swapRegistry = new Map();
         if (!(global.State.pipelineLedger instanceof Map)) global.State.pipelineLedger = new Map();
-        if (!global.State.intentBuckets) {
-            global.State.intentBuckets = new Array(101);
-            for (let i = 0; i <= 100; i++) global.State.intentBuckets[i] = [];
-        }
     },
 
     /**
@@ -50,14 +47,7 @@ const TrafficManager = {
             global.State.trafficIntents.clear();
             global.State.ledger.clear();
             global.State.swapRegistry.clear();
-
-            if (global.State.currentPositions) {
-                for (const roomMap of global.State.currentPositions.values()) {
-                    roomMap.clear();
-                }
-            } else {
-                global.State.currentPositions = new Map();
-            }
+            global.State.currentPositions = new Map();
 
             // Clean pipeline locks every tick
             for (const [id, lock] of global.State.pipelineLedger) {
@@ -87,14 +77,7 @@ const TrafficManager = {
 
             // IMPROVEMENT: Replace string keys with integer bitwise keys.
             // Reason: Optimizes performance. Bitwise operations and integer Map keys are significantly faster and reduce garbage collector overhead compared to string allocation.
-            if (!global.State.currentPositions) {
-                global.State.currentPositions = new Map();
-            } else {
-                for (const roomMap of global.State.currentPositions.values()) {
-                    roomMap.clear();
-                }
-            }
-            const currentPositions = global.State.currentPositions;
+            const currentPositions = new Map(); // Map<roomName, Map<int, string>>
 
             for (const roomName of global.State.scannedRooms || []) {
                 const roomCreeps = global.State.creepsByRoom.get(roomName);
@@ -115,6 +98,8 @@ const TrafficManager = {
                     }
                 }
             }
+
+            global.State.currentPositions = currentPositions;
 
             for (const [creepName, intent] of global.State.trafficIntents.entries()) {
                 const { creep, targetPos } = intent;
@@ -328,6 +313,38 @@ const TrafficManager = {
         return OK;
     },
 
+    /**
+     * @param {object} creep
+     * @param {number} direction
+     */
+    registerMove(creep, direction) {
+        // Fatigue Gating: Ensure only the specific creep is gated.
+        // The TrafficManager should only process creeps that are capable of moving.
+        if (!creep || creep.fatigue > 0 || this.checkPipeline(creep.id)) return;
+
+        if (global.State && global.State.trafficIntents) {
+            global.State.trafficIntents.set(creep.name, { creep, direction, priority: creep.heap.priority || 0 });
+        }
+    },
+
+    /**
+     * @param {object} creep
+     * @param {object} targetPos
+     * @param {object} [opts={}]
+     */
+    registerMoveIntent(creep, targetPos, opts = {}) {
+        if (!creep || creep.fatigue > 0) return;
+        if (!global.State) global.State = {};
+        if (!(global.State.trafficIntents instanceof Map)) global.State.trafficIntents = new Map();
+
+        global.State.trafficIntents.set(creep.name, {
+            creep,
+            targetPos,
+            opts,
+            originalPos: creep.pos
+        });
+    },
+
     registerSwap(creepA, creepB) {
         if (global.State && global.State.swapRegistry) {
             global.State.swapRegistry.set(creepA.name, creepB.name);
@@ -394,10 +411,8 @@ const TrafficManager = {
             if (!global.State || !global.State.trafficIntents || global.State.trafficIntents.size === 0) return;
 
             // Phase 3: Execute Moves (O(1) Priority Buckets)
-            const buckets = global.State.intentBuckets;
-            for (let i = 0; i <= 100; i++) {
-                buckets[i].length = 0;
-            }
+            const buckets = new Array(101);
+            for (let i = 0; i <= 100; i++) buckets[i] = [];
 
             for (const intent of global.State.trafficIntents.values()) {
                 let priority = (intent.creep && intent.creep.memory && intent.creep.memory.role) ? (ROLE_PRIORITIES.get(intent.creep.memory.role) || 0) : 0;
@@ -407,7 +422,6 @@ const TrafficManager = {
 
             const processedSwaps = new Set();
             const currentPositions = global.State.currentPositions || new Map();
-            const resolvedCreeps = new Set();
 
             for (let p = 100; p >= 0; p--) {
                 const bucket = buckets[p];
@@ -415,7 +429,6 @@ const TrafficManager = {
                     const intent = bucket[i];
                     const { creep, targetPos, opts, intendedNextPos } = intent;
                     if (!creep) continue;
-                    if (resolvedCreeps.has(creep.name)) continue;
 
                 if (global.State.swapRegistry && global.State.swapRegistry.has(creep.name)) {
                     if (processedSwaps.has(creep.name)) continue;
@@ -433,8 +446,6 @@ const TrafficManager = {
                         if (dir) {
                            creep.move(dir);
                            blockingCreep.move(((dir + 3) % 8) + 1);
-                           resolvedCreeps.add(creep.name);
-                           resolvedCreeps.add(blockingCreep.name);
                         }
                     }
 
@@ -459,8 +470,6 @@ const TrafficManager = {
                                 if (dir) {
                                     creep.move(dir);
                                     blockingLive.move(((dir + 3) % 8) + 1);
-                                    resolvedCreeps.add(creep.name);
-                                    resolvedCreeps.add(blockingLive.name);
                                 }
                                 global.State.trafficIntents.delete(creep.name);
                                 continue;
@@ -471,10 +480,7 @@ const TrafficManager = {
 
         if (intendedNextPos) {
             const dir = creep.pos.getDirectionTo(intendedNextPos);
-            if (dir) {
-                creep.move(dir);
-                resolvedCreeps.add(creep.name);
-            }
+            if (dir) creep.move(dir);
         }
                 global.State.trafficIntents.delete(creep.name);
             }
