@@ -33,7 +33,7 @@ function findRoute(fromRoom, toRoom) {
     if (fromRoom === toRoom) return [];
 
     return Game.map.findRoute(fromRoom, toRoom, {
-        routeCallback(roomName, fromRoomName) {
+        routeCallback(roomName, _fromRoomName) {
             // Avoid hostile rooms
             if (global.State && global.State.hostilesByRoom) {
                 const hostiles = global.State.hostilesByRoom.get(roomName);

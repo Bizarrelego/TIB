@@ -11,7 +11,6 @@ const operationsManager = require('./operations/operationsManager'); // High-lev
 const managerOrchestrator = require('./managers/managerOrchestrator'); // Standalone Managers
 const eventLogRadar = require('./os/eventLogRadar');
 const trafficManager = require('./traffic/trafficManager');
-const movement = require('./utils/movement');
 const garbageCollector = require('./os/garbageCollector');
 const Logger = require('./utils/logger');
 const IntentManager = require('./os/IntentManager');

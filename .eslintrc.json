@@ -17,11 +17,13 @@
         "EVENT_HARVEST": "readonly",
         "EVENT_REPAIR": "readonly",
         "EVENT_HEAL": "readonly",
-        "FIND_RUINS": "readonly"
+        "FIND_RUINS": "readonly",
+        "EVENT_TRANSFER": "readonly",
+        "EVENT_WITHDRAW": "readonly"
     },
     "extends": "eslint:recommended",
     "rules": {
         "no-undef": "error",
-        "no-unused-vars": "warn"
+        "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }]
     }
 }

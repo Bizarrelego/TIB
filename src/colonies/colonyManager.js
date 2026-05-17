@@ -3,28 +3,19 @@ const spawnManager = require('./spawnManager');
 const planner = require('./planner');
 const defense = require('./defense');
 const scavengingManager = require('./scavengingManager');
-const SpawnQueueManager = require('../managers/SpawnQueueManager');
-const BodyCalc = require('../utils/bodyCalc');
-
 /**
  * O(N) Top-Down Assignment for Early RCL (1-2) Progression.
  * Evaluates room state and assigns exact targets to workers.
  * @param {Room} room - The game room to evaluate.
- * @param {SpawnLedger} spawnLedger - The virtual ledger for energy capacity tracking.
+ * @param {SpawnLedger} _spawnLedger - The virtual ledger for energy capacity tracking.
  */
-function manageEarlyProgression(room, spawnLedger) {
+function manageEarlyProgression(room, _spawnLedger) {
     if (!room.controller || room.controller.level > 2) return;
 
     const roomCreeps = global.State.creepsByRoom.get(room.name);
     if (!roomCreeps) return;
 
     const workers = roomCreeps.get('worker') || [];
-    const emergencyBuilders = roomCreeps.get('emergencyBuilder') || [];
-    const haulers = roomCreeps.get('hauler') || [];
-
-    // Manager Communication: Check virtual room energy capacity to prevent engine rejections
-    const energyAvailable = spawnLedger.getAvailableEnergy();
-
 
     // Extract global state (0-CPU cost lookups)
     const sources = global.State.sourcesByRoom.get(room.name) || [];

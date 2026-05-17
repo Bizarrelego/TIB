@@ -20,11 +20,11 @@ class DistanceTransformInterface {
      * Compute a distance transform from a set of target points using Wasm.
      * The Wasm module should be able to process a raw terrain array or a boolean occupancy grid.
      *
-     * @param {string} roomName
-     * @param {CostMatrix} initialMatrix 255 = unwalkable, 0 = walkable
+     * @param {string} _roomName
+     * @param {CostMatrix} _initialMatrix 255 = unwalkable, 0 = walkable
      * @returns {CostMatrix|null} The distance transform or null if Wasm is unavailable
      */
-    static computeWasm(roomName, initialMatrix) {
+    static computeWasm(_roomName, _initialMatrix) {
         if (!wasmModule || !wasmModule.compute) {
             return null; // Fallback to JS implementation
         }

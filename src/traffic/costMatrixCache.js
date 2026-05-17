@@ -57,7 +57,11 @@ const CostMatrixCache = {
         const rawData = RawMemoryManager.getSegment(MEMORY_SEGMENTS.COST_MATRICES);
         let parsed = {};
         if (rawData) {
-            try { parsed = JSON.parse(rawData); } catch (e) {}
+            try {
+                parsed = JSON.parse(rawData);
+            } catch (e) {
+                // Ignore parse errors, will overwrite with new empty object
+            }
         }
         parsed[roomName] = serialized;
         RawMemoryManager.setSegment(MEMORY_SEGMENTS.COST_MATRICES, JSON.stringify(parsed));
