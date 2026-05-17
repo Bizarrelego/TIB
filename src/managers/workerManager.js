@@ -58,7 +58,14 @@ module.exports = {
         const supplies = EnergyRequestManager.getEnergySupplies(room.name, 'worker');
         const supplyLedger = new Map();
         for (let i = 0; i < supplies.length; i++) {
-            supplyLedger.set(supplies[i].target.id, supplies[i].amount);
+            const liveTarget = Game.getObjectById(supplies[i].target.id);
+            if (liveTarget) {
+                if (liveTarget.amount !== undefined && liveTarget.amount > 0) {
+                    supplyLedger.set(liveTarget.id, liveTarget.amount);
+                } else if (liveTarget.store && liveTarget.store[RESOURCE_ENERGY] > 0) {
+                    supplyLedger.set(liveTarget.id, liveTarget.store[RESOURCE_ENERGY]);
+                }
+            }
         }
 
         for (const creep of workers) {
@@ -83,12 +90,15 @@ module.exports = {
                 let targetAssigned = false;
                 for (let i = 0; i < supplies.length; i++) {
                     const supply = supplies[i];
-                    const available = supplyLedger.get(supply.target.id) || 0;
-                    if (available > 0) {
-                        creep.heap.targetId = supply.target.id;
-                        supplyLedger.set(supply.target.id, available - creep.store.getFreeCapacity());
-                        targetAssigned = true;
-                        break;
+                    const liveTarget = Game.getObjectById(supply.target.id);
+                    if (liveTarget && ((liveTarget.store && liveTarget.store[RESOURCE_ENERGY] > 0) || (liveTarget.amount !== undefined && liveTarget.amount > 0))) {
+                        const available = supplyLedger.get(liveTarget.id) || 0;
+                        if (available > 0) {
+                            creep.heap.targetId = liveTarget.id;
+                            supplyLedger.set(liveTarget.id, available - creep.store.getFreeCapacity());
+                            targetAssigned = true;
+                            break;
+                        }
                     }
                 }
                 if (!targetAssigned) {

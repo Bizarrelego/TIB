@@ -47,8 +47,18 @@ module.exports = {
                         movement.moveTo(creep, target);
                     }
                 } else if (state === 'pickup') {
+                    if ((target.store && target.store[RESOURCE_ENERGY] === 0) || (target.amount !== undefined && target.amount === 0)) {
+                        creep.heap.targetId = null;
+                        creep.heap.state = null;
+                        continue;
+                    }
                     if (creep.pos.isNearTo(target)) {
-                        const status = TrafficManager.registerPickup(creep, target, RESOURCE_ENERGY, Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), target.amount));
+                        let status;
+                        if (target.amount !== undefined) {
+                            status = TrafficManager.registerPickup(creep, target, RESOURCE_ENERGY, Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), target.amount));
+                        } else if (target.store !== undefined) {
+                            status = TrafficManager.registerWithdraw(creep, target, RESOURCE_ENERGY, Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), TrafficManager.getVirtualState(target, RESOURCE_ENERGY).used));
+                        }
                         if (status === ERR_NOT_ENOUGH_RESOURCES) {
                             creep.heap.targetId = null;
                             creep.heap.state = null;
@@ -57,8 +67,18 @@ module.exports = {
                         movement.moveTo(creep, target);
                     }
                 } else if (state === 'withdraw') {
+                    if ((target.store && target.store[RESOURCE_ENERGY] === 0) || (target.amount !== undefined && target.amount === 0)) {
+                        creep.heap.targetId = null;
+                        creep.heap.state = null;
+                        continue;
+                    }
                     if (creep.pos.isNearTo(target)) {
-                        const status = TrafficManager.registerWithdraw(creep, target, RESOURCE_ENERGY, Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), TrafficManager.getVirtualState(target, RESOURCE_ENERGY).used));
+                        let status;
+                        if (target.store !== undefined) {
+                            status = TrafficManager.registerWithdraw(creep, target, RESOURCE_ENERGY, Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), TrafficManager.getVirtualState(target, RESOURCE_ENERGY).used));
+                        } else if (target.amount !== undefined) {
+                            status = TrafficManager.registerPickup(creep, target, RESOURCE_ENERGY, Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), target.amount));
+                        }
                         if (status === ERR_NOT_ENOUGH_RESOURCES) {
                             creep.heap.targetId = null;
                             creep.heap.state = null;

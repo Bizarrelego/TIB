@@ -295,5 +295,31 @@ module.exports = function stateScanner() {
                 }
             }
         }
+
+        // Prune Empty Persistent Objects
+        if (roomRuins) {
+            for (const id of roomRuins.keys()) {
+                const liveObj = Game.getObjectById(id);
+                if (!liveObj || (liveObj.store && liveObj.store[RESOURCE_ENERGY] === 0)) {
+                    roomRuins.delete(id);
+                }
+            }
+        }
+        if (roomTombstones) {
+            for (const id of roomTombstones.keys()) {
+                const liveObj = Game.getObjectById(id);
+                if (!liveObj || (liveObj.store && liveObj.store[RESOURCE_ENERGY] === 0)) {
+                    roomTombstones.delete(id);
+                }
+            }
+        }
+        if (roomDropped) {
+            for (const id of roomDropped.keys()) {
+                const liveObj = Game.getObjectById(id);
+                if (!liveObj || (liveObj.amount !== undefined && liveObj.amount === 0)) {
+                    roomDropped.delete(id);
+                }
+            }
+        }
     }
 };
