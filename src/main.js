@@ -32,6 +32,9 @@ module.exports.loop = function () {
     // Rehydrate global state
     globalState.rehydrate();
 
+    if (!global.State) {
+        global.State = {};
+    }
     if (!global.State.intentManager) {
         global.State.intentManager = new IntentManager();
     }
