@@ -194,6 +194,7 @@ class EnergyRequestManager {
         } else if (global.State.droppedByRoom && global.State.droppedByRoom.has(roomName)) {
             dropped = global.State.droppedByRoom.get(roomName) || [];
         }
+        if (dropped instanceof Map) dropped = Array.from(dropped.values());
 
         for (let i = 0; i < dropped.length; i++) {
             const resource = dropped[i];
@@ -207,7 +208,8 @@ class EnergyRequestManager {
         }
 
         // Tombstones and Ruins (Priority 85)
-        const tombstones = (global.State.tombstonesByRoom && global.State.tombstonesByRoom.get(roomName)) || [];
+        let tombstones = (global.State.tombstonesByRoom && global.State.tombstonesByRoom.get(roomName)) || [];
+        if (tombstones instanceof Map) tombstones = Array.from(tombstones.values());
         for (let i = 0; i < tombstones.length; i++) {
             const tombstone = tombstones[i];
             if (tombstone.store) {
@@ -219,7 +221,8 @@ class EnergyRequestManager {
             }
         }
 
-        const ruins = (global.State.ruinsByRoom && global.State.ruinsByRoom.get(roomName)) || [];
+        let ruins = (global.State.ruinsByRoom && global.State.ruinsByRoom.get(roomName)) || [];
+        if (ruins instanceof Map) ruins = Array.from(ruins.values());
         for (let i = 0; i < ruins.length; i++) {
             const ruin = ruins[i];
             if (ruin.store) {

@@ -28,10 +28,12 @@ function manageEarlyProgression(room, spawnLedger) {
 
     // Extract global state (0-CPU cost lookups)
     const sources = global.State.sourcesByRoom.get(room.name) || [];
-    const droppedArrays = global.State.droppedByRoom.get(room.name) || [];
+    const droppedRaw = global.State.droppedByRoom.get(room.name) || [];
+    const droppedArrays = droppedRaw instanceof Map ? Array.from(droppedRaw.values()) : droppedRaw;
     const structures = global.State.structuresByRoom.get(room.name) || new Map();
     const sites = global.State.sitesByRoom.get(room.name) || [];
-    const tombstones = global.State.tombstonesByRoom.get(room.name) || [];
+    const tombstonesRaw = global.State.tombstonesByRoom.get(room.name) || [];
+    const tombstones = tombstonesRaw instanceof Map ? Array.from(tombstonesRaw.values()) : tombstonesRaw;
 
     if (!room.heap) room.heap = new Map();
     let harvesterSpots = room.heap.get('harvesterSpots');

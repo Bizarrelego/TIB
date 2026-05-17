@@ -165,7 +165,14 @@ module.exports = function stateScanner() {
                     if (global.State.needyExtensions) global.State.needyExtensions.delete(event.objectId);
                 }
 
-                roomSites.delete(event.objectId);
+                if (roomSites) {
+                    if (roomSites instanceof Map) {
+                        roomSites.delete(event.objectId);
+                    } else if (Array.isArray(roomSites)) {
+                        const idx = roomSites.findIndex(s => s.id === event.objectId);
+                        if (idx !== -1) roomSites.splice(idx, 1);
+                    }
+                }
                 roomDropped.delete(event.objectId);
                 roomTombstones.delete(event.objectId);
                 roomRuins.delete(event.objectId);
@@ -251,7 +258,14 @@ module.exports = function stateScanner() {
                 if (buildObj && buildObj.structureType) {
                     if (!(buildObj instanceof ConstructionSite)) {
                         const siteIdToRemove = event.data && event.data.targetId ? event.data.targetId : event.objectId;
-                        roomSites.delete(siteIdToRemove);
+                        if (roomSites) {
+                            if (roomSites instanceof Map) {
+                                roomSites.delete(siteIdToRemove);
+                            } else if (Array.isArray(roomSites)) {
+                                const idx = roomSites.findIndex(s => s.id === siteIdToRemove);
+                                if (idx !== -1) roomSites.splice(idx, 1);
+                            }
+                        }
 
                         let structsOfType = roomStructures.get(buildObj.structureType);
                         if (!structsOfType) {

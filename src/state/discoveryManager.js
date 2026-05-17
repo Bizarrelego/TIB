@@ -79,9 +79,22 @@ module.exports = function discoveryManager() {
                 state.controllersByRoom.set(roomName, room.controller);
                 state.sitesByRoom.set(roomName, room.find(FIND_MY_CONSTRUCTION_SITES));
                 state.mineralsByRoom.set(roomName, room.find(FIND_MINERALS));
-                state.droppedByRoom.set(roomName, room.find(FIND_DROPPED_RESOURCES));
-                state.tombstonesByRoom.set(roomName, room.find(FIND_TOMBSTONES));
-                state.ruinsByRoom.set(roomName, room.find(FIND_RUINS));
+                
+                const droppedMap = new Map();
+                const dropped = room.find(FIND_DROPPED_RESOURCES);
+                for (let i = 0; i < dropped.length; i++) droppedMap.set(dropped[i].id, dropped[i]);
+                state.droppedByRoom.set(roomName, droppedMap);
+
+                const tombstoneMap = new Map();
+                const tombstones = room.find(FIND_TOMBSTONES);
+                for (let i = 0; i < tombstones.length; i++) tombstoneMap.set(tombstones[i].id, tombstones[i]);
+                state.tombstonesByRoom.set(roomName, tombstoneMap);
+
+                const ruinsMap = new Map();
+                const ruins = room.find(FIND_RUINS);
+                for (let i = 0; i < ruins.length; i++) ruinsMap.set(ruins[i].id, ruins[i]);
+                state.ruinsByRoom.set(roomName, ruinsMap);
+                
                 state.nukesByRoom.set(roomName, room.find(FIND_NUKES));
 
                 state.roomTerrain.set(roomName, new Room.Terrain(roomName));
