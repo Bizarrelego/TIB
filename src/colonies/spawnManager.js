@@ -142,12 +142,7 @@ module.exports = {
                 SpawnQueueManager.requestSpawn(room.name, 'domesticHauler', body, 'domesticHauler_' + Game.time, { memory: { role: 'domesticHauler', colony: room.name } }, cost);
             }
 
-            // Spawn a worker to act as multi-purpose builder/upgrader
-            if (workerCount < spawnLedger.calculateWorkerTarget(room)) {
-                const body = BodyCalc.calculateWorker(capacity);
-                const cost = BodyCalc.getCost(body);
-                SpawnQueueManager.requestSpawn(room.name, 'worker', body, 'worker_' + Game.time, { memory: { role: 'worker', colony: room.name } }, cost);
-            }
+
 
             // Global Scout Spawning Logic (1 active scout globally)
             if (room.controller.level >= 1) {
@@ -251,7 +246,7 @@ module.exports = {
                         const activeReserver = colonyReservers.find(c => c.memory.targetRoom === targetRoomName);
 
                         if (!activeReserver && intel.reservation !== 'jules') {
-                            const body = capacity >= 1300 ? [CLAIM, CLAIM, MOVE, MOVE] : [CLAIM, MOVE];
+                            const body = [CLAIM, MOVE];
                             const cost = capacity >= 1300 ? 1300 : 650;
                             if (capacity >= cost && spawnLedger.canSpawn(cost)) {
                                 SpawnQueueManager.requestSpawn(room.name, 'reserver', body, 'reserver_' + Game.time, {

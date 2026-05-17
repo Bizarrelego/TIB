@@ -1,3 +1,4 @@
+const TrafficManager = require('../traffic/trafficManager');
 const movement = require('../utils/movement');
 
 // Upgraders must be static. Move once, then stay forever.
@@ -10,57 +11,36 @@ function run(creep, room) {
     try {
         if (creep.fatigue > 0) return;
 
-        let controllerContainer = null;
-
-        // Strictly blind top-down execution: read ID assigned by UpgraderManager
-        if (creep.heap.controllerContainerId) {
-            controllerContainer = Game.getObjectById(creep.heap.controllerContainerId);
-            if (!controllerContainer) {
-                creep.heap.controllerContainerId = null; // Invalidate cache if destroyed
-                creep.heap.state = null; // Enforce fault-tolerant reset
-                return;
-            }
-        }
-
-        if (controllerContainer) {
-            // 1. If the container exists, the creep must move to it
-            if (!creep.pos.isEqualTo(controllerContainer.pos)) {
-                movement.moveTo(creep, controllerContainer);
-            } else {
-                // 2. Once creep.pos.isEqualTo(container.pos), permanently stop moving.
-                // 3. Every tick, if container has energy, withdraw and upgrade simultaneously
-                const hasEnergy = controllerContainer.store.getUsedCapacity(RESOURCE_ENERGY) > 0;
-
-                if (hasEnergy) {
-                    if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                        if (creep.withdraw(controllerContainer, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
-                            movement.moveTo(creep, controllerContainer);
-                        }
-                    }
-                    if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                        if (creep.upgradeController(controller) === ERR_NOT_IN_RANGE) {
-                            movement.moveTo(creep, controller);
-                        }
-                    }
-                } else {
-                    // 4. If container is completely empty, sleep and wait for haulers. Do not walk away to harvest.
-                    if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                        if (creep.upgradeController(controller) === ERR_NOT_IN_RANGE) {
-                            movement.moveTo(creep, controller);
-                        }
+        // Lock position near controller and pull from drop pile or Storage
+        if (creep.pos.getRangeTo(controller) > 3) {
+            movement.moveTo(creep, controller);
+        } else {
+            const storage = room.storage;
+            if (storage && storage.isActive()) {
+                if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                    const status = TrafficManager.registerWithdraw(creep, storage, RESOURCE_ENERGY, creep.store.getFreeCapacity(RESOURCE_ENERGY));
+                    if (status !== OK && creep.pos.getRangeTo(storage) > 1) {
+                        movement.moveTo(creep, storage);
                     }
                 }
-            }
-        } else {
-            // Fallback if no container yet: move to controller and upgrade if it has energy
-            if (creep.pos.getRangeTo(controller) > 3) {
-                movement.moveTo(creep, controller);
-            } else if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                creep.upgradeController(controller);
             } else {
-                // Emergency fallback: wait for hauler drops or harvest if strictly needed
-                // But prompt says: "Upgraders must not wander or pull from sources unless in emergency fallback."
-                // Wait/Sleep if no container.
+                // Find dropped energy
+                const dropped = global.State.droppedByRoom.get(room.name) || new Map();
+                let targetDrop = null;
+                for (const drop of dropped.values()) {
+                    if (drop.resourceType === RESOURCE_ENERGY && creep.pos.isNearTo(drop)) {
+                        targetDrop = drop;
+                        break;
+                    }
+                }
+
+                if (targetDrop && creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                    TrafficManager.registerPickup(creep, targetDrop, RESOURCE_ENERGY, creep.store.getFreeCapacity());
+                }
+            }
+
+            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                creep.upgradeController(controller);
             }
         }
     } catch (e) {

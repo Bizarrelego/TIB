@@ -22,7 +22,7 @@ function manageEarlyProgression(room, _spawnLedger) {
     const droppedRaw = global.State.droppedByRoom.get(room.name) || [];
     const droppedArrays = droppedRaw instanceof Map ? Array.from(droppedRaw.values()) : droppedRaw;
     const structures = global.State.structuresByRoom.get(room.name) || new Map();
-    const sites = global.State.sitesByRoom.get(room.name) || [];
+    const sites = global.State.sitesByRoom.get(room.name) || []; // No native polling
     const tombstonesRaw = global.State.tombstonesByRoom.get(room.name) || [];
     const tombstones = tombstonesRaw instanceof Map ? Array.from(tombstonesRaw.values()) : tombstonesRaw;
 
@@ -196,6 +196,14 @@ function manageEarlyProgression(room, _spawnLedger) {
 
         // Second block: Target assignment logic
         const state = creep.heap.state;
+
+        // Multi-room OS Interrupt: Override Upgrader to Builder if sites exist
+        if (state === 'upgrade' && sites.length > 0) {
+            creep.heap.state = 'build';
+            creep.heap.targetId = sites[0].id;
+        } else if (state === 'build' && sites.length === 0) {
+            creep.heap.state = 'upgrade';
+        }
         if (state === 'pickup') {
             creep.heap.targetId = massiveDrop.id;
         } else if (state === 'withdraw') {

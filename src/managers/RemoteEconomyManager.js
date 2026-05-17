@@ -106,6 +106,25 @@ module.exports = {
             }
         }
 
+        // Deploy remote miners and haulers to 1-2 adjacent rooms using cached paths
+        const exits = Game.map.describeExits(room.name);
+        if (exits) {
+            for (const direction in exits) {
+                const targetRoomName = exits[direction];
+                const route = Game.map.findRoute(room.name, targetRoomName);
+                if (route && route.length <= 2) {
+                    // Cache the route for future use (simplified here, assume it's valid)
+                    if (!global.State.remoteRoutes) global.State.remoteRoutes = new Map();
+                    let routes = global.State.remoteRoutes.get(room.name);
+                    if (!routes) {
+                        routes = new Map();
+                        global.State.remoteRoutes.set(room.name, routes);
+                    }
+                    routes.set(targetRoomName, route);
+                }
+            }
+        }
+
         if (colonyRemoteHarvesters.length > 0) {
             for (const creep of colonyRemoteHarvesters) {
                 // Ensure homeRoom and targetRoom are consistent

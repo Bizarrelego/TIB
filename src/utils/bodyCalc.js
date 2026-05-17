@@ -105,31 +105,16 @@ class BodyCalc {
      */
     static calculateEarlyGameHarvester(energyCapacity) {
         let work = 0;
-        let carry = 1;
         let move = 0;
-        let cost = BODYPART_COST[CARRY]; // Start with 1 CARRY
+        let cost = 0;
 
-        // Ensure at least 1 WORK and 1 MOVE if possible
-        if (cost + BODYPART_COST[WORK] + BODYPART_COST[MOVE] <= energyCapacity) {
+        while (work < 3 && cost + BODYPART_COST[WORK] + BODYPART_COST[MOVE] <= energyCapacity) {
             work++;
             move++;
             cost += BODYPART_COST[WORK] + BODYPART_COST[MOVE];
         }
 
-        // Alternate adding WORK and MOVE up to capacity or logical cap
-        while (cost + BODYPART_COST[WORK] + BODYPART_COST[MOVE] <= energyCapacity && work < 6 && move < 6) {
-            work++;
-            move++;
-            cost += BODYPART_COST[WORK] + BODYPART_COST[MOVE];
-        }
-
-        // If there's still room, prioritize more WORK
-        while (cost + BODYPART_COST[WORK] <= energyCapacity && work < 7) {
-            work++;
-            cost += BODYPART_COST[WORK];
-        }
-
-        return this.buildArray({ [WORK]: work, [CARRY]: carry, [MOVE]: move });
+        return this.buildArray({ [WORK]: work, [MOVE]: move });
     }
 
     /**
@@ -171,24 +156,12 @@ class BodyCalc {
         let move = 0;
         let cost = 0;
 
-        // Try 2:1 ratio first
-        const twoToOneCost = BODYPART_COST[CARRY] * 2 + BODYPART_COST[MOVE];
-        const oneToOneCost = BODYPART_COST[CARRY] + BODYPART_COST[MOVE];
-
-        while (cost + twoToOneCost <= energyCapacity && carry + move + 3 <= 50) {
-            carry += 2;
-            move += 1;
-            cost += twoToOneCost;
+        while (cost + BODYPART_COST[CARRY] + BODYPART_COST[MOVE] <= energyCapacity && carry + move + 2 <= 50) {
+            carry++;
+            move++;
+            cost += BODYPART_COST[CARRY] + BODYPART_COST[MOVE];
         }
 
-        // If we can't afford a full 2:1 block, try adding a 1:1 block to fill capacity
-        if (cost + oneToOneCost <= energyCapacity && carry + move + 2 <= 50) {
-            carry += 1;
-            move += 1;
-            cost += oneToOneCost;
-        }
-
-        // Fallback for very low capacity
         if (carry === 0 && energyCapacity >= 100) {
             carry = 1; move = 1;
         }
