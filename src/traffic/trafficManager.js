@@ -356,42 +356,22 @@ const TrafficManager = {
             const target = intent.targetId ? Game.getObjectById(intent.targetId) : null;
             if (!target && intent.type !== 'DROP') return;
 
-            if (global.State && global.State.intentManager) {
-                switch (intent.type) {
-                    case 'TRANSFER':
-                        global.State.intentManager.registerIntent(creep.id, 'transfer', target.id, { resourceType: intent.resourceType, amount: intent.amount });
-                        break;
-                    case 'WITHDRAW':
-                        global.State.intentManager.registerIntent(creep.id, 'withdraw', target.id, { resourceType: intent.resourceType, amount: intent.amount });
-                        break;
-                    case 'PICKUP':
-                        global.State.intentManager.registerIntent(creep.id, 'pickup', target.id);
-                        break;
-                    case 'HARVEST':
-                        global.State.intentManager.registerIntent(creep.id, 'harvest', target.id);
-                        break;
-                    case 'DROP':
-                        global.State.intentManager.registerIntent(creep.id, 'drop', null, { resourceType: intent.resourceType, amount: intent.amount });
-                        break;
-                }
-            } else {
-                switch (intent.type) {
-                    case 'TRANSFER':
-                        creep.transfer(target, intent.resourceType, intent.amount);
-                        break;
-                    case 'WITHDRAW':
-                        creep.withdraw(target, intent.resourceType, intent.amount);
-                        break;
-                    case 'PICKUP':
-                        creep.pickup(target);
-                        break;
-                    case 'HARVEST':
-                        creep.harvest(target);
-                        break;
-                    case 'DROP':
-                        creep.drop(intent.resourceType, intent.amount);
-                        break;
-                }
+            switch (intent.type) {
+                case 'TRANSFER':
+                    creep.transfer(target, intent.resourceType, intent.amount);
+                    break;
+                case 'WITHDRAW':
+                    creep.withdraw(target, intent.resourceType, intent.amount);
+                    break;
+                case 'PICKUP':
+                    creep.pickup(target);
+                    break;
+                case 'HARVEST':
+                    creep.harvest(target);
+                    break;
+                case 'DROP':
+                    creep.drop(intent.resourceType, intent.amount);
+                    break;
             }
         } catch (e) {
             console.log(`[TrafficManager] FlushIntent Error on ${creep.name}: ${e.stack}`);
@@ -427,6 +407,7 @@ const TrafficManager = {
 
             const processedSwaps = new Set();
             const currentPositions = global.State.currentPositions || new Map();
+            const resolvedCreeps = new Set();
 
             for (let p = 100; p >= 0; p--) {
                 const bucket = buckets[p];
@@ -434,6 +415,7 @@ const TrafficManager = {
                     const intent = bucket[i];
                     const { creep, targetPos, opts, intendedNextPos } = intent;
                     if (!creep) continue;
+                    if (resolvedCreeps.has(creep.name)) continue;
 
                 if (global.State.swapRegistry && global.State.swapRegistry.has(creep.name)) {
                     if (processedSwaps.has(creep.name)) continue;
@@ -449,13 +431,10 @@ const TrafficManager = {
 
                         // Custom getDirection logic if needed since getDirectionTo exists in Screeps API
                         if (dir) {
-                           if (global.State && global.State.intentManager) {
-                                global.State.intentManager.registerIntent(creep.id, 'move', null, { direction: dir });
-                                global.State.intentManager.registerIntent(blockingCreep.id, 'move', null, { direction: (((dir + 3) % 8) + 1) });
-                           } else {
-                               creep.move(dir);
-                               blockingCreep.move(((dir + 3) % 8) + 1);
-                           }
+                           creep.move(dir);
+                           blockingCreep.move(((dir + 3) % 8) + 1);
+                           resolvedCreeps.add(creep.name);
+                           resolvedCreeps.add(blockingCreep.name);
                         }
                     }
 
@@ -478,13 +457,10 @@ const TrafficManager = {
                                 // Swap with stationary friendly creep
                                 const dir = creep.pos.getDirectionTo(intendedNextPos);
                                 if (dir) {
-                                    if (global.State && global.State.intentManager) {
-                                    global.State.intentManager.registerIntent(creep.id, 'move', null, { direction: dir });
-                                    global.State.intentManager.registerIntent(blockingLive.id, 'move', null, { direction: (((dir + 3) % 8) + 1) });
-                                } else {
                                     creep.move(dir);
                                     blockingLive.move(((dir + 3) % 8) + 1);
-                                }
+                                    resolvedCreeps.add(creep.name);
+                                    resolvedCreeps.add(blockingLive.name);
                                 }
                                 global.State.trafficIntents.delete(creep.name);
                                 continue;
@@ -496,11 +472,8 @@ const TrafficManager = {
         if (intendedNextPos) {
             const dir = creep.pos.getDirectionTo(intendedNextPos);
             if (dir) {
-                if (global.State && global.State.intentManager) {
-                    global.State.intentManager.registerIntent(creep.id, 'move', null, { direction: dir });
-                } else {
-                    creep.move(dir);
-                }
+                creep.move(dir);
+                resolvedCreeps.add(creep.name);
             }
         }
                 global.State.trafficIntents.delete(creep.name);

@@ -56,18 +56,38 @@ module.exports = {
                     matrix = CostMatrixCache.get(roomName);
                 }
 
+                let returnMatrix = matrix;
+
                 // Let's regenerate it properly using the base matrix.
                 if (global.State && global.State.roomPlanner) {
                     const planner = global.State.roomPlanner.get(roomName);
                     if (planner) {
                         const anchor = planner.get('anchor');
                         if (anchor && creep && creep.pos.inRangeTo(anchor, 5)) {
-                            return DirectionalCostMatrixGenerator.generate(roomName, anchor, creep.pos, 'clockwise', 1, matrix);
+                            returnMatrix = DirectionalCostMatrixGenerator.generate(roomName, anchor, creep.pos, 'clockwise', 1, matrix);
                         }
                     }
                 }
 
-                return matrix;
+                // Implement Dynamic Obstacle Avoidance
+                if (global.State && global.State.currentPositions) {
+                    const roomPositions = global.State.currentPositions.get(roomName);
+                    if (roomPositions) {
+                        // Clone the matrix before making creep-specific modifications to prevent shared reference mutation
+                        if (returnMatrix === matrix) returnMatrix = returnMatrix.clone();
+                        for (const [posKey, creepName] of roomPositions.entries()) {
+                            if (creepName === creep.name) continue; // Skip self
+
+                            if (global.State.trafficIntents && !global.State.trafficIntents.has(creepName)) {
+                                const cx = posKey >> 6;
+                                const cy = posKey & 0x3F;
+                                returnMatrix.set(cx, cy, 255);
+                            }
+                        }
+                    }
+                }
+
+                return returnMatrix;
             };
 
             const pathInfo = PathFinder.search(creep.pos, targetPos, pathingOpts);
