@@ -1,3 +1,4 @@
+const PreSpawnManager = require('./PreSpawnManager');
 const CombatManager = require('./CombatManager');
 const ConstructionManager = require('./ConstructionManager');
 const LogisticsManager = require('../colonies/logisticsManager');
@@ -29,6 +30,7 @@ const managers = {
     RemoteEconomyManager,
     RoomEventManager,
     SpawnQueueManager,
+    PreSpawnManager,
     StorageManager,
     TerminalManager,
     TowerManager,

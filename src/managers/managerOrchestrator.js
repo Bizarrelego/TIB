@@ -67,6 +67,7 @@ function managerOrchestrator() {
             { name: 'StorageManager', slice: 1 },
             { name: 'RoomEventManager', slice: 1 },
             { name: 'SpawnQueueManager', slice: 1 },
+            { name: 'PreSpawnManager', slice: 1 },
             { name: 'LogisticsManager', slice: 1 },
             { name: 'LabManager', slice: 5 },
             { name: 'RemoteEconomyManager', slice: 5 },
