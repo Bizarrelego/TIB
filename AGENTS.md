@@ -1,83 +1,45 @@
-# TIB Bot Architecture: Early Game Aggression & Efficiency
+# TIB Early Game Progression Matrix (RCL 1-4)
 
-## 1. Core Execution & CPU Efficiency
+## RCL 1: Bootstrap & Reconnaissance
 
-Strict JS & JSDoc Mandate: .js only. Extensive JSDoc required for IDE intellisense.
+Objective: Reach RCL 2 immediately. Map the surrounding sector.
 
-Zero Native Polling: Remove room.find(), room.lookAt(). Rely exclusively on global.State and cache.
+Spawning: Brute-force generic worker creeps ([WORK, CARRY, MOVE]). Cap the spawn queue based on exact source energy throughput, not an arbitrary static limit.
 
-Event-Driven Radar: Parse room.getEventLog() for attacks or decay. Zero CPU wasted scanning grids.
+Logistics: Zero pathing after arrival. Workers move to the source, harvest, and drop energy. Dedicated upgraders pick up and immediately apply it to the controller. No containers, no road construction.
 
-Fatigue Gating: Instantly return and skip tick logic if fatigue > 0.
+State Initialization: JavaScript memory proxies spin up. Parse the room grid exactly once to build O(1) dictionaries. Cache source and controller IDs to heap.
 
-Source Sleep: Suspend creep execution until wakeTick (Game.time + source.ticksToRegeneration) if a source is empty.
+Aggression: Deploy a single [MOVE] scout to map adjacent rooms. Identify vulnerable neighbors for future starving.
 
-Aggressive Tick Slicing: Sleep non-critical systems (e.g., evaluate spawns every 10 ticks) to maintain a sub-millisecond CPU floor.
+## RCL 2: Role Decoupling & Site Denial
 
-Heap Exclusivity: Proxy memory to heap. creep.memory strictly for persistent data (role, colony). Operational data routes to creep.heap.
+Objective: Stabilize economy. Block neighbor expansion.
 
-Global Reset Recovery: Detect VM resets and rehydrate global.Cache and O(1) dictionaries immediately to prevent ID lookup failures.
+Infrastructure: Plop 5 extensions using a hardcoded coordinate stamp relative to the Spawn. Bypass expensive 15-CPU layout matrices entirely.
 
-## 2. Early-Game Managers
+Logistics: Strict role split. harvester locks to the optimal mining tile and drops energy. domesticHauler sweeps dropped energy to fill the Spawn and extensions.
 
-OS/Memory Manager: Bypasses standard memory parse. Validates heap and builds O(1) entity dictionaries.
+State Management: Multi-room operating system architecture initializes. Track neighbor room states via RawMemory segments.
 
-Intel Manager: Maps cross-room intel to RawMemory segments to bypass the 2MB parse limit. Feeds hostile data directly to the Combat Manager.
+Aggression: Dispatch decoy creeps ([MOVE], holding minimal energy) to sit directly on top of enemy construction sites in adjacent rooms. This blocks their builds and wastes their CPU and energy if they spawn defenders to clear the site.
 
-Colony Manager: Drives room-level progression. Hardcodes early RCL 1-3 layouts relative to Spawn to bypass matrix calculations during the bootstrap phase.
+## RCL 3: Tower Deployment & Core Sniping
 
-Spawn Manager: Utilizes a Sub-Tick Spawn Ledger to track room energy capacity, preventing multiple managers from queuing expensive creeps simultaneously and triggering engine rejections.
+Objective: Secure domestic infrastructure. Choke local competition.
 
-Logistics Manager: Executes top-down assignment. Managers evaluate state and assign targets directly to creeps in O(1) or O(N). Creeps never scan or "bid".
+Infrastructure: Build 1 Tower. Build roads strictly on swamp tiles first to maximize fatigue reduction per energy spent, then connect plains.
 
-Traffic Manager: Issues opposite move intents to idle blocking creeps (Shoving) in 1-tile corridors. Injects custom CostMatrix in early RCL to heavily penalize swamp tiles, forcing creeps onto plains.
+Defense: Tower logic strictly prioritized: Hostile Healers > Hostile Attackers > Creep Healing > Structure Repair (capped at 10% max hits to save energy).
 
-Combat Manager: Drives early game poaching, core sniping, and harassment routing.
+Aggression: Execute Core Sniping. Target neighbor rooms still at RCL 1 or 2. Park a coreSniper ([ATTACK, MOVE]) directly on their controller to block upgrades and force a controller downgrade. If they deploy a tower, launch a drainerHunter ([TOUGH, HEAL, MOVE]) to ride the room border, soaking and healing damage to empty their energy reserves.
 
-## 3. Early Game Logistics & Economy
+## RCL 4: Hub Logistics & Remote Poaching
 
-Containerless Mining: Drop remote energy on the ground. Dynamically size haulers to sweep before decay. Bypasses early container construction delays.
+Objective: Centralize economy. Exploit remote sectors.
 
-Zero-Pathing Stationary Harvesting: Calculate optimal mining spot once. Move there. Never invoke pathing algorithms again.
+Infrastructure: Construct Storage. This fundamentally alters the JS logistics pipeline. All local and remote energy now flows into Storage before distribution to Spawns or Upgraders.
 
-Static Upgrading: Haulers drop energy on the upgrader's exact tile. Upgraders execute pickup() + upgradeController().
+Remote Mining: Claim 1-2 adjacent rooms. Harvesters drop-mine. High-capacity haulers sweep the dropped energy back to domestic Storage.
 
-Ruin Scavenging: Prioritize ruins/tombstones over harvesting to inject free energy directly into progression.
-
-Batched Construction Throttling: Throttle active construction sites to 3 per room to prevent engine parsing lag while allowing concurrent builder execution.
-
-## 4. Tigga-Style Early Aggression
-
-Early Poaching: Dispatch fast attackers to kill neighbor remote harvesters and loot dropped energy.
-
-Remote Denial: Park 150-energy decoys on enemy construction sites to kite defenders, waste their CPU, and starve their outposts.
-
-Core Sniping: Block or kill upgraders in low RCL neighbor rooms to trigger controller downgrading and wipe local competition.
-
-Tower Drain Ops: Deploy drainerHunter creeps to edge tower range, eat damage, heal, and step into adjacent rooms (I-frames) to drop aggro.
-
-## 5. Early Phase Milestones (RCL 1-3)
-
-RCL 1: Brute-force controller. 15 generic workers. Drop-mining. No structures.
-
-RCL 2: 5 extensions near spawn. Strict role split (Harvester/Hauler). Initiate domestic hauling.
-
-RCL 3: 1 Tower (Hostiles > Heals > Roads 10%). Central roads. Scale haulers. Launch Core Sniping operations.
-
-## 6. Creep Dictionary (Early-Game Only)
-
-worker: RCL 1-2 multi-tool fallback. Replaced immediately upon RCL 2.
-
-harvester: 1 per source. Zero-pathing execution. Halts based on ticksToRegeneration.
-
-domesticHauler: Local transport. Sweeps dropped energy.
-
-upgrader: Stationary. Upgrades via ground pickup.
-
-emergencyBuilder: Death spiral recovery. Ignores strict logistics, directly refills spawn.
-
-decoy: Harassment. Parks on enemy sites to block builds. Kites defenders.
-
-coreSniper: Blocks enemy controller upgrades to force downgrading.
-
-drainerHunter: Tower drain ops. I-frame bouncing.
+Aggression: Early Poaching. Dispatch fast attackers to neighboring remote mining operations. Kill their harvesters. Reroute your haulers to loot the dropped energy and transport it back to your Storage.
