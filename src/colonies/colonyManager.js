@@ -277,7 +277,8 @@ function manageEarlyProgression(room, _spawnLedger) {
  * passing it as a singleton-like service to spawnManager.
  */
 module.exports = function colonyManager() {
-    for (const room of Object.values(Game.rooms)) {
+    if (!global.State || !global.State.rooms) return;
+    for (const room of global.State.rooms.values()) {
         if (room.controller && room.controller.my === true) {
             try {
                 // Instantiate SpawnLedger globally for the room per tick

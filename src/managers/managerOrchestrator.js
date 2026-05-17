@@ -3,6 +3,7 @@ const globalState = require('../state/globalState');
 const Logger = require('../utils/logger');
 const { executeManager } = require('../utils/errorHandler');
 const { wrapModuleFunctions } = require('../utils/moduleWrapper');
+const cpuThrottler = require('../os/cpuThrottler');
 
 /**
  * @file managerOrchestrator.js
@@ -20,7 +21,7 @@ const { wrapModuleFunctions } = require('../utils/moduleWrapper');
  */
 function managerOrchestrator() {
     // CPU Throttling: Skip manager execution if bucket is too low
-    if (Game.cpu.bucket < 500) return;
+    if (cpuThrottler.run().skipManagers) return;
 
     // Zero Native Polling: rely on global.State for room objects if available.
     // Ensure discoveryManager has populated global.State.rooms
@@ -76,6 +77,13 @@ function managerOrchestrator() {
             { name: 'TerminalManager', slice: 10 },
             { name: 'QuadSquadManager', slice: 1 }
         ];
+
+        const registeredManagers = Object.keys(require('./index').managers);
+        for (const name of registeredManagers) {
+            if (!managersConfig.find(c => c.name === name)) {
+                managersConfig.push({ name, slice: 1 });
+            }
+        }
 
         for (const config of managersConfig) {
             if (Game.time % config.slice !== 0) continue;

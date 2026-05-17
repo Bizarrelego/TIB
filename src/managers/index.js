@@ -41,6 +41,7 @@ const managers = {
 };
 
 module.exports = {
+    managers,
     init: function(globalState) {
         for (const [name, manager] of Object.entries(managers)) {
             globalState.registerManager(name, manager);

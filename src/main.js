@@ -10,6 +10,7 @@ const colonyManager = require('./colonies/colonyManager');
 const operationsManager = require('./operations/operationsManager'); // High-level orchestrator
 const managerOrchestrator = require('./managers/managerOrchestrator'); // Standalone Managers
 const eventLogRadar = require('./os/eventLogRadar');
+const cpuThrottler = require('./os/cpuThrottler');
 const trafficManager = require('./traffic/trafficManager');
 const garbageCollector = require('./os/garbageCollector');
 const Logger = require('./utils/logger');
@@ -71,28 +72,9 @@ module.exports.loop = function () {
         return; // Fatal OS crash
     }
 
-    // Cascading CPU Throttling based on Game.cpu.bucket
-    let skipState = false;
-    let skipColonies = false;
-    let skipManagers = false;
-    let skipOperations = false;
-
-    switch (true) {
-        case Game.cpu.bucket < 100:
-            skipState = true;
-            // fallthrough
-        case Game.cpu.bucket < 500:
-            skipColonies = true;
-            skipManagers = true;
-            // fallthrough
-        case Game.cpu.bucket < 2000:
-            skipOperations = true;
-            // fallthrough
-        default:
-            break;
-    }
-
     // Phase 2: State Scanner (Event-driven map updaters)
+    const { skipState, skipColonies, skipManagers, skipOperations } = cpuThrottler.run();
+
     if (!skipState) {
         try {
             if (eventLogRadar) eventLogRadar();
