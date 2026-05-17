@@ -38,19 +38,31 @@ module.exports = {
 
                 if (state === 'harvest') {
                     if (creep.pos.isNearTo(target)) {
-                        TrafficManager.registerHarvest(creep, target);
+                        const status = TrafficManager.registerHarvest(creep, target);
+                        if (status === ERR_NOT_ENOUGH_RESOURCES) {
+                            creep.heap.targetId = null;
+                            creep.heap.state = null;
+                        }
                     } else {
                         movement.moveTo(creep, target);
                     }
                 } else if (state === 'pickup') {
                     if (creep.pos.isNearTo(target)) {
-                        TrafficManager.registerPickup(creep, target, RESOURCE_ENERGY, Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), target.amount));
+                        const status = TrafficManager.registerPickup(creep, target, RESOURCE_ENERGY, Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), target.amount));
+                        if (status === ERR_NOT_ENOUGH_RESOURCES) {
+                            creep.heap.targetId = null;
+                            creep.heap.state = null;
+                        }
                     } else {
                         movement.moveTo(creep, target);
                     }
                 } else if (state === 'withdraw') {
                     if (creep.pos.isNearTo(target)) {
-                        TrafficManager.registerWithdraw(creep, target, RESOURCE_ENERGY, Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), TrafficManager.getVirtualState(target, RESOURCE_ENERGY).used));
+                        const status = TrafficManager.registerWithdraw(creep, target, RESOURCE_ENERGY, Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), TrafficManager.getVirtualState(target, RESOURCE_ENERGY).used));
+                        if (status === ERR_NOT_ENOUGH_RESOURCES) {
+                            creep.heap.targetId = null;
+                            creep.heap.state = null;
+                        }
                     } else {
                         movement.moveTo(creep, target);
                     }

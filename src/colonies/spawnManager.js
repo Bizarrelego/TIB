@@ -90,14 +90,30 @@ module.exports = {
                 }
             }
 
-            const isBootstrapping = harvesterCount === 0 && haulerCount === 0;
-            if (isBootstrapping) {
-                const energyAvailable = spawnLedger.getAvailableEnergy();
-                const cost = energyAvailable >= 250 ? 250 : 200;
-                if (energyAvailable >= 200 && spawnLedger.canSpawn(cost)) {
-                    const body = cost >= 250 ? [WORK, CARRY, MOVE, MOVE] : [WORK, CARRY, MOVE];
-                    spawnLedger.requestSpawn(availableSpawns[0], body, 'bootstrap_' + Game.time, { memory: { role: 'harvester', colony: room.name } }, cost);
+            const roomHasContainers = spawnLedger.hasActiveSourceContainer(room);
+            const isEarlyGame = room.controller.level < 2 || !roomHasContainers;
+
+            if (isEarlyGame) {
+                if (workerCount < 15) {
+                    const energyAvailable = spawnLedger.getAvailableEnergy();
+                    const calcCapacity = (workerCount === 0 && energyAvailable < capacity && energyAvailable >= 200) ? energyAvailable : capacity;
+                    const body = BodyCalc.calculateWorker(calcCapacity);
+                    const cost = BodyCalc.getCost(body);
+                    if (spawnLedger.canSpawn(cost)) {
+                        SpawnQueueManager.requestSpawn(room.name, 'worker', body, 'worker_' + Game.time, { memory: { role: 'worker', colony: room.name } }, cost);
+                    }
+                } else {
+                    let totalScouts = 0;
+                    for (const crps of global.State.creepsByRoom.values()) {
+                        const s = crps.get('scout');
+                        if (s) totalScouts += s.length;
+                    }
+                    if (totalScouts === 0 && spawnLedger.canSpawn(50)) {
+                        SpawnQueueManager.requestSpawn(room.name, 'scout', [MOVE], 'scout_' + Game.time, { memory: { role: 'scout', colony: room.name } }, 50);
+                    }
                 }
+                const queue = new SpawnQueueManager();
+                queue.process(spawns, spawnLedger);
                 return; // suppress execution of all other spawning/queue logic (hubManager, fastFiller, upgrader, etc)
             }
 

@@ -25,19 +25,6 @@ function manageEarlyProgression(room, spawnLedger) {
     // Manager Communication: Check virtual room energy capacity to prevent engine rejections
     const energyAvailable = spawnLedger.getAvailableEnergy();
 
-    if (workers.length === 0 && haulers.length === 0 && emergencyBuilders.length === 0 && energyAvailable >= 200) {
-        if (spawnLedger.canSpawn(200)) {
-            SpawnQueueManager.requestSpawn(room.name, 'emergencyBuilder', [WORK, CARRY, MOVE], 'eb_' + Game.time, { memory: { role: 'emergencyBuilder', colony: room.name } }, 200);
-            spawnLedger.reserveEnergy(200);
-        }
-    } else if (workers.length < 20 && energyAvailable >= 200) {
-        const body = BodyCalc.calculateWorker(room.energyCapacityAvailable);
-        const cost = BodyCalc.getCost(body);
-        if (spawnLedger.canSpawn(cost)) {
-            SpawnQueueManager.requestSpawn(room.name, 'worker', body, 'worker_' + Game.time, { memory: { role: 'worker', colony: room.name } }, cost);
-            spawnLedger.reserveEnergy(cost);
-        }
-    }
 
     // Extract global state (0-CPU cost lookups)
     const sources = global.State.sourcesByRoom.get(room.name) || [];
@@ -221,18 +208,26 @@ function manageEarlyProgression(room, spawnLedger) {
         } else if (state === 'withdraw') {
             creep.heap.targetId = validWithdrawTargets[0].id;
         } else if (state === 'harvest') {
-            let bestSource = sources[0];
+            let bestSource = null;
             let minSat = Infinity;
+            const walkableTilesMap = global.State.sourceWalkableTiles.get(room.name);
+
             for (let s = 0; s < sources.length; s++) {
-                const sat = sourceSaturation.get(sources[s].id);
-                if (sat < minSat) {
+                const source = sources[s];
+                const maxSat = walkableTilesMap ? (walkableTilesMap.get(source.id) || 1) : Infinity;
+                const sat = sourceSaturation.get(source.id);
+                
+                if (sat < maxSat && sat < minSat) {
                     minSat = sat;
-                    bestSource = sources[s];
+                    bestSource = source;
                 }
             }
             if (bestSource) {
                 creep.heap.targetId = bestSource.id;
                 sourceSaturation.set(bestSource.id, minSat + 1);
+            } else {
+                creep.heap.targetId = null;
+                creep.heap.state = null;
             }
         } else if (state === 'refill') {
             let targetSpawn = null;
