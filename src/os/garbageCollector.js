@@ -11,6 +11,18 @@ function garbageCollector() {
                 if (global.Cache && global.Cache.has('creeps')) {
                     global.Cache.get('creeps').delete(name);
                 }
+
+                // Clear sub-tick global memory leaks
+                if (global.State && global.State.trafficIntents) global.State.trafficIntents.delete(name);
+                if (global.State && global.State.ledger) global.State.ledger.delete(name);
+                if (global.State && global.State.swapRegistry) global.State.swapRegistry.delete(name);
+                if (global.State && global.State.currentPositions) {
+                    for (const roomMap of global.State.currentPositions.values()) {
+                        for (const [posKey, creepName] of roomMap.entries()) {
+                            if (creepName === name) roomMap.delete(posKey);
+                        }
+                    }
+                }
             }
         }
 

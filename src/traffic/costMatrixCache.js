@@ -1,5 +1,7 @@
 const eventBus = require('../os/eventBus');
 const RoomHasher = require('../os/roomHasher');
+const RawMemoryManager = require('../os/RawMemoryManager');
+const MEMORY_SEGMENTS = require('../constants/memorySegments');
 
 const CostMatrixCache = {
     get: (roomName) => {
@@ -8,6 +10,20 @@ const CostMatrixCache = {
 
         if (global.State.costMatrices.has(roomName)) {
             return PathFinder.CostMatrix.deserialize(global.State.costMatrices.get(roomName));
+        }
+
+        // Attempt to deserialize from RawMemory to mitigate global reset CPU spikes
+        const rawData = RawMemoryManager.getSegment(MEMORY_SEGMENTS.COST_MATRICES);
+        if (rawData) {
+            try {
+                const parsed = JSON.parse(rawData);
+                if (parsed[roomName]) {
+                    global.State.costMatrices.set(roomName, parsed[roomName]);
+                    return PathFinder.CostMatrix.deserialize(parsed[roomName]);
+                }
+            } catch (e) {
+                console.log(`[CostMatrixCache] Failed to parse raw memory: ${e.message}`);
+            }
         }
 
         const matrices = global.Cache.get('costMatrices');
@@ -36,6 +52,15 @@ const CostMatrixCache = {
             global.Cache.set('roomHashes', new Map());
         }
         global.Cache.get('roomHashes').set(roomName, hash);
+
+        // Serialize generated base matrix to RawMemory
+        const rawData = RawMemoryManager.getSegment(MEMORY_SEGMENTS.COST_MATRICES);
+        let parsed = {};
+        if (rawData) {
+            try { parsed = JSON.parse(rawData); } catch (e) {}
+        }
+        parsed[roomName] = serialized;
+        RawMemoryManager.setSegment(MEMORY_SEGMENTS.COST_MATRICES, JSON.stringify(parsed));
     },
     invalidate: (roomName) => {
         // Strictly defer cache deletion to the eventBus handler, preserving caching behavior

@@ -152,8 +152,6 @@ const LogisticsManager = {
         const haulers = roomCreeps.get('hauler') || [];
         const hubManagers = roomCreeps.get('hubManager') || [];
 
-        const needsEmergencyRefill = storages.length > 0 && (spawns.every(s => TrafficManager.getVirtualState(s, RESOURCE_ENERGY).used === 0));
-
         // FAST FILLER ASSIGNMENT LOGIC
         if (fastFillers.length > 0) {
             const cacheData = getFastFillerCache(storage, spawns, extensions, links, room);
@@ -192,15 +190,18 @@ const LogisticsManager = {
                     let target = null;
                     let targetAmount = 0;
                     
-                    // O(1) Execution lookup skipping isNearTo
+                    // O(1) Logistics Polling via global state caching
+                    const needyExtensions = global.State.needyExtensions || new Set();
+
                     for (let j = 0; j < adjacentIds.length; j++) {
-                        const structObj = Game.getObjectById(adjacentIds[j]);
-                        if (!structObj) continue;
-                        const structState = TrafficManager.getVirtualState(structObj, RESOURCE_ENERGY);
-                        if (structState.free > 0) {
-                            target = structObj;
-                            targetAmount = Math.min(creepState.used, structState.free);
-                            break;
+                        if (needyExtensions.has(adjacentIds[j])) {
+                            const structObj = Game.getObjectById(adjacentIds[j]);
+                            if (structObj) {
+                                const structState = TrafficManager.getVirtualState(structObj, RESOURCE_ENERGY);
+                                target = structObj;
+                                targetAmount = Math.min(creepState.used, structState.free);
+                                break;
+                            }
                         }
                     }
 

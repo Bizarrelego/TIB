@@ -1,4 +1,5 @@
 const CostMatrixCache = require('../traffic/costMatrixCache');
+const DirectionalCostMatrixGenerator = require('../traffic/directionalCostMatrixGenerator');
 
 module.exports = {
     /**
@@ -51,6 +52,8 @@ module.exports = {
                 let matrix;
                 if (originalRoomCallback) {
                     matrix = originalRoomCallback(roomName);
+                } else {
+                    matrix = CostMatrixCache.get(roomName);
                 }
 
                 // Let's regenerate it properly using the base matrix.

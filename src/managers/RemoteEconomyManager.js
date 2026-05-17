@@ -2,6 +2,7 @@
  * @file RemoteEconomyManager.js
  * @description Executes Top-Down Assignment for remote economy roles.
  */
+const SpawnQueueManager = require('./SpawnQueueManager');
 
 module.exports = {
     /**
@@ -11,13 +12,17 @@ module.exports = {
     run(room) {
         let colonyRemoteHarvesters = [];
         let colonyRemoteHaulers = [];
+        const remoteRoomsTargeted = new Set();
 
         // Gather all creeps globally that belong to this colony
         for (const roomCreeps of global.State.creepsByRoom.values()) {
             const rHarvesters = roomCreeps.get('remoteHarvester');
             if (rHarvesters) {
                 for (let i = 0; i < rHarvesters.length; i++) {
-                    if (rHarvesters[i].memory.colony === room.name) colonyRemoteHarvesters.push(rHarvesters[i]);
+                    if (rHarvesters[i].memory.colony === room.name) {
+                        colonyRemoteHarvesters.push(rHarvesters[i]);
+                        remoteRoomsTargeted.add(rHarvesters[i].memory.targetRoom);
+                    }
                 }
             }
 
@@ -26,6 +31,36 @@ module.exports = {
                 for (let i = 0; i < rHaulers.length; i++) {
                     if (rHaulers[i].memory.colony === room.name) colonyRemoteHaulers.push(rHaulers[i]);
                 }
+            }
+        }
+
+        // Patch Vision-Loss Death Spirals
+        for (const remoteRoomName of remoteRoomsTargeted) {
+            if (!Memory.rooms[remoteRoomName]) Memory.rooms[remoteRoomName] = {};
+            
+            // Log recent threats
+            if (global.State.hostilesByRoom && global.State.hostilesByRoom.get(remoteRoomName) && global.State.hostilesByRoom.get(remoteRoomName).length > 0) {
+                Memory.rooms[remoteRoomName].threatExpiry = Game.time + 1500;
+            }
+
+            // Blind Defender Spawning
+            if (Memory.rooms[remoteRoomName].threatExpiry > Game.time) {
+                // Check if defender already deployed
+                let activeDefenders = 0;
+                const defenders = global.State.creepsByRoom.get(room.name)?.get('remoteDefender') || [];
+                for (const d of defenders) {
+                    if (d.memory.targetRoom === remoteRoomName) activeDefenders++;
+                }
+                if (activeDefenders === 0) {
+                    const body = [TOUGH, TOUGH, MOVE, MOVE, MOVE, MOVE, RANGED_ATTACK, RANGED_ATTACK]; // Minimal defense
+                    SpawnQueueManager.requestSpawn(room.name, 'remoteDefender', body, 'rd_' + Game.time, {
+                        memory: { role: 'remoteDefender', colony: room.name, targetRoom: remoteRoomName }
+                    }, 500);
+                }
+                
+                // Filter out assigned civilians to prevent walking into blind death
+                colonyRemoteHarvesters = colonyRemoteHarvesters.filter(c => c.memory.targetRoom !== remoteRoomName);
+                colonyRemoteHaulers = colonyRemoteHaulers.filter(c => c.memory.remoteRoom !== remoteRoomName);
             }
         }
 

@@ -33,7 +33,7 @@ module.exports = {
                 if (target === null || target === undefined) {
                     creep.heap.state = null;
                     creep.heap.targetId = null;
-                    continue;
+                    continue; // Skip further processing for this creep; delegates reassignment to the manager next tick
                 }
 
                 if (state === 'harvest') {

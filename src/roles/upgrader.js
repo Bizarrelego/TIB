@@ -17,6 +17,8 @@ function run(creep, room) {
             controllerContainer = Game.getObjectById(creep.heap.controllerContainerId);
             if (!controllerContainer) {
                 creep.heap.controllerContainerId = null; // Invalidate cache if destroyed
+                creep.heap.state = null; // Enforce fault-tolerant reset
+                return;
             }
         }
 
@@ -31,15 +33,21 @@ function run(creep, room) {
 
                 if (hasEnergy) {
                     if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                        creep.withdraw(controllerContainer, RESOURCE_ENERGY);
+                        if (creep.withdraw(controllerContainer, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                            movement.moveTo(creep, controllerContainer);
+                        }
                     }
                     if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                        creep.upgradeController(controller);
+                        if (creep.upgradeController(controller) === ERR_NOT_IN_RANGE) {
+                            movement.moveTo(creep, controller);
+                        }
                     }
                 } else {
                     // 4. If container is completely empty, sleep and wait for haulers. Do not walk away to harvest.
                     if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                        creep.upgradeController(controller);
+                        if (creep.upgradeController(controller) === ERR_NOT_IN_RANGE) {
+                            movement.moveTo(creep, controller);
+                        }
                     }
                 }
             }

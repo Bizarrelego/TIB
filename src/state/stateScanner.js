@@ -126,6 +126,16 @@ module.exports = function stateScanner() {
             global.State.repairQueues.set(roomName, queue);
             const structs = roomObj.find(FIND_STRUCTURES);
             for (let i = 0; i < structs.length; i++) updateStructureBucket(structs[i]);
+
+            // Initialize O(1) Logistics Cache
+            if (!global.State.needyExtensions) global.State.needyExtensions = new Set();
+            for (let i = 0; i < structs.length; i++) {
+                if (structs[i].structureType === STRUCTURE_SPAWN || structs[i].structureType === STRUCTURE_EXTENSION) {
+                    if (structs[i].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                        global.State.needyExtensions.add(structs[i].id);
+                    }
+                }
+            }
         }
 
         for (const event of events) {
@@ -148,6 +158,7 @@ module.exports = function stateScanner() {
                 if (typeToRemove) {
                     let structMap = roomStructures.get(typeToRemove);
                     if (structMap) structMap.delete(event.objectId);
+                    if (global.State.needyExtensions) global.State.needyExtensions.delete(event.objectId);
                 }
 
                 roomSites.delete(event.objectId);
@@ -195,6 +206,16 @@ module.exports = function stateScanner() {
                 }
                 if (target && target.hits !== undefined) {
                     updateStructureBucket(target);
+                }
+            } else if (event.event === EVENT_TRANSFER || event.event === EVENT_WITHDRAW) {
+                // Re-evaluate capacity status for needy structures
+                const targetId = event.data && event.data.targetId ? event.data.targetId : null;
+                if (targetId && global.State.needyExtensions) {
+                    const targetObj = Game.getObjectById(targetId);
+                    if (targetObj && (targetObj.structureType === STRUCTURE_SPAWN || targetObj.structureType === STRUCTURE_EXTENSION)) {
+                        if (targetObj.store.getFreeCapacity(RESOURCE_ENERGY) > 0) global.State.needyExtensions.add(targetId);
+                        else global.State.needyExtensions.delete(targetId);
+                    }
                 }
             } else if (event.event === EVENT_CREATE_CREEP) {
                 let newCreep = Game.getObjectById(event.objectId);
