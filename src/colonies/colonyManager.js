@@ -22,7 +22,7 @@ function manageEarlyProgression(room, _spawnLedger) {
     const droppedRaw = global.State.droppedByRoom.get(room.name) || [];
     const droppedArrays = droppedRaw instanceof Map ? Array.from(droppedRaw.values()) : droppedRaw;
     const structures = global.State.structuresByRoom.get(room.name) || new Map();
-    const sites = global.State.sitesByRoom.get(room.name) || [];
+    const sites = global.State.sitesByRoom.get(room.name) || []; // No native polling
     const tombstonesRaw = global.State.tombstonesByRoom.get(room.name) || [];
     const tombstones = tombstonesRaw instanceof Map ? Array.from(tombstonesRaw.values()) : tombstonesRaw;
 
