@@ -24,7 +24,8 @@ class IntentManager {
         /**
          * @type {Intent[]} Array of successfully registered intents to be executed.
          */
-        this.intents = [];
+        this.intents = new Map();
+        this.intentIdCounter = 0;
     }
 
     /**
@@ -77,12 +78,12 @@ class IntentManager {
 
         if (!pipeline) {
             console.log(`[IntentManager] Warning: Unknown action pipeline for '${action}'. Registering without lock.`);
-            this.intents.push({ creepId, action, targetId, args });
+            this.intents.set(this.intentIdCounter++, { creepId, action, targetId, args });
             return true;
         }
 
         if (this.pipelineLock.acquireLock(creepId, pipeline)) {
-            this.intents.push({ creepId, action, targetId, args });
+            this.intents.set(this.intentIdCounter++, { creepId, action, targetId, args });
             return true;
         }
 
@@ -180,12 +181,13 @@ class IntentManager {
      * @returns {void}
      */
     executeIntents() {
-        for (const intent of this.intents) {
+        for (const intent of this.intents.values()) {
             this._executeSingleIntent(intent);
         }
 
         // Clear state for the next tick
-        this.intents = [];
+        this.intents.clear();
+        this.intentIdCounter = 0;
         this.pipelineLock.clear();
     }
 }
