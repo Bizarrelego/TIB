@@ -11,7 +11,8 @@ const CacheRegistry = {
             ['creeps', new Map()],
             ['sources', new Map()],
             ['costMatrices', new Map()],
-            ['objectPools', new Map()]
+            ['objectPools', new Map()],
+            ['rooms', new Map()]
         ]);
 
         // Event-Driven Hydration: Only trigger on StateScanner update events

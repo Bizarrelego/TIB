@@ -39,7 +39,7 @@ function run(creep, room) {
                 }
             }
 
-            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0 || (targetDrop && targetDrop.amount > 0)) {
+            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
                 creep.upgradeController(controller);
             }
         }

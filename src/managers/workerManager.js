@@ -1,7 +1,4 @@
-const STRUCTURE_PRIORITIES = require('../constants/structurePriorities');
 const TrafficManager = require('../traffic/trafficManager');
-const Logger = require('../utils/logger');
-const VirtualLedger = require('../utils/VirtualLedger');
 
 module.exports = {
     run(room) {
@@ -58,53 +55,35 @@ module.exports = {
         }
         supplyTasks.sort((a, b) => b.priority - a.priority);
         
-        let idleCreeps = workers.filter(c => !c.heap.state || !c.heap.targetId);
-        
-        for (const task of tasks) {
-            if (idleCreeps.length === 0) break;
+        // Top-Down Assignment: Creeps do not bid or scan for jobs.
+        // The manager iterates over creeps and assigns tasks based on O(N) evaluation.
+        for (let i = 0; i < workers.length; i++) {
+            const creep = workers[i];
             
-            let nearestCreepIdx = -1;
-            let minDistance = Infinity;
+            // Only assign if idle or task is finished
+            if (creep.heap.state && creep.heap.targetId) continue;
             
-            for (let i = 0; i < idleCreeps.length; i++) {
-                const creep = idleCreeps[i];
-                if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) continue;
-                
-                const dist = Math.max(Math.abs(creep.pos.x - task.target.pos.x), Math.abs(creep.pos.y - task.target.pos.y));
-                if (dist < minDistance) {
-                    minDistance = dist;
-                    nearestCreepIdx = i;
+            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                // Find highest priority valid task
+                for (let j = 0; j < tasks.length; j++) {
+                    const task = tasks[j];
+                    if (task && task.target) {
+                        creep.heap.state = task.type;
+                        creep.heap.targetId = task.target.id;
+                        // For non-repeatable tasks, we could splice it out here.
+                        break;
+                    }
                 }
-            }
-            if (nearestCreepIdx !== -1) {
-                const creep = idleCreeps[nearestCreepIdx];
-                creep.heap.state = task.type;
-                creep.heap.targetId = task.target.id;
-                idleCreeps.splice(nearestCreepIdx, 1);
-            }
-        }
-        
-        for (const task of supplyTasks) {
-            if (!task.target) continue;
-            if (idleCreeps.length === 0) break;
-            
-            let nearestCreepIdx = -1;
-            let minDistance = Infinity;
-            for (let i = 0; i < idleCreeps.length; i++) {
-                const creep = idleCreeps[i];
-                if (creep.store.getFreeCapacity() === 0) continue;
-                
-                const dist = Math.max(Math.abs(creep.pos.x - task.target.pos.x), Math.abs(creep.pos.y - task.target.pos.y));
-                if (dist < minDistance) {
-                    minDistance = dist;
-                    nearestCreepIdx = i;
+            } else {
+                // Find highest priority valid supply task
+                for (let j = 0; j < supplyTasks.length; j++) {
+                    const task = supplyTasks[j];
+                    if (task && task.target) {
+                        creep.heap.state = task.type;
+                        creep.heap.targetId = task.target.id;
+                        break;
+                    }
                 }
-            }
-            if (nearestCreepIdx !== -1) {
-                const creep = idleCreeps[nearestCreepIdx];
-                creep.heap.state = task.type;
-                creep.heap.targetId = task.target.id;
-                idleCreeps.splice(nearestCreepIdx, 1);
             }
         }
     }
