@@ -68,7 +68,7 @@ module.exports = function stateScanner() {
             globalState.write(roomName, roomData);
         }
 
-        const events = Game.rooms[roomName] ? Game.rooms[roomName].getEventLog() : [];
+        const events = global.State.getEvents ? global.State.getEvents(roomName) : (global.State.eventCache.get(roomName) || []);
 
         const roomStructures = global.State.structuresByRoom.get(roomName) || new Map();
         const roomLogistics = global.State.logisticsByRoom.get(roomName) || new Map();

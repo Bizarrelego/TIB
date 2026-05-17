@@ -72,9 +72,13 @@ module.exports = {
                 const route = Game.map.findRoute(room.name, targetRoomName);
                 if (route && route.length <= 2) {
                     // Cache the route for future use (simplified here, assume it's valid)
-                    if (!Memory.rooms[room.name]) Memory.rooms[room.name] = {};
-                    if (!Memory.rooms[room.name].remoteRoutes) Memory.rooms[room.name].remoteRoutes = {};
-                    Memory.rooms[room.name].remoteRoutes[targetRoomName] = route;
+                    if (!global.State.remoteRoutes) global.State.remoteRoutes = new Map();
+                    let routes = global.State.remoteRoutes.get(room.name);
+                    if (!routes) {
+                        routes = new Map();
+                        global.State.remoteRoutes.set(room.name, routes);
+                    }
+                    routes.set(targetRoomName, route);
                 }
             }
         }
