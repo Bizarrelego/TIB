@@ -13,13 +13,13 @@ const sourceSleep = {
     isSleeping(source) {
         if (!source) return false;
 
-        if (!Memory.sources) {
-            Memory.sources = {};
-        }
+        if (!global.State) global.State = {};
+        if (!global.State.sourcesCache) global.State.sourcesCache = new Map();
 
-        // Initialize Memory for the specific source if it doesn't exist
-        if (!Memory.sources[source.id]) {
-            Memory.sources[source.id] = {};
+        let sourceCache = global.State.sourcesCache.get(source.id);
+        if (!sourceCache) {
+            sourceCache = {};
+            global.State.sourcesCache.set(source.id, sourceCache);
         }
 
         // If the source is empty, we must sleep it
@@ -27,17 +27,17 @@ const sourceSleep = {
         const amount = source.energy !== undefined ? source.energy : source.mineralAmount;
 
         if (amount === 0) {
-            if (!Memory.sources[source.id].wakeTick) {
-                Memory.sources[source.id].wakeTick = Game.time + source.ticksToRegeneration;
+            if (!sourceCache.wakeTick) {
+                sourceCache.wakeTick = Game.time + source.ticksToRegeneration;
             }
             return true;
         }
 
         // If it's not empty, check if we had a sleep timer
-        if (Memory.sources[source.id].wakeTick) {
-            if (Game.time >= Memory.sources[source.id].wakeTick) {
+        if (sourceCache.wakeTick) {
+            if (Game.time >= sourceCache.wakeTick) {
                 // Wake up time has come and passed
-                delete Memory.sources[source.id].wakeTick;
+                delete sourceCache.wakeTick;
                 return false;
             } else {
                 // Still sleeping
