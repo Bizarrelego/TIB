@@ -28,7 +28,7 @@ const SwampCostMatrixGenerator = {
                         // but setting it ensures the matrix logic explicitly handles it.
                         baseMatrix.set(x, y, 255);
                     } else if (terrainMask === TERRAIN_MASK_SWAMP) {
-                        baseMatrix.set(x, y, 15);
+                        baseMatrix.set(x, y, 5);
                     } else {
                         // Plains
                         baseMatrix.set(x, y, 2);

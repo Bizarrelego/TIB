@@ -48,70 +48,27 @@ function run(room) {
                 }
 
                 // Find energy to pick up
-                // 1. containerId
-                const containerId = creep.memory.containerId;
+                // Strict containerless scavenging: target dropped energy directly
                 let target = null;
-
-                if (containerId) {
-                    const container = Game.getObjectById(containerId);
-                    if (container && container.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                        target = container;
-                    }
-                }
-
-                // 2. Dropped energy
-                if (!target) {
-                    const droppedArray = global.State.droppedByRoom.get(creep.room.name) || [];
-                    for (let i = 0; i < droppedArray.length; i++) {
-                        const dropped = droppedArray[i];
+                const droppedArray = global.State.droppedByRoom.get(creep.room.name);
+                if (droppedArray) {
+                    for (const dropped of droppedArray.values()) {
                         if (dropped.resourceType === RESOURCE_ENERGY && dropped.amount > 0) {
                             if (!target || dropped.amount > target.amount) {
-                                target = dropped; // Simple priority: largest pile
+                                target = dropped; // Largest pile priority
                             }
                         }
                     }
                 }
 
-                // 3. Tombstones
-                if (!target) {
-                    const tombstonesArray = global.State.tombstonesByRoom.get(creep.room.name) || [];
-                    for (let i = 0; i < tombstonesArray.length; i++) {
-                        const ts = tombstonesArray[i];
-                        if (ts.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                            target = ts;
-                            break;
-                        }
-                    }
-                }
-
-                // 4. Ruins
-                if (!target) {
-                    const ruinsArray = global.State.ruinsByRoom.get(creep.room.name) || [];
-                    for (let i = 0; i < ruinsArray.length; i++) {
-                        const ruin = ruinsArray[i];
-                        if (ruin.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                            target = ruin;
-                            break;
-                        }
-                    }
-                }
-
                 if (target) {
-                    let result;
-                    let targetAmount = 0;
-                    if (target instanceof Resource) {
-                        result = creep.pickup(target);
-                        targetAmount = target.amount;
-                    } else {
-                        result = creep.withdraw(target, RESOURCE_ENERGY);
-                        targetAmount = target.store.getUsedCapacity(RESOURCE_ENERGY);
-                    }
+                    const result = creep.pickup(target);
 
                     if (result === ERR_NOT_IN_RANGE) {
                         movement.moveTo(creep, target);
                     } else if (result === OK) {
                         // Check if this action will fill the creep
-                        const amountTransferred = Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), targetAmount);
+                        const amountTransferred = Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), target.amount);
                         if (creep.store.getFreeCapacity(RESOURCE_ENERGY) - amountTransferred <= 0) {
                             creep.memory.hauling = true;
                         }

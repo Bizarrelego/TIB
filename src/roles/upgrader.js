@@ -11,8 +11,8 @@ function run(creep, room) {
     try {
         if (creep.fatigue > 0) return;
 
-        // Lock position near controller and pull from drop pile or Storage
-        if (creep.pos.getRangeTo(controller) > 3) {
+        // Lock position adjacent to controller and pull from drop pile or Storage
+        if (creep.pos.getRangeTo(controller) > 1) {
             movement.moveTo(creep, controller);
         } else {
             const storage = room.storage;
@@ -24,22 +24,22 @@ function run(creep, room) {
                     }
                 }
             } else {
-                // Find dropped energy
+                // Find dropped energy on exact tile
                 const dropped = global.State.droppedByRoom.get(room.name) || new Map();
                 let targetDrop = null;
                 for (const drop of dropped.values()) {
-                    if (drop.resourceType === RESOURCE_ENERGY && creep.pos.isNearTo(drop)) {
+                    if (drop.resourceType === RESOURCE_ENERGY && creep.pos.isEqualTo(drop.pos)) {
                         targetDrop = drop;
                         break;
                     }
                 }
 
                 if (targetDrop && creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                    TrafficManager.registerPickup(creep, targetDrop, RESOURCE_ENERGY, creep.store.getFreeCapacity());
+                    creep.pickup(targetDrop);
                 }
             }
 
-            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0 || (targetDrop && targetDrop.amount > 0)) {
                 creep.upgradeController(controller);
             }
         }

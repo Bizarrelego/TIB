@@ -69,28 +69,42 @@ function run(room) {
 
             // Once on spot, execute strictly stationary calls.
             if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
-                if (source && creep.pos.isNearTo(source)) {
+                // Pickup from floor if dropped by haulers or withdraw from core
+                if (source && creep.pos.isNearTo(source) && source.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
                     creep.withdraw(source, RESOURCE_ENERGY);
+                } else {
+                    const dropped = global.State.droppedByRoom.get(room.name);
+                    if (dropped) {
+                        for (const drop of dropped.values()) {
+                            if (drop.resourceType === RESOURCE_ENERGY && creep.pos.isEqualTo(drop.pos)) {
+                                creep.pickup(drop);
+                                break;
+                            }
+                        }
+                    }
                 }
             } else {
                 const structuresMap = global.State.structuresByRoom.get(room.name);
                 let target = null;
 
                 if (structuresMap) {
-                    const spawns = structuresMap.get(STRUCTURE_SPAWN) || [];
-                    for (let j = 0; j < spawns.length; j++) {
-                        if (creep.pos.isNearTo(spawns[j]) && spawns[j].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                            target = spawns[j];
-                            break;
+                    const extensions = structuresMap.get(STRUCTURE_EXTENSION);
+                    if (extensions) {
+                        for (const ext of extensions.values()) {
+                            if (creep.pos.isNearTo(ext) && ext.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                                target = ext;
+                                break;
+                            }
                         }
                     }
-
                     if (!target) {
-                        const extensions = structuresMap.get(STRUCTURE_EXTENSION) || [];
-                        for (let j = 0; j < extensions.length; j++) {
-                            if (creep.pos.isNearTo(extensions[j]) && extensions[j].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                                target = extensions[j];
-                                break;
+                        const spawns = structuresMap.get(STRUCTURE_SPAWN);
+                        if (spawns) {
+                            for (const sp of spawns.values()) {
+                                if (creep.pos.isNearTo(sp) && sp.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                                    target = sp;
+                                    break;
+                                }
                             }
                         }
                     }
@@ -104,8 +118,16 @@ function run(room) {
                     creep.transfer(target, RESOURCE_ENERGY);
                 } else {
                     // Refill if empty, otherwise wait.
-                    if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0 && source && creep.pos.isNearTo(source)) {
-                        creep.withdraw(source, RESOURCE_ENERGY);
+                    if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                        const dropped = global.State.droppedByRoom.get(room.name);
+                        if (dropped) {
+                            for (const drop of dropped.values()) {
+                                if (drop.resourceType === RESOURCE_ENERGY && creep.pos.isEqualTo(drop.pos)) {
+                                    creep.pickup(drop);
+                                    break;
+                                }
+                            }
+                        }
                     }
                 }
             }

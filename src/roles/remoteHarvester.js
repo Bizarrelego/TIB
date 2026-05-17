@@ -52,85 +52,12 @@ function run(room) {
             const source = Game.getObjectById(creep.memory.targetSourceId);
             if (!source) continue;
 
-            const containerId = creep.memory.containerId;
-            let container = null;
-            if (containerId) {
-                container = Game.getObjectById(containerId);
-            }
-
-            // Logic to build/repair container or harvest and drop
-            if (containerId) {
-                if (container) {
-                    // Container exists
-                    if (container.hits < container.hitsMax) {
-                        // Need to repair
-                        if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                            if (creep.repair(container) === ERR_NOT_IN_RANGE) {
-                                movement.moveTo(creep, container);
-                            }
-                            continue;
-                        } else {
-                            // Harvest to repair later
-                            if (creep.harvest(source) === ERR_NOT_IN_RANGE) {
-                                movement.moveTo(creep, source);
-                            }
-                            continue;
-                        }
-                    } else {
-                        // Container is fully repaired, harvest and drop on it or harvest directly
-                        if (!creep.pos.isEqualTo(container.pos)) {
-                            movement.moveTo(creep, container);
-                            continue;
-                        }
-
-                        // We are in position
-                        creep.harvest(source);
-                        if (creep.store.getFreeCapacity() === 0 && container.store.getFreeCapacity() === 0) {
-                            creep.drop(RESOURCE_ENERGY); // Drop if container is full
-                        }
-                    }
-                } else {
-                    // Container ID set but doesn't exist. Maybe it's a construction site?
-                    const sites = global.State.sitesByRoom.get(creep.room.name) || [];
-                    let siteFound = null;
-                    for (let i = 0; i < sites.length; i++) {
-                        if (sites[i].structureType === STRUCTURE_CONTAINER && sites[i].pos.isNearTo(source)) {
-                            siteFound = sites[i];
-                            break;
-                        }
-                    }
-
-                    if (siteFound) {
-                        if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                            if (creep.build(siteFound) === ERR_NOT_IN_RANGE) {
-                                movement.moveTo(creep, siteFound);
-                            }
-                        } else {
-                            if (creep.harvest(source) === ERR_NOT_IN_RANGE) {
-                                movement.moveTo(creep, source);
-                            }
-                        }
-                        continue;
-                    } else {
-                        // No container and no site. Just harvest and drop.
-                        if (creep.harvest(source) === ERR_NOT_IN_RANGE) {
-                            movement.moveTo(creep, source);
-                        } else {
-                            if (creep.store.getFreeCapacity() === 0) {
-                                creep.drop(RESOURCE_ENERGY);
-                            }
-                        }
-                    }
-                }
+            // Strict containerless remote mining: drop energy on the ground unconditionally.
+            if (creep.harvest(source) === ERR_NOT_IN_RANGE) {
+                movement.moveTo(creep, source);
             } else {
-                // No container Id. Harvest and drop.
-                if (creep.harvest(source) === ERR_NOT_IN_RANGE) {
-                    movement.moveTo(creep, source);
-                } else {
-                    // Drop energy if full
-                    if (creep.store.getFreeCapacity() === 0) {
-                        creep.drop(RESOURCE_ENERGY);
-                    }
+                if (creep.store.getFreeCapacity() === 0) {
+                    creep.drop(RESOURCE_ENERGY);
                 }
             }
 

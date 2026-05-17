@@ -82,13 +82,19 @@ module.exports = {
 
             // Inject DirectionalCostMatrix for hub routing
             const DirectionalCostMatrixGenerator = require('../traffic/directionalCostMatrixGenerator');
+            const SwampCostMatrixGenerator = require('../traffic/swampCostMatrixGenerator');
             const originalRoomCallback = searchOpts.roomCallback;
             searchOpts.roomCallback = function(roomName) {
                 let matrix;
                 if (originalRoomCallback) {
                     matrix = originalRoomCallback(roomName);
                 } else {
-                    matrix = CostMatrixCache.get(roomName);
+                    const rcl = Game.rooms[roomName] && Game.rooms[roomName].controller ? Game.rooms[roomName].controller.level : 0;
+                    if (rcl < 3) {
+                        matrix = SwampCostMatrixGenerator(roomName);
+                    } else {
+                        matrix = CostMatrixCache.get(roomName);
+                    }
                 }
 
                 let returnMatrix = matrix;

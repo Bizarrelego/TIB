@@ -26,10 +26,15 @@ module.exports = {
             const spawns = global.State.spawnsByRoom.get(room.name) || [];
             if (spawns.length > 0) {
                 const spawn = spawns[0];
+                // Flower pattern directly adjacent to spawn
                 const stamp = [
-                    {x: 1, y: 0}, {x: -1, y: 0}, {x: 0, y: 1}, {x: 0, y: -1}, {x: 1, y: 1}
+                    {x: 1, y: 1}, {x: -1, y: 1}, {x: 0, y: 2}, {x: 1, y: 2}, {x: -1, y: 2}
                 ];
-                const plannedStructures = plannerState.get('plannedStructures');
+                let plannedStructures = plannerState.get('plannedStructures');
+                if (!plannedStructures) {
+                    plannedStructures = new Map();
+                    plannerState.set('plannedStructures', plannedStructures);
+                }
                 for (let i = 0; i < stamp.length && i < 5; i++) {
                     const tx = spawn.pos.x + stamp[i].x;
                     const ty = spawn.pos.y + stamp[i].y;
@@ -42,6 +47,8 @@ module.exports = {
                         });
                     }
                 }
+                // Central micro-hub fast-filler spot
+                plannerState.set('fastFillerPositions', [new RoomPosition(spawn.pos.x, spawn.pos.y + 1, room.name)]);
             }
 
             // Disable dynamic road and container generation
