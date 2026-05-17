@@ -7,6 +7,8 @@ const { determineDefcon, DEFCON } = require('../constants/defcon');
 const TowerManager = require('../managers/TowerManager');
 const SpawnQueueManager = require('../managers/SpawnQueueManager');
 const rampartMelee = require('../roles/rampartMelee');
+const HeatmapGenerator = require('../traffic/heatmapGenerator');
+const CostMatrixCache = require('../traffic/costMatrixCache');
 
 module.exports = {
     /**
@@ -16,6 +18,15 @@ module.exports = {
     run(room) {
         try {
             const defconLevel = determineDefcon(room.name);
+
+            // Dynamic Heatmap Generation
+            const hostiles = global.State && global.State.hostilesByRoom ? global.State.hostilesByRoom.get(room.name) : null;
+            if (hostiles && hostiles.size > 0) {
+                const dynamicMatrix = HeatmapGenerator.generate(room.name, hostiles.values());
+                CostMatrixCache.setDynamic(room.name, dynamicMatrix);
+            } else {
+                CostMatrixCache.deleteDynamic(room.name);
+            }
 
             if (defconLevel <= DEFCON.CRITICAL) {
                 room.memory.haltUpgrades = true;
