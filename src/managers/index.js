@@ -18,6 +18,15 @@ const UpgraderManager = require('./UpgraderManager');
 const workerManager = require('./workerManager');
 const QuadSquadManager = require('./QuadSquadManager');
 
+// Core Phase Execution Modules registered to ensure adherence to architectural limits
+const colonyManager = require('../colonies/colonyManager');
+const spawnManager = require('../colonies/spawnManager');
+const planner = require('../colonies/planner');
+const RoleManager = require('../colonies/RoleManager');
+const operationsManager = require('../operations/operationsManager');
+const trafficManager = require('../traffic/trafficManager');
+const IntentManager = require('../os/IntentManager');
+
 const managers = {
     CombatManager,
     ConstructionManager,
@@ -37,7 +46,14 @@ const managers = {
     UpgraderManager,
     workerManager,
     QuadSquadManager,
-    LogisticsManager
+    LogisticsManager,
+    colonyManager,
+    spawnManager,
+    planner,
+    RoleManager,
+    operationsManager,
+    trafficManager,
+    IntentManager
 };
 
 module.exports = {

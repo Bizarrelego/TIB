@@ -6,8 +6,6 @@ const globalState = require('./state/globalState');
 const managersIntegration = require('./managers/index');
 const discoveryManager = require('./state/discoveryManager');
 const stateScanner = require('./state/stateScanner');
-const colonyManager = require('./colonies/colonyManager');
-const operationsManager = require('./operations/operationsManager'); // High-level orchestrator
 const managerOrchestrator = require('./managers/managerOrchestrator'); // Standalone Managers
 const eventLogRadar = require('./os/eventLogRadar');
 const cpuThrottler = require('./os/cpuThrottler');
@@ -16,9 +14,12 @@ const garbageCollector = require('./os/garbageCollector');
 const Logger = require('./utils/logger');
 const IntentManager = require('./os/IntentManager');
 const VirtualLedger = require('./utils/VirtualLedger');
-const spawnManager = require('./colonies/spawnManager');
-const planner = require('./colonies/planner');
-const SpawnLedger = require('./colonies/spawnLedger');
+
+// Added Missing OS Components
+const cpuBucketForecaster = require('./os/cpuBucketForecaster');
+const eventBus = require('./os/eventBus');
+const objectPool = require('./os/objectPool');
+const PipelineLock = require('./os/PipelineLock');
 
 module.exports.loop = function () {
     Logger.info(`--- Starting Tick ${Game.time} ---`);
@@ -45,6 +46,20 @@ module.exports.loop = function () {
         global.State.intentManager = new IntentManager();
     }
     
+    // Initialize required OS state pieces
+    if (!global.State.eventBus) {
+        global.State.eventBus = eventBus;
+    }
+    if (!global.State.objectPool) {
+        global.State.objectPool = objectPool;
+    }
+    if (!global.State.pipelineLock) {
+        global.State.pipelineLock = PipelineLock;
+    }
+
+    // CPU bucket forecast tick
+    cpuBucketForecaster.update();
+
     // Clear Virtual Ledger
     VirtualLedger.clear();
 
@@ -80,9 +95,9 @@ module.exports.loop = function () {
     }
 
     // Phase 2: State Scanner (Event-driven map updaters)
-    const { skipState, skipColonies, skipManagers, skipOperations } = cpuThrottler.run();
+    const throttlerFlags = cpuThrottler.run();
 
-    if (!skipState) {
+    if (!throttlerFlags.skipState) {
         try {
             if (eventLogRadar) eventLogRadar();
         } catch (e) {
@@ -99,101 +114,24 @@ module.exports.loop = function () {
         } catch (e) {
             Logger.error(`[Phase 2 Error] Global State Scan: ${e.stack}`);
         }
-
-        try {
-            const energyRequestManager = globalState.getManager('EnergyRequestManager');
-            if (energyRequestManager && energyRequestManager.handleSourceSleep) {
-                energyRequestManager.handleSourceSleep();
-            }
-        } catch (e) {
-            Logger.error(`[Phase 2 Error] EnergyRequestManager: ${e.stack}`);
-        }
     }
+    
+    managerOrchestrator.runPhase(2, throttlerFlags);
 
     Logger.debug('Phase 3: Colonies');
-    // Phase 3: Colonies
-    if (!skipColonies) {
-        try {
-            if (colonyManager) colonyManager();
-        } catch (e) {
-            Logger.error(`[Phase 3 Error] Colonies: ${e.stack}`);
-        }
-    }
-    
-    // Tick Slicing
-    if (Game.time % 10 === 0) {
-        for (const roomName in Game.rooms) {
-            const room = Game.rooms[roomName];
-            if (room.controller && room.controller.my && spawnManager && typeof spawnManager.run === 'function') {
-                const ledger = new SpawnLedger(room);
-                spawnManager.run(room, ledger);
-            }
-        }
-    }
-    
-    if (Game.time % 1000 === 0) {
-        for (const roomName in Game.rooms) {
-            const room = Game.rooms[roomName];
-            if (room.controller && room.controller.my && planner && typeof planner.run === 'function') {
-                planner.run(room);
-            }
-        }
-    }
+    managerOrchestrator.runPhase(3, throttlerFlags);
 
-    if (!skipManagers) {
-        try {
-            if (managerOrchestrator && managerOrchestrator.run) managerOrchestrator.run();
-        } catch (e) {
-            Logger.error(`[Phase 3 Error] Managers: ${e.stack}`);
-        }
+    Logger.debug('Phase 4: Running Operations');
+    managerOrchestrator.runPhase(4, throttlerFlags);
 
-        try {
-            const RoleManager = require('./colonies/RoleManager');
-            RoleManager.runAll();
-        } catch (e) {
-            Logger.error(`[Phase 3 Error] RoleManager: ${e.stack}`);
-        }
-    }
-
-    // Phase 4: Operations Orchestration Module
-    if (!skipOperations) {
-        Logger.debug('Phase 4: Running Operations');
-        try {
-            if (operationsManager) operationsManager();
-        } catch (e) {
-            Logger.error(`[Phase 4 Error] Operations: ${e.stack}`);
-        }
-    }
-
-    // Phase 5: Traffic Control
     Logger.debug('Phase 5: Running Traffic Control');
-    try {
-        if (trafficManager && trafficManager.run) trafficManager.run();
-    } catch (e) {
-        Logger.error(`[Phase 5 Error] Traffic Control: ${e.stack}`);
-    }
+    managerOrchestrator.runPhase(5, throttlerFlags);
 
-    // Phase 6: Intents & Sleep
     Logger.debug('Phase 6: Executing Intents & Sleep');
-    try {
-        if (trafficManager && trafficManager.executeIntents) {
-            trafficManager.executeIntents();
-        }
-    } catch (e) {
-        Logger.error(`[Phase 6 Error] Intents & Sleep: ${e.stack}`);
-    }
+    managerOrchestrator.runPhase(6, throttlerFlags);
 
     // Profiler output
     const Profiler = require('./utils/profiler');
-    try {
-        if (global.State && global.State.intentManager) {
-            global.State.intentManager.executeIntents();
-        }
-    } catch (e) {
-        Logger.error(`[Phase 6 Error] IntentManager: ${e.stack}`);
-    }
-
-    // Profiler output
     Profiler.report();
 
     // Save caches state for reset recovery
