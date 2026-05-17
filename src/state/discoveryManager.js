@@ -3,47 +3,47 @@
  * Initializes and populates global.State for owned rooms.
  */
 module.exports = function discoveryManager() {
-    if (!global.State) {
-        global.State = {
-            rooms: new Map(),
-            structuresByRoom: new Map(),
-            creepsByRoom: new Map(),
-            hostilesByRoom: new Map(),
-            logisticsByRoom: new Map(),
-            creepLookup: new Map(),
-            scannedRooms: new Set(),
-            eventCache: new Map(),
-            structureCache: new Map(),
-            sourcesByRoom: new Map(),
-            spawnsByRoom: new Map(),
-            controllersByRoom: new Map(),
-            sitesByRoom: new Map(),
-            mineralsByRoom: new Map(),
-            droppedByRoom: new Map(),
-            tombstonesByRoom: new Map(),
-            ruinsByRoom: new Map(),
-            nukesByRoom: new Map(),
-            roomTerrain: new Map(),
-            sourceWalkableTiles: new Map(),
-            getEvents: function(roomName) {
-                const room = Game.rooms[roomName];
-                if (!room) return [];
+    if (!global.State) global.State = {};
+    const state = global.State;
 
-                const currentEventLog = room.getEventLog() || [];
-                const previousEventLog = global.State.eventCache.get(roomName) || [];
+    if (!state.rooms) state.rooms = new Map();
+    if (!state.structuresByRoom) state.structuresByRoom = new Map();
+    if (!state.creepsByRoom) state.creepsByRoom = new Map();
+    if (!state.hostilesByRoom) state.hostilesByRoom = new Map();
+    if (!state.logisticsByRoom) state.logisticsByRoom = new Map();
+    if (!state.creepLookup) state.creepLookup = new Map();
+    if (!state.scannedRooms) state.scannedRooms = new Set();
+    if (!state.eventCache) state.eventCache = new Map();
+    if (!state.structureCache) state.structureCache = new Map();
+    if (!state.sourcesByRoom) state.sourcesByRoom = new Map();
+    if (!state.spawnsByRoom) state.spawnsByRoom = new Map();
+    if (!state.controllersByRoom) state.controllersByRoom = new Map();
+    if (!state.sitesByRoom) state.sitesByRoom = new Map();
+    if (!state.mineralsByRoom) state.mineralsByRoom = new Map();
+    if (!state.droppedByRoom) state.droppedByRoom = new Map();
+    if (!state.tombstonesByRoom) state.tombstonesByRoom = new Map();
+    if (!state.ruinsByRoom) state.ruinsByRoom = new Map();
+    if (!state.nukesByRoom) state.nukesByRoom = new Map();
+    if (!state.roomTerrain) state.roomTerrain = new Map();
+    if (!state.sourceWalkableTiles) state.sourceWalkableTiles = new Map();
+    
+    if (!state.getEvents) {
+        state.getEvents = function(roomName) {
+            const room = Game.rooms[roomName];
+            if (!room) return [];
 
-                // Event logs are append-only. New events are at the end.
-                const newEvents = currentEventLog.slice(previousEventLog.length);
+            const currentEventLog = room.getEventLog() || [];
+            const previousEventLog = global.State.eventCache.get(roomName) || [];
 
-                // Update cache so the next call diffs against this
-                global.State.eventCache.set(roomName, currentEventLog);
+            // Event logs are append-only. New events are at the end.
+            const newEvents = currentEventLog.slice(previousEventLog.length);
 
-                return newEvents;
-            }
+            // Update cache so the next call diffs against this
+            global.State.eventCache.set(roomName, currentEventLog);
+
+            return newEvents;
         };
     }
-
-    const state = global.State;
 
     // Populate global.State.scannedRooms for all visible rooms to ensure zero native polling for all logic
     for (const roomName in Game.rooms) {
