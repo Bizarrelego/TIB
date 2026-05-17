@@ -1,5 +1,4 @@
 const DeadlockEngine = require('./deadlock');
-const movement = require('../utils/movement');
 const ROLE_PRIORITIES = require('../constants/rolePriorities');
 const Logger = require('../utils/logger');
 
@@ -427,7 +426,7 @@ const TrafficManager = {
                 const bucket = buckets[p];
                 for (let i = 0; i < bucket.length; i++) {
                     const intent = bucket[i];
-                    const { creep, targetPos, opts, intendedNextPos } = intent;
+                    const { creep, intendedNextPos } = intent;
                     if (!creep) continue;
 
                 if (global.State.swapRegistry && global.State.swapRegistry.has(creep.name)) {

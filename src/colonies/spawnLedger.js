@@ -162,11 +162,11 @@ class SpawnLedger {
 
     /**
      * Caps the harvester target based on RCL and living workers.
-     * @param {Room} room The room.
-     * @param {number} workerCount The number of living workers.
+     * @param {Room} _room The room.
+     * @param {number} _workerCount The number of living workers.
      * @returns {number} The target harvester count.
      */
-    calculateHarvesterTarget(room, workerCount) {
+    calculateHarvesterTarget(_room, _workerCount) {
         return this.calculateSourceCaps();
     }
 

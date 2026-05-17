@@ -1,4 +1,3 @@
-const planner = require('./planner');
 const BodyCalc = require('../utils/bodyCalc');
 const SpawnQueueManager = require('../managers/SpawnQueueManager');
 const UpgraderManager = require('../managers/UpgraderManager');
@@ -126,9 +125,6 @@ module.exports = {
             }
 
             // Spawn harvesters first
-            const sources = global.State.sourcesByRoom.get(room.name);
-            const sourceCount = sources ? sources.length : 1;
-
             if (harvesterCount < spawnLedger.calculateHarvesterTarget(room, workerCount)) {
                 const energyAvailable = spawnLedger.getAvailableEnergy();
                 const calcCapacity = (haulerCount === 0 && energyAvailable < capacity && energyAvailable >= 200) ? energyAvailable : capacity;
