@@ -1,5 +1,6 @@
 const CostMatrixCache = require('../traffic/costMatrixCache');
 const DirectionalCostMatrixGenerator = require('../traffic/directionalCostMatrixGenerator');
+const InterRoomRouter = require('../traffic/InterRoomRouter');
 
 module.exports = {
     /**
@@ -40,15 +41,50 @@ module.exports = {
             delete creep.heap.path; // Force repath
         }
 
+        const targetPos = target.pos || target;
+        const isCrossRoom = targetPos.roomName !== currentPos.roomName;
+
+        // Two-Tier Pathing: Inter-Room Route Management
+        if (isCrossRoom) {
+            if (!creep.heap.route || creep.heap.routeTarget !== targetPos.roomName) {
+                creep.heap.route = InterRoomRouter.getRoute(currentPos.roomName, targetPos.roomName);
+                creep.heap.routeTarget = targetPos.roomName;
+                delete creep.heap.path; // Invalidate local path
+            }
+
+            if (creep.heap.route && creep.heap.route.length > 0 && creep.heap.route[0] === currentPos.roomName) {
+                creep.heap.route.shift();
+                delete creep.heap.path;
+            }
+        } else if (creep.heap.route) {
+            delete creep.heap.route;
+            delete creep.heap.routeTarget;
+        }
+
         // IMPROVEMENT: Eliminate native moveTo. Route all moves through TrafficManager.
         // Reason: Enforces atomic lockstep execution and prevents native pathing from bypassing the swap/deadlock registry.
         if (!creep.heap.path || creep.heap.path.length === 0) {
-            const targetPos = target.pos || target;
+            let searchTarget = targetPos;
+            let searchOpts = { ...pathingOpts };
+
+            if (isCrossRoom && creep.heap.route && creep.heap.route.length > 0) {
+                const nextRoom = creep.heap.route[0];
+                const exitDir = Game.map.findExit(currentPos.roomName, nextRoom);
+                if (exitDir > 0) {
+                    const exits = creep.room.find(exitDir);
+                    if (exits.length > 0) {
+                        searchTarget = exits.map(e => ({ pos: e, range: 0 }));
+                        searchOpts.maxRooms = 1; // Strictly local pathing
+                    }
+                }
+            } else if (!isCrossRoom) {
+                searchOpts.maxRooms = 1; // Strictly local pathing
+            }
 
             // Inject DirectionalCostMatrix for hub routing
             const DirectionalCostMatrixGenerator = require('../traffic/directionalCostMatrixGenerator');
-            const originalRoomCallback = pathingOpts.roomCallback;
-            pathingOpts.roomCallback = function(roomName) {
+            const originalRoomCallback = searchOpts.roomCallback;
+            searchOpts.roomCallback = function(roomName) {
                 let matrix;
                 if (originalRoomCallback) {
                     matrix = originalRoomCallback(roomName);
@@ -90,7 +126,7 @@ module.exports = {
                 return returnMatrix;
             };
 
-            const pathInfo = PathFinder.search(creep.pos, targetPos, pathingOpts);
+            const pathInfo = PathFinder.search(creep.pos, searchTarget, searchOpts);
             if (pathInfo.path.length > 0) creep.heap.path = pathInfo.path;
         }
 
