@@ -241,7 +241,6 @@ module.exports = {
                 // O(1) lookup for remote operations scaling
                 const census = remoteCensus.get(room.name) || { remoteHarvester: [], remoteHauler: [], reserver: [] };
                 let colonyRemoteHarvesters = census.remoteHarvester;
-                let colonyRemoteHaulers = census.remoteHauler;
                 let colonyReservers = census.reserver;
 
                 for (const direction in exits) {
@@ -275,17 +274,6 @@ module.exports = {
                                 }
                             }
 
-                            const roomRemoteHaulers = colonyRemoteHaulers.filter(c => c.memory.remoteRoom === targetRoomName);
-
-                            if (roomRemoteHaulers.length < roomRemoteHarvesters.length * 2) {
-                                const body = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE];
-                                const cost = 450;
-                                if (capacity >= cost && spawnLedger.canSpawn(cost)) {
-                                    SpawnQueueManager.requestSpawn(room.name, 'remoteHauler', body, 'remoteHauler_' + Game.time, {
-                                        memory: { role: 'remoteHauler', colony: room.name, homeRoom: room.name, remoteRoom: targetRoomName, containerId: null }
-                                    }, cost);
-                                }
-                            }
                         }
                     }
                 }

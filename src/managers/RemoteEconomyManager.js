@@ -3,6 +3,8 @@
  * @description Executes Top-Down Assignment for remote economy roles.
  */
 const SpawnQueueManager = require('./SpawnQueueManager');
+const haulerSizing = require('../colonies/haulerSizing');
+const BodyCalc = require('../utils/bodyCalc');
 
 module.exports = {
     /**
@@ -61,6 +63,46 @@ module.exports = {
                 // Filter out assigned civilians to prevent walking into blind death
                 colonyRemoteHarvesters = colonyRemoteHarvesters.filter(c => c.memory.targetRoom !== remoteRoomName);
                 colonyRemoteHaulers = colonyRemoteHaulers.filter(c => c.memory.remoteRoom !== remoteRoomName);
+            }
+
+            // Dynamic Hauler Sizing
+            const hasThreat = Memory.rooms && Memory.rooms[remoteRoomName] && Memory.rooms[remoteRoomName].threatExpiry > Game.time;
+            if (!hasThreat) {
+                const roomRemoteHarvesters = colonyRemoteHarvesters.filter(c => c.memory.targetRoom === remoteRoomName);
+                if (roomRemoteHarvesters.length > 0) {
+                    let droppedEnergy = 0;
+                    if (global.State.droppedByRoom && global.State.droppedByRoom.has(remoteRoomName)) {
+                        const dropped = global.State.droppedByRoom.get(remoteRoomName) || [];
+                        for (const drop of dropped) {
+                            if (drop.resourceType === RESOURCE_ENERGY) {
+                                droppedEnergy += drop.amount;
+                            }
+                        }
+                    }
+
+                    const pathLength = Game.map.getRoomLinearDistance(room.name, remoteRoomName) * 50;
+                    const energyPerTick = roomRemoteHarvesters.length * 10;
+                    const requiredCarry = haulerSizing.getRequiredCarryParts(pathLength, droppedEnergy, energyPerTick);
+
+                    let activeCarry = 0;
+                    const roomRemoteHaulers = colonyRemoteHaulers.filter(c => c.memory.remoteRoom === remoteRoomName);
+                    for (const hauler of roomRemoteHaulers) {
+                        activeCarry += hauler.getActiveBodyparts(CARRY);
+                    }
+
+                    const queuedCarry = SpawnQueueManager.getQueuedCarryParts(room.name, 'remoteHauler', remoteRoomName);
+
+                    if (activeCarry + queuedCarry < requiredCarry) {
+                        const capacity = room.energyCapacityAvailable;
+                        const body = haulerSizing.calculateBody(capacity, requiredCarry);
+                        const cost = BodyCalc.getCost(body);
+                        if (capacity >= cost) {
+                            SpawnQueueManager.requestSpawn(room.name, 'remoteHauler', body, 'remoteHauler_' + Game.time, {
+                                memory: { role: 'remoteHauler', colony: room.name, homeRoom: room.name, remoteRoom: remoteRoomName, containerId: null }
+                            }, cost);
+                        }
+                    }
+                }
             }
         }
 
