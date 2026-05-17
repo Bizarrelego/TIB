@@ -57,6 +57,10 @@ function updateStructureBucket(struct) {
 module.exports = function stateScanner() {
     if (!global.State?.scannedRooms) return;
 
+    if (!global.State.roomRuins) global.State.roomRuins = new Map();
+    if (!global.State.roomTombstones) global.State.roomTombstones = new Map();
+    if (!global.State.roomDropped) global.State.roomDropped = new Map();
+
     // Pure Event-Driven Consumer Loop
     for (const roomName of global.State.scannedRooms) {
         const roomData = globalState.read(roomName) || { events: [] };
@@ -77,31 +81,31 @@ module.exports = function stateScanner() {
 
         let requiresSync = false;
 
-        let roomDropped = global.State.droppedByRoom.get(roomName);
-        if (!roomDropped) {
-            roomDropped = new Map();
-            global.State.droppedByRoom.set(roomName, roomDropped);
+        if (!global.State.roomDropped.has(roomName)) {
+            global.State.roomDropped.set(roomName, new Map());
             requiresSync = true;
         }
+        let roomDropped = global.State.roomDropped.get(roomName);
+        global.State.droppedByRoom = global.State.roomDropped;
+
+        if (!global.State.roomTombstones.has(roomName)) {
+            global.State.roomTombstones.set(roomName, new Map());
+            requiresSync = true;
+        }
+        let roomTombstones = global.State.roomTombstones.get(roomName);
+        global.State.tombstonesByRoom = global.State.roomTombstones;
+
+        if (!global.State.roomRuins.has(roomName)) {
+            global.State.roomRuins.set(roomName, new Map());
+            requiresSync = true;
+        }
+        let roomRuins = global.State.roomRuins.get(roomName);
+        global.State.ruinsByRoom = global.State.roomRuins;
 
         let roomSites = global.State.sitesByRoom.get(roomName);
         if (!roomSites) {
             roomSites = new Map();
             global.State.sitesByRoom.set(roomName, roomSites);
-        }
-
-        let roomTombstones = global.State.tombstonesByRoom.get(roomName);
-        if (!roomTombstones) {
-            roomTombstones = new Map();
-            global.State.tombstonesByRoom.set(roomName, roomTombstones);
-            requiresSync = true;
-        }
-
-        let roomRuins = global.State.ruinsByRoom.get(roomName);
-        if (!roomRuins) {
-            roomRuins = new Map();
-            global.State.ruinsByRoom.set(roomName, roomRuins);
-            requiresSync = true;
         }
 
         if (requiresSync && typeof Game !== 'undefined' && Game.rooms[roomName]) {
@@ -273,27 +277,30 @@ module.exports = function stateScanner() {
         }
 
         // Prune Empty Persistent Objects
-        if (roomRuins) {
-            for (const id of roomRuins.keys()) {
+        const ruinsMap = global.State.roomRuins.get(roomName);
+        if (ruinsMap) {
+            for (const id of ruinsMap.keys()) {
                 const liveObj = Game.getObjectById(id);
                 if (!liveObj || (liveObj.store && liveObj.store[RESOURCE_ENERGY] === 0)) {
-                    roomRuins.delete(id);
+                    ruinsMap.delete(id);
                 }
             }
         }
-        if (roomTombstones) {
-            for (const id of roomTombstones.keys()) {
+        const tombstonesMap = global.State.roomTombstones.get(roomName);
+        if (tombstonesMap) {
+            for (const id of tombstonesMap.keys()) {
                 const liveObj = Game.getObjectById(id);
                 if (!liveObj || (liveObj.store && liveObj.store[RESOURCE_ENERGY] === 0)) {
-                    roomTombstones.delete(id);
+                    tombstonesMap.delete(id);
                 }
             }
         }
-        if (roomDropped) {
-            for (const id of roomDropped.keys()) {
+        const droppedMap = global.State.roomDropped.get(roomName);
+        if (droppedMap) {
+            for (const id of droppedMap.keys()) {
                 const liveObj = Game.getObjectById(id);
                 if (!liveObj || (liveObj.amount !== undefined && liveObj.amount === 0)) {
-                    roomDropped.delete(id);
+                    droppedMap.delete(id);
                 }
             }
         }

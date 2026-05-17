@@ -73,6 +73,25 @@ module.exports = {
             if (creep.store.getUsedCapacity() === 0) {
                 creep.heap.state = isBootstrapping ? 'harvest' : 'pickup';
             } else if (creep.store.getFreeCapacity() === 0) {
+                
+                const workerCount = global.State.creepsByRoom.get(room.name)?.get('worker')?.length || 0;
+                if (workerCount < 15 && room.energyAvailable < room.energyCapacityAvailable) {
+                    creep.heap.state = 'fill';
+                    let assigned = false;
+                    for (let j = 0; j < refillTargets.length; j++) {
+                        const target = refillTargets[j];
+                        const virtualFree = refillLedger.get(target.id) || 0;
+                        if (virtualFree > 0) {
+                            creep.heap.targetId = target.id;
+                            refillLedger.set(target.id, virtualFree - creep.store.getUsedCapacity(RESOURCE_ENERGY));
+                            assigned = true;
+                            break;
+                        }
+                    }
+                    if (!assigned && refillTargets.length > 0) creep.heap.targetId = refillTargets[0].id;
+                    continue;
+                }
+
                 if (room.energyAvailable < room.energyCapacityAvailable) {
                     creep.heap.state = 'fill';
                 } else if (sites && sites.length > 0) {
