@@ -1,4 +1,5 @@
-const Profiler = require('../utils/profiler');
+const fs = require('fs');
+const content = `const Profiler = require('../utils/profiler');
 const globalState = require('../state/globalState');
 const Logger = require('../utils/logger');
 const { executeManager } = require('../utils/errorHandler');
@@ -47,7 +48,7 @@ function runRoomManagers() {
             const haulers = roomCreeps.get('hauler') || [];
             const domHaulers = roomCreeps.get('domesticHauler') || [];
             const harvesters = roomCreeps.get('harvester') || [];
-            
+
             // If room starvation and no haulers exist, dynamically overwrite harvesters to domesticHauler
             if (room.energyAvailable < 300 && haulers.length === 0 && domHaulers.length === 0 && harvesters.length > 0) {
                 const overridden = [];
@@ -101,7 +102,7 @@ function runRoomManagers() {
                 // Ensure the manager's methods are wrapped by the error handler
                 if (!manager.__errorWrapped) {
                     manager = wrapModuleFunctions(manager, (funcName, originalFunc, ...args) => {
-                        return executeManager(`${config.name}.${funcName}`, originalFunc, ...args);
+                        return executeManager(\`\${config.name}.\${funcName}\`, originalFunc, ...args);
                     });
                     manager.__errorWrapped = true;
                     // Note: In globalState, it's stored by reference, but we assign it locally too
@@ -113,7 +114,7 @@ function runRoomManagers() {
                     manager.__profilerWrapped = true;
                 }
 
-                Logger.debug(`Running manager ${config.name} in room ${room.name}`);
+                Logger.debug(\`Running manager \${config.name} in room \${room.name}\`);
                 const profilerEnabled = global.PROFILER_ENABLED || (typeof Memory !== 'undefined' && Memory.PROFILER_ENABLED);
                 const cpuAvailable = typeof Game !== 'undefined' && Game.cpu && typeof Game.cpu.getUsed === 'function';
                 let startCpu;
@@ -215,3 +216,5 @@ module.exports = {
     runPhase: Profiler.wrap('managerOrchestrator.runPhase', runPhase),
     runRoomManagers // Exported for testing/mocking if needed
 };
+`;
+fs.writeFileSync('src/managers/managerOrchestrator.js', content);

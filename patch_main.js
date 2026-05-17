@@ -1,4 +1,5 @@
-const { CacheRegistry } = require('./os/cache');
+const fs = require('fs');
+const content = `const { CacheRegistry } = require('./os/cache');
 const resetRecovery = require('./os/resetRecovery');
 const RawMemoryManager = require('./os/RawMemoryManager');
 const installMemoryProxy = require('./os/memoryProxy');
@@ -13,7 +14,7 @@ const IntentManager = require('./os/IntentManager');
 const VirtualLedger = require('./utils/VirtualLedger');
 
 module.exports.loop = function () {
-    Logger.info(`--- Starting Tick ${Game.time} ---`);
+    Logger.info(\`--- Starting Tick \${Game.time} ---\`);
 
     Logger.debug('Phase 1: OS Init & Cache');
 
@@ -24,7 +25,7 @@ module.exports.loop = function () {
     try {
         RawMemoryManager.init();
     } catch (e) {
-        Logger.error(`[Phase 1 Error] RawMemoryManager: ${e.stack}`);
+        Logger.error(\`[Phase 1 Error] RawMemoryManager: \${e.stack}\`);
     }
 
     // Rehydrate global state
@@ -36,7 +37,7 @@ module.exports.loop = function () {
     if (!global.State.intentManager) {
         global.State.intentManager = new IntentManager();
     }
-    
+
     // Clear Virtual Ledger
     VirtualLedger.clear();
 
@@ -58,7 +59,7 @@ module.exports.loop = function () {
     try {
         if (trafficManager && trafficManager.setup) trafficManager.setup();
     } catch (e) {
-        Logger.error(`[Phase 1 Error] TrafficManager Setup: ${e.stack}`);
+        Logger.error(\`[Phase 1 Error] TrafficManager Setup: \${e.stack}\`);
     }
 
     const throttlerFlags = cpuThrottler.run();
@@ -77,7 +78,7 @@ module.exports.loop = function () {
             global.State.intentManager.executeIntents();
         }
     } catch (e) {
-        Logger.error(`[Phase 6 Error] IntentManager: ${e.stack}`);
+        Logger.error(\`[Phase 6 Error] IntentManager: \${e.stack}\`);
     }
 
     // Profiler output
@@ -86,3 +87,5 @@ module.exports.loop = function () {
     // Save caches state for reset recovery
     resetRecovery.saveState();
 };
+`;
+fs.writeFileSync('src/main.js', content);
