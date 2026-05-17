@@ -18,6 +18,8 @@ const IntentManager = require('./os/IntentManager');
 module.exports.loop = function () {
     Logger.info(`--- Starting Tick ${Game.time} ---`);
 
+    Logger.debug('Phase 1: OS Init & Cache');
+
     // Install memory proxy to bind heap to Creep prototypes
     installMemoryProxy();
 
@@ -25,7 +27,7 @@ module.exports.loop = function () {
     try {
         RawMemoryManager.init();
     } catch (e) {
-        Logger.error(`[Phase 0 Error] RawMemoryManager: ${e.stack}`);
+        Logger.error(`[Phase 1 Error] RawMemoryManager: ${e.stack}`);
     }
 
     // Rehydrate global state
@@ -56,15 +58,16 @@ module.exports.loop = function () {
     try {
         if (trafficManager && trafficManager.setup) trafficManager.setup();
     } catch (e) {
-        Logger.error(`[Phase 0 Error] TrafficManager Setup: ${e.stack}`);
+        Logger.error(`[Phase 1 Error] TrafficManager Setup: ${e.stack}`);
     }
 
-    // Phase 1: Discovery Manager (Raw Engine API execution & global.State Bootstrapping)
-    Logger.debug('Phase 1: Running Discovery Manager');
+    Logger.debug('Phase 2: Global State');
+
+    // Phase 2: Discovery Manager (Raw Engine API execution & global.State Bootstrapping)
     try {
         if (discoveryManager) discoveryManager();
     } catch (e) {
-        Logger.error(`[Phase 1 Error] Discovery Manager: ${e.stack}`);
+        Logger.error(`[Phase 2 Error] Discovery Manager: ${e.stack}`);
         return; // Fatal OS crash
     }
 
@@ -91,7 +94,6 @@ module.exports.loop = function () {
 
     // Phase 2: State Scanner (Event-driven map updaters)
     if (!skipState) {
-        Logger.debug('Phase 2: Running State Scanner');
         try {
             if (eventLogRadar) eventLogRadar();
         } catch (e) {
@@ -103,22 +105,20 @@ module.exports.loop = function () {
         } catch (e) {
             Logger.error(`[Phase 2 Error] Global State Scanner: ${e.stack}`);
         }
-    }
 
-    // Phase 2.5: Execution Gates
-    Logger.debug('Phase 2.5: Running Execution Gates');
-    try {
-        const energyRequestManager = globalState.getManager('EnergyRequestManager');
-        if (energyRequestManager && energyRequestManager.handleSourceSleep) {
-            energyRequestManager.handleSourceSleep();
+        try {
+            const energyRequestManager = globalState.getManager('EnergyRequestManager');
+            if (energyRequestManager && energyRequestManager.handleSourceSleep) {
+                energyRequestManager.handleSourceSleep();
+            }
+        } catch (e) {
+            Logger.error(`[Phase 2 Error] EnergyRequestManager: ${e.stack}`);
         }
-    } catch (e) {
-        Logger.error(`[Phase 2.5 Error] EnergyRequestManager: ${e.stack}`);
     }
 
+    Logger.debug('Phase 3: Colonies');
     // Phase 3: Colonies
     if (!skipColonies) {
-        Logger.debug('Phase 3: Running Colonies');
         try {
             if (colonyManager) colonyManager();
         } catch (e) {
@@ -126,20 +126,18 @@ module.exports.loop = function () {
         }
     }
 
-    // Phase 3.5: Standalone Managers
     if (!skipManagers) {
-        Logger.debug('Phase 3.5: Running Standalone Managers');
         try {
             if (managerOrchestrator && managerOrchestrator.run) managerOrchestrator.run();
         } catch (e) {
-            Logger.error(`[Phase 3.5 Error] Managers: ${e.stack}`);
+            Logger.error(`[Phase 3 Error] Managers: ${e.stack}`);
         }
 
         try {
             const RoleManager = require('./colonies/RoleManager');
             RoleManager.runAll();
         } catch (e) {
-            Logger.error(`[Phase 3.5 Error] RoleManager: ${e.stack}`);
+            Logger.error(`[Phase 3 Error] RoleManager: ${e.stack}`);
         }
     }
 
@@ -178,7 +176,7 @@ module.exports.loop = function () {
             global.State.intentManager.executeIntents();
         }
     } catch (e) {
-        Logger.error(`[Phase 7 Error] IntentManager: ${e.stack}`);
+        Logger.error(`[Phase 6 Error] IntentManager: ${e.stack}`);
     }
 
     // Profiler output

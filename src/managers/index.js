@@ -1,5 +1,6 @@
 const CombatManager = require('./CombatManager');
 const ConstructionManager = require('./ConstructionManager');
+const LogisticsManager = require('../colonies/logisticsManager');
 const EnergyRequestManager = require('./EnergyRequestManager');
 const LabManager = require('./LabManager');
 const LinkManager = require('./LinkManager');
@@ -33,7 +34,8 @@ const managers = {
     TowerManager,
     UpgraderManager,
     workerManager,
-    QuadSquadManager
+    QuadSquadManager,
+    LogisticsManager
 };
 
 module.exports = {
