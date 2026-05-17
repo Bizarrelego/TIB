@@ -14,6 +14,7 @@ const trafficManager = require('./traffic/trafficManager');
 const movement = require('./utils/movement');
 const garbageCollector = require('./os/garbageCollector');
 const Logger = require('./utils/logger');
+const IntentManager = require('./os/IntentManager');
 
 module.exports.loop = function () {
     Logger.info(`--- Starting Tick ${Game.time} ---`);
@@ -30,6 +31,10 @@ module.exports.loop = function () {
 
     // Rehydrate global state
     globalState.rehydrate();
+
+    if (!global.State.intentManager) {
+        global.State.intentManager = new IntentManager();
+    }
 
     // Run garbage collection for memory and intel
     garbageCollector();
@@ -159,6 +164,15 @@ module.exports.loop = function () {
 
     // Profiler output
     const Profiler = require('./utils/profiler');
+    try {
+        if (global.State && global.State.intentManager) {
+            global.State.intentManager.executeIntents();
+        }
+    } catch (e) {
+        Logger.error(`[Phase 7 Error] IntentManager: ${e.stack}`);
+    }
+
+    // Profiler output
     Profiler.report();
 
     // Save caches state for reset recovery

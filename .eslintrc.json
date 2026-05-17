@@ -1,5 +1,7 @@
 {
-    "plugins": ["screeps"],
+    "plugins": [
+        "screeps"
+    ],
     "env": {
         "screeps/screeps": true,
         "es2021": true,
@@ -7,7 +9,15 @@
     },
     "globals": {
         "FIND_TOMBSTONES": "readonly",
-        "InterShardMemory": "readonly"
+        "InterShardMemory": "readonly",
+        "STRUCTURE_FACTORY": "readonly",
+        "EVENT_ATTACK": "readonly",
+        "EVENT_BUILD": "readonly",
+        "EVENT_OBJECT_DESTROYED": "readonly",
+        "EVENT_HARVEST": "readonly",
+        "EVENT_REPAIR": "readonly",
+        "EVENT_HEAL": "readonly",
+        "FIND_RUINS": "readonly"
     },
     "extends": "eslint:recommended",
     "rules": {
