@@ -1,6 +1,4 @@
 const SpawnLedger = require('./spawnLedger');
-const spawnManager = require('./spawnManager');
-const planner = require('./planner');
 const defense = require('./defense');
 const scavengingManager = require('./scavengingManager');
 /**
@@ -197,6 +195,19 @@ function manageEarlyProgression(room, _spawnLedger) {
         // Second block: Target assignment logic
         const state = creep.heap.state;
 
+        // Early-game Role Priority: Generic workers bypass/supersede harvesters at RCL 1-2
+        if (room.controller.level <= 2 && harvesters.length > 0) {
+            if (state === 'harvest' && sources.length > 0) {
+                // Only clear harvester targets once to prevent constant overriding and infinite idle loops
+                for (let h = 0; h < harvesters.length; h++) {
+                    if (harvesters[h].heap.targetId === creep.heap.targetId && harvesters[h].heap.state !== 'idle') {
+                        harvesters[h].heap.targetId = null;
+                        harvesters[h].heap.state = 'idle';
+                    }
+                }
+            }
+        }
+
         // Multi-room OS Interrupt: Override Upgrader to Builder if sites exist
         if (state === 'upgrade' && sites.length > 0) {
             creep.heap.state = 'build';
@@ -283,9 +294,7 @@ module.exports = function colonyManager() {
             try {
                 // Instantiate SpawnLedger globally for the room per tick
                 const spawnLedger = new SpawnLedger(room);
-                spawnManager.run(room, spawnLedger);
                 
-                planner.run(room);
                 defense.run(room);
                 scavengingManager.run(room);
                 
