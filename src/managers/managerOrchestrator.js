@@ -1,6 +1,7 @@
 const Profiler = require('../utils/profiler');
 const globalState = require('../state/globalState');
 const Logger = require('../utils/logger');
+const { executeManager } = require('../utils/errorHandler');
 
 /**
  * @file managerOrchestrator.js
@@ -90,11 +91,7 @@ function managerOrchestrator() {
                     startCpu = cpuAvailable ? Game.cpu.getUsed() : Date.now();
                 }
 
-                try {
-                    manager.run(room);
-                } catch (e) {
-                    Logger.error(`[ManagerOrchestrator Error] ${config.name} in Room ${room.name}: ${e.stack}`);
-                }
+                executeManager(`${config.name} in Room ${room.name}`, manager.run.bind(manager), room);
 
                 if (profilerEnabled) {
                     const endCpu = cpuAvailable ? Game.cpu.getUsed() : Date.now();
