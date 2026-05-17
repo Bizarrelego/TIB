@@ -16,14 +16,13 @@ function run(room, defenseRepairTarget = null) {
         if (towers.length === 0) return;
 
         let targetHostile = null;
-        const hostiles = global.State.hostilesByRoom ? (global.State.hostilesByRoom.get(room.name) || []) : [];
-        if (hostiles.length > 0) {
+        const hostilesMap = global.State.hostilesByRoom ? global.State.hostilesByRoom.get(room.name) : null;
+        if (hostilesMap && hostilesMap.size > 0) {
             const referencePos = towers[0].pos;
             let maxDanger = -1;
             let minDistance = Infinity;
 
-            for (let i = 0; i < hostiles.length; i++) {
-                const hostile = hostiles[i];
+            for (const hostile of hostilesMap.values()) {
                 let danger = 10;
                 let healParts = 0;
                 let attackParts = 0;
@@ -51,8 +50,32 @@ function run(room, defenseRepairTarget = null) {
         for (let i = 0; i < towers.length; i++) {
             const tower = towers[i];
             if (tower.store.getUsedCapacity(RESOURCE_ENERGY) >= 10 && targetHostile) {
-                if (getDistance(tower.pos, targetHostile.pos) <= 50) {
-                    tower.attack(targetHostile);
+                const dist = getDistance(tower.pos, targetHostile.pos);
+                
+                // Component 61: Tower Calculus (Damage vs. Heal)
+                let damage = 150;
+                if (dist > 5) {
+                    if (dist > 20) {
+                        damage = 60;
+                    } else {
+                        damage -= (dist - 5) * 6; // 150 - (dist-5) * 6
+                    }
+                }
+                
+                let enemyHeal = 0;
+                if (global.State && global.State.enemyProfiles && global.State.enemyProfiles.has(targetHostile.id)) {
+                    enemyHeal = global.State.enemyProfiles.get(targetHostile.id).healParts * 12;
+                }
+
+                if (enemyHeal > damage) {
+                    // Stall the enemy infinitely by repairing/healing instead of wasting energy
+                    if (defenseRepairTarget) {
+                        tower.repair(defenseRepairTarget);
+                    }
+                } else {
+                    if (dist <= 50) {
+                        tower.attack(targetHostile);
+                    }
                 }
             }
         }

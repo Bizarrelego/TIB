@@ -260,8 +260,9 @@ module.exports = {
                             const roomRemoteHarvesters = colonyRemoteHarvesters.filter(c => c.memory.targetRoom === targetRoomName);
 
                             if (roomRemoteHarvesters.length < sourcesCount) {
-                                const body = [WORK, WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE, MOVE];
-                                const cost = 700;
+                                const sourceCapacity = (intel.reservation === 'jules' || activeReserver) ? 3000 : 1500;
+                                const body = BodyCalc.calculateRemoteMiner(capacity, sourceCapacity);
+                                const cost = BodyCalc.getCost(body);
                                 if (capacity >= cost && spawnLedger.canSpawn(cost)) {
                                     SpawnQueueManager.requestSpawn(room.name, 'remoteHarvester', body, 'remoteHarvester_' + Game.time, {
                                         memory: { role: 'remoteHarvester', colony: room.name, targetRoom: targetRoomName, targetSourceId: null }

@@ -70,9 +70,11 @@ function run(room) {
             // Once on spot, execute strictly stationary calls.
             if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
                 // Pickup from floor if dropped by haulers or withdraw from core
-                if (source && creep.pos.isNearTo(source) && source.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                if (storage && creep.pos.isNearTo(storage) && storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    creep.withdraw(storage, RESOURCE_ENERGY);
+                } else if (!storage && source && creep.pos.isNearTo(source) && source.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
                     creep.withdraw(source, RESOURCE_ENERGY);
-                } else {
+                } else if (!storage) {
                     const dropped = global.State.droppedByRoom.get(room.name);
                     if (dropped) {
                         for (const drop of dropped.values()) {
@@ -119,12 +121,16 @@ function run(room) {
                 } else {
                     // Refill if empty, otherwise wait.
                     if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                        const dropped = global.State.droppedByRoom.get(room.name);
-                        if (dropped) {
-                            for (const drop of dropped.values()) {
-                                if (drop.resourceType === RESOURCE_ENERGY && creep.pos.isEqualTo(drop.pos)) {
-                                    creep.pickup(drop);
-                                    break;
+                        if (storage && creep.pos.isNearTo(storage) && storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                            creep.withdraw(storage, RESOURCE_ENERGY);
+                        } else if (!storage) {
+                            const dropped = global.State.droppedByRoom.get(room.name);
+                            if (dropped) {
+                                for (const drop of dropped.values()) {
+                                    if (drop.resourceType === RESOURCE_ENERGY && creep.pos.isEqualTo(drop.pos)) {
+                                        creep.pickup(drop);
+                                        break;
+                                    }
                                 }
                             }
                         }

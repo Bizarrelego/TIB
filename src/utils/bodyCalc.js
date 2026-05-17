@@ -39,7 +39,9 @@ class BodyCalc {
      * @returns {string[]} Optimal body array
      */
     static calculateRemoteMiner(energyCapacity, sourceCapacity = 3000) {
-        const energyPerTick = sourceCapacity / 300;
+        // Generate creeps that cost exactly what is necessary to fully exploit the source and no more
+        const isReserved = sourceCapacity === 3000;
+        const energyPerTick = isReserved ? 10 : 5;
         const workNeeded = Math.ceil(energyPerTick / 2); // 2 energy per work per tick
 
         let work = 0;

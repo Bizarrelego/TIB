@@ -58,41 +58,176 @@ function runHarassment() {
 
 /**
  * Coordinates fast attack squads and reroutes haulers to steal dropped energy.
+ * Asymmetric Warfare - Poaching (Blueprint Component 53)
  */
 function runPoaching() {
     if (!global.State || !global.State.creepsByRoom) return;
 
-    for (const [roomName, roomCreeps] of global.State.creepsByRoom) {
-        const poachers = roomCreeps.get('poacher') || [];
-        for (const poacher of poachers) {
-            if (poacher.fatigue > 0) continue;
-            // Attack remote harvesters
-            const hostiles = global.State.hostilesByRoom.get(roomName) || [];
-            const target = CombatManager.getBestTarget(poacher, hostiles);
-            if (target) {
-                if (poacher.attack(target) === ERR_NOT_IN_RANGE) {
-                    poacher.moveTo(target);
+    const SpawnQueueManager = require('../managers/SpawnQueueManager');
+
+    for (const [homeRoomName, roomCreeps] of global.State.creepsByRoom) {
+        const room = Game.rooms[homeRoomName];
+        if (!room || !room.controller || !room.controller.my || room.controller.level < 3) continue;
+
+        // Scan neighbor remotes using Event Log radar (intel and hostilesByRoom)
+        const exits = Game.map.describeExits(homeRoomName);
+        if (exits) {
+            for (const direction in exits) {
+                const targetRoomName = exits[direction];
+                const hostiles = global.State.hostilesByRoom.get(targetRoomName) || new Map();
+                let enemyHarvester = null;
+                let enemyDefender = null;
+
+                for (const hostile of hostiles.values()) {
+                    let isDangerous = false;
+                    let isHarvester = false;
+                    if (global.State.enemyProfiles && global.State.enemyProfiles.has(hostile.id)) {
+                        isDangerous = global.State.enemyProfiles.get(hostile.id).isDangerous;
+                    }
+                    if (hostile.body) {
+                        for (let i=0; i<hostile.body.length; i++) {
+                            if (hostile.body[i].type === WORK) isHarvester = true;
+                            if (hostile.body[i].type === ATTACK || hostile.body[i].type === RANGED_ATTACK || hostile.body[i].type === HEAL) isDangerous = true;
+                        }
+                    } else {
+                        isDangerous = true;
+                    }
+
+                    if (isDangerous) enemyDefender = hostile;
+                    if (isHarvester && !isDangerous) enemyHarvester = hostile;
+                }
+
+                // If an unarmored enemy harvester is detected in a remote room without a defender, execute Poaching logic.
+                if (enemyHarvester && !enemyDefender) {
+                    let poacherExists = false;
+                    const poachers = roomCreeps.get('poacher') || [];
+                    for (const p of poachers) {
+                        if (p.memory.targetRoom === targetRoomName) {
+                            poacherExists = true;
+                            break;
+                        }
+                    }
+
+                    if (!poacherExists && SpawnQueueManager.getQueuedCarryParts(homeRoomName, 'poacher', targetRoomName) === 0) {
+                        // Spawn one cheap [MOVE, ATTACK] creep to kill the harvester.
+                        const cost = BODYPART_COST[MOVE] + BODYPART_COST[ATTACK];
+                        if (room.energyCapacityAvailable >= cost) {
+                            SpawnQueueManager.requestSpawn(homeRoomName, 'poacher', [MOVE, ATTACK], 'poacher_' + Game.time, {
+                                memory: { role: 'poacher', colony: homeRoomName, targetRoom: targetRoomName }
+                            }, cost);
+                        }
+                    }
+                }
+
+                // Once the harvester is dead (creating a tombstone), spawn a [CARRY, MOVE] looter
+                const tombstones = global.State.tombstonesByRoom.get(targetRoomName);
+                let hasLoot = false;
+                if (tombstones) {
+                    for (const t of tombstones.values()) {
+                        if (t.store && t.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                            hasLoot = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (hasLoot && !enemyDefender) {
+                    let looterExists = false;
+                    const looters = roomCreeps.get('looter') || [];
+                    for (const l of looters) {
+                        if (l.memory.targetRoom === targetRoomName) {
+                            looterExists = true;
+                            break;
+                        }
+                    }
+
+                    if (!looterExists && SpawnQueueManager.getQueuedCarryParts(homeRoomName, 'looter', targetRoomName) === 0) {
+                        const cost = BODYPART_COST[CARRY] + BODYPART_COST[MOVE];
+                        if (room.energyCapacityAvailable >= cost) {
+                            SpawnQueueManager.requestSpawn(homeRoomName, 'looter', [CARRY, MOVE], 'looter_' + Game.time, {
+                                memory: { role: 'looter', colony: homeRoomName, targetRoom: targetRoomName }
+                            }, cost);
+                        }
+                    }
                 }
             }
         }
 
-        // Reroute haulers
-        const remoteHaulers = roomCreeps.get('remoteHauler') || [];
-        for (const hauler of remoteHaulers) {
-            const dropped = global.State.droppedByRoom.get(roomName) || new Map();
-            let massiveDrop = null;
-            for (const drop of dropped.values()) {
-                if (drop.resourceType === RESOURCE_ENERGY && drop.amount > 500) {
-                    massiveDrop = drop;
-                    break;
+        const poachers = roomCreeps.get('poacher') || [];
+        for (const poacher of poachers) {
+            if (poacher.fatigue > 0) continue;
+            const targetRoomName = poacher.memory.targetRoom;
+            if (poacher.room.name !== targetRoomName) {
+                poacher.moveTo(new RoomPosition(25, 25, targetRoomName));
+            } else {
+                const hostiles = global.State.hostilesByRoom.get(targetRoomName) || new Map();
+                const target = CombatManager.getBestTarget(poacher, Array.from(hostiles.values()));
+                if (target) {
+                    if (poacher.attack(target) === ERR_NOT_IN_RANGE) {
+                        poacher.moveTo(target);
+                    }
                 }
             }
+        }
 
-            if (massiveDrop && hauler.store.getFreeCapacity() > 0) {
-                if (hauler.pickup(massiveDrop) === ERR_NOT_IN_RANGE) {
-                    hauler.moveTo(massiveDrop);
+        // Execute looter logic
+        const looters = roomCreeps.get('looter') || [];
+        for (const looter of looters) {
+            if (looter.fatigue > 0) continue;
+            
+            const targetRoomName = looter.memory.targetRoom;
+            const colonyRoomName = looter.memory.colony;
+
+            if (looter.store.getFreeCapacity() === 0 || (looter.store.getUsedCapacity() > 0 && looter.room.name === colonyRoomName)) {
+                if (looter.room.name !== colonyRoomName) {
+                    looter.moveTo(new RoomPosition(25, 25, colonyRoomName));
+                } else {
+                    const storage = Game.rooms[colonyRoomName].storage;
+                    const spawn = global.State.spawnsByRoom.get(colonyRoomName)?.[0];
+                    const target = storage || spawn;
+                    if (target) {
+                        if (looter.transfer(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                            looter.moveTo(target);
+                        }
+                    }
                 }
-                hauler.heap.state = 'poaching'; // Override normal state
+            } else {
+                if (looter.room.name !== targetRoomName) {
+                    looter.moveTo(new RoomPosition(25, 25, targetRoomName));
+                } else {
+                    const tombstones = global.State.tombstonesByRoom.get(targetRoomName);
+                    let target = null;
+                    if (tombstones) {
+                        for (const t of tombstones.values()) {
+                            if (t.store && t.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                                target = t;
+                                break;
+                            }
+                        }
+                    }
+                    if (target) {
+                        if (looter.withdraw(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                            looter.moveTo(target);
+                        }
+                    } else {
+                        const dropped = global.State.droppedByRoom.get(targetRoomName);
+                        if (dropped) {
+                            for (const d of dropped.values()) {
+                                if (d.resourceType === RESOURCE_ENERGY && d.amount > 0) {
+                                    target = d;
+                                    break;
+                                }
+                            }
+                        }
+                        if (target) {
+                            if (looter.pickup(target) === ERR_NOT_IN_RANGE) {
+                                looter.moveTo(target);
+                            }
+                        } else if (looter.store.getUsedCapacity() > 0) {
+                            looter.moveTo(new RoomPosition(25, 25, colonyRoomName));
+                        }
+                    }
+                }
             }
         }
     }

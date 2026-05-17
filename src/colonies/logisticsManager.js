@@ -251,8 +251,14 @@ const LogisticsManager = {
         const allHaulers = [...haulers, ...domesticHaulers, ...trainCarts];
 
         if (allHaulers.length > 0) {
-            const requests = EnergyRequestManager.getEnergyRequests(room.name);
+            let requests = EnergyRequestManager.getEnergyRequests(room.name);
             const supplies = EnergyRequestManager.getEnergySupplies(room.name);
+            
+            const hasStorage = storage && storage.isActive();
+            if (hasStorage) {
+                // RCL 4 Storage Pivot: Haulers must dump ONLY into Storage
+                requests = requests.filter(r => r.target.structureType === STRUCTURE_STORAGE || r.target.structureType === STRUCTURE_TERMINAL);
+            }
 
             let requestIndex = 0;
             let supplyIndex = 0;
