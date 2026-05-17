@@ -150,7 +150,7 @@ module.exports = {
             }
 
             // Global Scout Spawning Logic (1 active scout globally)
-            if (room.controller.level >= 2) {
+            if (room.controller.level >= 1) {
             let totalScouts = 0;
             for (const crps of global.State.creepsByRoom.values()) {
                 const s = crps.get('scout');
