@@ -5,6 +5,7 @@
 
 const movement = require('../utils/movement');
 const TrafficManager = require('../traffic/trafficManager');
+const sourceSleep = require('../utils/sourceSleep');
 
 module.exports = {
     /**
@@ -30,6 +31,10 @@ module.exports = {
                 const target = Game.getObjectById(targetId);
                 if (!target) {
                     creep.heap.targetId = null;
+                    continue;
+                }
+
+                if (target.ticksToRegeneration !== undefined && sourceSleep.isSleeping(target)) {
                     continue;
                 }
 
