@@ -5,6 +5,7 @@
 
 const movement = require('../utils/movement');
 const TrafficManager = require('../traffic/trafficManager');
+const fatigueGating = require('../utils/fatigueGating');
 
 module.exports = {
     /**
@@ -22,7 +23,7 @@ module.exports = {
         for (let i = 0; i < workers.length; i++) {
             const creep = workers[i];
             try {
-                if (creep.fatigue > 0 || TrafficManager.checkPipeline(creep.id)) continue;
+                if (fatigueGating.isFatigued(creep) || TrafficManager.checkPipeline(creep.id)) continue;
 
                 const state = creep.heap.state;
                 const targetId = creep.heap.targetId;
