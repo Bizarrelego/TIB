@@ -32,19 +32,44 @@ class SpawnQueueManager {
         }
 
         const buckets = SpawnQueueManager.globalQueue.get(roomName);
-        const targetRoom = opts && opts.memory ? opts.memory.targetRoom : undefined;
         const priority = ROLE_PRIORITIES.has(role) ? ROLE_PRIORITIES.get(role) : (ROLE_PRIORITIES.get('default') || 0);
         const bucket = buckets[priority];
 
         // Prevent duplicate requests in O(1) priority bucket
+        const reqTargetRoom = opts && opts.memory ? (opts.memory.targetRoom || opts.memory.remoteRoom) : undefined;
         const isDuplicate = bucket.some(req =>
             req.role === role &&
-            (req.opts && req.opts.memory ? req.opts.memory.targetRoom : undefined) === targetRoom
+            (req.opts && req.opts.memory ? (req.opts.memory.targetRoom || req.opts.memory.remoteRoom) : undefined) === reqTargetRoom
         );
 
         if (!isDuplicate) {
             bucket.push({ role, body, name, opts, cost });
         }
+    }
+
+    /**
+     * Calculates the number of CARRY parts already queued for a specific room and role
+     * @param {string} roomName The spawn room name
+     * @param {string} role The role of the creeps
+     * @param {string} targetRoomName The target/remote room name
+     * @returns {number} The total queued CARRY parts
+     */
+    static getQueuedCarryParts(roomName, role, targetRoomName) {
+        if (!SpawnQueueManager.globalQueue.has(roomName)) return 0;
+
+        let carryCount = 0;
+        const buckets = SpawnQueueManager.globalQueue.get(roomName);
+        for (const bucket of buckets) {
+            for (const req of bucket) {
+                const reqTargetRoom = req.opts && req.opts.memory ? (req.opts.memory.targetRoom || req.opts.memory.remoteRoom) : undefined;
+                if (req.role === role && reqTargetRoom === targetRoomName) {
+                    for (const part of req.body) {
+                        if (part === CARRY) carryCount++;
+                    }
+                }
+            }
+        }
+        return carryCount;
     }
 
     /**
