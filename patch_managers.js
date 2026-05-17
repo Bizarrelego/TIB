@@ -1,10 +1,9 @@
-const eventBus = require('../os/eventBus');
+const fs = require('fs');
 
-function getDistance(pos1, pos2) {
-    return Math.max(Math.abs(pos1.x - pos2.x), Math.abs(pos1.y - pos2.y));
-}
-
-function run(room, defenseRepairTarget = null) {
+// Patch TowerManager.js
+let towerManager = fs.readFileSync('src/managers/TowerManager.js', 'utf8');
+towerManager = towerManager.replace(/function run\(room, defenseRepairTarget = null\) \{[\s\S]*?\} catch \(e\) \{/,
+`function run(room, defenseRepairTarget = null) {
     if (Game.cpu.bucket < 500) return;
 
     try {
@@ -27,7 +26,7 @@ function run(room, defenseRepairTarget = null) {
                 let danger = 10;
                 let healParts = 0;
                 let attackParts = 0;
-                
+
                 if (global.State && global.State.enemyProfiles && global.State.enemyProfiles.has(hostile.id)) {
                     const profile = global.State.enemyProfiles.get(hostile.id);
                     healParts = profile.healParts || 0;
@@ -55,34 +54,11 @@ function run(room, defenseRepairTarget = null) {
                     tower.attack(targetHostile);
                 }
             }
-        }
-        } catch (e) {
-        console.log(`[TowerManager Error] Room ${room.name}: ${e.stack}`);
-    }
-}
+        }`);
+fs.writeFileSync('src/managers/TowerManager.js', towerManager);
 
-const runTicks = new Map();
+// Patch logisticsManager.js
+let logisticsManager = fs.readFileSync('src/colonies/logisticsManager.js', 'utf8');
+logisticsManager = logisticsManager.replace(/const isBootstrapping = true;/, 'const isBootstrapping = false;'); // Avoid overriding things blindly
 
-function executeRun(room, defenseRepairTarget = null) {
-    const key = room.name + (defenseRepairTarget ? '_repair' : '_attack');
-    if (runTicks.get(key) === Game.time) return;
-    runTicks.set(key, Game.time);
-
-    run(room, defenseRepairTarget);
-}
-
-eventBus.subscribe('HOSTILE_SPOTTED', (payload) => {
-    const roomName = payload.roomName;
-    const room = global.State && global.State.rooms ? global.State.rooms.get(roomName) : (typeof Game !== 'undefined' && Game.rooms ? Game.rooms[roomName] : null);
-    if (room) {
-        executeRun(room);
-    }
-});
-
-eventBus.subscribe('DEFENSE_REPAIR_REQUEST', (payload) => {
-    if (payload && payload.room) {
-        executeRun(payload.room, payload.defenseRepairTarget);
-    }
-});
-
-module.exports = { run: executeRun };
+fs.writeFileSync('src/colonies/logisticsManager.js', logisticsManager);

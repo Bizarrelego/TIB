@@ -196,6 +196,14 @@ function manageEarlyProgression(room, _spawnLedger) {
 
         // Second block: Target assignment logic
         const state = creep.heap.state;
+
+        // Multi-room OS Interrupt: Override Upgrader to Builder if sites exist
+        if (state === 'upgrade' && sites.length > 0) {
+            creep.heap.state = 'build';
+            creep.heap.targetId = sites[0].id;
+        } else if (state === 'build' && sites.length === 0) {
+            creep.heap.state = 'upgrade';
+        }
         if (state === 'pickup') {
             creep.heap.targetId = massiveDrop.id;
         } else if (state === 'withdraw') {

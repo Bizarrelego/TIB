@@ -22,6 +22,35 @@ module.exports = {
             }
             const plannerState = global.State.roomPlanner.get(room.name);
 
+            // Hardcode coordinate stamp for 5 extensions
+            const spawns = global.State.spawnsByRoom.get(room.name) || [];
+            if (spawns.length > 0) {
+                const spawn = spawns[0];
+                const stamp = [
+                    {x: 1, y: 0}, {x: -1, y: 0}, {x: 0, y: 1}, {x: 0, y: -1}, {x: 1, y: 1}
+                ];
+                const plannedStructures = plannerState.get('plannedStructures');
+                for (let i = 0; i < stamp.length && i < 5; i++) {
+                    const tx = spawn.pos.x + stamp[i].x;
+                    const ty = spawn.pos.y + stamp[i].y;
+                    const id = `${STRUCTURE_EXTENSION}-${tx}-${ty}`;
+                    if (!plannedStructures.has(id)) {
+                        plannedStructures.set(id, {
+                            pos: new RoomPosition(tx, ty, room.name),
+                            type: STRUCTURE_EXTENSION,
+                            id: id
+                        });
+                    }
+                }
+            }
+
+            // Disable dynamic road and container generation
+            if (Game.time) {
+                rampartPlanner.run(room, plannerState, plannerState.get('plannedStructures'));
+                return;
+            }
+
+
             if (!plannerState.has('anchor')) {
                 const spawns = global.State.spawnsByRoom ? (global.State.spawnsByRoom.get(room.name) || []) : [];
                 let bestPos = null;

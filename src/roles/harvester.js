@@ -60,14 +60,13 @@ module.exports = {
                     continue;
                 }
 
-                // Top-Down Harvester Container Building
-                if (creep.heap.siteId) {
-                    const site = Game.getObjectById(creep.heap.siteId);
-                    if (site && creep.store.getFreeCapacity() === 0) {
-                        creep.build(site);
-                        continue;
-                    } else if (!site) {
-                        creep.heap.siteId = null;
+                // Zero-Pathing Drop Mining
+                if (creep.store.getUsedCapacity() > 0) {
+                    const storage = room.storage;
+                    // If storage exists and we are in primary room, we terminate drop mining and rely on links/haulers to clear our inventory
+                    // Actually, prompt says "Terminate drop-mining in the primary room."
+                    if (!storage) {
+                        creep.drop(RESOURCE_ENERGY);
                     }
                 }
 
