@@ -250,6 +250,12 @@ function runPhase(phase, throttlerFlags = {}) {
             Logger.debug('Phase 6: Executing Intents & Sleep');
             executeManager('trafficManager.executeIntents', () => { if (trafficManager && trafficManager.executeIntents) trafficManager.executeIntents(); });
 
+            executeManager('global.State.intentManager.executeIntents', () => {
+                if (global.State && global.State.intentManager && typeof global.State.intentManager.executeIntents === 'function') {
+                    global.State.intentManager.executeIntents();
+                }
+            });
+
             executeManager('memoryProxy.serialize', () => { if (memoryProxy && typeof memoryProxy.serialize === 'function') { memoryProxy.serialize(); } });
 
             if (Game.cpu.bucket > 5000 && VisualsManager && typeof VisualsManager.run === 'function') {

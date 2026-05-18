@@ -8,26 +8,31 @@ const Logger = require('./utils/logger');
 const cpuBucketForecaster = require('./os/cpuBucketForecaster');
 const OSInitializer = require('./os/OSInitializer');
 const EnergySourceTracker = require('./managers/EnergySourceTracker');
+const { executeManager } = require('./utils/errorHandler');
 
 module.exports.loop = function () {
     Logger.info(`--- Starting Tick ${Game.time} ---`);
 
-    OSInitializer.init();
+    // Tick-level utilities
+    executeManager('cpuBucketForecaster.update', () => cpuBucketForecaster.update());
+
+    executeManager('OSInitializer', () => OSInitializer.init());
 
     // TrafficManager setup before intents are registered
-    try {
+    executeManager('trafficManager.setup', () => {
         if (trafficManager && trafficManager.setup) trafficManager.setup();
-    } catch (e) {
-        Logger.error(`[Phase 1 Error] TrafficManager Setup: ${e.stack}`);
-    }
+    });
 
-    const throttlerFlags = cpuThrottler.run();
+    let throttlerFlags = {};
+    executeManager('cpuThrottler.run', () => {
+        throttlerFlags = cpuThrottler.run() || {};
+    });
 
     // Initialize managers via integration layer
-    managersIntegration.init(globalState);
+    executeManager('managersIntegration.init', () => managersIntegration.init(globalState));
 
     // Call EnergySourceTracker specifically as per prompt
-    EnergySourceTracker.run();
+    executeManager('EnergySourceTracker.run', () => EnergySourceTracker.run());
 
     // Execute Phase 2-6 through managerOrchestrator
     managerOrchestrator.runPhase(2, throttlerFlags);
@@ -38,20 +43,10 @@ module.exports.loop = function () {
 
     // Profiler output
     const Profiler = require('./utils/profiler');
-    try {
-        if (global.State && global.State.intentManager) {
-            global.State.intentManager.executeIntents();
-        }
-    } catch (e) {
-        Logger.error(`[Phase 6 Error] IntentManager: ${e.stack}`);
-    }
 
     // Profiler output
-    Profiler.report();
+    executeManager('Profiler.report', () => Profiler.report());
 
     // Save caches state for reset recovery
-    resetRecovery.saveState();
-
-    // Tick-level utilities
-    cpuBucketForecaster.update();
+    executeManager('resetRecovery.saveState', () => resetRecovery.saveState());
 };
