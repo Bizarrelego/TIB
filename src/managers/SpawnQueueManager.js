@@ -73,6 +73,29 @@ class SpawnQueueManager {
     }
 
     /**
+     * Calculates the number of creeps of a given role queued for a specific target room
+     * @param {string} roomName The spawn room name
+     * @param {string} role The role of the creeps
+     * @param {string} targetRoomName The target/remote room name
+     * @returns {number} The count of queued creeps matching criteria
+     */
+    static getQueuedCount(roomName, role, targetRoomName) {
+        if (!SpawnQueueManager.globalQueue.has(roomName)) return 0;
+
+        let count = 0;
+        const buckets = SpawnQueueManager.globalQueue.get(roomName);
+        for (const bucket of buckets) {
+            for (const req of bucket) {
+                const reqTargetRoom = req.opts && req.opts.memory ? (req.opts.memory.targetRoom || req.opts.memory.remoteRoom) : undefined;
+                if (req.role === role && reqTargetRoom === targetRoomName) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    /**
      * Helper to request rampartMelee dynamically
      * @param {Room} room
      */
