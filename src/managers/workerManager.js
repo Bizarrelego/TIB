@@ -1,4 +1,6 @@
 const TrafficManager = require('../traffic/trafficManager');
+const { isFatigued } = require('../utils/fatigueGating');
+const { isSleeping } = require('../utils/sourceSleep');
 
 module.exports = {
     run(room) {
@@ -59,6 +61,12 @@ module.exports = {
         // The manager iterates over creeps and assigns tasks based on O(N) evaluation.
         for (let i = 0; i < workers.length; i++) {
             const creep = workers[i];
+            if (isFatigued(creep)) continue;
+
+            if (creep.heap.state === 'harvest' && creep.heap.targetId) {
+                const source = Game.getObjectById(creep.heap.targetId);
+                if (source && isSleeping(source)) continue;
+            }
             
             // Only assign if idle or task is finished
             if (creep.heap.state && creep.heap.targetId) continue;
