@@ -1,0 +1,2 @@
+## 2024-05-18 - [Scanner] Learning: `room.find` in loops is bad. Action: We use `room.getEventLog()` and cached state scanners to prevent native API calls.
+## 2024-05-18 - [Scanner] Learning: `room.find` inside stateScanner's requiresSync block was unnecessarily recalculating already-cached global state. Action: Read from `global.State.structuresByRoom` directly and eliminate the `FIND_` API abuse completely.

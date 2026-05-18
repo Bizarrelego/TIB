@@ -79,25 +79,36 @@ module.exports = function stateScanner() {
             global.State.hostilesByRoom.set(roomName, roomHostiles);
         }
 
-        let requiresSync = false;
 
         if (!global.State.roomDropped.has(roomName)) {
-            global.State.roomDropped.set(roomName, new Map());
-            requiresSync = true;
+            let droppedMap = global.State.droppedByRoom ? global.State.droppedByRoom.get(roomName) : null;
+            if (droppedMap) {
+                global.State.roomDropped.set(roomName, droppedMap);
+            } else {
+                global.State.roomDropped.set(roomName, new Map());
+            }
         }
         let roomDropped = global.State.roomDropped.get(roomName);
         global.State.droppedByRoom = global.State.roomDropped;
 
         if (!global.State.roomTombstones.has(roomName)) {
-            global.State.roomTombstones.set(roomName, new Map());
-            requiresSync = true;
+            let tombstonesMap = global.State.tombstonesByRoom ? global.State.tombstonesByRoom.get(roomName) : null;
+            if (tombstonesMap) {
+                global.State.roomTombstones.set(roomName, tombstonesMap);
+            } else {
+                global.State.roomTombstones.set(roomName, new Map());
+            }
         }
         let roomTombstones = global.State.roomTombstones.get(roomName);
         global.State.tombstonesByRoom = global.State.roomTombstones;
 
         if (!global.State.roomRuins.has(roomName)) {
-            global.State.roomRuins.set(roomName, new Map());
-            requiresSync = true;
+            let ruinsMap = global.State.ruinsByRoom ? global.State.ruinsByRoom.get(roomName) : null;
+            if (ruinsMap) {
+                global.State.roomRuins.set(roomName, ruinsMap);
+            } else {
+                global.State.roomRuins.set(roomName, new Map());
+            }
         }
         let roomRuins = global.State.roomRuins.get(roomName);
         global.State.ruinsByRoom = global.State.roomRuins;
@@ -108,35 +119,26 @@ module.exports = function stateScanner() {
             global.State.sitesByRoom.set(roomName, roomSites);
         }
 
-        if (requiresSync && typeof Game !== 'undefined' && Game.rooms[roomName]) {
-            const roomObj = Game.rooms[roomName];
-            
-            roomDropped.clear();
-            const dropped = roomObj.find(FIND_DROPPED_RESOURCES);
-            for (let i = 0; i < dropped.length; i++) roomDropped.set(dropped[i].id, dropped[i]);
-
-            roomTombstones.clear();
-            const tombstones = roomObj.find(FIND_TOMBSTONES);
-            for (let i = 0; i < tombstones.length; i++) roomTombstones.set(tombstones[i].id, tombstones[i]);
-
-            roomRuins.clear();
-            const ruins = roomObj.find(FIND_RUINS);
-            for (let i = 0; i < ruins.length; i++) roomRuins.set(ruins[i].id, ruins[i]);
-
-            // Bootstrap repair queue logic
-            if (!global.State.repairQueues) global.State.repairQueues = new Map();
+        // Bootstrap repair queue logic without roomObj.find
+        if (!global.State.repairQueues) global.State.repairQueues = new Map();
+        if (!global.State.repairQueues.has(roomName)) {
             let queue = new Array(100);
             for (let i = 0; i < 100; i++) queue[i] = new Set();
             global.State.repairQueues.set(roomName, queue);
-            const structs = roomObj.find(FIND_STRUCTURES);
-            for (let i = 0; i < structs.length; i++) updateStructureBucket(structs[i]);
 
             // Initialize O(1) Logistics Cache
             if (!global.State.needyExtensions) global.State.needyExtensions = new Set();
-            for (let i = 0; i < structs.length; i++) {
-                if (structs[i].structureType === STRUCTURE_SPAWN || structs[i].structureType === STRUCTURE_EXTENSION) {
-                    if (structs[i].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                        global.State.needyExtensions.add(structs[i].id);
+
+            if (roomStructures) {
+                for (const structsOfType of roomStructures.values()) {
+                    for (const struct of structsOfType.values()) {
+                        updateStructureBucket(struct);
+
+                        if (struct.structureType === STRUCTURE_SPAWN || struct.structureType === STRUCTURE_EXTENSION) {
+                            if (struct.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                                global.State.needyExtensions.add(struct.id);
+                            }
+                        }
                     }
                 }
             }
