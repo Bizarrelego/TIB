@@ -11,6 +11,7 @@ const stateScanner = require('../state/stateScanner');
 const colonyManager = require('../colonies/colonyManager');
 const spawnManager = require('../colonies/spawnManager');
 const SpawnLedger = require('../colonies/spawnLedger');
+const BoostingManager = require('./BoostingManager');
 const planner = require('../colonies/planner');
 const RoleManager = require('../colonies/RoleManager');
 const operationsManager = require('../operations/operationsManager');
@@ -190,6 +191,9 @@ function runPhase(phase, throttlerFlags = {}) {
                         if (room.controller && room.controller.my && spawnManager && typeof spawnManager.run === 'function') {
                             const ledger = new SpawnLedger(room);
                             executeManager('spawnManager', () => spawnManager.run(room, ledger));
+                        }
+                        if (room.controller && room.controller.my && BoostingManager && typeof BoostingManager.run === 'function') {
+                            executeManager('BoostingManager', () => BoostingManager.run(room));
                         }
                     }
                 }
