@@ -120,7 +120,6 @@ module.exports = function discoveryManager() {
                 state.sourceWalkableTiles.set(roomName, walkableTilesMap);
 
                 state.hostilesByRoom.set(roomName, new Map());
-                state.nukesByRoom.set(roomName, room.find(FIND_NUKES));
 
                 state.scannedRooms.add(roomName);
             }
