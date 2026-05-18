@@ -134,7 +134,8 @@ module.exports = {
             }
 
             // Spawn a domestic hauler to move energy from harvesters to spawn/extensions
-            if (haulerCount < 2) {
+            // Retire domestic haulers at RCL 5 if a Link network is established
+            if (haulerCount < 2 && (!room.controller || room.controller.level < 5 || !spawnLedger.isLinkNetworkPresent(room))) {
                 const energyAvailable = spawnLedger.getAvailableEnergy();
                 const calcCapacity = (haulerCount === 0 && energyAvailable < capacity && energyAvailable >= 200) ? energyAvailable : capacity;
                 const body = BodyCalc.calculateDomesticHauler(calcCapacity);

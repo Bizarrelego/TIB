@@ -1,4 +1,4 @@
-const movement = require('../utils/movement');
+const TrafficManager = require('../traffic/trafficManager');
 
 function run(room) {
     const roomCreeps = global.State.creepsByRoom.get(room.name);
@@ -11,47 +11,33 @@ function run(room) {
         const creep = hubManagers[i];
 
         try {
-            if (creep.fatigue > 0) continue; // Fatigue gating
+            // Stationary execution only - NO movement logic allowed.
+            if (TrafficManager && TrafficManager.checkPipeline && TrafficManager.checkPipeline(creep.id)) continue;
 
-            const parkPos = creep.heap.parkPos;
-            const state = creep.heap.state;
-            const sourceId = creep.heap.sourceId;
-            const targetId = creep.heap.targetId;
+            const storage = room.storage;
+            if (!storage) continue;
 
-            // 1. Move to optimized park position
-            if (parkPos) {
-                if (creep.pos.x !== parkPos.x || creep.pos.y !== parkPos.y) {
-                    movement.moveTo(creep, new RoomPosition(parkPos.x, parkPos.y, parkPos.roomName));
-                    
-                    // Allow intent maximization if adjacent enough during travel
-                    if (!creep.pos.isNearTo(parkPos.x, parkPos.y)) {
-                        continue;
+            const linkCache = global.State.linkCache ? global.State.linkCache.get(room.name) : null;
+            if (!linkCache || !linkCache.hubLinkId) continue;
+
+            const hubLink = Game.getObjectById(linkCache.hubLinkId);
+            if (!hubLink) continue;
+
+            // 0-CPU Stationary Transfer Logic
+            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+                if (hubLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    if (TrafficManager && TrafficManager.registerWithdraw) {
+                        TrafficManager.registerWithdraw(creep, hubLink, RESOURCE_ENERGY);
+                    } else {
+                        creep.withdraw(hubLink, RESOURCE_ENERGY);
                     }
                 }
-            }
-
-            // Note: The execution of the withdraw() or transfer() intent is handled by TrafficManager's
-            // `executeIntents()` pipeline ledger mechanism.
-            // The LogisticsManager sets the pipeline locks.
-
-            // For creeps that may be temporarily out of sync, we keep the fallback execution here:
-            if (
-                state === 'fill_link' || state === 'empty_link' ||
-                state === 'fill_terminal' || state === 'empty_terminal' ||
-                state === 'fill_storage' || state === 'empty_storage'
-            ) {
-                const srcId = sourceId;
-                const tgtId = targetId;
-
-                if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
-                    const src = Game.getObjectById(srcId);
-                    if (src && creep.pos.isNearTo(src)) {
-                        creep.withdraw(src, RESOURCE_ENERGY);
-                    }
-                } else {
-                    const tgt = Game.getObjectById(tgtId);
-                    if (tgt && creep.pos.isNearTo(tgt)) {
-                        creep.transfer(tgt, RESOURCE_ENERGY);
+            } else {
+                if (storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                    if (TrafficManager && TrafficManager.registerTransfer) {
+                        TrafficManager.registerTransfer(creep, storage, RESOURCE_ENERGY);
+                    } else {
+                        creep.transfer(storage, RESOURCE_ENERGY);
                     }
                 }
             }

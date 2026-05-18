@@ -11,7 +11,7 @@ class BucketGatedDT {
      */
     static compute(roomName, initialMatrix, threshold = 8000) {
         if (typeof Game !== 'undefined' && Game.cpu && Game.cpu.bucket !== undefined) {
-            if (Game.cpu.bucket < threshold) {
+            if (Game.cpu.bucket <= threshold) {
                 return 'deferred';
             }
         }
@@ -28,7 +28,7 @@ class BucketGatedDT {
      */
     static getCutTiles(roomName, sources, bounds, threshold = 8000) {
         if (typeof Game !== 'undefined' && Game.cpu && Game.cpu.bucket !== undefined) {
-            if (Game.cpu.bucket < threshold) {
+            if (Game.cpu.bucket <= threshold) {
                 return 'deferred';
             }
         }
