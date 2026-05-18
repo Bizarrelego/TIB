@@ -67,17 +67,18 @@ function run(room) {
             const sLink = sourceLinks[i];
             if (sLink.cooldown > 0) continue;
 
-            if (sLink.store.getUsedCapacity(RESOURCE_ENERGY) >= 700) { // Nearly full or full
+            // Immediately transfer anything we have to avoid any buildup, 0-CPU style
+            if (sLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
                 let transferred = false;
 
                 // Priority 1: Hub Link (Storage needs / Spawns)
-                if (hubLink && hubLink.store.getFreeCapacity(RESOURCE_ENERGY) >= 700) {
+                if (hubLink && hubLink.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
                     sLink.transferEnergy(hubLink);
                     transferred = true;
                 }
 
                 // Priority 2: Controller Link
-                if (!transferred && controllerLink && controllerLink.store.getFreeCapacity(RESOURCE_ENERGY) >= 700) {
+                if (!transferred && controllerLink && controllerLink.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
                     sLink.transferEnergy(controllerLink);
                 }
             }

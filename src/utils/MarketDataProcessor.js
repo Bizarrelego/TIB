@@ -85,8 +85,23 @@ function filterOutliers(dataArray) {
     return dataArray.filter(value => value >= lowerBound && value <= upperBound);
 }
 
+/**
+ * Calculates the Exponential Moving Average (EMA).
+ *
+ * @param {number} newValue - The current value.
+ * @param {number} prevEma - The previously calculated EMA.
+ * @param {number} periods - The number of periods.
+ * @returns {number} The newly calculated EMA.
+ */
+function calculateEMA(newValue, prevEma, periods = 100) {
+    if (prevEma === null || prevEma === undefined) return newValue;
+    const k = 2 / (periods + 1);
+    return (newValue * k) + (prevEma * (1 - k));
+}
+
 module.exports = {
     calculateMedian,
     calculateQuartiles,
-    filterOutliers
+    filterOutliers,
+    calculateEMA
 };

@@ -67,11 +67,26 @@ module.exports = {
 
                 // Zero-Pathing Drop Mining
                 if (creep.store.getUsedCapacity() > 0) {
-                    const storage = room.storage;
-                    // If storage exists and we are in primary room, we terminate drop mining and rely on links/haulers to clear our inventory
-                    // Actually, prompt says "Terminate drop-mining in the primary room."
-                    if (!storage) {
-                        creep.drop(RESOURCE_ENERGY);
+                    let hasLink = false;
+                    const structures = room.lookForAtArea(LOOK_STRUCTURES, creep.pos.y - 1, creep.pos.x - 1, creep.pos.y + 1, creep.pos.x + 1, true);
+                    for (let j = 0; j < structures.length; j++) {
+                        if (structures[j].structure.structureType === STRUCTURE_LINK) {
+                            if (TrafficManager.registerTransfer) {
+                                TrafficManager.registerTransfer(creep, structures[j].structure, RESOURCE_ENERGY);
+                            } else {
+                                creep.transfer(structures[j].structure, RESOURCE_ENERGY);
+                            }
+                            hasLink = true;
+                            break;
+                        }
+                    }
+
+                    if (!hasLink) {
+                        const storage = room.storage;
+                        // If storage exists and we are in primary room, we terminate drop mining and rely on links/haulers to clear our inventory
+                        if (!storage) {
+                            creep.drop(RESOURCE_ENERGY);
+                        }
                     }
                 }
 

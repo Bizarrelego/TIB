@@ -1,4 +1,4 @@
-const MathUtils = require('../utils/math');
+const MarketDataProcessor = require('../utils/MarketDataProcessor');
 
 /**
  * Handles global market trade execution based on EMA values.
@@ -55,64 +55,96 @@ class MarketManager {
      */
     static executeTrades(room) {
         const terminal = room.terminal;
-        const MIN_SELL_AMOUNT = 1000;
 
-        // Find minerals in the terminal to sell
-        for (const resourceType in terminal.store) {
-            if (resourceType === RESOURCE_ENERGY) continue;
+        // Arbitrage Logic: Evaluate global buy/sell orders.
+        // We look through all known orders to find arbitrage opportunities.
+        const allBuyOrders = Game.market.getAllOrders({ type: ORDER_BUY });
+        const allSellOrders = Game.market.getAllOrders({ type: ORDER_SELL });
 
-            const amount = terminal.store[resourceType];
-            if (amount < MIN_SELL_AMOUNT) continue;
+        if (!allBuyOrders || !allSellOrders) return;
 
-            const orders = global.State.marketOrders.get(resourceType) || [];
-            if (orders.length === 0) continue;
+        // Group by resource
+        const buyOrdersByResource = new Map();
+        for (const order of allBuyOrders) {
+            if (!buyOrdersByResource.has(order.resourceType)) buyOrdersByResource.set(order.resourceType, []);
+            buyOrdersByResource.get(order.resourceType).push(order);
+        }
 
-            const prices = orders.map(o => o.price);
-            const filteredPrices = MathUtils.filterOutliersIQR(prices);
+        const sellOrdersByResource = new Map();
+        for (const order of allSellOrders) {
+            if (!sellOrdersByResource.has(order.resourceType)) sellOrdersByResource.set(order.resourceType, []);
+            sellOrdersByResource.get(order.resourceType).push(order);
+        }
 
-            if (filteredPrices.length === 0) continue;
+        for (const [resourceType, buyOrders] of buyOrdersByResource.entries()) {
+            const sellOrders = sellOrdersByResource.get(resourceType) || [];
+            if (sellOrders.length === 0 || buyOrders.length === 0) continue;
 
-            const minPrice = Math.min(...filteredPrices);
-            const maxPrice = Math.max(...filteredPrices);
+            // Apply IQR Filter to reject troll orders
+            const buyPrices = buyOrders.map(o => o.price);
+            const filteredBuyPrices = MarketDataProcessor.filterOutliers(buyPrices);
 
-            const validOrders = orders.filter(o => o.price >= minPrice && o.price <= maxPrice);
+            const sellPrices = sellOrders.map(o => o.price);
+            const filteredSellPrices = MarketDataProcessor.filterOutliers(sellPrices);
 
-            if (validOrders.length === 0) continue;
+            if (filteredBuyPrices.length === 0 || filteredSellPrices.length === 0) continue;
 
-            // Calculate EMA (using a simple average of filtered prices for the current value, could be more complex based on historical data)
-            const currentAvgPrice = filteredPrices.reduce((sum, price) => sum + price, 0) / filteredPrices.length;
+            // Valid bounds
+            const minBuyPrice = Math.min(...filteredBuyPrices);
+            const maxBuyPrice = Math.max(...filteredBuyPrices);
+            const validBuyOrders = buyOrders.filter(o => o.price >= minBuyPrice && o.price <= maxBuyPrice);
 
-            // In a real implementation, prevEma would be fetched from Memory/Heap.
-            // For now, we will just use the current average as the baseline if we don't have history.
-            if (!global.State) global.State = new Map();
+            const minSellPrice = Math.min(...filteredSellPrices);
+            const maxSellPrice = Math.max(...filteredSellPrices);
+            const validSellOrders = sellOrders.filter(o => o.price >= minSellPrice && o.price <= maxSellPrice);
+
+            if (validBuyOrders.length === 0 || validSellOrders.length === 0) continue;
+
+            // EMA Baseline
+            const currentAvgBuyPrice = filteredBuyPrices.reduce((sum, p) => sum + p, 0) / filteredBuyPrices.length;
+
             if (!global.State.marketEMA) global.State.marketEMA = new Map();
-
-            const prevEma = global.State.marketEMA.get(resourceType) || currentAvgPrice;
-            const ema = MathUtils.calculateEMA(currentAvgPrice, prevEma, 100);
-
-            // Store new EMA
+            const prevEma = global.State.marketEMA.get(resourceType) || currentAvgBuyPrice;
+            const ema = MarketDataProcessor.calculateEMA(currentAvgBuyPrice, prevEma, 100);
             global.State.marketEMA.set(resourceType, ema);
 
-            // Sort orders by price descending
-            validOrders.sort((a, b) => b.price - a.price);
+            // Sort logic: Highest Buy Price, Lowest Sell Price
+            validBuyOrders.sort((a, b) => b.price - a.price);
+            validSellOrders.sort((a, b) => a.price - b.price);
 
-            for (const order of validOrders) {
-                // Sell if price is above EMA and spread is good enough to cover energy costs
-                if (order.price >= ema) {
-                    const spread = order.price - ema;
-                    const energyCost = Game.market.calcTransactionCost(MIN_SELL_AMOUNT, room.name, order.roomName);
-                    const transferCostPerUnit = energyCost / MIN_SELL_AMOUNT;
+            const highestBuy = validBuyOrders[0];
+            const lowestSell = validSellOrders[0];
 
-                    // Basic sanity check: Is the energy cost worth the trade?
-                    // (Assuming energy is worth roughly 1 credit for this simple example, can be adjusted)
-                    // Only execute trades if the spread exceeds transfer costs
-                    if (spread > transferCostPerUnit && terminal.store[RESOURCE_ENERGY] >= energyCost) {
-                         const amountToSell = Math.min(amount, order.remainingAmount, MIN_SELL_AMOUNT);
-                         const result = Game.market.deal(order.id, amountToSell, room.name);
-                         if (result === OK) {
-                             console.log(`[MarketManager] Sold ${amountToSell} ${resourceType} to ${order.roomName} at price ${order.price}`);
-                             break; // Only execute one deal per tick per resource
-                         }
+            // Calculate Arbitrage Margin
+            const margin = highestBuy.price - lowestSell.price;
+
+            if (margin > 0) {
+                // Cost calculation
+                // Arbitrage via terminal requires us to act as the intermediate or use our energy to cover transfers.
+                // Actually, if we buy from `lowestSell` it costs energy to transfer to us.
+                // Then selling to `highestBuy` costs energy to transfer from us to them.
+                // But wait, `Game.market.deal` takes `targetRoomName` as the room with the terminal.
+                // We buy from `lowestSell.roomName` to our `room.name`.
+                // We sell to `highestBuy.roomName` from our `room.name`.
+
+                const amountToTrade = Math.min(highestBuy.remainingAmount, lowestSell.remainingAmount, 1000); // 1000 limit per tick
+
+                if (amountToTrade > 0) {
+                    const energyCostBuy = Game.market.calcTransactionCost(amountToTrade, room.name, lowestSell.roomName);
+                    const energyCostSell = Game.market.calcTransactionCost(amountToTrade, room.name, highestBuy.roomName);
+
+                    const totalEnergyCost = energyCostBuy + energyCostSell;
+                    const transferCostPerUnit = totalEnergyCost / amountToTrade;
+
+                    // If the margin between global buy and sell orders exceeds terminal energy transfer cost, execute both
+                    if (margin > transferCostPerUnit && terminal.store[RESOURCE_ENERGY] >= totalEnergyCost) {
+                        const buyResult = Game.market.deal(lowestSell.id, amountToTrade, room.name);
+                        const sellResult = Game.market.deal(highestBuy.id, amountToTrade, room.name);
+
+                        if (buyResult === OK && sellResult === OK) {
+                            console.log(`[MarketManager] Arbitrage Executed for ${resourceType}: Margin ${margin.toFixed(3)}, Profit ${(margin * amountToTrade).toFixed(3)}`);
+                            break; // Stop after executing a successful arbitrage
+                        }
                     }
                 }
             }

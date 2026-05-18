@@ -13,6 +13,10 @@ module.exports = {
             if (Game.time % 100 !== 0) return;
             if (!room.controller || !room.controller.my) return;
 
+            // Bucket-Gated WASM Constraint
+            if (room.memory.needsPlanning !== true) return;
+            if (Game.cpu.bucket <= 8000) return;
+
             const sites = global.State.sitesByRoom.get(room.name) || [];
             if (sites.length >= 5) return;
 
@@ -347,6 +351,37 @@ module.exports = {
 
             // Rampart Planning
             rampartPlanner.run(room, plannerState, plannedStructures);
+
+            // Turn off planning flag once successfully completed
+            if (plannerState.get('rampartsPlanned')) {
+                room.memory.needsPlanning = false;
+
+                // Cache compressed CostMatrix
+                if (plannerState.has('dtMatrix')) {
+                    const dtMatrix = plannerState.get('dtMatrix');
+                    // simple RLE compression for the costmatrix
+                    let compressed = '';
+                    let currentVal = -1;
+                    let count = 0;
+                    for (let x = 0; x < 50; x++) {
+                        for (let y = 0; y < 50; y++) {
+                            const val = dtMatrix.get(x, y);
+                            if (val === currentVal) {
+                                count++;
+                            } else {
+                                if (count > 0) compressed += `${count}:${currentVal},`;
+                                currentVal = val;
+                                count = 1;
+                            }
+                        }
+                    }
+                    if (count > 0) compressed += `${count}:${currentVal}`;
+
+                    // Save to RawMemory segment (e.g. segment 10)
+                    RawMemory.segments[10] = compressed;
+                    RawMemory.setActiveSegments([10]);
+                }
+            }
 
         } catch (e) {
             console.log(`[Planner Error] Room ${room.name}: ${e.stack}`);
