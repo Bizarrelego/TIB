@@ -2,6 +2,7 @@ const BodyCalc = require('../utils/bodyCalc');
 const SpawnQueueManager = require('../managers/SpawnQueueManager');
 const UpgraderManager = require('../managers/UpgraderManager');
 const Profiler = require('../utils/profiler');
+const BootstrapPlanner = require('./BootstrapPlanner');
 
 let lastCensusTick = 0;
 const remoteCensus = new Map();
@@ -89,7 +90,9 @@ module.exports = {
                 }
             }
 
-            if (room.controller && room.controller.level < 2 && workerCount < 15) {
+            const bootstrapReqs = BootstrapPlanner.getCreepRequirements(room);
+
+            if (room.controller && room.controller.level < 2 && workerCount < bootstrapReqs.worker) {
                 if (room.energyAvailable >= 200 && availableSpawns.length > 0) {
                     const spawn = availableSpawns[0];
                     spawn.spawnCreep([WORK, CARRY, MOVE], 'worker_' + Game.time, { memory: { role: 'worker', colony: room.name } });
@@ -101,7 +104,7 @@ module.exports = {
             const isEarlyGame = room.controller.level < 2 || !roomHasContainers;
 
             if (isEarlyGame) {
-                if (workerCount < 15) {
+                if (workerCount < bootstrapReqs.worker) {
                     const energyAvailable = spawnLedger.getAvailableEnergy();
                     const calcCapacity = (workerCount === 0 && energyAvailable < capacity && energyAvailable >= 200) ? energyAvailable : capacity;
                     const body = BodyCalc.calculateWorker(calcCapacity);
@@ -125,7 +128,8 @@ module.exports = {
             }
 
             // Spawn harvesters first
-            if (harvesterCount < spawnLedger.calculateHarvesterTarget(room, workerCount)) {
+            const targetHarvesters = room.controller.level <= 4 ? bootstrapReqs.harvester : spawnLedger.calculateHarvesterTarget(room, workerCount);
+            if (harvesterCount < targetHarvesters) {
                 const energyAvailable = spawnLedger.getAvailableEnergy();
                 const calcCapacity = (haulerCount === 0 && energyAvailable < capacity && energyAvailable >= 200) ? energyAvailable : capacity;
                 const body = BodyCalc.calculateEarlyGameHarvester(calcCapacity);
@@ -135,7 +139,8 @@ module.exports = {
 
             // Spawn a domestic hauler to move energy from harvesters to spawn/extensions
             // Retire domestic haulers at RCL 5 if a Link network is established
-            if (haulerCount < 2 && (!room.controller || room.controller.level < 5 || !spawnLedger.isLinkNetworkPresent(room))) {
+            const targetHaulers = room.controller.level <= 4 ? bootstrapReqs.domesticHauler : 2;
+            if (haulerCount < targetHaulers && (!room.controller || room.controller.level < 5 || !spawnLedger.isLinkNetworkPresent(room))) {
                 const energyAvailable = spawnLedger.getAvailableEnergy();
                 const calcCapacity = (haulerCount === 0 && energyAvailable < capacity && energyAvailable >= 200) ? energyAvailable : capacity;
                 const body = BodyCalc.calculateDomesticHauler(calcCapacity);

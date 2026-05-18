@@ -1,5 +1,6 @@
 const Profiler = require('../utils/profiler');
 const STRUCTURE_PRIORITIES = require('../constants/structurePriorities');
+const BootstrapPlanner = require('../colonies/BootstrapPlanner');
 
 const MAX_CONSTRUCTION_SITES = 5;
 
@@ -19,10 +20,15 @@ module.exports = {
             const plannerState = global.State.roomPlanner && global.State.roomPlanner.get(room.name);
             if (!plannerState) return;
 
+            const rcl = room.controller ? room.controller.level : 0;
+
+            if (rcl <= 4) {
+                BootstrapPlanner.planStructures(room, plannerState);
+            }
+
             const plannedStructures = plannerState.get('plannedStructures');
             if (!plannedStructures || plannedStructures.size === 0) return;
 
-            const rcl = room.controller ? room.controller.level : 0;
             const structuresMap = global.State.structuresByRoom.get(room.name) || new Map();
 
             // Recompute current counts to respect limits
