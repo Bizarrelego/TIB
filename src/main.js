@@ -4,21 +4,13 @@ const RawMemoryManager = require('./os/RawMemoryManager');
 const installMemoryProxy = require('./os/memoryProxy');
 const globalState = require('./state/globalState');
 const managersIntegration = require('./managers/index');
-const discoveryManager = require('./state/discoveryManager');
-const stateScanner = require('./state/stateScanner');
-const colonyManager = require('./colonies/colonyManager');
-const operationsManager = require('./operations/operationsManager'); // High-level orchestrator
 const managerOrchestrator = require('./managers/managerOrchestrator'); // Standalone Managers
-const eventLogRadar = require('./os/eventLogRadar');
 const cpuThrottler = require('./os/cpuThrottler');
 const trafficManager = require('./traffic/trafficManager');
 const garbageCollector = require('./os/garbageCollector');
 const Logger = require('./utils/logger');
 const IntentManager = require('./os/IntentManager');
 const VirtualLedger = require('./utils/VirtualLedger');
-const spawnManager = require('./colonies/spawnManager');
-const planner = require('./colonies/planner');
-const SpawnLedger = require('./colonies/spawnLedger');
 
 module.exports.loop = function () {
     Logger.info(`--- Starting Tick ${Game.time} ---`);
@@ -39,7 +31,7 @@ module.exports.loop = function () {
     globalState.rehydrate();
 
     if (!global.State) {
-        global.State = {};
+        global.State = new Map();
     }
     if (!global.State.intentManager) {
         global.State.intentManager = new IntentManager();
@@ -69,119 +61,14 @@ module.exports.loop = function () {
         Logger.error(`[Phase 1 Error] TrafficManager Setup: ${e.stack}`);
     }
 
-    Logger.debug('Phase 2: Global State');
+    const throttlerFlags = cpuThrottler.run();
 
-    // Phase 2: Discovery Manager (Raw Engine API execution & global.State Bootstrapping)
-    try {
-        if (discoveryManager) discoveryManager();
-    } catch (e) {
-        Logger.error(`[Phase 2 Error] Discovery Manager: ${e.stack}`);
-        return; // Fatal OS crash
-    }
-
-    // Phase 2: State Scanner (Event-driven map updaters)
-    const { skipState, skipColonies, skipManagers, skipOperations } = cpuThrottler.run();
-
-    if (!skipState) {
-        try {
-            if (eventLogRadar) eventLogRadar();
-        } catch (e) {
-            Logger.error(`[Phase 2 Error] Event Log Radar: ${e.stack}`);
-        }
-
-        try {
-            if (stateScanner) stateScanner();
-        } catch (e) {
-            Logger.error(`[Phase 2 Error] Global State Scanner: ${e.stack}`);
-        }
-        try {
-            if (globalState && globalState.scan) globalState.scan();
-        } catch (e) {
-            Logger.error(`[Phase 2 Error] Global State Scan: ${e.stack}`);
-        }
-
-        try {
-            const energyRequestManager = globalState.getManager('EnergyRequestManager');
-            if (energyRequestManager && energyRequestManager.handleSourceSleep) {
-                energyRequestManager.handleSourceSleep();
-            }
-        } catch (e) {
-            Logger.error(`[Phase 2 Error] EnergyRequestManager: ${e.stack}`);
-        }
-    }
-
-    Logger.debug('Phase 3: Colonies');
-    // Phase 3: Colonies
-    if (!skipColonies) {
-        try {
-            if (colonyManager) colonyManager();
-        } catch (e) {
-            Logger.error(`[Phase 3 Error] Colonies: ${e.stack}`);
-        }
-    }
-    
-    // Tick Slicing
-    if (Game.time % 10 === 0) {
-        for (const roomName in Game.rooms) {
-            const room = Game.rooms[roomName];
-            if (room.controller && room.controller.my && spawnManager && typeof spawnManager.run === 'function') {
-                const ledger = new SpawnLedger(room);
-                spawnManager.run(room, ledger);
-            }
-        }
-    }
-    
-    if (Game.time % 1000 === 0) {
-        for (const roomName in Game.rooms) {
-            const room = Game.rooms[roomName];
-            if (room.controller && room.controller.my && planner && typeof planner.run === 'function') {
-                planner.run(room);
-            }
-        }
-    }
-
-    if (!skipManagers) {
-        try {
-            if (managerOrchestrator && managerOrchestrator.run) managerOrchestrator.run();
-        } catch (e) {
-            Logger.error(`[Phase 3 Error] Managers: ${e.stack}`);
-        }
-
-        try {
-            const RoleManager = require('./colonies/RoleManager');
-            RoleManager.runAll();
-        } catch (e) {
-            Logger.error(`[Phase 3 Error] RoleManager: ${e.stack}`);
-        }
-    }
-
-    // Phase 4: Operations Orchestration Module
-    if (!skipOperations) {
-        Logger.debug('Phase 4: Running Operations');
-        try {
-            if (operationsManager) operationsManager();
-        } catch (e) {
-            Logger.error(`[Phase 4 Error] Operations: ${e.stack}`);
-        }
-    }
-
-    // Phase 5: Traffic Control
-    Logger.debug('Phase 5: Running Traffic Control');
-    try {
-        if (trafficManager && trafficManager.run) trafficManager.run();
-    } catch (e) {
-        Logger.error(`[Phase 5 Error] Traffic Control: ${e.stack}`);
-    }
-
-    // Phase 6: Intents & Sleep
-    Logger.debug('Phase 6: Executing Intents & Sleep');
-    try {
-        if (trafficManager && trafficManager.executeIntents) {
-            trafficManager.executeIntents();
-        }
-    } catch (e) {
-        Logger.error(`[Phase 6 Error] Intents & Sleep: ${e.stack}`);
-    }
+    // Execute Phase 2-6 through managerOrchestrator
+    managerOrchestrator.runPhase(2, throttlerFlags);
+    managerOrchestrator.runPhase(3, throttlerFlags);
+    managerOrchestrator.runPhase(4, throttlerFlags);
+    managerOrchestrator.runPhase(5, throttlerFlags);
+    managerOrchestrator.runPhase(6, throttlerFlags);
 
     // Profiler output
     const Profiler = require('./utils/profiler');

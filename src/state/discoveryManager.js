@@ -3,7 +3,7 @@
  * Initializes and populates global.State for owned rooms.
  */
 module.exports = function discoveryManager() {
-    if (!global.State) global.State = {};
+    if (!global.State) global.State = new Map();
     const state = global.State;
 
     if (!state.rooms) state.rooms = new Map();

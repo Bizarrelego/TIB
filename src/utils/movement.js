@@ -142,7 +142,7 @@ module.exports = {
                 creep.heap.path.shift(); // Advance path
             }
             if (creep.heap.path.length > 0) {
-                if (!global.State) global.State = {};
+                if (!global.State) global.State = new Map();
                 if (!(global.State.trafficIntents instanceof Map)) global.State.trafficIntents = new Map();
 
                 global.State.trafficIntents.set(creep.name, {
@@ -251,7 +251,7 @@ module.exports = {
         if (blocked) return;
 
         // 3. Synchronize intents
-        if (!global.State) global.State = {};
+        if (!global.State) global.State = new Map();
         if (!(global.State.trafficIntents instanceof Map)) global.State.trafficIntents = new Map();
 
         for (const intent of intents) {

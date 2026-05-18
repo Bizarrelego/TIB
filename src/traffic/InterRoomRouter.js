@@ -11,7 +11,7 @@ class InterRoomRouter {
      * @returns {string[]} Array of room names to traverse.
      */
     static getRoute(startRoom, targetRoom) {
-        if (!global.State) global.State = {};
+        if (!global.State) global.State = new Map();
         if (!global.State.routeCache) global.State.routeCache = new Map();
 
         const cacheKey = `${startRoom}_${targetRoom}`;

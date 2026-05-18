@@ -5,7 +5,7 @@ const MEMORY_SEGMENTS = require('../constants/memorySegments');
 
 const CostMatrixCache = {
     get: (roomName) => {
-        if (!global.State) global.State = {};
+        if (!global.State) global.State = new Map();
         if (!global.State.costMatrices) global.State.costMatrices = new Map();
 
         if (global.State.costMatrices.has(roomName)) {
@@ -35,7 +35,7 @@ const CostMatrixCache = {
         return CostMatrixCache.generate(roomName);
     },
     set: (roomName, costMatrix) => {
-        if (!global.State) global.State = {};
+        if (!global.State) global.State = new Map();
         if (!global.State.costMatrices) global.State.costMatrices = new Map();
         if (!global.State.roomHashes) global.State.roomHashes = new Map();
 
@@ -71,7 +71,7 @@ const CostMatrixCache = {
         eventBus.publish('INVALIDATE_COSTMATRIX', { roomName });
     },
     setDynamic: (roomName, costMatrix) => {
-        if (!global.State) global.State = {};
+        if (!global.State) global.State = new Map();
         if (!global.State.dynamicCostMatrices) global.State.dynamicCostMatrices = new Map();
 
         global.State.dynamicCostMatrices.set(roomName, costMatrix);
