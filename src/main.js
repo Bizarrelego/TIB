@@ -12,6 +12,7 @@ const garbageCollector = require('./os/garbageCollector');
 const Logger = require('./utils/logger');
 const IntentManager = require('./os/IntentManager');
 const VirtualLedger = require('./utils/VirtualLedger');
+const cpuBucketForecaster = require('./os/cpuBucketForecaster');
 
 module.exports.loop = function () {
     Logger.info(`--- Starting Tick ${Game.time} ---`);
@@ -89,4 +90,7 @@ module.exports.loop = function () {
 
     // Save caches state for reset recovery
     resetRecovery.saveState();
+
+    // Tick-level utilities
+    cpuBucketForecaster.update();
 };

@@ -2,6 +2,13 @@ const Profiler = require('../utils/profiler');
 const globalState = require('../state/globalState');
 const Logger = require('../utils/logger');
 const { executeManager } = require('../utils/errorHandler');
+const defconManager = require('../colonies/defconManager');
+const interShardMemoryManager = require('../os/interShardMemoryManager');
+const RawMemoryManager = require('../os/RawMemoryManager');
+const { PipelineLock } = require('../os/PipelineLock');
+const memoryProxy = require('../os/memoryProxy');
+const VirtualLedger = require('../utils/VirtualLedger');
+const roomHasher = require('../os/roomHasher');
 const { wrapModuleFunctions } = require('../utils/moduleWrapper');
 
 // Phase Managers
@@ -171,6 +178,14 @@ function runPhase(phase, throttlerFlags = {}) {
                 executeManager('stateScanner', () => { if (stateScanner) stateScanner(); });
                 executeManager('globalState.scan', () => { if (globalState && globalState.scan) globalState.scan(); });
 
+                executeManager('roomHasher', () => {
+                    if (global.State && global.State.rooms) {
+                        for (const roomName of global.State.rooms.keys()) {
+                            roomHasher.generate(roomName);
+                        }
+                    }
+                });
+
                 executeManager('EnergyRequestManager', () => {
                     const energyRequestManager = globalState.getManager('EnergyRequestManager');
                     if (energyRequestManager && energyRequestManager.handleSourceSleep) {
@@ -183,7 +198,9 @@ function runPhase(phase, throttlerFlags = {}) {
         case 3:
             Logger.debug('Phase 3: Colonies');
             if (!skipColonies) {
+                executeManager('ledgerReset', () => { VirtualLedger.clear(); });
                 executeManager('colonyManager', () => { if (colonyManager) colonyManager(); });
+                executeManager('defconManager', () => { if (global.State && global.State.rooms) { for (const room of global.State.rooms.values()) { defconManager.run(room); } } });
             }
 
             if (global.State && global.State.rooms) {
@@ -218,17 +235,22 @@ function runPhase(phase, throttlerFlags = {}) {
             if (!skipOperations) {
                 Logger.debug('Phase 4: Running Operations');
                 executeManager('operationsManager', () => { if (operationsManager) operationsManager(); });
+                executeManager('interShardMemoryManager', () => { if (interShardMemoryManager && typeof interShardMemoryManager._loadLocal === 'function') { interShardMemoryManager._loadLocal(); } });
+                executeManager('RawMemoryManager.init', () => { if (RawMemoryManager && typeof RawMemoryManager.init === 'function') { RawMemoryManager.init(); } });
             }
             break;
 
         case 5:
             Logger.debug('Phase 5: Running Traffic Control');
             executeManager('trafficManager.run', () => { if (trafficManager && trafficManager.run) trafficManager.run(); });
+            executeManager('PipelineLock.clear', () => { const lock = new PipelineLock(); lock.clear(); });
             break;
 
         case 6:
             Logger.debug('Phase 6: Executing Intents & Sleep');
             executeManager('trafficManager.executeIntents', () => { if (trafficManager && trafficManager.executeIntents) trafficManager.executeIntents(); });
+
+            executeManager('memoryProxy.serialize', () => { if (memoryProxy && typeof memoryProxy.serialize === 'function') { memoryProxy.serialize(); } });
 
             if (Game.cpu.bucket > 5000 && VisualsManager && typeof VisualsManager.run === 'function') {
                 executeManager('VisualsManager', () => VisualsManager.run());

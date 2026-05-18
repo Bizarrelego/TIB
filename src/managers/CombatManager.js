@@ -1,5 +1,7 @@
 const movement = require('../utils/movement');
 const Profiler = require('../utils/profiler');
+const CombatTacticsEngine = require('../utils/CombatTacticsEngine');
+const { isFatigued } = require('../utils/fatigueGating');
 
 /**
  * @file CombatManager.js
@@ -17,7 +19,7 @@ class CombatManager {
      * @returns {boolean} True if kiting action was taken
      */
     static kite(creep, hostiles) {
-        if (creep.fatigue > 0 || !hostiles || hostiles.length === 0) return false;
+        if (isFatigued(creep) || !hostiles || hostiles.length === 0) return false;
 
         let totalFleeX = 0;
         let totalFleeY = 0;
@@ -87,37 +89,15 @@ class CombatManager {
      * @returns {number} The calculated incoming damage
      */
     static predictivePreHeal(creep, enemyTowers, enemyCreeps) {
-        // Simple heuristic: if we are within 5 tiles of a tower, or taking damage, pre-heal.
-        // Advanced logic would track incoming damage vectors.
-        let incomingDamage = 0;
-
-        if (enemyTowers) {
-            for (const tower of enemyTowers) {
-                if (creep.pos.getRangeTo(tower) <= 15) { // Assuming tower will likely target this creep if close
-                    incomingDamage += 600; // Max tower damage at close range
-                }
+        const intents = CombatTacticsEngine.predictiveHeal([creep], creep, 0);
+        if (intents && intents.length > 0) {
+            for (const intent of intents) {
+                if (intent.action === 'heal') creep.heal(Game.getObjectById(intent.target));
+                else if (intent.action === 'rangedHeal') creep.rangedHeal(Game.getObjectById(intent.target));
+                else if (intent.action === 'move') creep.moveTo(intent.target);
             }
         }
-
-        if (enemyCreeps) {
-            for (const hostile of enemyCreeps) {
-                let isDangerous = true;
-                if (global.State && global.State.enemyProfiles && global.State.enemyProfiles.has(hostile.id)) {
-                    isDangerous = global.State.enemyProfiles.get(hostile.id).isDangerous;
-                }
-                if (isDangerous) {
-                    if (creep.pos.getRangeTo(hostile) <= 3) {
-                        incomingDamage += 100; // Estimate
-                    }
-                }
-            }
-        }
-
-        if (incomingDamage > 0 || creep.hits < creep.hitsMax) {
-            creep.heal(creep);
-        }
-
-        return incomingDamage;
+        return 0;
     }
 
     /**
@@ -137,14 +117,13 @@ class CombatManager {
      */
     static synchronizedBurst(attackers, target) {
         if (!attackers || attackers.length === 0 || !target) return;
-
-        // Ensure all are in range 3
-        const allInRange = attackers.every(attacker => attacker.pos.getRangeTo(target) <= 3);
-
-        if (allInRange) {
-            for (const attacker of attackers) {
-                attacker.rangedAttack(target);
-            }
+        const intents = CombatTacticsEngine.planBurstFire(attackers, target);
+        for (const intent of intents) {
+            const attacker = Game.creeps[intent.creep];
+            if (!attacker) continue;
+            if (intent.action === 'attack') attacker.attack(target);
+            else if (intent.action === 'rangedAttack') attacker.rangedAttack(target);
+            else if (intent.action === 'move') movement.moveTo(attacker, intent.target);
         }
     }
 
@@ -154,7 +133,7 @@ class CombatManager {
      * @param {string} retreatRoomName
      */
     static borderBounce(creep, retreatRoomName) {
-        if (creep.fatigue > 0) return;
+        if (isFatigued(creep)) return;
         
         if (!global.State) global.State = new Map();
         if (!global.State.retreatPosCache) global.State.retreatPosCache = new Map();
