@@ -23,16 +23,9 @@ module.exports = {
 
         if (!global.State.activeQuads) return;
 
-        // Collect enemy towers for predictive healing
         const roomStructures = global.State.structuresByRoom ? global.State.structuresByRoom.get(room.name) || new Map() : new Map();
         const towers = roomStructures.get(STRUCTURE_TOWER) || [];
-        const enemyTowers = [];
-        for (let i = 0; i < towers.length; i++) {
-            if (!towers[i].my) {
-                enemyTowers.push(towers[i]);
-            }
-        }
-
+        const enemyTowers = towers.filter(t => !t.my);
         const hostiles = global.State.hostilesByRoom ? global.State.hostilesByRoom.get(room.name) || [] : [];
 
         for (const creep of quadHealers) {
@@ -54,30 +47,8 @@ module.exports = {
 
                 // Prioritize healing based on actual damage and predictive incoming damage
                 for (const member of myQuadObj.creeps) {
-                    // Check for damage and predict incoming tower/hostile damage
-                    let expectedDamage = 0;
-
-                    if (enemyTowers) {
-                        for (const tower of enemyTowers) {
-                            if (member.pos.getRangeTo(tower) <= 15) { // Assuming tower will likely target this creep if close
-                                expectedDamage += 600; // Max tower damage at close range
-                            }
-                        }
-                    }
-
-                    if (hostiles) {
-                        for (const hostile of hostiles) {
-                            let isDangerous = true;
-                            if (global.State && global.State.enemyProfiles && global.State.enemyProfiles.has(hostile.id)) {
-                                isDangerous = global.State.enemyProfiles.get(hostile.id).isDangerous;
-                            }
-                            if (isDangerous) {
-                                if (member.pos.getRangeTo(hostile) <= 3) {
-                                    expectedDamage += 100; // Estimate
-                                }
-                            }
-                        }
-                    }
+                    // Delegate expected damage heuristic to CombatManager
+                    let expectedDamage = CombatManager.predictivePreHeal(member, enemyTowers, hostiles);
 
                     // Add current missing health to the weight
                     expectedDamage += (member.hitsMax - member.hits);
