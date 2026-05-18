@@ -11,9 +11,6 @@ module.exports = {
         if (!workers || workers.length === 0) return;
 
         let sources = global.State.sourcesByRoom.get(room.name) || [];
-        if (!sources || sources.length === 0) {
-            sources = room.find(FIND_SOURCES);
-        }
 
         const structures = global.State.structuresByRoom.get(room.name);
         const sites = global.State.sitesByRoom.get(room.name);
