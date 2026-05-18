@@ -89,6 +89,28 @@ class GlobalStateManager {
     scan() {
         // Tick slicing state scanner entry point
     }
+
+    clear() {
+        this.heapCache.clear();
+        this.managers.clear();
+        this.creepsByRole.clear();
+        this.creepsByRoom.clear();
+        this.structuresByRoom.clear();
+        this.hostilesByRoom.clear();
+        this.logisticsByRoom.clear();
+        this.creepLookup.clear();
+        this.sourcesByRoom.clear();
+        this.spawnsByRoom.clear();
+        this.controllersByRoom.clear();
+        this.sitesByRoom.clear();
+        this.mineralsByRoom.clear();
+
+        if (this.scannedRooms) this.scannedRooms.clear();
+        if (this.rooms) this.rooms.clear();
+        if (this.eventCache) this.eventCache.clear();
+
+        this.isRehydrated = false;
+    }
 }
 
 module.exports = new GlobalStateManager();

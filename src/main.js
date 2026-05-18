@@ -19,6 +19,15 @@ module.exports.loop = function () {
 
     Logger.debug('Phase 1: OS Init & Cache');
 
+    // Respawn Detection & Cache Invalidation
+    if (!Memory.os_initialized) {
+        Logger.info('Respawn detected or first execution. Invalidating cache.');
+        global.Cache = {};
+        globalState.clear();
+        global.State = globalState;
+        Memory.os_initialized = true;
+    }
+
     // Install memory proxy to bind heap to Creep prototypes
     installMemoryProxy();
 
