@@ -1,8 +1,8 @@
 /**
- * @file RoomVisualsManager.js
+ * @file VisualsManager.js
  * @description Manager for handling room visuals (e.g., debug drawings, metrics).
  */
-class RoomVisualsManager {
+class VisualsManager {
     /**
      * Executes the room visuals logic.
      */
@@ -11,4 +11,4 @@ class RoomVisualsManager {
     }
 }
 
-module.exports = RoomVisualsManager;
+module.exports = VisualsManager;

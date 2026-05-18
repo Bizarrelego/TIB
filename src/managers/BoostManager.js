@@ -1,8 +1,8 @@
 /**
- * @file BoostingManager.js
+ * @file BoostManager.js
  * @description Manager for handling creep boosting logic using labs.
  */
-class BoostingManager {
+class BoostManager {
     /**
      * Executes the boosting logic for a specific room.
      * @param {Room} room - The room object.
@@ -12,4 +12,4 @@ class BoostingManager {
     }
 }
 
-module.exports = BoostingManager;
+module.exports = BoostManager;
