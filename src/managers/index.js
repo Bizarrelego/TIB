@@ -17,8 +17,8 @@ const TowerManager = require('./TowerManager');
 const UpgraderManager = require('./UpgraderManager');
 const workerManager = require('./workerManager');
 const QuadSquadManager = require('./QuadSquadManager');
-const BoostingManager = require('./BoostingManager');
-const RoomVisualsManager = require('./RoomVisualsManager');
+const BoostManager = require('./BoostManager');
+const VisualsManager = require('./VisualsManager');
 
 const managers = {
     CombatManager,
@@ -40,8 +40,8 @@ const managers = {
     workerManager,
     QuadSquadManager,
     LogisticsManager,
-    BoostingManager,
-    RoomVisualsManager
+    BoostManager,
+    VisualsManager
 };
 
 module.exports = {

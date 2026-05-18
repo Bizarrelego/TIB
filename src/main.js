@@ -11,7 +11,6 @@ const garbageCollector = require('./os/garbageCollector');
 const Logger = require('./utils/logger');
 const IntentManager = require('./os/IntentManager');
 const VirtualLedger = require('./utils/VirtualLedger');
-const RoomVisualsManager = require('./managers/RoomVisualsManager');
 
 module.exports.loop = function () {
     Logger.info(`--- Starting Tick ${Game.time} ---`);
@@ -83,10 +82,6 @@ module.exports.loop = function () {
 
     // Profiler output
     Profiler.report();
-
-    if (Game.cpu.bucket > 5000 && RoomVisualsManager && typeof RoomVisualsManager.run === 'function') {
-        RoomVisualsManager.run();
-    }
 
     // Save caches state for reset recovery
     resetRecovery.saveState();

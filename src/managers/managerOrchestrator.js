@@ -11,7 +11,8 @@ const stateScanner = require('../state/stateScanner');
 const colonyManager = require('../colonies/colonyManager');
 const spawnManager = require('../colonies/spawnManager');
 const SpawnLedger = require('../colonies/spawnLedger');
-const BoostingManager = require('./BoostingManager');
+const BoostManager = require('./BoostManager');
+const VisualsManager = require('./VisualsManager');
 const planner = require('../colonies/planner');
 const RoleManager = require('../colonies/RoleManager');
 const operationsManager = require('../operations/operationsManager');
@@ -192,8 +193,8 @@ function runPhase(phase, throttlerFlags = {}) {
                             const ledger = new SpawnLedger(room);
                             executeManager('spawnManager', () => spawnManager.run(room, ledger));
                         }
-                        if (room.controller && room.controller.my && BoostingManager && typeof BoostingManager.run === 'function') {
-                            executeManager('BoostingManager', () => BoostingManager.run(room));
+                        if (room.controller && room.controller.my && BoostManager && typeof BoostManager.run === 'function') {
+                            executeManager('BoostManager', () => BoostManager.run(room));
                         }
                     }
                 }
@@ -228,6 +229,10 @@ function runPhase(phase, throttlerFlags = {}) {
         case 6:
             Logger.debug('Phase 6: Executing Intents & Sleep');
             executeManager('trafficManager.executeIntents', () => { if (trafficManager && trafficManager.executeIntents) trafficManager.executeIntents(); });
+
+            if (Game.cpu.bucket > 5000 && VisualsManager && typeof VisualsManager.run === 'function') {
+                executeManager('VisualsManager', () => VisualsManager.run());
+            }
             break;
     }
 }
