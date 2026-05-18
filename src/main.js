@@ -22,7 +22,7 @@ module.exports.loop = function () {
     // Respawn Detection & Cache Invalidation
     if (!Memory.os_initialized) {
         Logger.info('Respawn detected or first execution. Invalidating cache.');
-        global.Cache = {};
+        global.Cache = new Map();
         globalState.clear();
         global.State = globalState;
         Memory.os_initialized = true;
