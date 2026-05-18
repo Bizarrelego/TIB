@@ -45,21 +45,15 @@ module.exports = function discoveryManager() {
         };
     }
 
-    // Populate global.State.scannedRooms for all visible rooms to ensure zero native polling for all logic
-    for (const roomName in Game.rooms) {
-        state.scannedRooms.add(roomName);
-    }
-
     // Initial Room Scan for Scanned Rooms
     for (const roomName in Game.rooms) {
         const room = Game.rooms[roomName];
 
-        if (state.scannedRooms.has(roomName)) {
-            // Only run the heavy native polling if the room isn't already initialized in State
-            if (!state.structuresByRoom.has(roomName)) {
-                state.rooms.set(roomName, room);
-                // Cache event log to establish baseline during init. Should not be polled here after init.
-                state.eventCache.set(roomName, room.getEventLog());
+        // Only run the heavy native polling if the room isn't already scanned
+        if (!state.scannedRooms.has(roomName)) {
+            state.rooms.set(roomName, room);
+            // Cache event log to establish baseline during init. Should not be polled here after init.
+            state.eventCache.set(roomName, room.getEventLog());
 
                 // Populate structuresByRoom and structureCache
                 const roomStructures = new Map();
@@ -126,12 +120,12 @@ module.exports = function discoveryManager() {
                 state.sourceWalkableTiles.set(roomName, walkableTilesMap);
 
                 state.hostilesByRoom.set(roomName, new Map());
-                state.nukesByRoom.set(roomName, room.find(FIND_NUKES));
+
+                state.scannedRooms.add(roomName);
             }
 
-            if (!state.logisticsByRoom.has(roomName)) {
-                state.logisticsByRoom.set(roomName, new Map());
-            }
+        if (!state.logisticsByRoom.has(roomName)) {
+            state.logisticsByRoom.set(roomName, new Map());
         }
     }
 
