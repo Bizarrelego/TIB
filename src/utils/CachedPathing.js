@@ -73,12 +73,9 @@ function deserializePath(serializedPath) {
 }
 
 /**
- * Initializes the path caching structures in Memory and global.Cache if they don't exist.
+ * Initializes the path caching structures in global.Cache if they don't exist.
  */
 function initCaches() {
-    if (!Memory.pathCache) {
-        Memory.pathCache = {};
-    }
     if (global.Cache && !global.Cache.has('pathing')) {
         global.Cache.set('pathing', new Map());
     }
@@ -97,14 +94,7 @@ function storePath(startPos, endPos, path, opts = {}) {
     initCaches();
 
     const key = getCacheKey(startPos, endPos, opts);
-    const serialized = serializePath(path);
     const length = path.length;
-
-    const cacheObject = {
-        path: serialized,
-        length: length,
-        tick: Game.time
-    };
 
     // Store in global.Cache for O(1) in-memory retrieval
     if (global.Cache && global.Cache.has('pathing')) {
@@ -114,9 +104,6 @@ function storePath(startPos, endPos, path, opts = {}) {
             tick: Game.time
         });
     }
-
-    // Store in Memory for persistence
-    Memory.pathCache[key] = cacheObject;
 }
 
 /**
@@ -137,23 +124,6 @@ function getPath(startPos, endPos, opts = {}) {
         if (cacheMap.has(key)) {
             return cacheMap.get(key).pathArray;
         }
-    }
-
-    // Fallback to Memory
-    if (Memory.pathCache && Memory.pathCache[key]) {
-        const cachedData = Memory.pathCache[key];
-        const deserializedPath = deserializePath(cachedData.path);
-
-        // Populate global.Cache with deserialized path for future use
-        if (global.Cache && global.Cache.has('pathing')) {
-            global.Cache.get('pathing').set(key, {
-                pathArray: deserializedPath,
-                length: cachedData.length,
-                tick: cachedData.tick
-            });
-        }
-
-        return deserializedPath;
     }
 
     // No cached path found, calculate a new one
@@ -218,11 +188,6 @@ function getPathLength(startPos, endPos, opts = {}) {
         if (cacheMap.has(key)) {
             return cacheMap.get(key).length;
         }
-    }
-
-    // Fallback to Memory
-    if (Memory.pathCache && Memory.pathCache[key]) {
-        return Memory.pathCache[key].length;
     }
 
     // Path not cached, calculate it
