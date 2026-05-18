@@ -68,16 +68,22 @@ module.exports = {
                 // Zero-Pathing Drop Mining
                 if (creep.store.getUsedCapacity() > 0) {
                     let hasLink = false;
-                    const structures = room.lookForAtArea(LOOK_STRUCTURES, creep.pos.y - 1, creep.pos.x - 1, creep.pos.y + 1, creep.pos.x + 1, true);
-                    for (let j = 0; j < structures.length; j++) {
-                        if (structures[j].structure.structureType === STRUCTURE_LINK) {
-                            if (TrafficManager.registerTransfer) {
-                                TrafficManager.registerTransfer(creep, structures[j].structure, RESOURCE_ENERGY);
-                            } else {
-                                creep.transfer(structures[j].structure, RESOURCE_ENERGY);
+
+                    const structuresByRoom = global.State.structuresByRoom ? global.State.structuresByRoom.get(room.name) : null;
+                    if (structuresByRoom) {
+                        const links = structuresByRoom.get(STRUCTURE_LINK);
+                        if (links) {
+                            for (const link of links.values()) {
+                                if (Math.max(Math.abs(link.pos.x - creep.pos.x), Math.abs(link.pos.y - creep.pos.y)) <= 1) {
+                                    if (TrafficManager.registerTransfer) {
+                                        TrafficManager.registerTransfer(creep, link, RESOURCE_ENERGY);
+                                    } else {
+                                        creep.transfer(link, RESOURCE_ENERGY);
+                                    }
+                                    hasLink = true;
+                                    break;
+                                }
                             }
-                            hasLink = true;
-                            break;
                         }
                     }
 
