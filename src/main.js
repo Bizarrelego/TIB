@@ -1,6 +1,7 @@
 const { CacheRegistry } = require('./os/cache');
 const resetRecovery = require('./os/resetRecovery');
 const RawMemoryManager = require('./os/RawMemoryManager');
+const heapValidator = require('./os/heapValidator');
 const installMemoryProxy = require('./os/memoryProxy');
 const globalState = require('./state/globalState');
 const managersIntegration = require('./managers/index');
@@ -53,6 +54,9 @@ module.exports.loop = function () {
 
     // Attempt global reset recovery
     resetRecovery.checkAndRecover();
+
+    // Validate heap integrity after caching and recovery
+    heapValidator.validate();
 
     // TrafficManager setup before intents are registered
     try {
