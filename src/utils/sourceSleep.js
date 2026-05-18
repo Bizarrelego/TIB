@@ -13,7 +13,7 @@ const sourceSleep = {
     isSleeping(source) {
         if (!source) return false;
 
-        if (!global.State) global.State = {};
+        if (!global.State) global.State = new Map();
         if (!global.State.sourcesCache) global.State.sourcesCache = new Map();
 
         let sourceCache = global.State.sourcesCache.get(source.id);

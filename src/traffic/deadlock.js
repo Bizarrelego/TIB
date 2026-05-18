@@ -48,7 +48,7 @@ const DeadlockEngine = {
         if (!cycle || cycle.length === 0) return;
 
         if (cycle.length === 2) {
-            if (!global.State) global.State = {};
+            if (!global.State) global.State = new Map();
             if (!global.State.swapRegistry) global.State.swapRegistry = new Map();
             global.State.swapRegistry.set(cycle[0], cycle[1]);
             global.State.swapRegistry.set(cycle[1], cycle[0]);

@@ -156,7 +156,7 @@ class CombatManager {
     static borderBounce(creep, retreatRoomName) {
         if (creep.fatigue > 0) return;
         
-        if (!global.State) global.State = {};
+        if (!global.State) global.State = new Map();
         if (!global.State.retreatPosCache) global.State.retreatPosCache = new Map();
         
         let retreatPos = global.State.retreatPosCache.get(retreatRoomName);

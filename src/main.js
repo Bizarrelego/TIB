@@ -31,7 +31,7 @@ module.exports.loop = function () {
     globalState.rehydrate();
 
     if (!global.State) {
-        global.State = {};
+        global.State = new Map();
     }
     if (!global.State.intentManager) {
         global.State.intentManager = new IntentManager();

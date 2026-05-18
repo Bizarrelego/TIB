@@ -10,7 +10,7 @@ class PreSpawnManager {
      * Initializes the global pre-spawn ledger if it doesn't exist.
      */
     static initLedger() {
-        if (!global.State) global.State = {};
+        if (!global.State) global.State = new Map();
         if (!global.State.preSpawnLedger) {
             global.State.preSpawnLedger = new Map();
         }

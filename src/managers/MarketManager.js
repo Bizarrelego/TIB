@@ -11,7 +11,7 @@ class MarketManager {
     static run(room) {
         if (Game.cpu.bucket < 2000) return; // CPU Throttling
 
-        if (!global.State) global.State = {};
+        if (!global.State) global.State = new Map();
         if (!global.State.marketOrders) global.State.marketOrders = new Map();
 
         // Throttle API calls to every 50 ticks
@@ -84,7 +84,7 @@ class MarketManager {
 
             // In a real implementation, prevEma would be fetched from Memory/Heap.
             // For now, we will just use the current average as the baseline if we don't have history.
-            if (!global.State) global.State = {};
+            if (!global.State) global.State = new Map();
             if (!global.State.marketEMA) global.State.marketEMA = new Map();
 
             const prevEma = global.State.marketEMA.get(resourceType) || currentAvgPrice;

@@ -17,7 +17,7 @@ const TrafficManager = {
      * Initializes global state only if missing to support hot-reloads/rehydration.
      */
     init() {
-        if (!global.State) global.State = {};
+        if (!global.State) global.State = new Map();
         if (!(global.State.trafficIntents instanceof Map)) global.State.trafficIntents = new Map();
         if (!(global.State.ledger instanceof Map)) global.State.ledger = new Map();
         if (!(global.State.swapRegistry instanceof Map)) global.State.swapRegistry = new Map();
@@ -333,7 +333,7 @@ const TrafficManager = {
      */
     registerMoveIntent(creep, targetPos, opts = {}) {
         if (!creep || creep.fatigue > 0) return;
-        if (!global.State) global.State = {};
+        if (!global.State) global.State = new Map();
         if (!(global.State.trafficIntents instanceof Map)) global.State.trafficIntents = new Map();
 
         global.State.trafficIntents.set(creep.name, {
