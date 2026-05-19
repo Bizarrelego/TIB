@@ -112,13 +112,16 @@ function runRoomManagers() {
         }
 
         // Initialize Process Table in Heap
-        if (!global.Cache) global.Cache = {};
-        if (!global.Cache.processes) global.Cache.processes = new Map();
+        if (!global.Cache) {
+            const { CacheRegistry } = require('../os/cache');
+            CacheRegistry.init();
+        }
+        if (!global.Cache.has('processes')) global.Cache.set('processes', new Map());
 
         for (const config of managersConfig) {
             // Process Scheduler (OS Sleep/Wake)
             const processId = `${room.name}_${config.name}`;
-            const process = global.Cache.processes.get(processId);
+            const process = global.Cache.get('processes').get(processId);
 
             if (process && process.wakeTick && Game.time < process.wakeTick) {
                 continue; // Process is asleep, drop idle execution cost to 0
@@ -131,7 +134,7 @@ function runRoomManagers() {
             if (manager && typeof manager.run === 'function') {
                 // Ensure process object exists for the manager to modify its own wakeTick
                 if (!process) {
-                    global.Cache.processes.set(processId, { id: processId });
+                    global.Cache.get('processes').set(processId, { id: processId });
                 }
                 // Ensure the manager's methods are wrapped by the error handler
                 if (!manager.__errorWrapped) {
@@ -157,7 +160,7 @@ function runRoomManagers() {
                 }
 
                 // Call directly since wrapModuleFunctions provides the error boundary now
-                manager.run(room, global.Cache.processes.get(processId));
+                manager.run(room, global.Cache.get('processes').get(processId));
 
                 if (profilerEnabled) {
                     const endCpu = cpuAvailable ? Game.cpu.getUsed() : Date.now();

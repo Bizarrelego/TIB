@@ -25,6 +25,7 @@ module.exports = function discoveryManager() {
     if (!state.ruinsByRoom) state.ruinsByRoom = new Map();
     if (!state.nukesByRoom) state.nukesByRoom = new Map();
     if (!state.roomTerrain) state.roomTerrain = new Map();
+    if (!state.roomExits) state.roomExits = new Map();
     if (!state.sourceWalkableTiles) state.sourceWalkableTiles = new Map();
     
     if (!state.getEvents) {
@@ -120,6 +121,17 @@ module.exports = function discoveryManager() {
                 state.sourceWalkableTiles.set(roomName, walkableTilesMap);
 
                 state.hostilesByRoom.set(roomName, new Map());
+
+                // Cache room exits
+                const roomExitsMap = new Map();
+                const exitDirs = [FIND_EXIT_TOP, FIND_EXIT_RIGHT, FIND_EXIT_BOTTOM, FIND_EXIT_LEFT];
+                for (let i = 0; i < exitDirs.length; i++) {
+                    const exits = room.find(exitDirs[i]);
+                    if (exits.length > 0) {
+                        roomExitsMap.set(exitDirs[i], exits);
+                    }
+                }
+                state.roomExits.set(roomName, roomExitsMap);
 
                 state.scannedRooms.add(roomName);
             }
