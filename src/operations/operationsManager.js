@@ -5,6 +5,7 @@ const offenseManager = require('./offense');
 const scoutManager = require('./scoutManager');
 const skOperationsManager = require('./skOperations');
 const HarassmentManager = require('./HarassmentManager');
+const powerOperationsManager = require('./powerOperations');
 const PowerSpawnManager = require('../managers/PowerSpawnManager');
 
 /**
@@ -19,6 +20,7 @@ module.exports = Profiler.wrap('operationsManager', function operationsManager()
         offenseManager();
         skOperationsManager();
         HarassmentManager();
+        powerOperationsManager();
 
         if (global.State && global.State.rooms) {
             for (const room of global.State.rooms.values()) {

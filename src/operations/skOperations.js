@@ -35,162 +35,93 @@ function runSKOperations() {
 
     for (const roomName of global.State.scannedRooms) {
         const roomType = getRoomType(roomName);
-        if (roomType !== 'sk' && roomType !== 'highway') continue;
+        if (roomType !== 'sk') continue;
 
-        if (roomType === 'highway') {
-            const roomStructures = global.State.structuresByRoom.get(roomName) || new Map();
-            const powerBanks = roomStructures.get(STRUCTURE_POWER_BANK);
+        const roomStructures = global.State.structuresByRoom.get(roomName) || new Map();
+        const lairs = roomStructures.get(STRUCTURE_KEEPER_LAIR) || new Map();
 
-            if (powerBanks) {
-                const banksArray = powerBanks instanceof Map ? Array.from(powerBanks.values()) : powerBanks;
-                for (const powerBank of banksArray) {
-                    if (Game.time % 50 !== 0) continue;
+        let roomLairsHeap = global.State.skLairsHeap.get(roomName);
+        if (!roomLairsHeap) {
+            roomLairsHeap = new Map();
+            global.State.skLairsHeap.set(roomName, roomLairsHeap);
+        }
 
-                    let closestRoomName = null;
-                    let minDistance = Infinity;
+        if (lairs instanceof Map) {
+            for (const [id, lair] of lairs.entries()) {
+                roomLairsHeap.set(id, lair.ticksToSpawn || 0);
+            }
+        } else if (Array.isArray(lairs)) {
+            for (const lair of lairs) {
+                roomLairsHeap.set(lair.id, lair.ticksToSpawn || 0);
+            }
+        }
 
-                    if (global.State.rooms) {
-                        for (const [baseName, baseRoom] of global.State.rooms.entries()) {
-                            if (baseRoom.controller && baseRoom.controller.my && baseRoom.energyCapacityAvailable >= 4000) {
-                                const dist = Game.map.getRoomLinearDistance(baseName, roomName);
-                                if (dist < minDistance) {
-                                    minDistance = dist;
-                                    closestRoomName = baseName;
-                                }
-                            }
-                        }
-                    }
+        if (Game.time % 50 !== 0) continue;
 
-                    if (!closestRoomName) continue;
+        let closestRoomName = null;
+        let minDistance = Infinity;
 
-                    const dist = Game.map.getRoomLinearDistance(closestRoomName, roomName);
-
-                    let assignedCapacity = 0;
-                    for (const creepsByRole of global.State.creepsByRoom.values()) {
-                        const haulers = creepsByRole.get('powerHauler') || [];
-                        for (const h of haulers) {
-                            if (h.memory.targetRoom === roomName && h.memory.targetId === powerBank.id) {
-                                assignedCapacity += h.store.getCapacity();
-                            }
-                        }
-                    }
-
-                    const ticksToKill = powerBank.hits / 600;
-                    const travelTime = dist * 50;
-
-                    if (ticksToKill <= travelTime + 150 && assignedCapacity < powerBank.power) {
-                        const BodyCalc = require('../utils/bodyCalc');
-                        const body = BodyCalc.calculatePowerHauler(global.State.rooms.get(closestRoomName).energyCapacityAvailable, dist, powerBank.power - assignedCapacity);
-                        const cost = BodyCalc.getCost(body);
-                        SpawnQueueManager.requestSpawn(closestRoomName, 'powerHauler', body, 'pHaul_' + Game.time + '_' + Math.floor(Math.random() * 100), {
-                            memory: { role: 'powerHauler', colony: closestRoomName, targetRoom: roomName, homeRoom: closestRoomName, targetId: powerBank.id }
-                        }, cost);
+        if (global.State.rooms) {
+            for (const [baseName, baseRoom] of global.State.rooms.entries()) {
+                if (baseRoom.controller && baseRoom.controller.my && baseRoom.energyCapacityAvailable >= 4000) {
+                    const dist = Game.map.getRoomLinearDistance(baseName, roomName);
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        closestRoomName = baseName;
                     }
                 }
             }
         }
 
-        if (roomType === 'sk') {
-            const roomStructures = global.State.structuresByRoom.get(roomName) || new Map();
-            const lairs = roomStructures.get(STRUCTURE_KEEPER_LAIR) || new Map();
+        if (!closestRoomName) continue;
 
-            let roomLairsHeap = global.State.skLairsHeap.get(roomName);
-            if (!roomLairsHeap) {
-                roomLairsHeap = new Map();
-                global.State.skLairsHeap.set(roomName, roomLairsHeap);
-            }
-
-            if (lairs instanceof Map) {
-                for (const [id, lair] of lairs.entries()) {
-                    roomLairsHeap.set(id, lair.ticksToSpawn || 0);
-                }
-            } else if (Array.isArray(lairs)) {
-                for (const lair of lairs) {
-                    roomLairsHeap.set(lair.id, lair.ticksToSpawn || 0);
-                }
-            }
-
-            if (Game.time % 50 !== 0) continue;
-
-            let closestRoomName = null;
-            let minDistance = Infinity;
-
-            if (global.State.rooms) {
-                for (const [baseName, baseRoom] of global.State.rooms.entries()) {
-                    if (baseRoom.controller && baseRoom.controller.my && baseRoom.energyCapacityAvailable >= 4000) {
-                        const dist = Game.map.getRoomLinearDistance(baseName, roomName);
-                        if (dist < minDistance) {
-                            minDistance = dist;
-                            closestRoomName = baseName;
-                        }
-                    }
-                }
-            }
-
-            if (!closestRoomName) continue;
-
-            let skMinersCount = 0;
-            let skGuardsCount = 0;
-            let skHaulersCount = 0;
-
+        // Ensure we have SK mining ops queued
+        const BodyCalc = require('../utils/bodyCalc');
+        const roomSources = global.State.sourcesByRoom.get(roomName) || [];
+        for (const source of roomSources) {
+            let minerExists = false;
             for (const creepsByRole of global.State.creepsByRoom.values()) {
                 const miners = creepsByRole.get('skMiner') || [];
                 for (const m of miners) {
-                    if (m.memory.targetRoom === roomName) skMinersCount++;
-                }
-
-                const guards = creepsByRole.get('skGuard') || [];
-                for (const g of guards) {
-                    if (g.memory.targetRoom === roomName) skGuardsCount++;
-                }
-
-                const haulers = creepsByRole.get('skHauler') || [];
-                for (const h of haulers) {
-                    if (h.memory.targetRoom === roomName) skHaulersCount++;
+                    if (m.memory.targetRoom === roomName && m.memory.sourceId === source.id) minerExists = true;
                 }
             }
 
-            const sources = global.State.sourcesByRoom.get(roomName) || [];
-            const requiredMiners = sources.length;
-
-            if (skMinersCount < requiredMiners) {
-                const assignedSources = new Set();
-                for (const creepsByRole of global.State.creepsByRoom.values()) {
-                    const miners = creepsByRole.get('skMiner') || [];
-                    for (const m of miners) {
-                        if (m.memory.targetRoom === roomName && m.memory.targetSourceId) {
-                            assignedSources.add(m.memory.targetSourceId);
-                        }
-                    }
-                }
-
-                for (const source of sources) {
-                    if (!assignedSources.has(source.id)) {
-                        const body = [WORK, WORK, WORK, WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE, MOVE, MOVE];
-                        const cost = 1000;
-                        SpawnQueueManager.requestSpawn(closestRoomName, 'skMiner', body, 'skMiner_' + Game.time + '_' + Math.floor(Math.random() * 100), {
-                            memory: { role: 'skMiner', colony: closestRoomName, targetRoom: roomName, targetSourceId: source.id }
-                        }, cost);
-                        break;
-                    }
-                }
+            if (!minerExists && SpawnQueueManager.getQueuedCount(closestRoomName, 'skMiner', roomName) === 0) {
+                const body = BodyCalc.calculateRemoteMiner(global.State.rooms.get(closestRoomName).energyCapacityAvailable, 4000); // SK sources hold 4k
+                SpawnQueueManager.requestSpawn(closestRoomName, 'skMiner', body, 'skMiner_' + Game.time + '_' + Math.floor(Math.random() * 100), {
+                    memory: { role: 'skMiner', colony: closestRoomName, targetRoom: roomName, sourceId: source.id }
+                }, BodyCalc.getCost(body));
             }
+        }
 
-            if (skGuardsCount < 1) {
-                const guardBody = [MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, ATTACK, ATTACK, ATTACK, ATTACK, ATTACK, ATTACK, ATTACK, HEAL, HEAL, HEAL];
-                const guardCost = 1810;
-                SpawnQueueManager.requestSpawn(closestRoomName, 'skGuard', guardBody, 'skGuard_' + Game.time, {
-                    memory: { role: 'skGuard', colony: closestRoomName, targetRoom: roomName }
-                }, guardCost);
-            }
+        // Ensure SK Guard and Hauler
+        let guardExists = false;
+        let haulerExists = false;
 
-            if (skHaulersCount < 2) {
-                const haulerBody = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE];
-                const haulerCost = 1000;
-                SpawnQueueManager.requestSpawn(closestRoomName, 'skHauler', haulerBody, 'skHauler_' + Game.time + '_' + Math.floor(Math.random() * 100), {
-                    memory: { role: 'skHauler', colony: closestRoomName, targetRoom: roomName, homeRoom: closestRoomName }
-                }, haulerCost);
+        for (const creepsByRole of global.State.creepsByRoom.values()) {
+            const guards = creepsByRole.get('skGuard') || [];
+            for (const g of guards) {
+                if (g.memory.targetRoom === roomName) guardExists = true;
             }
+            const haulers = creepsByRole.get('skHauler') || [];
+            for (const h of haulers) {
+                if (h.memory.targetRoom === roomName) haulerExists = true;
+            }
+        }
+
+        if (!guardExists && SpawnQueueManager.getQueuedCount(closestRoomName, 'skGuard', roomName) === 0) {
+            const guardBody = [MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, ATTACK, ATTACK, ATTACK, ATTACK, ATTACK, ATTACK, ATTACK, ATTACK, HEAL, HEAL];
+            SpawnQueueManager.requestSpawn(closestRoomName, 'skGuard', guardBody, 'skGuard_' + Game.time, {
+                memory: { role: 'skGuard', colony: closestRoomName, targetRoom: roomName }
+            }, BodyCalc.getCost(guardBody));
+        }
+
+        if (!haulerExists && SpawnQueueManager.getQueuedCount(closestRoomName, 'skHauler', roomName) === 0) {
+            const haulerBody = BodyCalc.calculateHauler(global.State.rooms.get(closestRoomName).energyCapacityAvailable, Game.map.getRoomLinearDistance(closestRoomName, roomName), 10);
+            SpawnQueueManager.requestSpawn(closestRoomName, 'skHauler', haulerBody, 'skHauler_' + Game.time + '_' + Math.floor(Math.random() * 100), {
+                memory: { role: 'skHauler', colony: closestRoomName, targetRoom: roomName }
+            }, BodyCalc.getCost(haulerBody));
         }
     }
 }
