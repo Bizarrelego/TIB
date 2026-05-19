@@ -1,3 +1,6 @@
+const { DEFCON } = require('../constants/defcon');
+const defconManager = require('../colonies/defconManager');
+
 /**
  * Handles the operation of STRUCTURE_POWER_SPAWN structures.
  * Responsible for deciding when to process power, managing power resources,
@@ -11,6 +14,9 @@ class PowerSpawnManager {
     static run(room) {
         if (!room.controller || room.controller.level < 8) return;
         if (Game.cpu.bucket < 2000) return; // CPU Throttling
+
+        const defconLevel = defconManager.getDefconLevel(room.name);
+        if (defconLevel < DEFCON.CAUTION) return; // Pause power processing during high threat levels
 
         try {
             const structuresMap = global.State.structuresByRoom.get(room.name);

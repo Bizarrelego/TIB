@@ -5,6 +5,7 @@ const offenseManager = require('./offense');
 const scoutManager = require('./scoutManager');
 const skOperationsManager = require('./skOperations');
 const HarassmentManager = require('./HarassmentManager');
+const PowerSpawnManager = require('../managers/PowerSpawnManager');
 
 /**
  * The main entry point for the Operations module, acting as a high-level orchestrator.
@@ -18,6 +19,12 @@ module.exports = Profiler.wrap('operationsManager', function operationsManager()
         offenseManager();
         skOperationsManager();
         HarassmentManager();
+
+        if (global.State && global.State.rooms) {
+            for (const room of global.State.rooms.values()) {
+                PowerSpawnManager.run(room);
+            }
+        }
     } catch (e) {
         console.error(`[OperationsManager Main Error] ${e.stack}`);
     }

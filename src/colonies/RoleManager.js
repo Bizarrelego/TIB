@@ -19,6 +19,8 @@ const skGuard = require('../roles/skGuard');
 const decoy = require('../roles/decoy');
 const hubManager = require('../roles/hubManager');
 const reserver = require('../roles/reserver');
+const powerAttacker = require('../roles/powerAttacker');
+const powerHealer = require('../roles/powerHealer');
 
 class RoleManager {
     static runAll() {
@@ -32,6 +34,8 @@ class RoleManager {
                 hauler.run(room);
                 remoteHauler.run(room);
                 powerHauler.run(room);
+                powerAttacker.run(room);
+                powerHealer.run(room);
                 remoteHarvester.run(room);
                 skHauler.run(room);
                 skMiner.run(room);
