@@ -15,31 +15,33 @@ const CacheRegistry = {
             ['rooms', new Map()]
         ]);
 
-        // Event-Driven Hydration: Only trigger on StateScanner update events
-        eventBus.subscribe('INVALIDATE_COSTMATRIX', (data) => {
-            const roomName = typeof data === 'string' ? data : data.roomName;
+        // Prevent duplicate subscriptions on rehydration
+        if (!global.__cacheEventSubscribed) {
+            eventBus.subscribe('INVALIDATE_COSTMATRIX', (data) => {
+                const roomName = typeof data === 'string' ? data : data.roomName;
+                const newHash = RoomHasher.generate(roomName);
 
-            const newHash = RoomHasher.generate(roomName);
-
-            // Validate against cached hash
-            let currentHash = null;
-            if (global.State && global.State.roomHashes && global.State.roomHashes.has(roomName)) {
-                currentHash = global.State.roomHashes.get(roomName);
-            } else if (global.Cache && global.Cache.has('roomHashes') && global.Cache.get('roomHashes').has(roomName)) {
-                currentHash = global.Cache.get('roomHashes').get(roomName);
-            }
-
-            if (newHash !== currentHash) {
-                if (global.State && global.State.costMatrices) {
-                    global.State.costMatrices.delete(roomName);
+                // Validate against cached hash
+                let currentHash = null;
+                if (global.State && global.State.roomHashes && global.State.roomHashes.has(roomName)) {
+                    currentHash = global.State.roomHashes.get(roomName);
+                } else if (global.Cache && global.Cache.has('roomHashes') && global.Cache.get('roomHashes').has(roomName)) {
+                    currentHash = global.Cache.get('roomHashes').get(roomName);
                 }
-                if (global.Cache && global.Cache.has('costMatrices')) {
-                    const matrices = global.Cache.get('costMatrices');
-                    matrices.delete(roomName);
+
+                if (newHash !== currentHash) {
+                    if (global.State && global.State.costMatrices) {
+                        global.State.costMatrices.delete(roomName);
+                    }
+                    if (global.Cache && global.Cache.has('costMatrices')) {
+                        const matrices = global.Cache.get('costMatrices');
+                        matrices.delete(roomName);
+                    }
+                    CostMatrixCache.generate(roomName);
                 }
-                CostMatrixCache.generate(roomName);
-            }
-        });
+            });
+            global.__cacheEventSubscribed = true;
+        }
     },
     // Event-Driven Hydration: Only trigger on StateScanner update events
     hydrate: (key, dataMap) => {
