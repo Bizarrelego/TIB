@@ -236,9 +236,65 @@ function planBorderBounce(creep) {
     return [];
 }
 
+/**
+ * Plans Kiting away from dangerous hostiles. Returns an intent to move away
+ * if enemies are too close.
+ *
+ * @param {Creep} creep - The creep to plan kiting for.
+ * @param {Creep[]} hostiles - The array of hostiles in the room.
+ * @returns {CombatIntent[]} An array of recommended intents.
+ */
+function planKite(creep, hostiles) {
+    if (isFatigued(creep) || !hostiles || hostiles.length === 0) return [];
+
+    let totalFleeX = 0;
+    let totalFleeY = 0;
+    let dangerFound = false;
+
+    for (let i = 0; i < hostiles.length; i++) {
+        const hostile = hostiles[i];
+        let isDangerous = true;
+
+        if (global.State && global.State.enemyProfiles && global.State.enemyProfiles.has(hostile.id)) {
+            isDangerous = global.State.enemyProfiles.get(hostile.id).isDangerous;
+        }
+
+        if (isDangerous) {
+            const range = Math.max(
+                Math.abs(creep.pos.x - hostile.pos.x),
+                Math.abs(creep.pos.y - hostile.pos.y)
+            );
+
+            if (range <= 4) {
+                dangerFound = true;
+                const dx = creep.pos.x - hostile.pos.x;
+                const dy = creep.pos.y - hostile.pos.y;
+                const weight = 5 - range;
+
+                totalFleeX += (dx === 0 ? 0 : Math.sign(dx)) * weight;
+                totalFleeY += (dy === 0 ? 0 : Math.sign(dy)) * weight;
+            }
+        }
+    }
+
+    if (dangerFound) {
+        let targetX = creep.pos.x + totalFleeX;
+        let targetY = creep.pos.y + totalFleeY;
+
+        targetX = Math.max(1, Math.min(48, targetX));
+        targetY = Math.max(1, Math.min(48, targetY));
+
+        const fleePos = new RoomPosition(Math.floor(targetX), Math.floor(targetY), creep.pos.roomName);
+        return [{ creep: creep.name, action: 'flee', target: fleePos }];
+    }
+
+    return [];
+}
+
 module.exports = {
     planBurstFire,
     planRMA,
     predictiveHeal,
-    planBorderBounce
+    planBorderBounce,
+    planKite
 };
