@@ -135,6 +135,26 @@ module.exports = {
                         }
                     }
 
+                    if (global.State && global.State.creepsByRoom) {
+                        const roomCreeps = global.State.creepsByRoom.get(roomName);
+                        if (roomCreeps) {
+                            // Ensure array conversion per "V8 Map Optimization Constraint" memory entry
+                            const roleGroups = Array.from(roomCreeps.values());
+                            for (let r = 0; r < roleGroups.length; r++) {
+                                const roleCreeps = roleGroups[r];
+                                if (Array.isArray(roleCreeps)) {
+                                    for (let i = 0; i < roleCreeps.length; i++) {
+                                        const c = roleCreeps[i];
+                                        if (c && c.heap && c.heap.isStatic === true) {
+                                            if (returnMatrix === matrix) returnMatrix = returnMatrix.clone();
+                                            returnMatrix.set(c.pos.x, c.pos.y, 255);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     if (global.State.currentPositions) {
                         const roomPositions = global.State.currentPositions.get(roomName);
                         if (roomPositions) {

@@ -499,6 +499,10 @@ const TrafficManager = {
                                 }
                             }
 
+                            if (blockingLive && blockingLive.heap && blockingLive.heap.isStatic) {
+                                canSwap = false;
+                            }
+
                             if (canSwap) {
                                 const dir = creep.pos.getDirectionTo(intendedNextPos);
                                 if (dir) {
