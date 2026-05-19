@@ -66,17 +66,17 @@ function runPowerOperations() {
                 for (const creepsByRole of global.State.creepsByRoom.values()) {
                     const attackers = creepsByRole.get('powerAttacker') || [];
                     for (const a of attackers) {
-                        if (a.memory.targetRoom === roomName && a.memory.targetId === powerBank.id) attackersCount++;
+                        if (a.heap.targetRoom === roomName && a.heap.targetId === powerBank.id) attackersCount++;
                     }
 
                     const healers = creepsByRole.get('powerHealer') || [];
                     for (const h of healers) {
-                        if (h.memory.targetRoom === roomName && h.memory.targetId === powerBank.id) healersCount++;
+                        if (h.heap.targetRoom === roomName && h.heap.targetId === powerBank.id) healersCount++;
                     }
 
                     const haulers = creepsByRole.get('powerHauler') || [];
                     for (const h of haulers) {
-                        if (h.memory.targetRoom === roomName && h.memory.targetId === powerBank.id) {
+                        if (h.heap.targetRoom === roomName && h.heap.targetId === powerBank.id) {
                             assignedCapacity += h.store.getCapacity();
                         }
                     }
@@ -105,11 +105,11 @@ function runPowerOperations() {
                              const r = Math.floor(Math.random() * 100);
 
                              SpawnQueueManager.requestSpawn(closestRoomName, 'powerHealer', siegeCalc.healerBody, 'pHeal_' + time + '_' + r, {
-                                memory: { role: 'powerHealer', colony: closestRoomName, targetRoom: roomName, homeRoom: closestRoomName, targetId: powerBank.id }
+                                memory: { role: 'powerHealer', colony: closestRoomName }, heap: { targetRoom: roomName, homeRoom: closestRoomName, targetId: powerBank.id }
                              }, siegeCalc.healerCost);
 
                              SpawnQueueManager.requestSpawn(closestRoomName, 'powerAttacker', siegeCalc.attackerBody, 'pAtk_' + time + '_' + r, {
-                                memory: { role: 'powerAttacker', colony: closestRoomName, targetRoom: roomName, homeRoom: closestRoomName, targetId: powerBank.id }
+                                memory: { role: 'powerAttacker', colony: closestRoomName }, heap: { targetRoom: roomName, homeRoom: closestRoomName, targetId: powerBank.id }
                              }, siegeCalc.attackerCost);
                          }
                      }
@@ -125,7 +125,7 @@ function runPowerOperations() {
                     const body = BodyCalc.calculatePowerHauler(baseRoomObj.energyCapacityAvailable, dist, powerBank.power - assignedCapacity);
                     const cost = BodyCalc.getCost(body);
                     SpawnQueueManager.requestSpawn(closestRoomName, 'powerHauler', body, 'pHaul_' + Game.time + '_' + Math.floor(Math.random() * 100), {
-                        memory: { role: 'powerHauler', colony: closestRoomName, targetRoom: roomName, homeRoom: closestRoomName, targetId: powerBank.id }
+                        memory: { role: 'powerHauler', colony: closestRoomName }, heap: { targetRoom: roomName, homeRoom: closestRoomName, targetId: powerBank.id }
                     }, cost);
                 }
             }
