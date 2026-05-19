@@ -4,6 +4,7 @@
  */
 
 const resetRecovery = require('./resetRecovery');
+const { CacheRegistry } = require('./cache');
 
 class HeapValidator {
     /**
@@ -31,6 +32,8 @@ class HeapValidator {
         if (needsRehydration) {
             // Unset the reset detected flag so checkAndRecover will actually run and rehydrate
             global.__resetDetected = undefined;
+            // Build the Map infrastructure FIRST
+            CacheRegistry.init();
             resetRecovery.checkAndRecover();
         }
     }

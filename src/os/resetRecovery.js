@@ -9,15 +9,19 @@ class ResetRecovery {
                     const parsed = JSON.parse(Memory._recoveryCache);
                     if (global.Cache) {
                         const targets = ['structures', 'creeps', 'sources'];
+                        let rehydrated = false;
                         for (const target of targets) {
                             if (parsed[target] && global.Cache.has(target)) {
                                 const targetMap = global.Cache.get(target);
                                 for (const key in parsed[target]) {
                                     targetMap.set(key, parsed[target][key]);
                                 }
+                                rehydrated = true;
                             }
                         }
-                        console.log(`[ResetRecovery] Successfully rehydrated ID dictionaries.`);
+                        if (rehydrated) {
+                            console.log(`[ResetRecovery] Successfully rehydrated ID dictionaries.`);
+                        }
                     }
                 } catch (e) {
                     console.log(`[ResetRecovery] Failed to parse recovery cache data: ${e.message}`);
