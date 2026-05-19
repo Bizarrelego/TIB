@@ -40,6 +40,7 @@ module.exports = {
 
                 if (state === 'harvest') {
                     if (creep.pos.isNearTo(target)) {
+                        TrafficManager.setStatic(creep);
                         const status = TrafficManager.registerHarvest(creep, target);
                         if (status === ERR_NOT_ENOUGH_RESOURCES) {
                             creep.heap.targetId = null;
@@ -132,15 +133,19 @@ module.exports = {
                 } else if (state === 'build') {
                     if (creep.build(target) === ERR_NOT_IN_RANGE) {
                         movement.moveTo(creep, target);
+                    } else {
+                        TrafficManager.setStatic(creep);
                     }
                 } else if (state === 'upgrade') {
                     if (creep.pos.getRangeTo(target) <= 3) {
+                        TrafficManager.setStatic(creep);
                         creep.upgradeController(target);
                     } else {
                         movement.moveTo(creep, target, { range: 1 });
                     }
                 } else if (state === 'repair') {
                     if (creep.pos.getRangeTo(target) <= 3) {
+                        TrafficManager.setStatic(creep);
                         creep.repair(target);
                     } else {
                         movement.moveTo(creep, target);

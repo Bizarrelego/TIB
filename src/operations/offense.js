@@ -45,7 +45,8 @@ function runHarassment() {
         if (hunter.room.name !== targetRoomName) {
             hunter.moveTo(new RoomPosition(25, 25, targetRoomName));
         } else {
-            const hostiles = global.State.hostilesByRoom.get(targetRoomName) || [];
+                const hostilesMap = global.State.hostilesByRoom.get(targetRoomName);
+                const hostiles = hostilesMap ? Array.from(hostilesMap.values()) : [];
             const bestTarget = CombatManager.getBestTarget(hunter, hostiles);
             if (bestTarget) {
                 if (hunter.attack(bestTarget) === ERR_NOT_IN_RANGE) {
@@ -160,8 +161,9 @@ function runPoaching() {
             if (poacher.room.name !== targetRoomName) {
                 poacher.moveTo(new RoomPosition(25, 25, targetRoomName));
             } else {
-                const hostiles = global.State.hostilesByRoom.get(targetRoomName) || new Map();
-                const target = CombatManager.getBestTarget(poacher, Array.from(hostiles.values()));
+                const hostilesMap = global.State.hostilesByRoom.get(targetRoomName);
+                const hostiles = hostilesMap ? Array.from(hostilesMap.values()) : [];
+                const target = CombatManager.getBestTarget(poacher, hostiles);
                 if (target) {
                     if (poacher.attack(target) === ERR_NOT_IN_RANGE) {
                         poacher.moveTo(target);
@@ -263,7 +265,8 @@ function runSynchronizedBurst() {
         const attackers = roomCreeps.get('quadAttacker') || [];
         if (attackers.length === 0) continue;
 
-        const hostiles = global.State.hostilesByRoom ? global.State.hostilesByRoom.get(roomName) || [] : [];
+        const hostilesMap = global.State.hostilesByRoom ? global.State.hostilesByRoom.get(roomName) : null;
+        const hostiles = hostilesMap ? Array.from(hostilesMap.values()) : [];
         if (hostiles.length === 0) continue;
 
         const bestTarget = CombatManager.getBestTarget(attackers[0], hostiles);

@@ -353,6 +353,10 @@ const TrafficManager = {
         global.State.staticCreeps.set(creep.name, { x: creep.pos.x, y: creep.pos.y, roomName: creep.pos.roomName });
     },
 
+    setStatic(creep) {
+        this.registerStatic(creep);
+    },
+
     registerSwap(creepA, creepB) {
         if (global.State && global.State.swapRegistry) {
             global.State.swapRegistry.set(creepA.name, creepB.name);
@@ -488,6 +492,10 @@ const TrafficManager = {
                                     blockingIntent.intendedNextPos.roomName === creep.pos.roomName) {
                                     // Creep B has a move intent in the EXACT OPPOSITE direction (head-on collision)
                                     canSwap = true;
+
+                                    if (global.State.staticCreeps && global.State.staticCreeps.has(blockingCreepName)) {
+                                        canSwap = false;
+                                    }
                                 }
                             }
 

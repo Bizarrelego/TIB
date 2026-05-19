@@ -41,7 +41,7 @@ module.exports = {
             if (!Memory.rooms[remoteRoomName]) Memory.rooms[remoteRoomName] = {};
             
             // Log recent threats
-            if (global.State.hostilesByRoom && global.State.hostilesByRoom.get(remoteRoomName) && global.State.hostilesByRoom.get(remoteRoomName).length > 0) {
+            if (global.State.hostilesByRoom && global.State.hostilesByRoom.get(remoteRoomName) && global.State.hostilesByRoom.get(remoteRoomName).size > 0) {
                 Memory.rooms[remoteRoomName].threatExpiry = Game.time + 1500;
             }
 
