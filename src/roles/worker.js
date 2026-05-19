@@ -152,13 +152,10 @@ module.exports = {
                     }
                 } else if (state === 'upgrade') {
                     if (creep.pos.getRangeTo(target) <= 3) {
-                        creep.upgradeController(target);
-                    }
-                    if (creep.pos.getRangeTo(target) > 1) {
-                        movement.moveTo(creep, target);
-                    } else {
                         TrafficManager.setStatic(creep);
-                        creep.heap.isStatic = true;
+                        creep.upgradeController(target);
+                    } else {
+                        movement.moveTo(creep, target, { range: 1 });
                     }
                 } else if (state === 'repair') {
                     if (creep.pos.getRangeTo(target) <= 3) {
