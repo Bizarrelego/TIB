@@ -1,4 +1,5 @@
 const RawMemoryManager = require('../os/RawMemoryManager');
+const Profiler = require('../utils/profiler');
 
 /**
  * @file AllianceIntelManager.js
@@ -189,4 +190,4 @@ class AllianceIntelManager {
     }
 }
 
-module.exports = new AllianceIntelManager();
+module.exports = Profiler.wrap('AllianceIntelManager', new AllianceIntelManager());
