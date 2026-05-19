@@ -503,6 +503,15 @@ const TrafficManager = {
                                 canSwap = false;
                             }
 
+                            if (!canSwap && (blockingLive && blockingLive.heap && blockingLive.heap.isStatic || (global.State.staticCreeps && global.State.staticCreeps.has(blockingCreepName)))) {
+                                creep.heap.needsDetour = true;
+                                if (blockingLive) {
+                                    creep.heap.blockerPos = { x: blockingLive.pos.x, y: blockingLive.pos.y, roomName: blockingLive.pos.roomName };
+                                } else if (intendedNextPos) {
+                                    creep.heap.blockerPos = { x: intendedNextPos.x, y: intendedNextPos.y, roomName: intendedNextPos.roomName };
+                                }
+                            }
+
                             if (canSwap) {
                                 const dir = creep.pos.getDirectionTo(intendedNextPos);
                                 if (dir) {
