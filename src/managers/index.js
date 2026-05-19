@@ -19,6 +19,7 @@ const workerManager = require('./workerManager');
 const QuadSquadManager = require('./QuadSquadManager');
 const BoostManager = require('./BoostManager');
 const VisualsManager = require('./VisualsManager');
+const PowerSpawnManager = require('./PowerSpawnManager');
 
 const managers = {
     CombatManager,
@@ -41,7 +42,8 @@ const managers = {
     QuadSquadManager,
     LogisticsManager,
     BoostManager,
-    VisualsManager
+    VisualsManager,
+    PowerSpawnManager
 };
 
 module.exports = {
