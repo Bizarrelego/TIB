@@ -66,6 +66,19 @@ module.exports = {
             let searchTarget = targetPos;
             let searchOpts = { ...pathingOpts };
 
+            // Task 3: Range-1 Source Pathing
+            // If target is a Source, Mineral, or StructureController, enforce range: 1
+            if (target && (
+                target.structureType === STRUCTURE_CONTROLLER ||
+                target instanceof Source ||
+                target instanceof Mineral ||
+                (target.id && Game.getObjectById(target.id) instanceof Source) ||
+                (target.id && Game.getObjectById(target.id) instanceof Mineral) ||
+                (target.id && Game.getObjectById(target.id) && Game.getObjectById(target.id).structureType === STRUCTURE_CONTROLLER)
+            )) {
+                searchTarget = { pos: targetPos, range: 1 };
+            }
+
             if (isCrossRoom && creep.heap.route && creep.heap.route.length > 0) {
                 const nextRoom = creep.heap.route[0];
                 const exitDir = Game.map.findExit(currentPos.roomName, nextRoom);
@@ -111,18 +124,30 @@ module.exports = {
                 }
 
                 // Implement Dynamic Obstacle Avoidance
-                if (global.State && global.State.currentPositions) {
-                    const roomPositions = global.State.currentPositions.get(roomName);
-                    if (roomPositions) {
-                        // Clone the matrix before making creep-specific modifications to prevent shared reference mutation
-                        if (returnMatrix === matrix) returnMatrix = returnMatrix.clone();
-                        for (const [posKey, creepName] of roomPositions.entries()) {
-                            if (creepName === creep.name) continue; // Skip self
+                if (global.State) {
+                    // Static Creeps as unwalkable obstacles
+                    if (global.State.staticCreeps) {
+                        for (const [creepName, pos] of global.State.staticCreeps.entries()) {
+                            if (creepName !== creep.name && pos.roomName === roomName) {
+                                if (returnMatrix === matrix) returnMatrix = returnMatrix.clone();
+                                returnMatrix.set(pos.x, pos.y, 255);
+                            }
+                        }
+                    }
 
-                            if (global.State.trafficIntents && !global.State.trafficIntents.has(creepName)) {
-                                const cx = posKey >> 6;
-                                const cy = posKey & 0x3F;
-                                returnMatrix.set(cx, cy, 255);
+                    if (global.State.currentPositions) {
+                        const roomPositions = global.State.currentPositions.get(roomName);
+                        if (roomPositions) {
+                            // Clone the matrix before making creep-specific modifications to prevent shared reference mutation
+                            if (returnMatrix === matrix) returnMatrix = returnMatrix.clone();
+                            for (const [posKey, creepName] of roomPositions.entries()) {
+                                if (creepName === creep.name) continue; // Skip self
+
+                                if (global.State.trafficIntents && !global.State.trafficIntents.has(creepName)) {
+                                    const cx = posKey >> 6;
+                                    const cy = posKey & 0x3F;
+                                    returnMatrix.set(cx, cy, 255);
+                                }
                             }
                         }
                     }

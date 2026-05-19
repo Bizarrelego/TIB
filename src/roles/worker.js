@@ -46,7 +46,7 @@ module.exports = {
                             creep.heap.state = null;
                         }
                     } else {
-                        movement.moveTo(creep, target);
+                        movement.moveTo(creep, target, { range: 1 });
                     }
                 } else if (state === 'pickup') {
                     if ((target.store && target.store[RESOURCE_ENERGY] === 0) || (target.amount !== undefined && target.amount === 0)) {
@@ -137,7 +137,7 @@ module.exports = {
                     if (creep.pos.getRangeTo(target) <= 3) {
                         creep.upgradeController(target);
                     } else {
-                        movement.moveTo(creep, target);
+                        movement.moveTo(creep, target, { range: 1 });
                     }
                 } else if (state === 'repair') {
                     if (creep.pos.getRangeTo(target) <= 3) {
