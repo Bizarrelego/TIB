@@ -1,4 +1,6 @@
 const Profiler = require('../utils/profiler');
+const { wrapModuleFunctions } = require('../utils/moduleWrapper');
+const { executeManager } = require('../utils/errorHandler');
 const intelManager = require('./intel');
 const expansionManager = require('./expansion');
 const offenseManager = require('./offense');
@@ -12,9 +14,8 @@ const PowerSpawnManager = require('../managers/PowerSpawnManager');
  * The main entry point for the Operations module, acting as a high-level orchestrator.
  * @returns {void}
  */
-module.exports = Profiler.wrap('operationsManager', function operationsManager() {
-    try {
-        intelManager();
+const exportedModule = Profiler.wrap('operationsManager', function operationsManager() {
+    intelManager();
         scoutManager();
         expansionManager();
         offenseManager();
@@ -27,7 +28,6 @@ module.exports = Profiler.wrap('operationsManager', function operationsManager()
                 PowerSpawnManager.run(room);
             }
         }
-    } catch (e) {
-        console.error(`[OperationsManager Main Error] ${e.stack}`);
-    }
 });
+
+module.exports = wrapModuleFunctions(exportedModule, (funcName, originalFunc, ...args) => executeManager(`operationsManager.${funcName}`, originalFunc, ...args));

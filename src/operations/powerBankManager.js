@@ -1,4 +1,6 @@
 const Profiler = require('../utils/profiler');
+const { wrapModuleFunctions } = require('../utils/moduleWrapper');
+const { executeManager } = require('../utils/errorHandler');
 const SpawnQueueManager = require('../managers/SpawnQueueManager');
 
 /**
@@ -117,4 +119,6 @@ function runPowerBankOperations() {
     }
 }
 
-module.exports = Profiler.wrap('powerBankManager', runPowerBankOperations);
+const exportedModule = Profiler.wrap('powerBankManager', runPowerBankOperations);
+
+module.exports = wrapModuleFunctions(exportedModule, (funcName, originalFunc, ...args) => executeManager(`powerBankManager.${funcName}`, originalFunc, ...args));

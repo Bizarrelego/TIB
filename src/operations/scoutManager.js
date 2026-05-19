@@ -1,4 +1,6 @@
 const Profiler = require('../utils/profiler');
+const { wrapModuleFunctions } = require('../utils/moduleWrapper');
+const { executeManager } = require('../utils/errorHandler');
 const intelManager = require('./intel');
 /**
  * @file scoutManager.js
@@ -116,9 +118,8 @@ function runScouts() {
  * Main scout manager loop to process global scout assignments.
  * @returns {void}
  */
-module.exports = Profiler.wrap('scoutManager', function scoutManager() {
-    try {
-        // Run scouts every tick to assign targets and gather intel
+const exportedModule = Profiler.wrap('scoutManager', function scoutManager() {
+    // Run scouts every tick to assign targets and gather intel
         runScouts();
 
         // Also gather intel on our own rooms where we have vision naturally
@@ -127,7 +128,6 @@ module.exports = Profiler.wrap('scoutManager', function scoutManager() {
                 intelManager.gatherIntel(roomName);
             }
         }
-    } catch (e) {
-        console.error(`[ScoutManager Error] ${e.stack}`);
-    }
 });
+
+module.exports = wrapModuleFunctions(exportedModule, (funcName, originalFunc, ...args) => executeManager(`scoutManager.${funcName}`, originalFunc, ...args));
