@@ -88,8 +88,17 @@ module.exports = {
                 const nextRoom = creep.heap.route[0];
                 const exitDir = Game.map.findExit(currentPos.roomName, nextRoom);
                 if (exitDir > 0) {
-                    const exits = creep.room.find(exitDir);
-                    if (exits.length > 0) {
+                    let exits = [];
+                    if (global.State && global.State.roomExits && global.State.roomExits.has(currentPos.roomName)) {
+                        const roomExitsMap = global.State.roomExits.get(currentPos.roomName);
+                        if (roomExitsMap.has(exitDir)) {
+                            exits = roomExitsMap.get(exitDir);
+                        }
+                    } else {
+                        exits = creep.room.find(exitDir);
+                    }
+
+                    if (exits && exits.length > 0) {
                         searchTarget = exits.map(e => ({ pos: e, range: 0 }));
                         searchOpts.maxRooms = 1; // Strictly local pathing
                     }
