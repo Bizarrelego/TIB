@@ -25,11 +25,12 @@ function run(room) {
             }
 
             if (creep.room.name !== targetRoomName) {
-                // Move towards the target room. Use a generic position in the middle.
                 const targetPos = new RoomPosition(25, 25, targetRoomName);
 
-                // Pass custom opts to avoid highly hostile rooms if known
-                const opts = {
+                // FIX: Bypass complex TrafficManager and use native pathfinding for pure long-distance scouting
+                creep.moveTo(targetPos, {
+                    visualizePathStyle: {stroke: '#ffffff'},
+                    reusePath: 50,
                     roomCallback: function(roomName) {
                         const intel = global.State && global.State.intel ? global.State.intel.get(roomName) : null;
                         if (intel && intel.hostile) {
@@ -37,15 +38,13 @@ function run(room) {
                         }
                         return undefined;
                     }
-                };
-
-                movement.moveTo(creep, targetPos, opts);
+                });
                 continue;
             } else {
                 // Once in the target room, move off the exit edge
                 if (creep.pos.x === 0 || creep.pos.x === 49 || creep.pos.y === 0 || creep.pos.y === 49) {
                     const centerPos = new RoomPosition(25, 25, targetRoomName);
-                    movement.moveTo(creep, centerPos);
+                    creep.moveTo(centerPos); // FIX: Use native move
                 } else {
                     // We are in the room and off the exit.
                     TrafficManager.setStatic(creep);

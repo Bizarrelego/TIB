@@ -197,9 +197,20 @@ function manageEarlyProgression(room, _spawnLedger) {
                 creep.heap.state = 'upgrade';
             }
         } else if (!creep.heap.state) {
-            if (massiveDrop) creep.heap.state = 'pickup';
-            else if (validWithdrawTargets.length > 0) creep.heap.state = 'withdraw';
-            else creep.heap.state = 'harvest';
+            // FIX: Prioritize spending energy if capacity > 0 before defaulting to harvest
+            if (usedCap > 0) {
+                if (spawnIndex < freeSpawns.length || extIndex < freeExtensions.length) {
+                    creep.heap.state = 'refill';
+                } else if (sites.length > 0) {
+                    creep.heap.state = 'build';
+                } else {
+                    creep.heap.state = 'upgrade';
+                }
+            } else {
+                if (massiveDrop) creep.heap.state = 'pickup';
+                else if (validWithdrawTargets.length > 0) creep.heap.state = 'withdraw';
+                else creep.heap.state = 'harvest';
+            }
         }
 
         // State exhaustion fallbacks

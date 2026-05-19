@@ -92,14 +92,6 @@ module.exports = {
 
             const bootstrapReqs = BootstrapPlanner.getCreepRequirements(room);
 
-            if (room.controller && room.controller.level < 2 && workerCount < bootstrapReqs.worker) {
-                if (room.energyAvailable >= 200 && availableSpawns.length > 0) {
-                    const spawn = availableSpawns[0];
-                    spawn.spawnCreep([WORK, CARRY, MOVE], 'worker_' + Game.time, { memory: { role: 'worker', colony: room.name } });
-                }
-                return;
-            }
-
             const roomHasContainers = spawnLedger.hasActiveSourceContainer(room);
             const isEarlyGame = room.controller.level < 2 || !roomHasContainers;
 

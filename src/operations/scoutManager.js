@@ -30,7 +30,9 @@ function getScoutTarget(scoutCreep) {
         const levelSize = queue.length;
         for (let i = 0; i < levelSize; i++) {
             const currentRoom = queue.shift();
-            const neighbors = intelManager.getAdjacentRooms(currentRoom);
+            // FIX: Use Game.map directly to prevent silent intelManager failures
+            const neighborsObj = Game.map.describeExits(currentRoom);
+            const neighbors = neighborsObj ? Object.values(neighborsObj) : [];
 
             for (let j = 0; j < neighbors.length; j++) {
                 const neighborRoom = neighbors[j];
