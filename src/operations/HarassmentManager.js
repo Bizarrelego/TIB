@@ -1,4 +1,6 @@
 const Profiler = require('../utils/profiler');
+const { wrapModuleFunctions } = require('../utils/moduleWrapper');
+const { executeManager } = require('../utils/errorHandler');
 const SpawnQueueManager = require('../managers/SpawnQueueManager');
 
 /**
@@ -7,7 +9,7 @@ const SpawnQueueManager = require('../managers/SpawnQueueManager');
  * Identifies targets, deploys simple attack creeps, and coordinates looting of dropped energy.
  */
 
-module.exports = Profiler.wrap('HarassmentManager', function HarassmentManager() {
+const exportedModule = Profiler.wrap('HarassmentManager', function HarassmentManager() {
     if (!global.State || !global.State.rooms) return;
 
     for (const room of global.State.rooms.values()) {
@@ -141,3 +143,5 @@ module.exports = Profiler.wrap('HarassmentManager', function HarassmentManager()
         }
     }
 });
+
+module.exports = wrapModuleFunctions(exportedModule, (funcName, originalFunc, ...args) => executeManager(`HarassmentManager.${funcName}`, originalFunc, ...args));

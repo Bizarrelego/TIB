@@ -1,4 +1,6 @@
 const Profiler = require('../utils/profiler');
+const { wrapModuleFunctions } = require('../utils/moduleWrapper');
+const { executeManager } = require('../utils/errorHandler');
 const SpawnQueueManager = require('../managers/SpawnQueueManager');
 
 /**
@@ -142,4 +144,6 @@ function runSKOperations() {
     }
 }
 
-module.exports = Profiler.wrap('skOperations', runSKOperations);
+const exportedModule = Profiler.wrap('skOperations', runSKOperations);
+
+module.exports = wrapModuleFunctions(exportedModule, (funcName, originalFunc, ...args) => executeManager(`skOperations.${funcName}`, originalFunc, ...args));

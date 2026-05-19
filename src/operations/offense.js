@@ -1,4 +1,6 @@
 const Profiler = require('../utils/profiler');
+const { wrapModuleFunctions } = require('../utils/moduleWrapper');
+const { executeManager } = require('../utils/errorHandler');
 /**
  * @file offense.js
  * @description Manages combat & siege execution.
@@ -326,16 +328,14 @@ function runCoreSnipers() {
  * Main offense loop executing atomic combat intents.
  * @returns {void}
  */
-module.exports = Profiler.wrap('offenseManager', function offenseManager() {
-    try {
-        // Execute heavy combat logic
+const exportedModule = Profiler.wrap('offenseManager', function offenseManager() {
+    // Execute heavy combat logic
         runAtomicQuads();
         runSynchronizedBurst();
         runTowerDrain();
         runCoreSnipers();
         runHarassment();
         runPoaching();
-    } catch (e) {
-        console.error(`[OffenseManager Error] ${e.stack}`);
-    }
 });
+
+module.exports = wrapModuleFunctions(exportedModule, (funcName, originalFunc, ...args) => executeManager(`offenseManager.${funcName}`, originalFunc, ...args));

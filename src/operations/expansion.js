@@ -1,4 +1,6 @@
 const Profiler = require('../utils/profiler');
+const { wrapModuleFunctions } = require('../utils/moduleWrapper');
+const { executeManager } = require('../utils/errorHandler');
 /**
  * @file expansion.js
  * @description Manages expansion operations including early poaching, remote denial, and auto-claim.
@@ -203,14 +205,12 @@ function runAutoClaim() {
  * Main expansion loop to evaluate room targets and deploy auto-claimers.
  * @returns {void}
  */
-module.exports = Profiler.wrap('expansionManager', function expansionManager() {
-    try {
-        if (Game.time % 100 === 0) {
+const exportedModule = Profiler.wrap('expansionManager', function expansionManager() {
+    if (Game.time % 100 === 0) {
             runEarlyPoaching();
             runRemoteDenial();
             runAutoClaim();
         }
-    } catch (e) {
-        console.error(`[ExpansionManager Error] ${e.stack}`);
-    }
 });
+
+module.exports = wrapModuleFunctions(exportedModule, (funcName, originalFunc, ...args) => executeManager(`expansionManager.${funcName}`, originalFunc, ...args));

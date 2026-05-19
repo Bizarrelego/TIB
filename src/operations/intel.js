@@ -1,4 +1,6 @@
 const Profiler = require('../utils/profiler');
+const { wrapModuleFunctions } = require('../utils/moduleWrapper');
+const { executeManager } = require('../utils/errorHandler');
 /**
  * @file intel.js
  * @description Manages cross-room intel, heatmaps, and RawMemory mapping.
@@ -219,17 +221,13 @@ function mapToRawMemory() {
  * @returns {void}
  */
 const run = Profiler.wrap('intelManager', function intelManager() {
-    try {
-        if (Game.time % 10 === 0) {
+    if (Game.time % 10 === 0) {
             buildHeatmaps();
             mapToRawMemory();
         }
-    } catch (e) {
-        console.error(`[IntelManager Error] ${e.stack}`);
-    }
 });
 
 run.gatherIntel = gatherIntel;
 run.getAdjacentRooms = getAdjacentRooms;
 run.getRoomType = getRoomType;
-module.exports = run;
+module.exports = wrapModuleFunctions(run, (funcName, originalFunc, ...args) => executeManager(`intelManager.${funcName}`, originalFunc, ...args));
