@@ -74,14 +74,21 @@ module.exports = {
             // Task 3: Range-1 Source Pathing
             // If target is a Source, Mineral, or StructureController, enforce range: 1
             if (target && (
-                target.structureType === STRUCTURE_CONTROLLER ||
                 target instanceof Source ||
                 target instanceof Mineral ||
                 (target.id && Game.getObjectById(target.id) instanceof Source) ||
-                (target.id && Game.getObjectById(target.id) instanceof Mineral) ||
-                (target.id && Game.getObjectById(target.id) && Game.getObjectById(target.id).structureType === STRUCTURE_CONTROLLER)
+                (target.id && Game.getObjectById(target.id) instanceof Mineral)
             )) {
                 searchTarget = { pos: targetPos, range: 1 };
+            } else if (target && (
+                target.structureType === STRUCTURE_CONTROLLER ||
+                (target.id && Game.getObjectById(target.id) && Game.getObjectById(target.id).structureType === STRUCTURE_CONTROLLER)
+            )) {
+                if (creep.pos.getRangeTo(targetPos) <= 3) {
+                    searchTarget = { pos: targetPos, range: 1 };
+                } else {
+                    searchTarget = { pos: targetPos, range: 3 };
+                }
             }
 
             if (isCrossRoom && creep.heap.route && creep.heap.route.length > 0) {

@@ -27,10 +27,12 @@ module.exports = {
                 if (creep.heap.isHarvesting && creep.store.getFreeCapacity() === 0) {
                     creep.heap.isHarvesting = false;
                     creep.heap.activeTask = null;
+                    creep.heap.isStatic = false; // Un-anchor from the source
                 }
                 if (!creep.heap.isHarvesting && creep.store.getUsedCapacity() === 0) {
                     creep.heap.isHarvesting = true;
                     creep.heap.activeTask = null;
+                    creep.heap.isStatic = false; // Un-anchor from the controller/hub
                 }
 
                 if (fatigueGating.isFatigued(creep) || TrafficManager.checkPipeline(creep.id)) continue;
@@ -150,10 +152,13 @@ module.exports = {
                     }
                 } else if (state === 'upgrade') {
                     if (creep.pos.getRangeTo(target) <= 3) {
-                        TrafficManager.setStatic(creep);
                         creep.upgradeController(target);
+                    }
+                    if (creep.pos.getRangeTo(target) > 1) {
+                        movement.moveTo(creep, target);
                     } else {
-                        movement.moveTo(creep, target, { range: 1 });
+                        TrafficManager.setStatic(creep);
+                        creep.heap.isStatic = true;
                     }
                 } else if (state === 'repair') {
                     if (creep.pos.getRangeTo(target) <= 3) {
