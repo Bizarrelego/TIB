@@ -1,3 +1,4 @@
+const TrafficManager = require('../traffic/trafficManager');
 const movement = require('../utils/movement');
 
 /**
@@ -47,6 +48,8 @@ function run(room) {
                     movement.moveTo(creep, centerPos);
                 } else {
                     // We are in the room and off the exit.
+                    TrafficManager.setStatic(creep);
+                    creep.heap.isStatic = true;
                     // Clear the target so the scout manager will assign a new one next tick.
                     creep.heap.targetRoom = null;
                 }

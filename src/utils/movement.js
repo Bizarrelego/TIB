@@ -13,6 +13,11 @@ module.exports = {
     },
 
     moveTo: function(creep, target, opts = {}) {
+        if (creep.heap.needsDetour) {
+            delete creep.heap._path;
+            delete creep.heap.path;
+            creep.heap.needsDetour = false;
+        }
         // Anti-clustering / Stuck-detection logic
         const currentPos = creep.pos;
         if (creep.heap.lastPos) {
@@ -153,6 +158,11 @@ module.exports = {
                                 }
                             }
                         }
+                    }
+
+                    if (creep.heap.blockerPos && creep.heap.blockerPos.roomName === roomName) {
+                        if (returnMatrix === matrix) returnMatrix = returnMatrix.clone();
+                        returnMatrix.set(creep.heap.blockerPos.x, creep.heap.blockerPos.y, 255);
                     }
 
                     if (global.State.currentPositions) {

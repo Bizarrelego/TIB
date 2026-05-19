@@ -56,7 +56,7 @@ module.exports = {
         
         const EnergyRequestManager = require('./EnergyRequestManager');
         const supplies = EnergyRequestManager.getEnergySupplies(room.name, 'worker') || [];
-        let supplyTasks = supplies.map(s => ({ target: Game.getObjectById(s.target.id), type: 'pickup', priority: s.priority }));
+        let supplyTasks = supplies.map(s => ({ target: Game.getObjectById(s.target.id), type: 'pickup', priority: s.priority, amount: s.amount }));
         for (let i = 0; i < sources.length; i++) {
             supplyTasks.push({ target: sources[i], type: 'harvest', priority: 50 });
         }
@@ -93,7 +93,7 @@ module.exports = {
             // Only assign if idle or task is finished
             if (creep.heap.state && creep.heap.targetId) continue;
             
-            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+            if (!creep.heap.isHarvesting) {
                 // Find highest priority valid task
                 for (let j = 0; j < tasks.length; j++) {
                     const task = tasks[j];
@@ -109,6 +109,12 @@ module.exports = {
                 for (let j = 0; j < supplyTasks.length; j++) {
                     const task = supplyTasks[j];
                     if (task && task.target) {
+                        if (task.type === 'pickup' || task.type === 'withdraw') {
+                            const VirtualLedger = require('../utils/VirtualLedger');
+                            const maxWanted = creep.store.getFreeCapacity(RESOURCE_ENERGY);
+                            const claimed = VirtualLedger.claim(task.target, RESOURCE_ENERGY, maxWanted);
+                            if (claimed < 0) continue;
+                        }
                         if (task.type === 'harvest') {
                             const count = sourceAssignments.get(task.target.id) || 0;
                             if (count >= 3) continue;

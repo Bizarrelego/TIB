@@ -24,6 +24,15 @@ module.exports = {
         for (let i = 0; i < workers.length; i++) {
             const creep = workers[i];
             try {
+                if (creep.heap.isHarvesting && creep.store.getFreeCapacity() === 0) {
+                    creep.heap.isHarvesting = false;
+                    creep.heap.activeTask = null;
+                }
+                if (!creep.heap.isHarvesting && creep.store.getUsedCapacity() === 0) {
+                    creep.heap.isHarvesting = true;
+                    creep.heap.activeTask = null;
+                }
+
                 if (fatigueGating.isFatigued(creep) || TrafficManager.checkPipeline(creep.id)) continue;
 
                 const state = creep.heap.state;
