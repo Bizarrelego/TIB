@@ -1,6 +1,7 @@
 const SpawnLedger = require('./spawnLedger');
 const defense = require('./defense');
 const scavengingManager = require('./scavengingManager');
+
 /**
  * O(N) Top-Down Assignment for Early RCL (1-2) Progression.
  * Evaluates room state and assigns exact targets to workers.
@@ -20,7 +21,7 @@ function manageEarlyProgression(room, _spawnLedger) {
     const droppedRaw = global.State.droppedByRoom.get(room.name) || [];
     const droppedArrays = droppedRaw instanceof Map ? Array.from(droppedRaw.values()) : droppedRaw;
     const structures = global.State.structuresByRoom.get(room.name) || new Map();
-    const sites = global.State.sitesByRoom.get(room.name) || []; // No native polling
+    const sites = global.State.sitesByRoom.get(room.name) || []; 
     const tombstonesRaw = global.State.tombstonesByRoom.get(room.name) || [];
     const tombstones = tombstonesRaw instanceof Map ? Array.from(tombstonesRaw.values()) : tombstonesRaw;
 
@@ -60,6 +61,7 @@ function manageEarlyProgression(room, _spawnLedger) {
     // Distribute exact harvester assignments
     const harvesters = roomCreeps.get('harvester') || [];
     const assignedSpots = new Set();
+    
     // Pass 1: Claim already assigned spots
     for (let i = 0; i < harvesters.length; i++) {
         const creep = harvesters[i];
@@ -176,74 +178,47 @@ function manageEarlyProgression(room, _spawnLedger) {
 
     for (let i = 0; i < workers.length; i++) {
         const creep = workers[i];
-        if (creep.fatigue > 0) continue; // Fatigue gating
+        if (creep.fatigue > 0) continue;
 
         if (!creep.heap) creep.heap = {};
 
         const usedCap = creep.store.getUsedCapacity(RESOURCE_ENERGY);
         const freeCap = creep.store.getFreeCapacity(RESOURCE_ENERGY);
 
-        // First block: State transition logic
-        if (usedCap === 0) {
+        // 1. Strict Intent Locking
+        let intent = creep.heap.intent;
+        if (usedCap === 0) intent = 'gather';
+        else if (freeCap === 0) intent = 'work';
+        else if (!intent) intent = usedCap > 0 ? 'work' : 'gather';
+        creep.heap.intent = intent;
+
+        // 2. Action State Resolution
+        if (intent === 'gather') {
             if (massiveDrop) creep.heap.state = 'pickup';
             else if (validWithdrawTargets.length > 0) creep.heap.state = 'withdraw';
             else creep.heap.state = 'harvest';
-        } else if (freeCap === 0) {
-            if (spawnIndex < freeSpawns.length || extIndex < freeExtensions.length) {
-                creep.heap.state = 'refill';
-            } else if (sites.length > 0) {
-                creep.heap.state = 'build';
-            } else {
-                creep.heap.state = 'upgrade';
-            }
-        } else if (!creep.heap.state) {
-            if (massiveDrop) creep.heap.state = 'pickup';
-            else if (validWithdrawTargets.length > 0) creep.heap.state = 'withdraw';
-            else creep.heap.state = 'harvest';
+        } else {
+            if (spawnIndex < freeSpawns.length || extIndex < freeExtensions.length) creep.heap.state = 'refill';
+            else if (sites.length > 0) creep.heap.state = 'build';
+            else creep.heap.state = 'upgrade';
         }
 
-        // State exhaustion fallbacks
-        if (creep.heap.state === 'refill' && spawnIndex >= freeSpawns.length && extIndex >= freeExtensions.length) {
-            creep.heap.state = sites.length > 0 ? 'build' : 'upgrade';
-        }
-        if (creep.heap.state === 'build' && sites.length === 0) {
-            creep.heap.state = 'upgrade';
-        }
-        if (creep.heap.state === 'pickup' && !massiveDrop) {
-            if (validWithdrawTargets.length > 0) creep.heap.state = 'withdraw';
-            else creep.heap.state = 'harvest';
-        }
-        if (creep.heap.state === 'withdraw' && validWithdrawTargets.length === 0) {
-            creep.heap.state = massiveDrop ? 'pickup' : 'harvest';
-        }
-
-        // Second block: Target assignment logic
         const state = creep.heap.state;
 
-        // Early-game Role Priority: Generic workers bypass/supersede harvesters at RCL 1-2
-        if (room.controller.level <= 2 && harvesters.length > 0) {
-            if (state === 'harvest' && sources.length > 0) {
-                // Only clear harvester targets once to prevent constant overriding and infinite idle loops
-                for (let h = 0; h < harvesters.length; h++) {
-                    if (harvesters[h].heap.targetId === creep.heap.targetId && harvesters[h].heap.state !== 'idle') {
-                        harvesters[h].heap.targetId = null;
-                        harvesters[h].heap.state = 'idle';
-                    }
-                }
-            }
-        }
-
-        // Multi-room OS Interrupt: Override Upgrader to Builder if sites exist
-        if (state === 'upgrade' && sites.length > 0) {
-            creep.heap.state = 'build';
-            creep.heap.targetId = sites[0].id;
-        } else if (state === 'build' && sites.length === 0) {
-            creep.heap.state = 'upgrade';
-        }
+        // 3. Target Assignment
         if (state === 'pickup') {
             creep.heap.targetId = massiveDrop.id;
         } else if (state === 'withdraw') {
-            creep.heap.targetId = validWithdrawTargets[0].id;
+            let bestTarget = validWithdrawTargets[0];
+            let minDistance = Infinity;
+            for (let t = 0; t < validWithdrawTargets.length; t++) {
+                const dist = Math.max(Math.abs(creep.pos.x - validWithdrawTargets[t].pos.x), Math.abs(creep.pos.y - validWithdrawTargets[t].pos.y));
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    bestTarget = validWithdrawTargets[t];
+                }
+            }
+            creep.heap.targetId = bestTarget.id;
         } else if (state === 'harvest') {
             let bestSource = null;
             let minSat = Infinity;
@@ -296,11 +271,29 @@ function manageEarlyProgression(room, _spawnLedger) {
                 creep.heap.targetId = targetSpawn.id;
             } else {
                 creep.heap.state = sites.length > 0 ? 'build' : 'upgrade';
-                if (creep.heap.state === 'build') creep.heap.targetId = sites[0].id;
+                if (creep.heap.state === 'build') {
+                    let bestSite = sites[0];
+                    for (let s = 1; s < sites.length; s++) {
+                        const typeA = bestSite.structureType;
+                        const typeB = sites[s].structureType;
+                        if (typeB === STRUCTURE_SPAWN && typeA !== STRUCTURE_SPAWN) bestSite = sites[s];
+                        else if (typeB === STRUCTURE_EXTENSION && typeA !== STRUCTURE_EXTENSION && typeA !== STRUCTURE_SPAWN) bestSite = sites[s];
+                    }
+                    creep.heap.targetId = bestSite.id;
+                }
                 else if (room.controller) creep.heap.targetId = room.controller.id;
             }
         } else if (state === 'build') {
-            if (sites.length > 0) creep.heap.targetId = sites[0].id;
+            let bestSite = sites[0];
+            for (let s = 1; s < sites.length; s++) {
+                const typeA = bestSite.structureType;
+                const typeB = sites[s].structureType;
+                // Hierarchy: Spawn > Extension > Container > Other
+                if (typeB === STRUCTURE_SPAWN && typeA !== STRUCTURE_SPAWN) bestSite = sites[s];
+                else if (typeB === STRUCTURE_EXTENSION && typeA !== STRUCTURE_EXTENSION && typeA !== STRUCTURE_SPAWN) bestSite = sites[s];
+                else if (typeB === STRUCTURE_CONTAINER && typeA !== STRUCTURE_CONTAINER && typeA !== STRUCTURE_EXTENSION && typeA !== STRUCTURE_SPAWN) bestSite = sites[s];
+            }
+            creep.heap.targetId = bestSite.id;
         } else if (state === 'upgrade') {
             if (room.controller) creep.heap.targetId = room.controller.id;
         }
@@ -325,8 +318,6 @@ module.exports = function colonyManager() {
                 
                 manageEarlyProgression(room, spawnLedger);
 
-                // IMPROVEMENT: Removed all direct role executions (worker.run, hauler.run, etc.).
-                // Reason: Consolidates execution hierarchy. Roles are now exclusively ticked via managerOrchestrator.js to respect tick-slicing and CPU bucket constraints.
             } catch (e) {
                 console.log(`[ColonyManager Error] Room ${room.name}: ${e.stack}`);
             }

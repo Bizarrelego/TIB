@@ -129,7 +129,7 @@ module.exports = {
                     } else {
                         movement.moveTo(creep, target);
                     }
-                } else if (state === 'fill') {
+                } else if (state === 'refill') { // Fixes the string bug
                     if (creep.pos.isNearTo(target)) {
                         const claimed = VirtualLedger.getClaimedAmount(target.id, RESOURCE_ENERGY);
                         const amountToFill = Math.min(creep.store.getUsedCapacity(RESOURCE_ENERGY), Math.max(0, TrafficManager.getVirtualState(target, RESOURCE_ENERGY).free - claimed));
@@ -146,7 +146,7 @@ module.exports = {
                     }
                 } else if (state === 'build') {
                     if (creep.build(target) === ERR_NOT_IN_RANGE) {
-                        movement.moveTo(creep, target);
+                        movement.moveTo(creep, target, { range: 3 }); // Range 3 optimization
                     } else {
                         TrafficManager.setStatic(creep);
                     }
@@ -155,7 +155,7 @@ module.exports = {
                         TrafficManager.setStatic(creep);
                         creep.upgradeController(target);
                     } else {
-                        movement.moveTo(creep, target, { range: 1 });
+                        movement.moveTo(creep, target, { range: 3 }); // Range 3 optimization
                     }
                 } else if (state === 'repair') {
                     if (creep.pos.getRangeTo(target) <= 3) {
