@@ -8,7 +8,7 @@ const scavengingManager = require('./scavengingManager');
  * @param {SpawnLedger} _spawnLedger - The virtual ledger for energy capacity tracking.
  */
 function manageEarlyProgression(room, _spawnLedger) {
-    if (!room.controller || room.controller.level > 2) return;
+    if (!room.controller || room.controller.level > 3) return;
 
     const roomCreeps = global.State.creepsByRoom.get(room.name);
     if (!roomCreeps) return;
@@ -88,6 +88,31 @@ function manageEarlyProgression(room, _spawnLedger) {
                         creep.heap.siteId = sites[s].id;
                         break;
                     }
+                }
+            }
+        }
+    }
+
+    if (room.controller.level === 3 && room.energyAvailable >= room.energyCapacityAvailable - 50) {
+        global.State.aggressionState = 'Expansion';
+        if (global.State.intel) {
+            const intelArray = Array.from(global.State.intel.entries());
+            let bestRoom = null;
+            let highestScore = 0;
+
+            for (const [roomName, data] of intelArray) {
+                if (data.expansionScore && data.expansionScore > highestScore) {
+                    highestScore = data.expansionScore;
+                    bestRoom = roomName;
+                }
+            }
+
+            if (bestRoom) {
+                const SpawnQueueManager = require('../managers/SpawnQueueManager');
+                if (SpawnQueueManager.getQueuedCount(room.name, 'reserver', bestRoom) === 0) {
+                    const body = room.energyCapacityAvailable >= 1300 ? [CLAIM, CLAIM, MOVE, MOVE] : [CLAIM, MOVE];
+                    const cost = room.energyCapacityAvailable >= 1300 ? 1300 : 650;
+                    SpawnQueueManager.requestSpawn(room.name, 'reserver', body, 'claimer_' + Game.time, { memory: { role: 'reserver', colony: room.name, targetRoom: bestRoom, claimFlag: true } }, cost);
                 }
             }
         }

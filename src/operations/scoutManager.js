@@ -89,6 +89,14 @@ function runScouts() {
                 // If the scout is in a room, gather intel
                 if (scout.room) {
                     intelManager.gatherIntel(scout.room.name);
+
+                    if (global.State.intel && global.State.intel.has(scout.room.name) && global.State.intel.get(scout.room.name).harassmentTarget) {
+                        const SpawnQueueManager = require('../managers/SpawnQueueManager');
+                        const cost = BODYPART_COST[WORK] + BODYPART_COST[MOVE];
+                        if (SpawnQueueManager.getQueuedCount(scout.memory.colony, 'soloDismantler', scout.room.name) === 0) {
+                            SpawnQueueManager.requestSpawn(scout.memory.colony, 'soloDismantler', [WORK, MOVE], 'dismantle_' + Game.time, { memory: { role: 'soloDismantler', colony: scout.memory.colony, targetRoom: scout.room.name } }, cost);
+                        }
+                    }
                 }
 
                 // If the scout doesn't have a target, assign one
