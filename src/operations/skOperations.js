@@ -35,60 +35,7 @@ function runSKOperations() {
 
     for (const roomName of global.State.scannedRooms) {
         const roomType = getRoomType(roomName);
-        if (roomType !== 'sk' && roomType !== 'highway') continue;
-
-        if (roomType === 'highway') {
-            const roomStructures = global.State.structuresByRoom.get(roomName) || new Map();
-            const powerBanks = roomStructures.get(STRUCTURE_POWER_BANK);
-
-            if (powerBanks) {
-                const banksArray = powerBanks instanceof Map ? Array.from(powerBanks.values()) : powerBanks;
-                for (const powerBank of banksArray) {
-                    if (Game.time % 50 !== 0) continue;
-
-                    let closestRoomName = null;
-                    let minDistance = Infinity;
-
-                    if (global.State.rooms) {
-                        for (const [baseName, baseRoom] of global.State.rooms.entries()) {
-                            if (baseRoom.controller && baseRoom.controller.my && baseRoom.energyCapacityAvailable >= 4000) {
-                                const dist = Game.map.getRoomLinearDistance(baseName, roomName);
-                                if (dist < minDistance) {
-                                    minDistance = dist;
-                                    closestRoomName = baseName;
-                                }
-                            }
-                        }
-                    }
-
-                    if (!closestRoomName) continue;
-
-                    const dist = Game.map.getRoomLinearDistance(closestRoomName, roomName);
-
-                    let assignedCapacity = 0;
-                    for (const creepsByRole of global.State.creepsByRoom.values()) {
-                        const haulers = creepsByRole.get('powerHauler') || [];
-                        for (const h of haulers) {
-                            if (h.memory.targetRoom === roomName && h.memory.targetId === powerBank.id) {
-                                assignedCapacity += h.store.getCapacity();
-                            }
-                        }
-                    }
-
-                    const ticksToKill = powerBank.hits / 600;
-                    const travelTime = dist * 50;
-
-                    if (ticksToKill <= travelTime + 150 && assignedCapacity < powerBank.power) {
-                        const BodyCalc = require('../utils/bodyCalc');
-                        const body = BodyCalc.calculatePowerHauler(global.State.rooms.get(closestRoomName).energyCapacityAvailable, dist, powerBank.power - assignedCapacity);
-                        const cost = BodyCalc.getCost(body);
-                        SpawnQueueManager.requestSpawn(closestRoomName, 'powerHauler', body, 'pHaul_' + Game.time + '_' + Math.floor(Math.random() * 100), {
-                            memory: { role: 'powerHauler', colony: closestRoomName, targetRoom: roomName, homeRoom: closestRoomName, targetId: powerBank.id }
-                        }, cost);
-                    }
-                }
-            }
-        }
+        if (roomType !== 'sk') continue;
 
         if (roomType === 'sk') {
             const roomStructures = global.State.structuresByRoom.get(roomName) || new Map();
