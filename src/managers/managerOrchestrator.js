@@ -95,6 +95,15 @@ function runRoomManagers() {
             { name: 'QuadSquadManager', slice: 1 }
         ];
 
+        if (room.controller.level < 6) {
+            const prune = ['NukeEvacuationManager', 'TerminalManager', 'LabManager'];
+            for (let i = managersConfig.length - 1; i >= 0; i--) {
+                if (prune.includes(managersConfig[i].name)) {
+                    managersConfig.splice(i, 1);
+                }
+            }
+        }
+
         const registeredManagers = Object.keys(require('./index').managers);
         for (const name of registeredManagers) {
             if (!managersConfig.find(c => c.name === name)) {

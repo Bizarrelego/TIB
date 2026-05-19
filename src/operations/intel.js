@@ -110,8 +110,10 @@ function gatherIntel(roomName) {
 
             if (intel.hostile && intel.owner && intel.towerCount === 0) {
                 intel.vulnerableNeighbor = true;
+                intel.harassmentTarget = true;
             } else {
                 intel.vulnerableNeighbor = false;
+                intel.harassmentTarget = false;
             }
 
             if (!intel.hostile && intel.type === 'regular' && intel.sources > 0) {
@@ -129,6 +131,10 @@ function gatherIntel(roomName) {
                 intel.expansionScore = score;
             } else {
                 intel.expansionScore = 0;
+            }
+
+            if (intel.vulnerableNeighbor) {
+                intel.expansionScore += 200;
             }
         }
     } else if (intel.type === 'highway') {

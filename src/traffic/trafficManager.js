@@ -1,4 +1,3 @@
-const DeadlockEngine = require('./deadlock');
 const ROLE_PRIORITIES = require('../constants/rolePriorities');
 const Logger = require('../utils/logger');
 
@@ -71,13 +70,7 @@ const TrafficManager = {
         try {
             if (!global.State || !global.State.trafficIntents || global.State.trafficIntents.size === 0) return;
 
-            // Phase 1: Build Dependency Graph & Identify Swaps
-            const dependencyGraph = new Map();
-            if (!(global.State.swapRegistry instanceof Map)) global.State.swapRegistry = new Map();
-            global.State.swapRegistry.clear();
-
-            // IMPROVEMENT: Replace string keys with integer bitwise keys.
-            // Reason: Optimizes performance. Bitwise operations and integer Map keys are significantly faster and reduce garbage collector overhead compared to string allocation.
+            // Phase 1: Build bitwise position map
             const currentPositions = new Map(); // Map<roomName, Map<int, string>>
 
             for (const roomName of global.State.scannedRooms || []) {
@@ -102,7 +95,7 @@ const TrafficManager = {
 
             global.State.currentPositions = currentPositions;
 
-            for (const [creepName, intent] of global.State.trafficIntents.entries()) {
+            for (const intent of global.State.trafficIntents.values()) {
                 const { creep, targetPos } = intent;
                 if (!creep || !targetPos) continue;
 
@@ -115,26 +108,12 @@ const TrafficManager = {
                 } else if (creep.heap && creep.heap.path && creep.heap.path.length > 0) {
                     // Pull from pre-calculated CostMatrix path if available
                     intendedNextPos = creep.heap.path[0];
-                } else {
-                     // Provide default intendedNextPos to skip heavy PathFinder inside loop
-                     // Since PathFinder is forbidden here.
-                     continue;
                 }
 
-                if (!intendedNextPos) continue;
-                intent.intendedNextPos = intendedNextPos;
-
-                const posKey = (intendedNextPos.x << 6) | intendedNextPos.y;
-                const roomMap = currentPositions.get(intendedNextPos.roomName);
-                const blockingCreepName = roomMap ? roomMap.get(posKey) : undefined;
-
-                if (blockingCreepName && blockingCreepName !== creepName) {
-                    dependencyGraph.set(creepName, blockingCreepName);
+                if (intendedNextPos) {
+                    intent.intendedNextPos = intendedNextPos;
                 }
             }
-
-            // Phase 2: Resolve Deadlocks
-            DeadlockEngine.detectAndResolve(global.State.trafficIntents, dependencyGraph);
         } catch (e) {
             console.log(`[TrafficManager CRITICAL]: ${e.stack}`);
         }
@@ -441,32 +420,6 @@ const TrafficManager = {
                     const intent = bucket[i];
                     const { creep, intendedNextPos } = intent;
                     if (!creep) continue;
-
-                if (global.State.swapRegistry && global.State.swapRegistry.has(creep.name)) {
-                    if (processedSwaps.has(creep.name)) continue;
-
-
-                    const blockingCreepName = global.State.swapRegistry.get(creep.name);
-                    const blockingCreep = global.State.creepLookup ? global.State.creepLookup.get(blockingCreepName) : Game.creeps[blockingCreepName];
-
-
-                    if (blockingCreep) {
-
-                        const dir = creep.pos.getDirectionTo(blockingCreep.pos); // Alternative logic
-
-                        // Custom getDirection logic if needed since getDirectionTo exists in Screeps API
-                        if (dir) {
-                           creep.move(dir);
-                           blockingCreep.move(((dir + 3) % 8) + 1);
-                        }
-                    }
-
-                    processedSwaps.add(creep.name);
-                    processedSwaps.add(blockingCreepName);
-                    global.State.trafficIntents.delete(creep.name);
-                    global.State.trafficIntents.delete(blockingCreepName);
-                    continue;
-                }
 
                 if (intendedNextPos) {
                     const posKey = (intendedNextPos.x << 6) | intendedNextPos.y;

@@ -14,6 +14,7 @@ class GlobalStateManager {
         this.controllersByRoom = new Map();
         this.sitesByRoom = new Map();
         this.mineralsByRoom = new Map();
+        this.aggressionState = 'Growth';
     }
 
     registerManager(name, instance) {
@@ -104,6 +105,7 @@ class GlobalStateManager {
         this.controllersByRoom.clear();
         this.sitesByRoom.clear();
         this.mineralsByRoom.clear();
+        this.aggressionState = 'Growth';
 
         if (this.scannedRooms) this.scannedRooms.clear();
         if (this.rooms) this.rooms.clear();
