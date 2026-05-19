@@ -56,6 +56,7 @@ module.exports = {
                         TrafficManager.setStatic(creep);
                         creep.heap.isStatic = true;
                         const status = TrafficManager.registerHarvest(creep, target);
+                        // activeTask is only cleared by the state machine lock at the top of the file
                         if (status === ERR_NOT_ENOUGH_RESOURCES) {
                             creep.heap.targetId = null;
                             creep.heap.state = null;
@@ -138,6 +139,7 @@ module.exports = {
                             TrafficManager.registerTransfer(creep, target, RESOURCE_ENERGY, amountToFill);
                             VirtualLedger.registerIntent(target.id, RESOURCE_ENERGY, amountToFill);
                         } else {
+                            // activeTask is only cleared by the state machine lock at the top of the file
                             creep.heap.targetId = null;
                             creep.heap.state = null;
                         }

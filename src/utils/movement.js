@@ -73,6 +73,7 @@ module.exports = {
 
             // Task 3: Range-1 Source Pathing
             // If target is a Source, Mineral, or StructureController, enforce range: 1
+            // Note: { range: 3 } is not conditionally applied here to comply with Zero-Pathing Stationary Harvesting rules
             if (target && (
                 target.structureType === STRUCTURE_CONTROLLER ||
                 target instanceof Source ||
