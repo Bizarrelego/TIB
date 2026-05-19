@@ -5,9 +5,11 @@ function run(room) {
         if (!room.controller || room.controller.level < 4) return;
 
         const structuresMap = global.State.structuresByRoom.get(room.name);
-        const sites = global.State.sitesByRoom.get(room.name) || [];
+        const sitesMap = global.State.sitesByRoom.get(room.name);
+        const sites = sitesMap ? (sitesMap instanceof Map ? Array.from(sitesMap.values()) : sitesMap) : [];
 
-        const storageStructures = structuresMap ? (structuresMap.get(STRUCTURE_STORAGE) || []) : [];
+        const storageStructuresMap = structuresMap ? structuresMap.get(STRUCTURE_STORAGE) : null;
+        const storageStructures = storageStructuresMap ? Array.from(storageStructuresMap.values()) : [];
 
         let hasStorageSite = false;
         for (let i = 0; i < sites.length; i++) {
@@ -21,7 +23,8 @@ function run(room) {
         if (storageStructures.length === 0 && !hasStorageSite) {
             // Respect Single-Site Construction rule
             if (sites.length === 0) {
-                const spawns = global.State.spawnsByRoom.get(room.name);
+                const spawnsMap = global.State.spawnsByRoom.get(room.name);
+                const spawns = spawnsMap ? Array.from(spawnsMap.values()) : [];
                 if (spawns && spawns.length > 0) {
                     const spawn = spawns[0];
                     const targetX = spawn.pos.x;

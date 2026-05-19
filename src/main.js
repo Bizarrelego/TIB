@@ -11,6 +11,11 @@ const EnergySourceTracker = require('./managers/EnergySourceTracker');
 const { executeManager } = require('./utils/errorHandler');
 
 module.exports.loop = function () {
+    if (!Memory.os_installed && global.Cache) {
+        global.Cache = undefined;
+        global.State = undefined;
+    }
+
     Logger.info(`--- Starting Tick ${Game.time} ---`);
 
     // Tick-level utilities

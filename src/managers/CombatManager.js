@@ -74,8 +74,9 @@ class CombatManager {
     static manageDomestic(creep) {
         if (!global.State || !global.State.hostilesByRoom) return false;
 
-        const hostiles = global.State.hostilesByRoom.get(creep.room.name);
-        if (hostiles && hostiles.length > 0) {
+        const hostilesMap = global.State.hostilesByRoom.get(creep.room.name);
+        const hostiles = hostilesMap ? Array.from(hostilesMap.values()) : [];
+        if (hostiles.length > 0) {
             return this.kite(creep, hostiles);
         }
         return false;

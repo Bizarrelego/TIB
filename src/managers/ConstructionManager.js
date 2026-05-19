@@ -15,7 +15,8 @@ module.exports = {
     run: Profiler.wrap('ConstructionManager.run', function(room) {
         try {
             // Get current active sites
-            const sites = global.State.sitesByRoom.get(room.name) || [];
+            const sitesMap = global.State.sitesByRoom.get(room.name);
+            const sites = sitesMap ? (sitesMap instanceof Map ? Array.from(sitesMap.values()) : sitesMap) : [];
 
             const plannerState = global.State.roomPlanner && global.State.roomPlanner.get(room.name);
             if (!plannerState) return;

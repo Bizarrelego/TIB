@@ -13,26 +13,30 @@ module.exports = {
         let sources = global.State.sourcesByRoom.get(room.name) || [];
 
         const structures = global.State.structuresByRoom.get(room.name);
-        const sites = global.State.sitesByRoom.get(room.name);
+        const sitesMap = global.State.sitesByRoom.get(room.name);
+        const sites = sitesMap ? (sitesMap instanceof Map ? Array.from(sitesMap.values()) : sitesMap) : [];
 
         let tasks = [];
 
         if (structures) {
-            const spawns = structures.get(STRUCTURE_SPAWN) || [];
+            const spawnsMap = structures.get(STRUCTURE_SPAWN);
+            const spawns = spawnsMap ? Array.from(spawnsMap.values()) : [];
             for (let i = 0; i < spawns.length; i++) {
                 const free = TrafficManager.getVirtualState(spawns[i], RESOURCE_ENERGY).free;
                 if (free > 0) {
                     tasks.push({ target: spawns[i], type: 'fill', priority: 100, free });
                 }
             }
-            const extensions = structures.get(STRUCTURE_EXTENSION) || [];
+            const extensionsMap = structures.get(STRUCTURE_EXTENSION);
+            const extensions = extensionsMap ? Array.from(extensionsMap.values()) : [];
             for (let i = 0; i < extensions.length; i++) {
                 const free = TrafficManager.getVirtualState(extensions[i], RESOURCE_ENERGY).free;
                 if (free > 0) {
                     tasks.push({ target: extensions[i], type: 'fill', priority: 90, free });
                 }
             }
-            const ramparts = structures.get(STRUCTURE_RAMPART) || [];
+            const rampartsMap = structures.get(STRUCTURE_RAMPART);
+            const ramparts = rampartsMap ? Array.from(rampartsMap.values()) : [];
             for (let i = 0; i < ramparts.length; i++) {
                 if (ramparts[i].hits < 5000) {
                     tasks.push({ target: ramparts[i], type: 'repair', priority: 70 });
@@ -64,12 +68,17 @@ module.exports = {
             const creep = workers[i];
             if (isFatigued(creep)) continue;
 
+            if (creep.heap.activeTask === 'harvest' && creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+                creep.heap.activeTask = null;
+            }
+
             if (creep.heap.state === 'harvest' && creep.heap.targetId) {
                 const source = Game.getObjectById(creep.heap.targetId);
                 if (source && isSleeping(source)) continue;
             }
             
             // Only assign if idle or task is finished
+            if (creep.heap.activeTask) continue;
             if (creep.heap.state && creep.heap.targetId) continue;
             
             if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
@@ -90,6 +99,9 @@ module.exports = {
                     if (task && task.target) {
                         creep.heap.state = task.type;
                         creep.heap.targetId = task.target.id;
+                        if (task.type === 'harvest') {
+                            creep.heap.activeTask = 'harvest';
+                        }
                         break;
                     }
                 }

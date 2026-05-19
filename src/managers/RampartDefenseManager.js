@@ -34,7 +34,8 @@ class RampartDefenseManager {
         const structuresMap = global.State.structuresByRoom.get(room.name);
         if (!structuresMap) return;
 
-        const ramparts = structuresMap.get(STRUCTURE_RAMPART) || [];
+        const rampartsMap = structuresMap.get(STRUCTURE_RAMPART);
+        const ramparts = rampartsMap ? Array.from(rampartsMap.values()) : [];
 
         // Pre-compute O(1) Rampart Lookups
         if (!global.State.rampartPosCache) global.State.rampartPosCache = new Map();
@@ -111,7 +112,8 @@ class RampartDefenseManager {
 
             if (!swapped) {
                 // No backup to swap with or not adjacent, standard retreat
-                const spawns = global.State.spawnsByRoom.get(room.name) || [];
+                const spawnsMap = global.State.spawnsByRoom.get(room.name);
+                const spawns = spawnsMap ? Array.from(spawnsMap.values()) : [];
                 if (spawns.length > 0) {
                     // Set retreating flag and temporarily unset parkPos to allow retreating without bouncing back
                     damagedCreep.heap.retreating = true;
