@@ -135,6 +135,17 @@ module.exports = {
                         }
                     }
 
+                    if (Game.rooms[roomName]) {
+                        const myCreeps = Game.rooms[roomName].find(FIND_MY_CREEPS);
+                        for (let i = 0; i < myCreeps.length; i++) {
+                            const c = myCreeps[i];
+                            if (c.heap && c.heap.isStatic === true) {
+                                if (returnMatrix === matrix) returnMatrix = returnMatrix.clone();
+                                returnMatrix.set(c.pos.x, c.pos.y, 255);
+                            }
+                        }
+                    }
+
                     if (global.State.currentPositions) {
                         const roomPositions = global.State.currentPositions.get(roomName);
                         if (roomPositions) {

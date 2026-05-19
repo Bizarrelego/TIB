@@ -64,13 +64,26 @@ module.exports = {
         
         // Top-Down Assignment: Creeps do not bid or scan for jobs.
         // The manager iterates over creeps and assigns tasks based on O(N) evaluation.
+        const sourceAssignments = new Map();
+
+        // Pre-count active tasks to hydrate the assignment tracking
         for (let i = 0; i < workers.length; i++) {
             const creep = workers[i];
-            if (isFatigued(creep)) continue;
-
             if (creep.heap.activeTask === 'harvest' && creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
                 creep.heap.activeTask = null;
             }
+            if (creep.heap.activeTask === 'harvest' && creep.heap.targetId) {
+                const count = sourceAssignments.get(creep.heap.targetId) || 0;
+                sourceAssignments.set(creep.heap.targetId, count + 1);
+            }
+        }
+
+        for (let i = 0; i < workers.length; i++) {
+            const creep = workers[i];
+
+            if (creep.heap.activeTask) continue;
+
+            if (isFatigued(creep)) continue;
 
             if (creep.heap.state === 'harvest' && creep.heap.targetId) {
                 const source = Game.getObjectById(creep.heap.targetId);
@@ -78,7 +91,6 @@ module.exports = {
             }
             
             // Only assign if idle or task is finished
-            if (creep.heap.activeTask) continue;
             if (creep.heap.state && creep.heap.targetId) continue;
             
             if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
@@ -97,6 +109,11 @@ module.exports = {
                 for (let j = 0; j < supplyTasks.length; j++) {
                     const task = supplyTasks[j];
                     if (task && task.target) {
+                        if (task.type === 'harvest') {
+                            const count = sourceAssignments.get(task.target.id) || 0;
+                            if (count >= 3) continue;
+                            sourceAssignments.set(task.target.id, count + 1);
+                        }
                         creep.heap.state = task.type;
                         creep.heap.targetId = task.target.id;
                         if (task.type === 'harvest') {

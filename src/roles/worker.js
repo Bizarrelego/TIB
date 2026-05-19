@@ -29,6 +29,8 @@ module.exports = {
                 const state = creep.heap.state;
                 const targetId = creep.heap.targetId;
 
+                creep.heap.isStatic = false;
+
                 if (!state || !targetId) continue;
 
                 const target = Game.getObjectById(targetId);
@@ -41,6 +43,7 @@ module.exports = {
                 if (state === 'harvest') {
                     if (creep.pos.isNearTo(target)) {
                         TrafficManager.setStatic(creep);
+                        creep.heap.isStatic = true;
                         const status = TrafficManager.registerHarvest(creep, target);
                         if (status === ERR_NOT_ENOUGH_RESOURCES) {
                             creep.heap.targetId = null;
