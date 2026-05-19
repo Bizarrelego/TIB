@@ -5,11 +5,14 @@
   "main": "src/main.js",
   "scripts": {
     "test": "npm run lint",
-    "lint": "eslint \"src/**/*.js\""
+    "lint": "eslint \"src/**/*.js\"",
+    "build": "rollup -c --bundleConfigAsCjs",
+    "watch": "rollup -c -w --bundleConfigAsCjs"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^29.0.2",
     "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-wasm": "^6.2.2",
     "eslint": "^8.57.1",
     "eslint-plugin-screeps": "^1.4.0",
     "rollup": "^4.60.4"
