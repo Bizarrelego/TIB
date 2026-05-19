@@ -22,6 +22,8 @@ const TrafficManager = {
         if (!(global.State.ledger instanceof Map)) global.State.ledger = new Map();
         if (!(global.State.swapRegistry instanceof Map)) global.State.swapRegistry = new Map();
         if (!(global.State.pipelineLedger instanceof Map)) global.State.pipelineLedger = new Map();
+        // Clear static creeps every tick
+        global.State.staticCreeps = new Map();
     },
 
     /**
@@ -344,6 +346,13 @@ const TrafficManager = {
         });
     },
 
+    registerStatic(creep) {
+        if (!creep) return;
+        if (!global.State) global.State = new Map();
+        if (!global.State.staticCreeps) global.State.staticCreeps = new Map();
+        global.State.staticCreeps.set(creep.name, { x: creep.pos.x, y: creep.pos.y, roomName: creep.pos.roomName });
+    },
+
     registerSwap(creepA, creepB) {
         if (global.State && global.State.swapRegistry) {
             global.State.swapRegistry.set(creepA.name, creepB.name);
@@ -462,13 +471,33 @@ const TrafficManager = {
 
                     if (blockingCreepName && blockingCreepName !== creep.name) {
                         const blockingLive = global.State.creepLookup ? global.State.creepLookup.get(blockingCreepName) : Game.creeps[blockingCreepName];
-                        if (blockingLive && blockingLive.fatigue === 0) { // check if friendly (it is friendly since it's in our lookups, though game creeps could be hostile but our lookups are only my creeps normally)
+                        if (blockingLive && blockingLive.fatigue === 0) {
+                            let canSwap = false;
+
                             if (!global.State.trafficIntents.has(blockingCreepName)) {
-                                // Swap with stationary friendly creep
+                                // Creep B is completely idle
+                                canSwap = true;
+                                if (global.State.staticCreeps && global.State.staticCreeps.has(blockingCreepName)) {
+                                    canSwap = false;
+                                }
+                            } else {
+                                const blockingIntent = global.State.trafficIntents.get(blockingCreepName);
+                                if (blockingIntent && blockingIntent.intendedNextPos &&
+                                    blockingIntent.intendedNextPos.x === creep.pos.x &&
+                                    blockingIntent.intendedNextPos.y === creep.pos.y &&
+                                    blockingIntent.intendedNextPos.roomName === creep.pos.roomName) {
+                                    // Creep B has a move intent in the EXACT OPPOSITE direction (head-on collision)
+                                    canSwap = true;
+                                }
+                            }
+
+                            if (canSwap) {
                                 const dir = creep.pos.getDirectionTo(intendedNextPos);
                                 if (dir) {
                                     creep.move(dir);
-                                    blockingLive.move(((dir + 3) % 8) + 1);
+                                    if (!global.State.trafficIntents.has(blockingCreepName)) {
+                                        blockingLive.move(((dir + 3) % 8) + 1);
+                                    }
                                 }
                                 global.State.trafficIntents.delete(creep.name);
                                 continue;

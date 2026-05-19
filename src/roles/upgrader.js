@@ -15,6 +15,8 @@ function run(creep, room) {
         if (creep.pos.getRangeTo(controller) > 1) {
             movement.moveTo(creep, controller);
         } else {
+            TrafficManager.registerStatic(creep);
+
             const storage = room.storage;
             if (storage && storage.isActive()) {
                 if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {

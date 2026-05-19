@@ -1,3 +1,4 @@
+const TrafficManager = require('../traffic/trafficManager');
 const movement = require('../utils/movement');
 
 function run(room) {
@@ -68,6 +69,8 @@ function run(room) {
             }
 
             // Once on spot, execute strictly stationary calls.
+            TrafficManager.registerStatic(creep);
+
             if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
                 // Pickup from floor if dropped by haulers or withdraw from core
                 if (storage && creep.pos.isNearTo(storage) && storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
