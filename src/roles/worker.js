@@ -4,7 +4,6 @@
  */
 
 const movement = require('../utils/movement');
-const TrafficManager = require('../traffic/trafficManager');
 const fatigueGating = require('../utils/fatigueGating');
 
 module.exports = {
@@ -19,7 +18,6 @@ module.exports = {
 
         const workers = roomCreeps.get('worker');
         if (!workers || workers.length === 0) return;
-        const VirtualLedger = require('../utils/VirtualLedger');
 
         for (let i = 0; i < workers.length; i++) {
             const creep = workers[i];
@@ -27,21 +25,14 @@ module.exports = {
                 if (creep.heap.isHarvesting && creep.store.getFreeCapacity() === 0) {
                     creep.heap.isHarvesting = false;
                     creep.heap.activeTask = null;
-                    creep.heap.isStatic = false; // Un-anchor from the source
                 }
                 if (!creep.heap.isHarvesting && creep.store.getUsedCapacity() === 0) {
                     creep.heap.isHarvesting = true;
                     creep.heap.activeTask = null;
-                    creep.heap.isStatic = false; // Un-anchor from the controller/hub
                 }
-
-                if (TrafficManager.checkPipeline(creep.id)) continue;
-                const isFatigued = fatigueGating.isFatigued(creep);
 
                 const state = creep.heap.state;
                 const targetId = creep.heap.targetId;
-
-                creep.heap.isStatic = false;
 
                 if (!state || !targetId) continue;
 
@@ -54,16 +45,8 @@ module.exports = {
 
                 if (state === 'harvest') {
                     if (creep.pos.isNearTo(target)) {
-                        TrafficManager.setStatic(creep);
-                        creep.heap.isStatic = true;
-                        const status = TrafficManager.registerHarvest(creep, target);
-                        if (status === ERR_NOT_ENOUGH_RESOURCES) {
-                            creep.heap.targetId = null;
-                            creep.heap.state = null;
-                        } else {
-                            creep.harvest(target);
-                        }
-                    } else if (!isFatigued) {
+                        creep.harvest(target);
+                    } else if (!fatigueGating.isFatigued(creep)) {
                         movement.moveTo(creep, target, { range: 1 });
                     }
                 } else if (state === 'pickup') {
@@ -73,32 +56,12 @@ module.exports = {
                         continue;
                     }
                     if (creep.pos.isNearTo(target)) {
-                        let status;
-                        const claimed = VirtualLedger.getClaimedAmount(target.id, RESOURCE_ENERGY);
-                        const amountToWithdraw = target.amount !== undefined
-                            ? Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), Math.max(0, target.amount - claimed))
-                            : Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), Math.max(0, TrafficManager.getVirtualState(target, RESOURCE_ENERGY).used - claimed));
-
-                        if (amountToWithdraw <= 0) {
-                            creep.heap.targetId = null;
-                            creep.heap.state = null;
-                            continue;
-                        }
-
                         if (target.amount !== undefined) {
-                            status = TrafficManager.registerPickup(creep, target, RESOURCE_ENERGY, amountToWithdraw);
+                            creep.pickup(target);
                         } else if (target.store !== undefined) {
-                            status = TrafficManager.registerWithdraw(creep, target, RESOURCE_ENERGY, amountToWithdraw);
+                            creep.withdraw(target, RESOURCE_ENERGY);
                         }
-                        if (status === ERR_NOT_ENOUGH_RESOURCES) {
-                            creep.heap.targetId = null;
-                            creep.heap.state = null;
-                        } else {
-                            VirtualLedger.registerIntent(target.id, RESOURCE_ENERGY, amountToWithdraw);
-                            if (target.amount !== undefined) creep.pickup(target);
-                            else creep.withdraw(target, RESOURCE_ENERGY);
-                        }
-                    } else if (!isFatigued) {
+                    } else if (!fatigueGating.isFatigued(creep)) {
                         movement.moveTo(creep, target);
                     }
                 } else if (state === 'withdraw') {
@@ -108,69 +71,40 @@ module.exports = {
                         continue;
                     }
                     if (creep.pos.isNearTo(target)) {
-                        let status;
-                        const claimed = VirtualLedger.getClaimedAmount(target.id, RESOURCE_ENERGY);
-                        const amountToWithdraw = target.store !== undefined
-                            ? Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), Math.max(0, TrafficManager.getVirtualState(target, RESOURCE_ENERGY).used - claimed))
-                            : Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), Math.max(0, target.amount - claimed));
-
-                        if (amountToWithdraw <= 0) {
-                            creep.heap.targetId = null;
-                            creep.heap.state = null;
-                            continue;
-                        }
-
                         if (target.store !== undefined) {
-                            status = TrafficManager.registerWithdraw(creep, target, RESOURCE_ENERGY, amountToWithdraw);
+                            creep.withdraw(target, RESOURCE_ENERGY);
                         } else if (target.amount !== undefined) {
-                            status = TrafficManager.registerPickup(creep, target, RESOURCE_ENERGY, amountToWithdraw);
+                            creep.pickup(target);
                         }
-                        if (status === ERR_NOT_ENOUGH_RESOURCES) {
-                            creep.heap.targetId = null;
-                            creep.heap.state = null;
-                        } else {
-                            VirtualLedger.registerIntent(target.id, RESOURCE_ENERGY, amountToWithdraw);
-                            if (target.store !== undefined) creep.withdraw(target, RESOURCE_ENERGY);
-                            else creep.pickup(target);
-                        }
-                    } else if (!isFatigued) {
+                    } else if (!fatigueGating.isFatigued(creep)) {
                         movement.moveTo(creep, target);
                     }
-                } else if (state === 'refill') { // Fixes the string bug
+                } else if (state === 'refill') {
                     if (creep.pos.isNearTo(target)) {
-                        const claimed = VirtualLedger.getClaimedAmount(target.id, RESOURCE_ENERGY);
-                        const amountToFill = Math.min(creep.store.getUsedCapacity(RESOURCE_ENERGY), Math.max(0, TrafficManager.getVirtualState(target, RESOURCE_ENERGY).free - claimed));
-
-                        if (amountToFill > 0) {
-                            TrafficManager.registerTransfer(creep, target, RESOURCE_ENERGY, amountToFill);
-                            VirtualLedger.registerIntent(target.id, RESOURCE_ENERGY, amountToFill);
-                            creep.transfer(target, RESOURCE_ENERGY);
-                        } else {
+                        const status = creep.transfer(target, RESOURCE_ENERGY);
+                        if (status === ERR_FULL) {
                             creep.heap.targetId = null;
                             creep.heap.state = null;
                         }
-                    } else if (!isFatigued) {
+                    } else if (!fatigueGating.isFatigued(creep)) {
                         movement.moveTo(creep, target);
                     }
                 } else if (state === 'build') {
                     if (creep.pos.inRangeTo(target, 3)) {
-                        TrafficManager.setStatic(creep);
-                        creep.build(target); // native API called after all
-                    } else if (!isFatigued) {
+                        creep.build(target);
+                    } else if (!fatigueGating.isFatigued(creep)) {
                         movement.moveTo(creep, target, { range: 3 });
                     }
                 } else if (state === 'upgrade') {
                     if (creep.pos.inRangeTo(target, 3)) {
-                        TrafficManager.setStatic(creep);
                         creep.upgradeController(target);
-                    } else if (!isFatigued) {
+                    } else if (!fatigueGating.isFatigued(creep)) {
                         movement.moveTo(creep, target, { range: 3 });
                     }
                 } else if (state === 'repair') {
                     if (creep.pos.inRangeTo(target, 3)) {
-                        TrafficManager.setStatic(creep);
                         creep.repair(target);
-                    } else if (!isFatigued) {
+                    } else if (!fatigueGating.isFatigued(creep)) {
                         movement.moveTo(creep, target, { range: 3 });
                     }
                 }
