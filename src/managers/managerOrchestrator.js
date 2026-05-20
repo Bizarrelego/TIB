@@ -329,9 +329,8 @@ function run(externalThrottlerFlags = {}) {
         if (trfMgr && typeof trfMgr.run === 'function') trfMgr.run();
     });
     executeWrapped('PipelineLock.clear', () => {
-        if (typeof PipelineLock !== 'undefined') {
-            const lock = new PipelineLock();
-            if (typeof lock.clear === 'function') lock.clear();
+        if (global.State && global.State.pipelineLedger) {
+            global.State.pipelineLedger.clear();
         }
     });
 

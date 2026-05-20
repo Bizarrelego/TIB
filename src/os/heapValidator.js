@@ -18,14 +18,15 @@ class HeapValidator {
 
         if (!global.Cache || !(global.Cache instanceof Map)) {
             console.log('[HeapValidator] global.Cache is missing or invalid. Triggering rehydration.');
+            global.Cache = new Map();
             needsRehydration = true;
-        } else {
-            for (const key of criticalKeys) {
-                if (!global.Cache.has(key) || !(global.Cache.get(key) instanceof Map)) {
-                    console.log(`[HeapValidator] Critical cache key '${key}' is missing or invalid. Triggering rehydration.`);
-                    needsRehydration = true;
-                    break;
-                }
+        }
+
+        for (const key of criticalKeys) {
+            if (!global.Cache.has(key) || !(global.Cache.get(key) instanceof Map)) {
+                console.log(`[HeapValidator] Critical cache key '${key}' is missing or invalid. Triggering rehydration.`);
+                global.Cache.set(key, new Map());
+                needsRehydration = true;
             }
         }
 

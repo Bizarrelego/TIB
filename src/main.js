@@ -5,14 +5,9 @@ const cpuBucketForecaster = require('./os/cpuBucketForecaster');
 const { executeManager } = require('./utils/errorHandler');
 
 module.exports.loop = function () {
-    if (!Memory.os_installed && global.Cache) {
+    if (!Memory.os_initialized && global.Cache) {
         global.Cache = undefined;
         global.State = undefined;
-    }
-
-    if (!global.Cache) {
-        const OSInitializer = require('./os/OSInitializer');
-        OSInitializer.init();
     }
 
     Logger.info(`--- Starting Tick ${Game.time} ---`);

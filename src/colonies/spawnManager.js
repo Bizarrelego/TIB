@@ -19,40 +19,24 @@ function buildRemoteCensus() {
         for (let i = 0; i < rHarvesters.length; i++) {
             const c = rHarvesters[i];
             if (c.memory.colony) {
-                if (!remoteCensus.has(c.memory.colony)) remoteCensus.set(c.memory.colony, new Map());
-                const colonyCensus = remoteCensus.get(c.memory.colony);
-                if (!colonyCensus.has('remoteHarvester')) colonyCensus.set('remoteHarvester', []);
-                colonyCensus.get('remoteHarvester').push(c);
+                if (!remoteCensus.has(c.memory.colony)) remoteCensus.set(c.memory.colony, { remoteHarvester: [], remoteHauler: [], reserver: [] });
+                remoteCensus.get(c.memory.colony).remoteHarvester.push(c);
             }
         }
         const rHaulers = rmCreeps.get('remoteHauler') || [];
         for (let i = 0; i < rHaulers.length; i++) {
             const c = rHaulers[i];
             if (c.memory.colony) {
-                if (!remoteCensus.has(c.memory.colony)) remoteCensus.set(c.memory.colony, new Map());
-                const colonyCensus = remoteCensus.get(c.memory.colony);
-                if (!colonyCensus.has('remoteHauler')) colonyCensus.set('remoteHauler', []);
-                colonyCensus.get('remoteHauler').push(c);
+                if (!remoteCensus.has(c.memory.colony)) remoteCensus.set(c.memory.colony, { remoteHarvester: [], remoteHauler: [], reserver: [] });
+                remoteCensus.get(c.memory.colony).remoteHauler.push(c);
             }
         }
         const rReservers = rmCreeps.get('reserver') || [];
         for (let i = 0; i < rReservers.length; i++) {
             const c = rReservers[i];
             if (c.memory.colony) {
-                if (!remoteCensus.has(c.memory.colony)) remoteCensus.set(c.memory.colony, new Map());
-                const colonyCensus = remoteCensus.get(c.memory.colony);
-                if (!colonyCensus.has('reserver')) colonyCensus.set('reserver', []);
-                colonyCensus.get('reserver').push(c);
-            }
-        }
-        const rHunters = rmCreeps.get('remoteHarvesterHunter') || [];
-        for (let i = 0; i < rHunters.length; i++) {
-            const c = rHunters[i];
-            if (c.memory.colony) {
-                if (!remoteCensus.has(c.memory.colony)) remoteCensus.set(c.memory.colony, new Map());
-                const colonyCensus = remoteCensus.get(c.memory.colony);
-                if (!colonyCensus.has('remoteHarvesterHunter')) colonyCensus.set('remoteHarvesterHunter', []);
-                colonyCensus.get('remoteHarvesterHunter').push(c);
+                if (!remoteCensus.has(c.memory.colony)) remoteCensus.set(c.memory.colony, { remoteHarvester: [], remoteHauler: [], reserver: [] });
+                remoteCensus.get(c.memory.colony).reserver.push(c);
             }
         }
     }
@@ -94,12 +78,7 @@ module.exports = {
             if (roomCreeps) {
                 const harvesters = roomCreeps.get('harvester');
                 if (harvesters) {
-                    harvesterCount = 0;
-                    for (const h of harvesters) {
-                        if (!h.ticksToLive || h.ticksToLive >= (h.body.length * 3) + 15) {
-                            harvesterCount++;
-                        }
-                    }
+                    harvesterCount = harvesters.length;
                 }
                 const workers = roomCreeps.get('worker');
                 if (workers) {
@@ -112,6 +91,20 @@ module.exports = {
             }
 
             const bootstrapReqs = BootstrapPlanner.getCreepRequirements(room);
+
+            // Spawns the initial bootstrap worker exclusively to start the colony economy
+            if (workerCount < bootstrapReqs.worker) {
+                const energyAvailable = spawnLedger.getAvailableEnergy();
+                const calcCapacity = (workerCount === 0 && energyAvailable < capacity && energyAvailable >= 200) ? energyAvailable : capacity;
+                const body = BodyCalc.calculateWorker(calcCapacity);
+                const cost = BodyCalc.getCost(body);
+                if (spawnLedger.canSpawn(cost)) {
+                    SpawnQueueManager.requestSpawn(room.name, 'worker', body, 'worker_' + Game.time, { memory: { role: 'worker', colony: room.name } }, cost);
+                }
+                const queue = new SpawnQueueManager();
+                queue.process(spawns, spawnLedger);
+                return;
+            }
 
             // Spawn harvesters first
             const targetHarvesters = room.controller.level <= 4 ? bootstrapReqs.harvester : spawnLedger.calculateHarvesterTarget(room, workerCount);
@@ -161,7 +154,7 @@ module.exports = {
             if (upgraders) upgraderCount = upgraders.length;
         }
 
-        let desiredUpgraders = spawnLedger.calculateUpgraderTarget(room, harvesterCount);
+        let desiredUpgraders = room.controller.level <= 4 ? bootstrapReqs.upgrader : spawnLedger.calculateUpgraderTarget(room, harvesterCount);
         if (room.controller.level >= 5) {
             desiredUpgraders = UpgraderManager.getDesiredCount(room);
         }
@@ -226,28 +219,13 @@ module.exports = {
             const exits = Game.map.describeExits(room.name);
             if (exits) {
                 // O(1) lookup for remote operations scaling
-                const census = remoteCensus.get(room.name) || new Map();
-                let colonyRemoteHarvesters = census.get('remoteHarvester') || [];
-                let colonyReservers = census.get('reserver') || [];
-                let colonyHunters = census.get('remoteHarvesterHunter') || [];
+                const census = remoteCensus.get(room.name) || { remoteHarvester: [], remoteHauler: [], reserver: [] };
+                let colonyRemoteHarvesters = census.remoteHarvester;
+                let colonyReservers = census.reserver;
 
                 for (const direction in exits) {
                     const targetRoomName = exits[direction];
                     const intel = global.State.intel.get(targetRoomName);
-
-                    if (intel && (intel.hostile || intel.enemyRemoteMiners)) {
-                        const activeHunters = colonyHunters.filter(c => c.memory.targetRoom === targetRoomName).length;
-                        const queuedHunters = SpawnQueueManager.getQueuedCount(room.name, 'remoteHarvesterHunter', targetRoomName);
-                        if (activeHunters + queuedHunters === 0) {
-                            const body = [ATTACK, ATTACK, MOVE, MOVE];
-                            const cost = BodyCalc.getCost(body);
-                            if (capacity >= cost && spawnLedger.canSpawn(cost)) {
-                                SpawnQueueManager.requestSpawn(room.name, 'remoteHarvesterHunter', body, 'hunter_' + Game.time, {
-                                    memory: { role: 'remoteHarvesterHunter', colony: room.name, targetRoom: targetRoomName }
-                                }, cost);
-                            }
-                        }
-                    }
 
                     if (intel && intel.type === 'regular' && !intel.hostile) {
                         const activeReserver = colonyReservers.find(c => c.memory.targetRoom === targetRoomName);
@@ -274,56 +252,6 @@ module.exports = {
                                     SpawnQueueManager.requestSpawn(room.name, 'remoteHarvester', body, 'remoteHarvester_' + Game.time, {
                                         memory: { role: 'remoteHarvester', colony: room.name, targetRoom: targetRoomName, targetSourceId: null }
                                     }, cost);
-                                }
-                            }
-
-                            const colonyRemoteHaulers = census.get('remoteHauler') || [];
-                            const roomRemoteHaulers = colonyRemoteHaulers.filter(c => c.memory.targetRoom === targetRoomName);
-                            let activeHaulers = 0;
-                            for (let i = 0; i < roomRemoteHaulers.length; i++) {
-                                const h = roomRemoteHaulers[i];
-                                // Creep Pre-Spawning Matrix logic from AGENTS.md
-                                // Assuming spawnTime + cachedPathLength roughly correlates to ticksToLive vs distance.
-                                // Actually we just need to ensure we don't count creeps that are about to die.
-                                const distance = Game.map.getRoomLinearDistance(room.name, targetRoomName) * 50;
-                                const spawnTime = h.body ? h.body.length * 3 : 0;
-                                if (!h.ticksToLive || h.ticksToLive >= spawnTime + distance) {
-                                    activeHaulers++;
-                                }
-                            }
-                            const queuedHaulers = SpawnQueueManager.getQueuedCount(room.name, 'remoteHauler', targetRoomName);
-
-                            if (activeHaulers + queuedHaulers < sourcesCount) {
-                                const sourceCapacity = (intel.reservation === 'jules' || activeReserver) ? 3000 : 1500;
-                                const distance = Game.map.getRoomLinearDistance(room.name, targetRoomName) * 50;
-                                const requiredCarry = Math.ceil((sourceCapacity / 1500) * (distance / 100));
-
-                                let carry = 0;
-                                let move = 0;
-                                let cost = 0;
-
-                                while (carry < requiredCarry && carry + move < 50) {
-                                    if (cost + BODYPART_COST[CARRY] + BODYPART_COST[MOVE] <= capacity) {
-                                        carry++;
-                                        move++;
-                                        cost += BODYPART_COST[CARRY] + BODYPART_COST[MOVE];
-                                    } else {
-                                        break;
-                                    }
-                                }
-
-                                if (carry === 0 && capacity >= 100) {
-                                    carry = 1; move = 1; cost = 100;
-                                }
-
-                                if (carry > 0) {
-                                    const body = BodyCalc.buildArray({ [CARRY]: carry, [MOVE]: move });
-                                    const actualCost = BodyCalc.getCost(body);
-                                    if (capacity >= actualCost && spawnLedger.canSpawn(actualCost)) {
-                                        SpawnQueueManager.requestSpawn(room.name, 'remoteHauler', body, 'remoteHauler_' + Game.time, {
-                                            memory: { role: 'remoteHauler', colony: room.name, targetRoom: targetRoomName }
-                                        }, actualCost);
-                                    }
                                 }
                             }
 

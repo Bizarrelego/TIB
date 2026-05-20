@@ -24,6 +24,53 @@ class BootstrapPlanner {
         const structuresMap = global.State.structuresByRoom.get(room.name) || new Map();
         const sites = global.State.sitesByRoom.get(room.name) || [];
 
+        // Fast-Start Heuristic: Prioritize placing Containers near Controller and Sources immediately
+        const terrain = Game.map.getRoomTerrain(room.name);
+        const fastStartTargets = [];
+        if (room.controller) fastStartTargets.push(room.controller);
+        const sources = global.State.sourcesByRoom.get(room.name) || [];
+        for (const s of sources) fastStartTargets.push(s);
+
+        for (const target of fastStartTargets) {
+            let placed = false;
+            for (let dx = -1; dx <= 1; dx++) {
+                for (let dy = -1; dy <= 1; dy++) {
+                    if (dx === 0 && dy === 0) continue;
+                    const px = target.pos.x + dx;
+                    const py = target.pos.y + dy;
+
+                    if (px < 1 || px > 48 || py < 1 || py > 48) continue;
+                    if (terrain.get(px, py) === TERRAIN_MASK_WALL) continue;
+
+                    let occupied = false;
+                    const existingContainers = structuresMap.get(STRUCTURE_CONTAINER) || new Map();
+                    for (const struct of existingContainers.values()) {
+                        if (struct.pos.x === px && struct.pos.y === py) occupied = true;
+                    }
+                    if (!occupied) {
+                        for (const site of sites) {
+                            if (site.pos.x === px && site.pos.y === py) occupied = true;
+                        }
+                    }
+
+                    const id = `container-${px}-${py}`;
+                    if (!occupied && !plannedStructures.has(id)) {
+                        plannedStructures.set(id, {
+                            pos: new RoomPosition(px, py, room.name),
+                            type: STRUCTURE_CONTAINER,
+                            id: id
+                        });
+                        placed = true;
+                        break;
+                    } else if (plannedStructures.has(id) || occupied) {
+                         placed = true;
+                         break;
+                    }
+                }
+                if (placed) break;
+            }
+        }
+
         for (const [structureType, offsets] of BASE_LAYOUT_STAMP.entries()) {
             const limits = CONTROLLER_STRUCTURES[structureType];
             const limit = limits ? (limits[rcl] || 0) : 0;
@@ -103,30 +150,32 @@ class BootstrapPlanner {
         const rcl = room.controller.level;
 
         let reqs = {
-            worker: 15,
+            worker: 1,
             harvester: 0,
             domesticHauler: 0,
             upgrader: 0
         };
 
         if (rcl === 1) {
-            reqs.worker = 0;
+            reqs.worker = 1;
             reqs.harvester = 2;
             reqs.domesticHauler = 2;
-            reqs.upgrader = 4;
+            reqs.upgrader = 2;
         } else if (rcl === 2) {
-            reqs.worker = 0;
+            reqs.worker = 2;
             reqs.harvester = 2; // Generally 1 per source
             reqs.domesticHauler = 2;
             reqs.upgrader = 4;
         } else if (rcl === 3) {
-            reqs.worker = 10;
+            reqs.worker = 4;
             reqs.harvester = 2;
             reqs.domesticHauler = 2;
+            reqs.upgrader = 3;
         } else if (rcl >= 4) {
-            reqs.worker = 6;
+            reqs.worker = 4;
             reqs.harvester = 2;
             reqs.domesticHauler = 2;
+            reqs.upgrader = 2;
         }
 
         return reqs;

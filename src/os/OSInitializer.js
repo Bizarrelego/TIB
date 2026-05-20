@@ -11,15 +11,16 @@ const VirtualLedger = require('../utils/VirtualLedger');
 
 class OSInitializer {
     static init() {
-        Logger.info('Respawn detected or first execution. Invalidating cache.');
-        global.Cache = new Map();
-        globalState.clear();
-        global.State = globalState;
-        Memory.os_initialized = true;
-    }
-
-    static run() {
         Logger.debug('Phase 1: OS Init & Cache');
+
+        if (!global.Cache) {
+            Logger.info('Respawn detected or first execution. Invalidating cache.');
+            global.Cache = new Map();
+            globalState.clear();
+            global.State = globalState;
+            Memory.os_initialized = true;
+            CacheRegistry.init();
+        }
 
         if (memoryProxy && typeof memoryProxy.init === 'function') {
             memoryProxy.init();
@@ -45,12 +46,12 @@ class OSInitializer {
         VirtualLedger.clear();
         garbageCollector();
 
-        if (!global.Cache) {
-            CacheRegistry.init();
-        }
-
         resetRecovery.checkAndRecover();
         heapValidator.validate();
+    }
+
+    static run() {
+        OSInitializer.init();
     }
 }
 

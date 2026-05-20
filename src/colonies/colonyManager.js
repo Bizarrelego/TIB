@@ -1,6 +1,7 @@
 const SpawnLedger = require('./spawnLedger');
 const defense = require('./defense');
 const scavengingManager = require('./scavengingManager');
+const spawnManager = require('./spawnManager');
 
 /**
  * O(N) Top-Down Assignment for Early RCL (1-2) Progression.
@@ -23,6 +24,9 @@ function manageEarlyProgression(room, _spawnLedger) {
         if (!creep.heap) creep.heap = {};
         if (!creep.heap.targetId && sources.length > 0) {
             creep.heap.targetId = sources[i % sources.length].id;
+        }
+        if (!creep.memory.targetSourceId && sources.length > 0) {
+            creep.memory.targetSourceId = sources[i % sources.length].id;
         }
     }
 
@@ -67,6 +71,8 @@ module.exports = { run: function colonyManager() {
                 
                 defense.run(room);
                 scavengingManager.run(room);
+                
+                spawnManager.run(room, spawnLedger);
                 
                 manageEarlyProgression(room, spawnLedger);
 
