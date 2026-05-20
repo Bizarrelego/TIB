@@ -13,6 +13,8 @@ const { wrapModuleFunctions } = require('../utils/moduleWrapper');
 
 // Phase Managers
 const discoveryManager = require('../state/discoveryManager');
+const OSInitializer = require('../os/OSInitializer');
+const IntentManager = require('../os/IntentManager');
 const eventLogRadar = require('../os/eventLogRadar');
 const stateScanner = require('../state/stateScanner');
 const colonyManager = require('../colonies/colonyManager');
@@ -180,10 +182,60 @@ function runRoomManagers() {
  * @param {number} phase - The execution phase to run (2-6).
  * @param {Object} throttlerFlags - CPU Throttler output.
  */
+
+const registeredTopLevelManagers = new Map();
+
+function init() {
+    registeredTopLevelManagers.set('OSInitializer', typeof OSInitializer !== 'undefined' ? OSInitializer : require('../os/OSInitializer'));
+    registeredTopLevelManagers.set('globalState', typeof globalState !== 'undefined' ? globalState : require('../state/globalState'));
+    registeredTopLevelManagers.set('colonyManager', typeof colonyManager !== 'undefined' ? colonyManager : require('../colonies/colonyManager'));
+    registeredTopLevelManagers.set('operationsManager', typeof operationsManager !== 'undefined' ? operationsManager : require('../operations/operationsManager'));
+    registeredTopLevelManagers.set('trafficManager', typeof trafficManager !== 'undefined' ? trafficManager : require('../traffic/trafficManager'));
+    registeredTopLevelManagers.set('IntentManager', typeof IntentManager !== 'undefined' ? IntentManager : require('../os/IntentManager'));
+}
+
+const cpuThrottler = require('../os/cpuThrottler');
+const managersIntegration = require('./index');
+
+function run(externalThrottlerFlags = {}) {
+    let throttlerFlags = externalThrottlerFlags;
+
+    for (let phase = 1; phase <= 6; phase++) {
+        module.exports.runPhase(phase, throttlerFlags);
+
+        // After Phase 1 (OS Init & Cache) we have global state rehydrated.
+        // We must calculate throttler flags and register all integration managers
+        // before we continue to Phase 2 (Global State).
+        if (phase === 1) {
+            executeManager('cpuThrottler.run', () => {
+                throttlerFlags = cpuThrottler.run() || {};
+            });
+            executeManager('managersIntegration.init', () => managersIntegration.init(registeredTopLevelManagers.get('globalState')));
+        }
+    }
+}
+
 function runPhase(phase, throttlerFlags = {}) {
     const { skipState, skipColonies, skipManagers, skipOperations } = throttlerFlags;
 
     switch(phase) {
+
+        case 1:
+            Logger.debug('Phase 1: OS Init & Cache');
+            executeManager('OSInitializer', () => {
+                const osInit = registeredTopLevelManagers.get('OSInitializer');
+                if (osInit) {
+                    osInit.init();
+                }
+            });
+            executeManager('trafficManager.setup', () => {
+                const trfMgr = registeredTopLevelManagers.get('trafficManager');
+                if (trfMgr && trfMgr.setup) {
+                    trfMgr.setup();
+                }
+            });
+            break;
+
         case 2:
             Logger.debug('Phase 2: Global State');
             executeManager('discoveryManager', () => { if (discoveryManager) discoveryManager(); });
@@ -194,7 +246,10 @@ function runPhase(phase, throttlerFlags = {}) {
                     if (roomEventManager) roomEventManager();
                 });
                 executeManager('stateScanner', () => { if (stateScanner) stateScanner(); });
-                executeManager('globalState.scan', () => { if (globalState && globalState.scan) globalState.scan(); });
+                executeManager('globalState.scan', () => {
+                    const gState = registeredTopLevelManagers.get('globalState');
+                    if (gState && gState.scan) gState.scan();
+                });
 
                 executeManager('roomHasher', () => {
                     if (global.State && global.State.rooms) {
@@ -214,7 +269,10 @@ function runPhase(phase, throttlerFlags = {}) {
             Logger.debug('Phase 3: Colonies');
             if (!skipColonies) {
                 executeManager('ledgerReset', () => { VirtualLedger.clear(); });
-                executeManager('colonyManager', () => { if (colonyManager) colonyManager(); });
+                executeManager('colonyManager', () => {
+                    const colMgr = registeredTopLevelManagers.get('colonyManager');
+                    if (colMgr) colMgr();
+                });
                 executeManager('defconManager', () => { if (global.State && global.State.rooms) { for (const room of global.State.rooms.values()) { defconManager.run(room); } } });
             }
 
@@ -257,7 +315,10 @@ function runPhase(phase, throttlerFlags = {}) {
                     const AllianceIntelManager = globalState.getManager('AllianceIntelManager');
                     if (AllianceIntelManager && typeof AllianceIntelManager.run === 'function') AllianceIntelManager.run();
                 });
-                executeManager('operationsManager', () => { if (operationsManager) operationsManager(); });
+                executeManager('operationsManager', () => {
+                    const opMgr = registeredTopLevelManagers.get('operationsManager');
+                    if (opMgr) opMgr();
+                });
                 executeManager('interShardMemoryManager', () => { if (interShardMemoryManager && typeof interShardMemoryManager._loadLocal === 'function') { interShardMemoryManager._loadLocal(); } });
                 executeManager('RawMemoryManager.init', () => { if (RawMemoryManager && typeof RawMemoryManager.init === 'function') { RawMemoryManager.init(); } });
             }
@@ -265,17 +326,25 @@ function runPhase(phase, throttlerFlags = {}) {
 
         case 5:
             Logger.debug('Phase 5: Running Traffic Control');
-            executeManager('trafficManager.run', () => { if (trafficManager && trafficManager.run) trafficManager.run(); });
+            executeManager('trafficManager.run', () => {
+                const trfMgr = registeredTopLevelManagers.get('trafficManager');
+                if (trfMgr && trfMgr.run) trfMgr.run();
+            });
             executeManager('PipelineLock.clear', () => { const lock = new PipelineLock(); lock.clear(); });
             break;
 
         case 6:
             Logger.debug('Phase 6: Executing Intents & Sleep');
-            executeManager('trafficManager.executeIntents', () => { if (trafficManager && trafficManager.executeIntents) trafficManager.executeIntents(); });
+            executeManager('trafficManager.executeIntents', () => {
+                const trfMgr = registeredTopLevelManagers.get('trafficManager');
+                if (trfMgr && trfMgr.executeIntents) trfMgr.executeIntents();
+            });
 
-            executeManager('global.State.intentManager.executeIntents', () => {
+            executeManager('IntentManager.executeIntents', () => {
                 if (global.State && global.State.intentManager && typeof global.State.intentManager.executeIntents === 'function') {
                     global.State.intentManager.executeIntents();
+                } else if (registeredTopLevelManagers.get('IntentManager')) {
+                    // Fallback to static class call if it's implemented there
                 }
             });
 
@@ -289,6 +358,8 @@ function runPhase(phase, throttlerFlags = {}) {
 }
 
 module.exports = {
+    init,
+    run: Profiler.wrap('managerOrchestrator.run', run),
     runPhase: Profiler.wrap('managerOrchestrator.runPhase', runPhase),
     runRoomManagers // Exported for testing/mocking if needed
 };
