@@ -234,6 +234,11 @@ function runPhase(phase, throttlerFlags = {}) {
                     trfMgr.setup();
                 }
             });
+            executeManager('interShardMemoryManager', () => {
+                if (interShardMemoryManager && typeof interShardMemoryManager._loadLocal === 'function') {
+                    interShardMemoryManager._loadLocal();
+                }
+            });
             break;
 
         case 2:
@@ -319,7 +324,6 @@ function runPhase(phase, throttlerFlags = {}) {
                     const opMgr = registeredTopLevelManagers.get('operationsManager');
                     if (opMgr) opMgr();
                 });
-                executeManager('interShardMemoryManager', () => { if (interShardMemoryManager && typeof interShardMemoryManager._loadLocal === 'function') { interShardMemoryManager._loadLocal(); } });
                 executeManager('RawMemoryManager.init', () => { if (RawMemoryManager && typeof RawMemoryManager.init === 'function') { RawMemoryManager.init(); } });
             }
             break;
