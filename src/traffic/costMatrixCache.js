@@ -8,30 +8,45 @@ const CostMatrixCache = {
         if (!global.State) global.State = new Map();
         if (!global.State.costMatrices) global.State.costMatrices = new Map();
 
-        if (global.State.costMatrices.has(roomName)) {
-            return PathFinder.CostMatrix.deserialize(global.State.costMatrices.get(roomName));
-        }
+        const currentHash = RoomHasher.generate(roomName);
+        let cachedHash = null;
 
-        // Attempt to deserialize from RawMemory to mitigate global reset CPU spikes
-        const rawData = RawMemoryManager.getSegment(MEMORY_SEGMENTS.COST_MATRICES);
-        if (rawData) {
-            try {
-                const parsed = JSON.parse(rawData);
-                if (parsed[roomName]) {
-                    global.State.costMatrices.set(roomName, parsed[roomName]);
-                    return PathFinder.CostMatrix.deserialize(parsed[roomName]);
-                }
-            } catch (e) {
-                console.log(`[CostMatrixCache] Failed to parse raw memory: ${e.message}`);
+        if (global.State.roomHashes && global.State.roomHashes.has(roomName)) {
+            cachedHash = global.State.roomHashes.get(roomName);
+        } else if (global.Cache && global.Cache.has('roomHashes')) {
+            const roomHashes = global.Cache.get('roomHashes');
+            if (roomHashes.has(roomName)) {
+                cachedHash = roomHashes.get(roomName);
             }
         }
 
-        const matrices = global.Cache.get('costMatrices');
-        if (matrices.has(roomName)) {
-            const serialized = matrices.get(roomName);
-            global.State.costMatrices.set(roomName, serialized);
-            return PathFinder.CostMatrix.deserialize(serialized);
+        if (currentHash === cachedHash) {
+            if (global.State.costMatrices.has(roomName)) {
+                return PathFinder.CostMatrix.deserialize(global.State.costMatrices.get(roomName));
+            }
+
+            // Attempt to deserialize from RawMemory to mitigate global reset CPU spikes
+            const rawData = RawMemoryManager.getSegment(MEMORY_SEGMENTS.COST_MATRICES);
+            if (rawData) {
+                try {
+                    const parsed = JSON.parse(rawData);
+                    if (parsed[roomName]) {
+                        global.State.costMatrices.set(roomName, parsed[roomName]);
+                        return PathFinder.CostMatrix.deserialize(parsed[roomName]);
+                    }
+                } catch (e) {
+                    console.log(`[CostMatrixCache] Failed to parse raw memory: ${e.message}`);
+                }
+            }
+
+            const matrices = global.Cache.get('costMatrices');
+            if (matrices.has(roomName)) {
+                const serialized = matrices.get(roomName);
+                global.State.costMatrices.set(roomName, serialized);
+                return PathFinder.CostMatrix.deserialize(serialized);
+            }
         }
+
         return CostMatrixCache.generate(roomName);
     },
     set: (roomName, costMatrix) => {
