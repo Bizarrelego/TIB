@@ -277,6 +277,56 @@ module.exports = {
                                 }
                             }
 
+                            const colonyRemoteHaulers = census.get('remoteHauler') || [];
+                            const roomRemoteHaulers = colonyRemoteHaulers.filter(c => c.memory.targetRoom === targetRoomName);
+                            let activeHaulers = 0;
+                            for (let i = 0; i < roomRemoteHaulers.length; i++) {
+                                const h = roomRemoteHaulers[i];
+                                // Creep Pre-Spawning Matrix logic from AGENTS.md
+                                // Assuming spawnTime + cachedPathLength roughly correlates to ticksToLive vs distance.
+                                // Actually we just need to ensure we don't count creeps that are about to die.
+                                const distance = Game.map.getRoomLinearDistance(room.name, targetRoomName) * 50;
+                                const spawnTime = h.body ? h.body.length * 3 : 0;
+                                if (!h.ticksToLive || h.ticksToLive >= spawnTime + distance) {
+                                    activeHaulers++;
+                                }
+                            }
+                            const queuedHaulers = SpawnQueueManager.getQueuedCount(room.name, 'remoteHauler', targetRoomName);
+
+                            if (activeHaulers + queuedHaulers < sourcesCount) {
+                                const sourceCapacity = (intel.reservation === 'jules' || activeReserver) ? 3000 : 1500;
+                                const distance = Game.map.getRoomLinearDistance(room.name, targetRoomName) * 50;
+                                const requiredCarry = Math.ceil((sourceCapacity / 1500) * (distance / 100));
+
+                                let carry = 0;
+                                let move = 0;
+                                let cost = 0;
+
+                                while (carry < requiredCarry && carry + move < 50) {
+                                    if (cost + BODYPART_COST[CARRY] + BODYPART_COST[MOVE] <= capacity) {
+                                        carry++;
+                                        move++;
+                                        cost += BODYPART_COST[CARRY] + BODYPART_COST[MOVE];
+                                    } else {
+                                        break;
+                                    }
+                                }
+
+                                if (carry === 0 && capacity >= 100) {
+                                    carry = 1; move = 1; cost = 100;
+                                }
+
+                                if (carry > 0) {
+                                    const body = BodyCalc.buildArray({ [CARRY]: carry, [MOVE]: move });
+                                    const actualCost = BodyCalc.getCost(body);
+                                    if (capacity >= actualCost && spawnLedger.canSpawn(actualCost)) {
+                                        SpawnQueueManager.requestSpawn(room.name, 'remoteHauler', body, 'remoteHauler_' + Game.time, {
+                                            memory: { role: 'remoteHauler', colony: room.name, targetRoom: targetRoomName }
+                                        }, actualCost);
+                                    }
+                                }
+                            }
+
                         }
                     }
                 }
