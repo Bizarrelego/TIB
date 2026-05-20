@@ -28,24 +28,6 @@ module.exports = function discoveryManager() {
     if (!state.roomExits) state.roomExits = new Map();
     if (!state.sourceWalkableTiles) state.sourceWalkableTiles = new Map();
     
-    if (!state.getEvents) {
-        state.getEvents = function(roomName) {
-            const room = Game.rooms[roomName];
-            if (!room) return [];
-
-            const currentEventLog = room.getEventLog() || [];
-            const previousEventLog = global.State.eventCache.get(roomName) || [];
-
-            // Event logs are append-only. New events are at the end.
-            const newEvents = currentEventLog.slice(previousEventLog.length);
-
-            // Update cache so the next call diffs against this
-            global.State.eventCache.set(roomName, currentEventLog);
-
-            return newEvents;
-        };
-    }
-
     // Initial Room Scan for Scanned Rooms
     for (const roomName in Game.rooms) {
         const room = Game.rooms[roomName];

@@ -8,10 +8,15 @@ const Profiler = require('../utils/profiler');
 function eventLogRadar() {
     if (typeof Game === 'undefined' || !Game.rooms) return;
 
+    if (!global.State) global.State = new Map();
+    if (!global.State.currentTickEvents) global.State.currentTickEvents = new Map();
+    global.State.currentTickEvents.clear();
+
     for (const room of Object.values(Game.rooms)) {
         const roomName = room.name;
         // Parse the native engine event log directly
         const currentEventLog = room.getEventLog() || [];
+        global.State.currentTickEvents.set(roomName, currentEventLog);
 
         // Event log in screeps is generated per tick. We process the entire log.
         const events = currentEventLog;
