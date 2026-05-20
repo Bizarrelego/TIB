@@ -57,7 +57,7 @@ function manageEarlyProgression(room, _spawnLedger) {
  * Instantiates the SpawnLedger to track energy use during the tick,
  * passing it as a singleton-like service to spawnManager.
  */
-module.exports = function colonyManager() {
+module.exports = { run: function colonyManager() {
     if (!global.State || !global.State.rooms) return;
     for (const room of global.State.rooms.values()) {
         if (room.controller && room.controller.my === true) {
@@ -90,4 +90,4 @@ module.exports = function colonyManager() {
             }
         }
     }
-};
+} };

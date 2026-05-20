@@ -10,10 +10,14 @@ module.exports.loop = function () {
         global.State = undefined;
     }
 
+    if (!global.Cache) {
+        const OSInitializer = require('./os/OSInitializer');
+        OSInitializer.init();
+    }
+
     Logger.info(`--- Starting Tick ${Game.time} ---`);
 
     // Tick-level utilities
-    executeManager('cpuBucketForecaster.update', () => cpuBucketForecaster.update());
 
     managerOrchestrator.init();
 

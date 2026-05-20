@@ -27,6 +27,10 @@ class ObjectPool {
         });
     }
 
+    init() {
+        this.getPoolStorage();
+    }
+
     /**
      * Gets or initializes the pool storage from global.Cache
      * @returns {Map} The objectPools map

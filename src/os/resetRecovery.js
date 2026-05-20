@@ -1,4 +1,8 @@
 class ResetRecovery {
+    check() {
+        this.checkAndRecover();
+    }
+
     checkAndRecover() {
         if (global.__resetDetected === undefined) {
             global.__resetDetected = true;

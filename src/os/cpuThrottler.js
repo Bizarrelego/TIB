@@ -79,5 +79,6 @@ function run() {
 }
 
 module.exports = {
-    run
+    run,
+    throttle: run
 };
