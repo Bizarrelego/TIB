@@ -189,7 +189,7 @@ function manageEarlyProgression(room, _spawnLedger) {
         let intent = creep.heap.intent;
         if (usedCap === 0) intent = 'gather';
         else if (freeCap === 0) intent = 'work';
-        else if (!intent) intent = usedCap > 0 ? 'work' : 'gather';
+        else if (!intent) intent = 'gather';
         creep.heap.intent = intent;
 
         // 2. Action State Resolution
@@ -212,13 +212,14 @@ function manageEarlyProgression(room, _spawnLedger) {
             let bestTarget = validWithdrawTargets[0];
             let minDistance = Infinity;
             for (let t = 0; t < validWithdrawTargets.length; t++) {
-                const dist = Math.max(Math.abs(creep.pos.x - validWithdrawTargets[t].pos.x), Math.abs(creep.pos.y - validWithdrawTargets[t].pos.y));
+                const target = validWithdrawTargets[t];
+                const dist = Math.max(Math.abs(creep.pos.x - target.pos.x), Math.abs(creep.pos.y - target.pos.y));
                 if (dist < minDistance) {
                     minDistance = dist;
-                    bestTarget = validWithdrawTargets[t];
+                    bestTarget = target;
                 }
             }
-            creep.heap.targetId = bestTarget.id;
+            creep.heap.targetId = bestTarget ? bestTarget.id : null;
         } else if (state === 'harvest') {
             let bestSource = null;
             let minSat = Infinity;
@@ -278,6 +279,7 @@ function manageEarlyProgression(room, _spawnLedger) {
                         const typeB = sites[s].structureType;
                         if (typeB === STRUCTURE_SPAWN && typeA !== STRUCTURE_SPAWN) bestSite = sites[s];
                         else if (typeB === STRUCTURE_EXTENSION && typeA !== STRUCTURE_EXTENSION && typeA !== STRUCTURE_SPAWN) bestSite = sites[s];
+                        else if (typeB === STRUCTURE_CONTAINER && typeA !== STRUCTURE_CONTAINER && typeA !== STRUCTURE_EXTENSION && typeA !== STRUCTURE_SPAWN) bestSite = sites[s];
                     }
                     creep.heap.targetId = bestSite.id;
                 }
