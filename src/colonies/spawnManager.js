@@ -279,7 +279,21 @@ module.exports = {
 
                             const colonyRemoteHaulers = census.get('remoteHauler') || [];
                             const roomRemoteHaulers = colonyRemoteHaulers.filter(c => c.memory.targetRoom === targetRoomName);
-                            if (roomRemoteHaulers.length < sourcesCount) {
+                            let activeHaulers = 0;
+                            for (let i = 0; i < roomRemoteHaulers.length; i++) {
+                                const h = roomRemoteHaulers[i];
+                                // Creep Pre-Spawning Matrix logic from AGENTS.md
+                                // Assuming spawnTime + cachedPathLength roughly correlates to ticksToLive vs distance.
+                                // Actually we just need to ensure we don't count creeps that are about to die.
+                                const distance = Game.map.getRoomLinearDistance(room.name, targetRoomName) * 50;
+                                const spawnTime = h.body ? h.body.length * 3 : 0;
+                                if (!h.ticksToLive || h.ticksToLive >= spawnTime + distance) {
+                                    activeHaulers++;
+                                }
+                            }
+                            const queuedHaulers = SpawnQueueManager.getQueuedCount(room.name, 'remoteHauler', targetRoomName);
+
+                            if (activeHaulers + queuedHaulers < sourcesCount) {
                                 const sourceCapacity = (intel.reservation === 'jules' || activeReserver) ? 3000 : 1500;
                                 const distance = Game.map.getRoomLinearDistance(room.name, targetRoomName) * 50;
                                 const requiredCarry = Math.ceil((sourceCapacity / 1500) * (distance / 100));
