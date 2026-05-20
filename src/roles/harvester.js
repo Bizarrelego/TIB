@@ -38,29 +38,7 @@ module.exports = {
                     continue;
                 }
 
-                const dropId = creep.heap.dropId;
-                let dropPos = creep.heap.dropPos;
-
-                if (!dropPos && dropId !== undefined && dropId !== null) {
-                    if (typeof dropId === 'number') {
-                        // Decode 50x + y coordinate
-                        const x = Math.floor(dropId / 50);
-                        const y = dropId % 50;
-                        dropPos = new RoomPosition(x, y, room.name);
-                        creep.heap.dropPos = dropPos;
-                    } else if (typeof dropId === 'string') {
-                        const dropTarget = Game.getObjectById(dropId);
-                        if (dropTarget) {
-                            dropPos = dropTarget.pos;
-                            creep.heap.dropPos = dropPos;
-                        }
-                    }
-                }
-
-                if (dropPos && (creep.pos.x !== dropPos.x || creep.pos.y !== dropPos.y)) {
-                    movement.moveTo(creep, dropPos);
-                    continue;
-                } else if (!dropPos && !creep.pos.isNearTo(target)) {
+                if (!creep.pos.isNearTo(target)) {
                     movement.moveTo(creep, target);
                     continue;
                 }
