@@ -1,0 +1,51 @@
+/**
+ * Module responsible for managing the execution frequency of non-critical managers and systems.
+ * It allows managers to register themselves with a desired execution interval, ensuring they
+ * are only called when their scheduled tick arrives. This handles aggressive tick slicing.
+ * @module os/SystemScheduler
+ */
+
+/**
+ * @typedef {Object} ScheduledTask
+ * @property {number} interval - The tick interval at which the callback should run.
+ * @property {function(): void} callback - The function to execute.
+ */
+
+/**
+ * @type {Map<string, ScheduledTask>}
+ */
+const tasks = new Map();
+
+/**
+ * Registers a manager or system to be executed at a specific interval.
+ * @param {string} managerId - The unique identifier for the manager/system.
+ * @param {number} interval - The tick interval at which the callback should run.
+ * @param {function(): void} callback - The callback function to execute.
+ * @returns {void}
+ */
+function register(managerId, interval, callback) {
+    tasks.set(managerId, { interval, callback });
+}
+
+/**
+ * Runs the scheduled tasks if their interval matches the current game time.
+ * Iterates through registered managers and executes their callbacks only if Game.time % interval === 0.
+ * @returns {void}
+ */
+function run() {
+    for (const task of tasks.values()) {
+        if (Game.time % task.interval === 0) {
+            task.callback();
+        }
+    }
+}
+
+/**
+ * Top-level managers must explicitly export specific lifecycle methods as properties of module.exports.
+ */
+module.exports = {
+    register,
+    run,
+    // Expose tasks for testing purposes
+    tasks
+};
