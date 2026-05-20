@@ -12,23 +12,6 @@ function run(room) {
         try {
             if (creep.fatigue > 0) continue;
 
-            // Anti-Stall Failsafe without native polling
-            let onSpawn = false;
-            const spawns = global.State.structuresByRoom.get(creep.room.name)?.get(STRUCTURE_SPAWN);
-            if (spawns) {
-                for (const spawn of spawns.values()) {
-                    if (spawn.pos.x === creep.pos.x && spawn.pos.y === creep.pos.y) {
-                        onSpawn = true;
-                        break;
-                    }
-                }
-            }
-            if (onSpawn) {
-                const randomDir = Math.floor(Math.random() * 8) + 1;
-                creep.move(randomDir); // Force a move, bypassing intents
-                continue;
-            }
-
             const targetRoomName = creep.heap.targetRoom;
 
             // If no target room assigned by the scout manager, wait in place
