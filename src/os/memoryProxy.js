@@ -14,12 +14,15 @@ Object.defineProperty(Creep.prototype, 'heap', {
     enumerable: false
 });
 
-module.exports = function installMemoryProxy() {
+function installMemoryProxy() {
     // Initialization/Installation happens during require/execution.
-};
+}
 
-module.exports.serialize = function serialize() {
-    if (typeof RawMemory !== 'undefined') {
-        RawMemory._parsed = Memory;
+module.exports = {
+    init: installMemoryProxy,
+    serialize: function serialize() {
+        if (typeof RawMemory !== 'undefined') {
+            RawMemory._parsed = Memory;
+        }
     }
 };

@@ -2,7 +2,7 @@ const { CacheRegistry } = require('./cache');
 const resetRecovery = require('./resetRecovery');
 const RawMemoryManager = require('./RawMemoryManager');
 const heapValidator = require('./heapValidator');
-const installMemoryProxy = require('./memoryProxy');
+const memoryProxy = require('./memoryProxy');
 const globalState = require('../state/globalState');
 const garbageCollector = require('./garbageCollector');
 const Logger = require('../utils/logger');
@@ -11,17 +11,21 @@ const VirtualLedger = require('../utils/VirtualLedger');
 
 class OSInitializer {
     static init() {
+        Logger.info('Respawn detected or first execution. Invalidating cache.');
+        global.Cache = new Map();
+        globalState.clear();
+        global.State = globalState;
+        Memory.os_initialized = true;
+    }
+
+    static run() {
         Logger.debug('Phase 1: OS Init & Cache');
 
-        if (!Memory.os_initialized) {
-            Logger.info('Respawn detected or first execution. Invalidating cache.');
-            global.Cache = new Map();
-            globalState.clear();
-            global.State = globalState;
-            Memory.os_initialized = true;
+        if (memoryProxy && typeof memoryProxy.init === 'function') {
+            memoryProxy.init();
+        } else if (typeof memoryProxy === 'function') {
+            memoryProxy();
         }
-
-        installMemoryProxy();
 
         try {
             RawMemoryManager.init();

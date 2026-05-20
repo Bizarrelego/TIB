@@ -30,4 +30,4 @@ const exportedModule = Profiler.wrap('operationsManager', function operationsMan
         }
 });
 
-module.exports = wrapModuleFunctions(exportedModule, (funcName, originalFunc, ...args) => executeManager(`operationsManager.${funcName}`, originalFunc, ...args));
+module.exports = { run: wrapModuleFunctions(exportedModule, (funcName, originalFunc, ...args) => executeManager(`operationsManager.${funcName}`, originalFunc, ...args)) };

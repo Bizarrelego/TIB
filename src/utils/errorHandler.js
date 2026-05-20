@@ -23,4 +23,10 @@ function executeManager(moduleName, fn, ...args) {
     }
 }
 
-module.exports = { executeManager };
+function wrap(moduleName, fn) {
+    return function(...args) {
+        return executeManager(moduleName, fn, ...args);
+    };
+}
+
+module.exports = { executeManager, wrap };

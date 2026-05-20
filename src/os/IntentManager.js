@@ -81,7 +81,7 @@ class IntentManager {
      * Clears all pipeline locks. Called at the end of the tick.
      * @returns {void}
      */
-    executeIntents() {
+    fire() {
         // Clear state for the next tick
         this.pipelineLock.clear();
     }

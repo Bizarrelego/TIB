@@ -54,7 +54,7 @@ function updateStructureBucket(struct) {
     }
 }
 
-module.exports = function stateScanner() {
+module.exports = { scan: function stateScanner() {
     if (!global.State?.scannedRooms) return;
 
     if (!global.State.roomRuins) global.State.roomRuins = new Map();
@@ -321,4 +321,4 @@ module.exports = function stateScanner() {
             }
         }
     }
-};
+} };

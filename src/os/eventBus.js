@@ -3,6 +3,12 @@
  * @class PubSub
  */
 class PubSub {
+    init() {
+        if (!this.events) {
+            this.events = new Map();
+        }
+    }
+
     /**
      * Creates an instance of PubSub.
      */

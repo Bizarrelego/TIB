@@ -10,6 +10,12 @@ const memoryProxy = require('../os/memoryProxy');
 const VirtualLedger = require('../utils/VirtualLedger');
 const roomHasher = require('../os/roomHasher');
 const { wrapModuleFunctions } = require('../utils/moduleWrapper');
+const errorHandler = require('../utils/errorHandler');
+const heapValidator = require('../os/heapValidator');
+const resetRecovery = require('../os/resetRecovery');
+const objectPool = require('../os/objectPool');
+const eventBus = require('../os/eventBus');
+const cpuBucketForecaster = require('../os/cpuBucketForecaster');
 
 // Phase Managers
 const discoveryManager = require('../state/discoveryManager');
@@ -200,170 +206,158 @@ const managersIntegration = require('./index');
 function run(externalThrottlerFlags = {}) {
     let throttlerFlags = externalThrottlerFlags;
 
-    for (let phase = 1; phase <= 6; phase++) {
-        module.exports.runPhase(phase, throttlerFlags);
+    const executeWrapped = (name, fn) => {
+        if (!fn) return;
+        const wrapped = Profiler.wrap(name, errorHandler.wrap(name, fn));
+        wrapped();
+    };
 
-        // After Phase 1 (OS Init & Cache) we have global state rehydrated.
-        // We must calculate throttler flags and register all integration managers
-        // before we continue to Phase 2 (Global State).
-        if (phase === 1) {
-            executeManager('cpuThrottler.run', () => {
-                throttlerFlags = cpuThrottler.run() || {};
-            });
-            executeManager('managersIntegration.init', () => managersIntegration.init(registeredTopLevelManagers.get('globalState')));
+    // Phase 1: OS Init & Cache
+    executeWrapped('OSInitializer.run', () => {
+        const osInit = registeredTopLevelManagers.get('OSInitializer');
+        if (osInit && typeof osInit.run === 'function') osInit.run();
+    });
+    executeWrapped('resetRecovery.check', () => { if (resetRecovery && typeof resetRecovery.check === 'function') resetRecovery.check(); });
+    executeWrapped('heapValidator.validate', () => { if (heapValidator && typeof heapValidator.validate === 'function') heapValidator.validate(); });
+    executeWrapped('memoryProxy.init', () => { if (memoryProxy && typeof memoryProxy.init === 'function') memoryProxy.init(); });
+    executeWrapped('objectPool.init', () => { if (objectPool && typeof objectPool.init === 'function') objectPool.init(); });
+    executeWrapped('eventBus.init', () => { if (eventBus && typeof eventBus.init === 'function') eventBus.init(); });
+    executeWrapped('cpuBucketForecaster.update', () => { if (cpuBucketForecaster && typeof cpuBucketForecaster.update === 'function') cpuBucketForecaster.update(); });
+    executeWrapped('trafficManager.setup', () => {
+        const trfMgr = registeredTopLevelManagers.get('trafficManager');
+        if (trfMgr && typeof trfMgr.setup === 'function') trfMgr.setup();
+    });
+    executeWrapped('interShardMemoryManager._loadLocal', () => {
+        if (interShardMemoryManager && typeof interShardMemoryManager._loadLocal === 'function') interShardMemoryManager._loadLocal();
+    });
+
+    executeWrapped('cpuThrottler.throttle', () => {
+        if (cpuThrottler && typeof cpuThrottler.throttle === 'function') {
+            throttlerFlags = cpuThrottler.throttle() || {};
         }
-    }
-}
+    });
+    executeWrapped('managersIntegration.init', () => {
+        if (managersIntegration && typeof managersIntegration.init === 'function') {
+            managersIntegration.init(registeredTopLevelManagers.get('globalState'));
+        }
+    });
 
-function runPhase(phase, throttlerFlags = {}) {
     const { skipState, skipColonies, skipManagers, skipOperations } = throttlerFlags;
 
-    switch(phase) {
-
-        case 1:
-            Logger.debug('Phase 1: OS Init & Cache');
-            executeManager('OSInitializer', () => {
-                const osInit = registeredTopLevelManagers.get('OSInitializer');
-                if (osInit) {
-                    osInit.init();
-                }
-            });
-            executeManager('trafficManager.setup', () => {
-                const trfMgr = registeredTopLevelManagers.get('trafficManager');
-                if (trfMgr && trfMgr.setup) {
-                    trfMgr.setup();
-                }
-            });
-            executeManager('interShardMemoryManager', () => {
-                if (interShardMemoryManager && typeof interShardMemoryManager._loadLocal === 'function') {
-                    interShardMemoryManager._loadLocal();
-                }
-            });
-            break;
-
-        case 2:
-            Logger.debug('Phase 2: Global State');
-            executeManager('discoveryManager', () => { if (discoveryManager) discoveryManager(); });
-
-            if (!skipState) {
-                executeManager('eventLogRadar', () => { if (eventLogRadar) eventLogRadar(); });
-                executeManager('RoomEventManager', () => {
-                    if (roomEventManager) roomEventManager();
-                });
-                executeManager('stateScanner', () => { if (stateScanner) stateScanner(); });
-                executeManager('globalState.scan', () => {
-                    const gState = registeredTopLevelManagers.get('globalState');
-                    if (gState && gState.scan) gState.scan();
-                });
-
-                executeManager('roomHasher', () => {
-                    if (global.State && global.State.rooms) {
-                        for (const roomName of global.State.rooms.keys()) {
-                            roomHasher.generate(roomName);
-                        }
-                    }
-                });
-
-                executeManager('EnergySourceTracker.run', () => {
-                    if (EnergySourceTracker && EnergySourceTracker.run) EnergySourceTracker.run();
-                });
-            }
-            break;
-
-        case 3:
-            Logger.debug('Phase 3: Colonies');
-            if (!skipColonies) {
-                executeManager('ledgerReset', () => { VirtualLedger.clear(); });
-                executeManager('colonyManager', () => {
-                    const colMgr = registeredTopLevelManagers.get('colonyManager');
-                    if (colMgr) colMgr();
-                });
-                executeManager('defconManager', () => { if (global.State && global.State.rooms) { for (const room of global.State.rooms.values()) { defconManager.run(room); } } });
-            }
-
+    // Phase 2: Global State
+    executeWrapped('discoveryManager', () => { if (discoveryManager) discoveryManager(); });
+    if (!skipState) {
+        executeWrapped('eventLogRadar', () => { if (eventLogRadar) eventLogRadar(); });
+        executeWrapped('RoomEventManager', () => { if (roomEventManager) roomEventManager(); });
+        executeWrapped('stateScanner.scan', () => { if (stateScanner && typeof stateScanner.scan === 'function') stateScanner.scan(); });
+        executeWrapped('globalState.scan', () => {
+            const gState = registeredTopLevelManagers.get('globalState');
+            if (gState && typeof gState.scan === 'function') gState.scan();
+        });
+        executeWrapped('roomHasher.generate', () => {
             if (global.State && global.State.rooms) {
-                if (Game.time % 10 === 0) {
-                    for (const room of global.State.rooms.values()) {
-                        if (room.controller && room.controller.my && spawnManager && typeof spawnManager.run === 'function') {
-                            const ledger = new SpawnLedger(room);
-                            executeManager('spawnManager', () => spawnManager.run(room, ledger));
-                        }
-                        if (room.controller && room.controller.my && BoostManager && typeof BoostManager.run === 'function') {
-                            executeManager('BoostManager', () => BoostManager.run(room));
-                        }
-                    }
-                }
-
-                if (Game.time % 1000 === 0) {
-                    for (const room of global.State.rooms.values()) {
-                        if (room.controller && room.controller.my && planner && typeof planner.run === 'function') {
-                            executeManager('planner', () => planner.run(room));
-                        }
-                    }
+                for (const roomName of global.State.rooms.keys()) {
+                    if (roomHasher && typeof roomHasher.generate === 'function') roomHasher.generate(roomName);
                 }
             }
+        });
+        executeWrapped('EnergySourceTracker.run', () => { if (EnergySourceTracker && typeof EnergySourceTracker.run === 'function') EnergySourceTracker.run(); });
+    }
 
-            if (!skipManagers) {
-                executeManager('PreSpawnManager.run', () => {
-                    const PreSpawnManager = globalState.getManager('PreSpawnManager');
-                    if (PreSpawnManager && typeof PreSpawnManager.run === 'function') PreSpawnManager.run();
-                });
-                executeManager('runRoomManagers', runRoomManagers);
-                executeManager('RoleManager', () => RoleManager.runAll());
+    // Phase 3: Colonies
+    if (!skipColonies) {
+        executeWrapped('ledgerReset', () => { if (VirtualLedger && typeof VirtualLedger.clear === 'function') VirtualLedger.clear(); });
+        executeWrapped('colonyManager.run', () => {
+            const colMgr = registeredTopLevelManagers.get('colonyManager');
+            if (colMgr && typeof colMgr.run === 'function') colMgr.run();
+        });
+        executeWrapped('defconManager.run', () => {
+            if (global.State && global.State.rooms && defconManager && typeof defconManager.run === 'function') {
+                for (const room of global.State.rooms.values()) defconManager.run(room);
             }
-            break;
+        });
+    }
 
-        case 4:
-            if (!skipOperations) {
-                Logger.debug('Phase 4: Running Operations');
-                executeManager('AllianceIntelManager.run', () => {
-                    const AllianceIntelManager = globalState.getManager('AllianceIntelManager');
-                    if (AllianceIntelManager && typeof AllianceIntelManager.run === 'function') AllianceIntelManager.run();
-                });
-                executeManager('operationsManager', () => {
-                    const opMgr = registeredTopLevelManagers.get('operationsManager');
-                    if (opMgr) opMgr();
-                });
-                executeManager('RawMemoryManager.init', () => { if (RawMemoryManager && typeof RawMemoryManager.init === 'function') { RawMemoryManager.init(); } });
-            }
-            break;
-
-        case 5:
-            Logger.debug('Phase 5: Running Traffic Control');
-            executeManager('trafficManager.run', () => {
-                const trfMgr = registeredTopLevelManagers.get('trafficManager');
-                if (trfMgr && trfMgr.run) trfMgr.run();
-            });
-            executeManager('PipelineLock.clear', () => { const lock = new PipelineLock(); lock.clear(); });
-            break;
-
-        case 6:
-            Logger.debug('Phase 6: Executing Intents & Sleep');
-            executeManager('trafficManager.executeIntents', () => {
-                const trfMgr = registeredTopLevelManagers.get('trafficManager');
-                if (trfMgr && trfMgr.executeIntents) trfMgr.executeIntents();
-            });
-
-            executeManager('IntentManager.executeIntents', () => {
-                if (global.State && global.State.intentManager && typeof global.State.intentManager.executeIntents === 'function') {
-                    global.State.intentManager.executeIntents();
-                } else if (registeredTopLevelManagers.get('IntentManager')) {
-                    // Fallback to static class call if it's implemented there
+    if (global.State && global.State.rooms) {
+        if (Game.time % 10 === 0) {
+            for (const room of global.State.rooms.values()) {
+                if (room.controller && room.controller.my && spawnManager && typeof spawnManager.run === 'function') {
+                    const ledger = new SpawnLedger(room);
+                    executeWrapped('spawnManager.run', () => spawnManager.run(room, ledger));
                 }
-            });
-
-            executeManager('memoryProxy.serialize', () => { if (memoryProxy && typeof memoryProxy.serialize === 'function') { memoryProxy.serialize(); } });
-
-            if (Game.cpu.bucket > 5000 && VisualsManager && typeof VisualsManager.run === 'function') {
-                executeManager('VisualsManager', () => VisualsManager.run());
+                if (room.controller && room.controller.my && BoostManager && typeof BoostManager.run === 'function') {
+                    executeWrapped('BoostManager.run', () => BoostManager.run(room));
+                }
             }
-            break;
+        }
+        if (Game.time % 1000 === 0) {
+            for (const room of global.State.rooms.values()) {
+                if (room.controller && room.controller.my && planner && typeof planner.run === 'function') {
+                    executeWrapped('planner.run', () => planner.run(room));
+                }
+            }
+        }
+    }
+
+    if (!skipManagers) {
+        executeWrapped('PreSpawnManager.run', () => {
+            const preMgr = registeredTopLevelManagers.get('globalState') ? registeredTopLevelManagers.get('globalState').getManager('PreSpawnManager') : null;
+            if (preMgr && typeof preMgr.run === 'function') preMgr.run();
+        });
+        executeWrapped('runRoomManagers', () => runRoomManagers());
+        executeWrapped('RoleManager.runAll', () => { if (RoleManager && typeof RoleManager.runAll === 'function') RoleManager.runAll(); });
+    }
+
+    // Phase 4: Operations
+    if (!skipOperations) {
+        executeWrapped('AllianceIntelManager.run', () => {
+            const intelMgr = registeredTopLevelManagers.get('globalState') ? registeredTopLevelManagers.get('globalState').getManager('AllianceIntelManager') : null;
+            if (intelMgr && typeof intelMgr.run === 'function') intelMgr.run();
+        });
+        executeWrapped('operationsManager.run', () => {
+            const opMgr = registeredTopLevelManagers.get('operationsManager');
+            if (opMgr && typeof opMgr.run === 'function') opMgr.run();
+        });
+        executeWrapped('RawMemoryManager.init', () => {
+            if (RawMemoryManager && typeof RawMemoryManager.init === 'function') RawMemoryManager.init();
+        });
+    }
+
+    // Phase 5: Traffic Control
+    executeWrapped('trafficManager.run', () => {
+        const trfMgr = registeredTopLevelManagers.get('trafficManager');
+        if (trfMgr && typeof trfMgr.run === 'function') trfMgr.run();
+    });
+    executeWrapped('PipelineLock.clear', () => {
+        if (typeof PipelineLock !== 'undefined') {
+            const lock = new PipelineLock();
+            if (typeof lock.clear === 'function') lock.clear();
+        }
+    });
+
+    // Phase 6: Intents & Sleep
+    executeWrapped('trafficManager.executeIntents', () => {
+        const trfMgr = registeredTopLevelManagers.get('trafficManager');
+        if (trfMgr && typeof trfMgr.executeIntents === 'function') trfMgr.executeIntents();
+    });
+    executeWrapped('IntentManager.fire', () => {
+        if (global.State && global.State.intentManager && typeof global.State.intentManager.fire === 'function') {
+            global.State.intentManager.fire();
+        } else {
+            const intMgr = registeredTopLevelManagers.get('IntentManager');
+            if (intMgr && typeof intMgr.fire === 'function') intMgr.fire();
+        }
+    });
+    executeWrapped('memoryProxy.serialize', () => { if (memoryProxy && typeof memoryProxy.serialize === 'function') memoryProxy.serialize(); });
+
+    if (typeof Game !== 'undefined' && Game.cpu && Game.cpu.bucket > 5000 && VisualsManager && typeof VisualsManager.run === 'function') {
+        executeWrapped('VisualsManager.run', () => VisualsManager.run());
     }
 }
+
 
 module.exports = {
     init,
     run: Profiler.wrap('managerOrchestrator.run', run),
-    runPhase: Profiler.wrap('managerOrchestrator.runPhase', runPhase),
     runRoomManagers // Exported for testing/mocking if needed
 };
