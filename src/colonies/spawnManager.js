@@ -19,7 +19,7 @@ function buildRemoteCensus() {
         for (let i = 0; i < rHarvesters.length; i++) {
             const c = rHarvesters[i];
             if (c.memory.colony) {
-                if (!remoteCensus.has(c.memory.colony)) remoteCensus.set(c.memory.colony, { remoteHarvester: [], remoteHauler: [], reserver: [] });
+                if (!remoteCensus.has(c.memory.colony)) remoteCensus.set(c.memory.colony, { remoteHarvester: [], remoteHauler: [], reserver: [], remoteHarvesterHunter: [] });
                 remoteCensus.get(c.memory.colony).remoteHarvester.push(c);
             }
         }
@@ -27,7 +27,7 @@ function buildRemoteCensus() {
         for (let i = 0; i < rHaulers.length; i++) {
             const c = rHaulers[i];
             if (c.memory.colony) {
-                if (!remoteCensus.has(c.memory.colony)) remoteCensus.set(c.memory.colony, { remoteHarvester: [], remoteHauler: [], reserver: [] });
+                if (!remoteCensus.has(c.memory.colony)) remoteCensus.set(c.memory.colony, { remoteHarvester: [], remoteHauler: [], reserver: [], remoteHarvesterHunter: [] });
                 remoteCensus.get(c.memory.colony).remoteHauler.push(c);
             }
         }
@@ -35,8 +35,16 @@ function buildRemoteCensus() {
         for (let i = 0; i < rReservers.length; i++) {
             const c = rReservers[i];
             if (c.memory.colony) {
-                if (!remoteCensus.has(c.memory.colony)) remoteCensus.set(c.memory.colony, { remoteHarvester: [], remoteHauler: [], reserver: [] });
+                if (!remoteCensus.has(c.memory.colony)) remoteCensus.set(c.memory.colony, { remoteHarvester: [], remoteHauler: [], reserver: [], remoteHarvesterHunter: [] });
                 remoteCensus.get(c.memory.colony).reserver.push(c);
+            }
+        }
+        const rHunters = rmCreeps.get('remoteHarvesterHunter') || [];
+        for (let i = 0; i < rHunters.length; i++) {
+            const c = rHunters[i];
+            if (c.memory.colony) {
+                if (!remoteCensus.has(c.memory.colony)) remoteCensus.set(c.memory.colony, { remoteHarvester: [], remoteHauler: [], reserver: [], remoteHarvesterHunter: [] });
+                remoteCensus.get(c.memory.colony).remoteHarvesterHunter.push(c);
             }
         }
     }
@@ -78,7 +86,12 @@ module.exports = {
             if (roomCreeps) {
                 const harvesters = roomCreeps.get('harvester');
                 if (harvesters) {
-                    harvesterCount = harvesters.length;
+                    harvesterCount = 0;
+                    for (const h of harvesters) {
+                        if (!h.ticksToLive || h.ticksToLive >= (h.body.length * 3) + 15) {
+                            harvesterCount++;
+                        }
+                    }
                 }
                 const workers = roomCreeps.get('worker');
                 if (workers) {
@@ -205,13 +218,27 @@ module.exports = {
             const exits = Game.map.describeExits(room.name);
             if (exits) {
                 // O(1) lookup for remote operations scaling
-                const census = remoteCensus.get(room.name) || { remoteHarvester: [], remoteHauler: [], reserver: [] };
+                const census = remoteCensus.get(room.name) || { remoteHarvester: [], remoteHauler: [], reserver: [], remoteHarvesterHunter: [] };
                 let colonyRemoteHarvesters = census.remoteHarvester;
                 let colonyReservers = census.reserver;
 
                 for (const direction in exits) {
                     const targetRoomName = exits[direction];
                     const intel = global.State.intel.get(targetRoomName);
+
+                    if (intel && (intel.hostile || intel.enemyRemoteMiners)) {
+                        const activeHunters = census.remoteHarvesterHunter.filter(c => c.memory.targetRoom === targetRoomName).length;
+                        const queuedHunters = SpawnQueueManager.getQueuedCount(room.name, 'remoteHarvesterHunter', targetRoomName);
+                        if (activeHunters + queuedHunters === 0) {
+                            const body = [ATTACK, ATTACK, MOVE, MOVE];
+                            const cost = BodyCalc.getCost(body);
+                            if (capacity >= cost && spawnLedger.canSpawn(cost)) {
+                                SpawnQueueManager.requestSpawn(room.name, 'remoteHarvesterHunter', body, 'hunter_' + Game.time, {
+                                    memory: { role: 'remoteHarvesterHunter', colony: room.name, targetRoom: targetRoomName }
+                                }, cost);
+                            }
+                        }
+                    }
 
                     if (intel && intel.type === 'regular' && !intel.hostile) {
                         const activeReserver = colonyReservers.find(c => c.memory.targetRoom === targetRoomName);

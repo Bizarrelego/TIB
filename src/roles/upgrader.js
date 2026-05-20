@@ -1,5 +1,26 @@
 const TrafficManager = require('../traffic/trafficManager');
 const movement = require('../utils/movement');
+const { isWalkable } = require('../utils/roomPositionUtils');
+
+function getUpgraderAnchor(room) {
+    if (!global.State.upgraderAnchors) global.State.upgraderAnchors = new Map();
+    if (global.State.upgraderAnchors.has(room.name)) return global.State.upgraderAnchors.get(room.name);
+    const cpos = room.controller.pos;
+    for (let dx = -2; dx <= 2; dx++) {
+        for (let dy = -2; dy <= 2; dy++) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) === 2) {
+                const x = cpos.x + dx;
+                const y = cpos.y + dy;
+                if (isWalkable(room.name, x, y)) {
+                    const pos = new RoomPosition(x, y, room.name);
+                    global.State.upgraderAnchors.set(room.name, pos);
+                    return pos;
+                }
+            }
+        }
+    }
+    return null;
+}
 
 // Upgraders must be static. Move once, then stay forever.
 function run(creep, room) {
@@ -12,7 +33,10 @@ function run(creep, room) {
         if (creep.fatigue > 0) return;
 
         // Lock position adjacent to controller and pull from drop pile or Storage
-        if (creep.pos.getRangeTo(controller) > 1) {
+        const anchor = getUpgraderAnchor(room) || controller;
+        if (creep.pos.getRangeTo(anchor) > 0 && anchor !== controller) {
+            movement.moveTo(creep, anchor);
+        } else if (creep.pos.getRangeTo(controller) > 1 && anchor === controller) {
             movement.moveTo(creep, controller);
         } else {
             TrafficManager.registerStatic(creep);
@@ -26,13 +50,16 @@ function run(creep, room) {
                     }
                 }
             } else {
-                // Find dropped energy on exact tile or adjacent
-                const dropped = global.State.droppedByRoom.get(room.name) || new Map();
+                // Find dropped energy on exact tile
+                const dropped = global.State.droppedByRoom.get(room.name);
                 let targetDrop = null;
-                for (const drop of dropped.values()) {
-                    if (drop.resourceType === RESOURCE_ENERGY && creep.pos.isNearTo(drop.pos)) {
-                        targetDrop = drop;
-                        break;
+
+                if (dropped) {
+                    for (const drop of dropped.values()) {
+                        if (drop.resourceType === RESOURCE_ENERGY && drop.pos.x === creep.pos.x && drop.pos.y === creep.pos.y) {
+                            targetDrop = drop;
+                            break;
+                        }
                     }
                 }
 

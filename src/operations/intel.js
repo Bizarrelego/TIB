@@ -118,6 +118,23 @@ function gatherIntel(roomName) {
                 intel.harassmentTarget = false;
             }
 
+            intel.enemyRemoteMiners = false;
+            if (global.State.hostilesByRoom && global.State.hostilesByRoom.has(roomName)) {
+                const hostiles = Array.from(global.State.hostilesByRoom.get(roomName).values());
+                for (let i = 0; i < hostiles.length; i++) {
+                    const h = hostiles[i];
+                    if (h.body) {
+                        for (let j = 0; j < h.body.length; j++) {
+                            if (h.body[j].type === WORK) {
+                                intel.enemyRemoteMiners = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (intel.enemyRemoteMiners) break;
+                }
+            }
+
             if (!intel.hostile && intel.type === 'regular' && intel.sources > 0) {
                 intel.remoteCandidate = true;
             } else {

@@ -1,5 +1,26 @@
 const TrafficManager = require('../traffic/trafficManager');
 const movement = require('../utils/movement');
+const { isWalkable } = require('../utils/roomPositionUtils');
+
+function getUpgraderAnchor(room) {
+    if (!global.State.upgraderAnchors) global.State.upgraderAnchors = new Map();
+    if (global.State.upgraderAnchors.has(room.name)) return global.State.upgraderAnchors.get(room.name);
+    const cpos = room.controller.pos;
+    for (let dx = -2; dx <= 2; dx++) {
+        for (let dy = -2; dy <= 2; dy++) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) === 2) {
+                const x = cpos.x + dx;
+                const y = cpos.y + dy;
+                if (isWalkable(room.name, x, y)) {
+                    const pos = new RoomPosition(x, y, room.name);
+                    global.State.upgraderAnchors.set(room.name, pos);
+                    return pos;
+                }
+            }
+        }
+    }
+    return null;
+}
 
 module.exports = {
     run: function(room) {
@@ -16,6 +37,11 @@ module.exports = {
             try {
                 if (creep.fatigue > 0) continue;
 
+                if (creep.store.getUsedCapacity() === 0) {
+                    creep.heap.state = 'pickup';
+                } else if (creep.store.getFreeCapacity() === 0) {
+                    creep.heap.state = 'transfer';
+                }
 
 
                 if (creep.heap.state === 'pickup') {
@@ -112,8 +138,13 @@ module.exports = {
                             movement.moveTo(creep, target);
                         }
                     } else if (targetId === 'controller' && room.controller) {
-                        if (creep.pos.inRangeTo(room.controller, 3)) {
-                            creep.drop(RESOURCE_ENERGY);
+                        const anchor = getUpgraderAnchor(room);
+                        if (anchor) {
+                            if (creep.pos.getRangeTo(anchor) > 1) {
+                                movement.moveTo(creep, anchor);
+                            } else {
+                                creep.drop(RESOURCE_ENERGY);
+                            }
                         } else {
                             movement.moveTo(creep, room.controller);
                         }
