@@ -35,7 +35,8 @@ module.exports = {
                     creep.heap.isStatic = false; // Un-anchor from the controller/hub
                 }
 
-                if (fatigueGating.isFatigued(creep) || TrafficManager.checkPipeline(creep.id)) continue;
+                if (TrafficManager.checkPipeline(creep.id)) continue;
+                const isFatigued = fatigueGating.isFatigued(creep);
 
                 const state = creep.heap.state;
                 const targetId = creep.heap.targetId;
@@ -60,7 +61,7 @@ module.exports = {
                             creep.heap.targetId = null;
                             creep.heap.state = null;
                         }
-                    } else {
+                    } else if (!isFatigued) {
                         movement.moveTo(creep, target, { range: 1 });
                     }
                 } else if (state === 'pickup') {
@@ -72,10 +73,10 @@ module.exports = {
                     if (creep.pos.isNearTo(target)) {
                         let status;
                         const claimed = VirtualLedger.getClaimedAmount(target.id, RESOURCE_ENERGY);
-                        const amountToWithdraw = target.amount !== undefined 
+                        const amountToWithdraw = target.amount !== undefined
                             ? Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), Math.max(0, target.amount - claimed))
                             : Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), Math.max(0, TrafficManager.getVirtualState(target, RESOURCE_ENERGY).used - claimed));
-                            
+
                         if (amountToWithdraw <= 0) {
                             creep.heap.targetId = null;
                             creep.heap.state = null;
@@ -93,7 +94,7 @@ module.exports = {
                         } else {
                             VirtualLedger.registerIntent(target.id, RESOURCE_ENERGY, amountToWithdraw);
                         }
-                    } else {
+                    } else if (!isFatigued) {
                         movement.moveTo(creep, target);
                     }
                 } else if (state === 'withdraw') {
@@ -114,7 +115,7 @@ module.exports = {
                             creep.heap.state = null;
                             continue;
                         }
-                        
+
                         if (target.store !== undefined) {
                             status = TrafficManager.registerWithdraw(creep, target, RESOURCE_ENERGY, amountToWithdraw);
                         } else if (target.amount !== undefined) {
@@ -126,14 +127,14 @@ module.exports = {
                         } else {
                             VirtualLedger.registerIntent(target.id, RESOURCE_ENERGY, amountToWithdraw);
                         }
-                    } else {
+                    } else if (!isFatigued) {
                         movement.moveTo(creep, target);
                     }
                 } else if (state === 'refill') { // Fixes the string bug
                     if (creep.pos.isNearTo(target)) {
                         const claimed = VirtualLedger.getClaimedAmount(target.id, RESOURCE_ENERGY);
                         const amountToFill = Math.min(creep.store.getUsedCapacity(RESOURCE_ENERGY), Math.max(0, TrafficManager.getVirtualState(target, RESOURCE_ENERGY).free - claimed));
-                        
+
                         if (amountToFill > 0) {
                             TrafficManager.registerTransfer(creep, target, RESOURCE_ENERGY, amountToFill);
                             VirtualLedger.registerIntent(target.id, RESOURCE_ENERGY, amountToFill);
@@ -141,28 +142,29 @@ module.exports = {
                             creep.heap.targetId = null;
                             creep.heap.state = null;
                         }
-                    } else {
+                    } else if (!isFatigued) {
                         movement.moveTo(creep, target);
                     }
                 } else if (state === 'build') {
-                    if (creep.build(target) === ERR_NOT_IN_RANGE) {
-                        movement.moveTo(creep, target, { range: 3 }); // Range 3 optimization
-                    } else {
+                    if (creep.pos.inRangeTo(target, 3)) {
                         TrafficManager.setStatic(creep);
+                        TrafficManager.registerBuild(creep, target);
+                    } else if (!isFatigued) {
+                        movement.moveTo(creep, target, { range: 3 });
                     }
                 } else if (state === 'upgrade') {
-                    if (creep.pos.getRangeTo(target) <= 3) {
+                    if (creep.pos.inRangeTo(target, 3)) {
                         TrafficManager.setStatic(creep);
-                        creep.upgradeController(target);
-                    } else {
-                        movement.moveTo(creep, target, { range: 3 }); // Range 3 optimization
+                        TrafficManager.registerUpgrade(creep, target);
+                    } else if (!isFatigued) {
+                        movement.moveTo(creep, target, { range: 3 });
                     }
                 } else if (state === 'repair') {
-                    if (creep.pos.getRangeTo(target) <= 3) {
+                    if (creep.pos.inRangeTo(target, 3)) {
                         TrafficManager.setStatic(creep);
-                        creep.repair(target);
-                    } else {
-                        movement.moveTo(creep, target);
+                        TrafficManager.registerRepair(creep, target);
+                    } else if (!isFatigued) {
+                        movement.moveTo(creep, target, { range: 3 });
                     }
                 }
             } catch (e) {
