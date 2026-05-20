@@ -24,6 +24,8 @@ const planner = require('../colonies/planner');
 const RoleManager = require('../colonies/RoleManager');
 const operationsManager = require('../operations/operationsManager');
 const trafficManager = require('../traffic/trafficManager');
+const roomEventManager = require('./RoomEventManager');
+const EnergySourceTracker = require('./EnergySourceTracker');
 
 /**
  * @file managerOrchestrator.js
@@ -189,7 +191,6 @@ function runPhase(phase, throttlerFlags = {}) {
             if (!skipState) {
                 executeManager('eventLogRadar', () => { if (eventLogRadar) eventLogRadar(); });
                 executeManager('RoomEventManager', () => {
-                    const roomEventManager = require('./RoomEventManager');
                     if (roomEventManager) roomEventManager();
                 });
                 executeManager('stateScanner', () => { if (stateScanner) stateScanner(); });
@@ -204,8 +205,7 @@ function runPhase(phase, throttlerFlags = {}) {
                 });
 
                 executeManager('EnergySourceTracker.run', () => {
-                    const EnergySourceTracker = require('./EnergySourceTracker');
-                    EnergySourceTracker.run();
+                    if (EnergySourceTracker && EnergySourceTracker.run) EnergySourceTracker.run();
                 });
             }
             break;
