@@ -225,11 +225,140 @@ function predictiveHeal(healers, targetCreep, expectedDamage = 0) {
 function planBorderBounce(creep) {
     if (!creep || !creep.pos || isFatigued(creep)) return [];
 
-    const bounceTargets = calculateBorderBounce(creep.pos.roomName);
+    let incomingDamage = 0;
+    const roomName = creep.pos.roomName;
+
+    // Calculate expected tower damage
+    if (global.State && global.State.structuresByRoom) {
+        const roomStructures = global.State.structuresByRoom.get(roomName);
+        if (roomStructures) {
+            const towers = roomStructures.get('tower');
+            if (towers) {
+                for (const tower of towers.values()) {
+                    if (tower.my === false && tower.store && tower.store.energy >= 10) {
+                        const distance = Math.max(
+                            Math.abs(tower.pos.x - creep.pos.x),
+                            Math.abs(tower.pos.y - creep.pos.y)
+                        );
+                        if (distance <= 5) {
+                            incomingDamage += 600;
+                        } else if (distance >= 20) {
+                            incomingDamage += 150;
+                        } else {
+                            incomingDamage += 600 - (600 * 0.75 * (distance - 5) / 15);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Calculate expected creep damage
+    if (global.State && global.State.hostilesByRoom) {
+        const hostiles = global.State.hostilesByRoom.get(roomName) || [];
+        for (let i = 0; i < hostiles.length; i++) {
+            const hostile = hostiles[i];
+            const distance = Math.max(
+                Math.abs(hostile.pos.x - creep.pos.x),
+                Math.abs(hostile.pos.y - creep.pos.y)
+            );
+
+            if (distance <= 3) {
+                if (hostile.body) {
+                    for (let j = 0; j < hostile.body.length; j++) {
+                        const part = hostile.body[j];
+                        if (part.hits > 0) {
+                            if (part.type === ATTACK && distance <= 1) incomingDamage += 30; // ATTACK_POWER
+                            if (part.type === RANGED_ATTACK && distance <= 3) {
+                                incomingDamage += 10; // Standard is 10, RMA varies but 10 is a safe maximum estimate
+                            }
+                        }
+                    }
+                } else {
+                    // if no body visibility, assume a scary amount
+                    incomingDamage += 30;
+                }
+            }
+        }
+    }
+
+    // Calculate available healing
+    let availableHealing = 0;
+
+    // self healing
+    if (creep.body) {
+        for (let i = 0; i < creep.body.length; i++) {
+            const part = creep.body[i];
+            if (part.hits > 0 && part.type === HEAL) {
+                availableHealing += 12; // HEAL_POWER
+            }
+        }
+    }
+
+    // allied healing
+    if (global.State && global.State.creepsByRoom) {
+        const roomCreeps = global.State.creepsByRoom.get(roomName);
+        if (roomCreeps) {
+            for (const creeps of roomCreeps.values()) {
+                for (let i = 0; i < creeps.length; i++) {
+                    const ally = creeps[i];
+                    if (ally.name !== creep.name) {
+                        const distance = Math.max(
+                            Math.abs(ally.pos.x - creep.pos.x),
+                            Math.abs(ally.pos.y - creep.pos.y)
+                        );
+                        if (distance <= 3) {
+                            for (let j = 0; j < ally.body.length; j++) {
+                                const part = ally.body[j];
+                                if (part.hits > 0 && part.type === HEAL) {
+                                    if (distance <= 1) availableHealing += 12; // HEAL_POWER
+                                    else availableHealing += 4; // RANGED_HEAL_POWER
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Check if bounce is beneficial
+    // Beneficial if we will die, or if we take more damage than we can heal
+    const willDie = (creep.hits + availableHealing) <= incomingDamage;
+    const takingNetDamage = incomingDamage > availableHealing;
+
+    // If not taking net damage and not going to die, we don't need to bounce
+    if (!willDie && !takingNetDamage) {
+        return [];
+    }
+
+    // If beneficial, find the closest exit tile
+    if (global.State && global.State.roomExits && global.State.roomExits.has(roomName)) {
+        const roomExitsMap = global.State.roomExits.get(roomName);
+        let closestExit = null;
+        let minDistance = Infinity;
+
+        for (const exits of roomExitsMap.values()) {
+            for (let i = 0; i < exits.length; i++) {
+                const exitPos = exits[i];
+                const dx = Math.abs(exitPos.x - creep.pos.x);
+                const dy = Math.abs(exitPos.y - creep.pos.y);
+                const distance = dx + dy; // Manhattan is fine for closest
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestExit = exitPos;
+                }
+            }
+        }
+
+        if (closestExit) {
+            return [{ creep: creep.name, action: 'move', target: closestExit }];
+        }
+    }
+
+    // Fallback to calculating the adjacent room names and returning a borderBounce action
+    const bounceTargets = calculateBorderBounce(roomName);
     if (bounceTargets.length > 0) {
-        // Find the closest exit tile? Or just return the room to bounce to.
-        // We will output a 'borderBounce' action which the caller can interpret
-        // to invoke Game.map.findExit or pathing.
         return [{ creep: creep.name, action: 'borderBounce', target: bounceTargets[0] }];
     }
 
