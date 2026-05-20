@@ -26,11 +26,11 @@ function run(creep, room) {
                     }
                 }
             } else {
-                // Find dropped energy on exact tile
+                // Find dropped energy on exact tile or adjacent
                 const dropped = global.State.droppedByRoom.get(room.name) || new Map();
                 let targetDrop = null;
                 for (const drop of dropped.values()) {
-                    if (drop.resourceType === RESOURCE_ENERGY && creep.pos.isEqualTo(drop.pos)) {
+                    if (drop.resourceType === RESOURCE_ENERGY && creep.pos.isNearTo(drop.pos)) {
                         targetDrop = drop;
                         break;
                     }
@@ -38,6 +38,17 @@ function run(creep, room) {
 
                 if (targetDrop && creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
                     creep.pickup(targetDrop);
+                }
+            }
+
+            if (creep.heap && creep.heap.overrideTask === 'build') {
+                const sites = global.State.sitesByRoom.get(room.name);
+                if (sites && sites.length > 0) {
+                    const site = sites[0];
+                    if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                        TrafficManager.registerBuild(creep, site);
+                    }
+                    return;
                 }
             }
 

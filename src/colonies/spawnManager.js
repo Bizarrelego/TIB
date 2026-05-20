@@ -92,41 +92,6 @@ module.exports = {
 
             const bootstrapReqs = BootstrapPlanner.getCreepRequirements(room);
 
-            if (room.controller && room.controller.level < 2 && workerCount < bootstrapReqs.worker) {
-                if (room.energyAvailable >= 200 && availableSpawns.length > 0) {
-                    const spawn = availableSpawns[0];
-                    spawn.spawnCreep([WORK, CARRY, MOVE], 'worker_' + Game.time, { memory: { role: 'worker', colony: room.name } });
-                }
-                return;
-            }
-
-            const roomHasContainers = spawnLedger.hasActiveSourceContainer(room);
-            const isEarlyGame = room.controller.level < 2 || !roomHasContainers;
-
-            if (isEarlyGame) {
-                if (workerCount < bootstrapReqs.worker) {
-                    const energyAvailable = spawnLedger.getAvailableEnergy();
-                    const calcCapacity = (workerCount === 0 && energyAvailable < capacity && energyAvailable >= 200) ? energyAvailable : capacity;
-                    const body = BodyCalc.calculateWorker(calcCapacity);
-                    const cost = BodyCalc.getCost(body);
-                    if (spawnLedger.canSpawn(cost)) {
-                        SpawnQueueManager.requestSpawn(room.name, 'worker', body, 'worker_' + Game.time, { memory: { role: 'worker', colony: room.name } }, cost);
-                    }
-                } else {
-                    let totalScouts = 0;
-                    for (const crps of global.State.creepsByRoom.values()) {
-                        const s = crps.get('scout');
-                        if (s) totalScouts += s.length;
-                    }
-                    if (totalScouts === 0 && spawnLedger.canSpawn(50)) {
-                        SpawnQueueManager.requestSpawn(room.name, 'scout', [MOVE], 'scout_' + Game.time, { memory: { role: 'scout', colony: room.name } }, 50);
-                    }
-                }
-                const queue = new SpawnQueueManager();
-                queue.process(spawns, spawnLedger);
-                return; // suppress execution of all other spawning/queue logic (hubManager, fastFiller, upgrader, etc)
-            }
-
             // Spawn harvesters first
             const targetHarvesters = room.controller.level <= 4 ? bootstrapReqs.harvester : spawnLedger.calculateHarvesterTarget(room, workerCount);
             if (harvesterCount < targetHarvesters) {
