@@ -14,11 +14,15 @@ const Logger = require('./logger');
  * @param {...any} args - The arguments to pass to the function.
  * @returns {any} The result of the function execution, or undefined if an error occurred.
  */
+function logError(e, moduleName) {
+    Logger.error(`[Execution Error] ${moduleName}: ${e.stack}`);
+}
+
 function executeManager(moduleName, fn, ...args) {
     try {
         return fn(...args);
     } catch (e) {
-        Logger.error(`[Execution Error] ${moduleName}: ${e.stack}`);
+        logError(e, moduleName);
         return undefined;
     }
 }
@@ -29,4 +33,4 @@ function wrap(moduleName, fn) {
     };
 }
 
-module.exports = { executeManager, wrap };
+module.exports = { executeManager, wrap, logError };
