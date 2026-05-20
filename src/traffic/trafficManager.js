@@ -263,6 +263,25 @@ const TrafficManager = {
         return OK;
     },
 
+
+    registerBuild(creep, target) {
+        if (this.checkPipeline(creep.id)) return ERR_BUSY;
+        this.lockPipeline(creep.name, creep.id, target.id, RESOURCE_ENERGY, 0, 'BUILD');
+        return OK;
+    },
+
+    registerUpgrade(creep, target) {
+        if (this.checkPipeline(creep.id)) return ERR_BUSY;
+        this.lockPipeline(creep.name, creep.id, target.id, RESOURCE_ENERGY, 0, 'UPGRADE');
+        return OK;
+    },
+
+    registerRepair(creep, target) {
+        if (this.checkPipeline(creep.id)) return ERR_BUSY;
+        this.lockPipeline(creep.name, creep.id, target.id, RESOURCE_ENERGY, 0, 'REPAIR');
+        return OK;
+    },
+
     registerHarvest(creep, target) {
         if (this.checkPipeline(creep.id)) return ERR_BUSY;
         const ledger = global.State.ledger;
@@ -379,6 +398,15 @@ const TrafficManager = {
                     break;
                 case 'DROP':
                     creep.drop(intent.resourceType, intent.amount);
+                    break;
+                case 'BUILD':
+                    creep.build(target);
+                    break;
+                case 'UPGRADE':
+                    creep.upgradeController(target);
+                    break;
+                case 'REPAIR':
+                    creep.repair(target);
                     break;
             }
         } catch (e) {
