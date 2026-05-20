@@ -86,32 +86,31 @@ module.exports = {
                         // Priority 3: TOWER (under 70% capacity)
                         let bestTarget = null;
                         const structures = global.State.structuresByRoom.get(room.name);
-
-                        // Priority 1: Spawns and Extensions
-                        const spawns = structures ? (structures.get(STRUCTURE_SPAWN) || []) : [];
-                        const extensions = structures ? (structures.get(STRUCTURE_EXTENSION) || []) : [];
-                        for (const s of spawns) {
-                            if (s.store.getFreeCapacity(RESOURCE_ENERGY) > 0) { bestTarget = s; break; }
-                        }
-                        if (!bestTarget) {
-                            for (const e of extensions) {
-                                if (e.store.getFreeCapacity(RESOURCE_ENERGY) > 0) { bestTarget = e; break; }
-                            }
-                        }
-
-                        // Priority 2: Storage (RCL 4)
                         const storage = room.storage;
-                        if (!bestTarget && storage && storage.isActive() && storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                            bestTarget = storage;
-                        }
 
-                        // Priority 3: Upgrader Drop Pile
-                        if (!bestTarget) {
-                            const upgraders = global.State.creepsByRoom.get(room.name)?.get('upgrader') || [];
-                            if (upgraders.length > 0 && !storage) {
-                                creep.heap.targetId = 'controller';
-                                target = null;
-                                bestTarget = null;
+                        if (storage && storage.isActive() && storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                            bestTarget = storage;
+                        } else {
+                            // Priority 1: Spawns and Extensions
+                            const spawns = structures ? (structures.get(STRUCTURE_SPAWN) || []) : [];
+                            const extensions = structures ? (structures.get(STRUCTURE_EXTENSION) || []) : [];
+                            for (const s of spawns) {
+                                if (s.store.getFreeCapacity(RESOURCE_ENERGY) > 0) { bestTarget = s; break; }
+                            }
+                            if (!bestTarget) {
+                                for (const e of extensions) {
+                                    if (e.store.getFreeCapacity(RESOURCE_ENERGY) > 0) { bestTarget = e; break; }
+                                }
+                            }
+
+                            // Priority 3: Upgrader Drop Pile
+                            if (!bestTarget) {
+                                const upgraders = global.State.creepsByRoom.get(room.name)?.get('upgrader') || [];
+                                if (upgraders.length > 0 && !storage) {
+                                    creep.heap.targetId = 'controller';
+                                    target = null;
+                                    bestTarget = null;
+                                }
                             }
                         }
 

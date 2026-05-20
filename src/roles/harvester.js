@@ -66,11 +66,7 @@ module.exports = {
                     }
 
                     if (!hasLink) {
-                        const storage = room.storage;
-                        // If storage exists and we are in primary room, we terminate drop mining and rely on links/haulers to clear our inventory
-                        if (!storage) {
-                            creep.drop(RESOURCE_ENERGY);
-                        }
+                        creep.drop(RESOURCE_ENERGY);
                     }
                 }
 
