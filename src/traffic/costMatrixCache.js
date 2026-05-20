@@ -2,6 +2,7 @@ const eventBus = require('../os/eventBus');
 const RoomHasher = require('../os/roomHasher');
 const RawMemoryManager = require('../os/RawMemoryManager');
 const MEMORY_SEGMENTS = require('../constants/memorySegments');
+const HeatmapGenerator = require('./heatmapGenerator');
 
 const CostMatrixCache = {
     get: (roomName) => {
@@ -85,22 +86,36 @@ const CostMatrixCache = {
         // Strictly defer cache deletion to the eventBus handler, preserving caching behavior
         eventBus.publish('INVALIDATE_COSTMATRIX', { roomName });
     },
-    setDynamic: (roomName, costMatrix) => {
+    getDynamic: (roomName, baseMatrix = null) => {
         if (!global.State) global.State = new Map();
-        if (!global.State.dynamicCostMatrices) global.State.dynamicCostMatrices = new Map();
+        if (!global.State.dynamicOverlays) global.State.dynamicOverlays = new Map();
+        if (!global.State.hostileHashes) global.State.hostileHashes = new Map();
 
-        global.State.dynamicCostMatrices.set(roomName, costMatrix);
-    },
-    getDynamic: (roomName) => {
-        if (global.State && global.State.dynamicCostMatrices && global.State.dynamicCostMatrices.has(roomName)) {
-            return global.State.dynamicCostMatrices.get(roomName);
+        const hostiles = global.State.hostilesByRoom ? global.State.hostilesByRoom.get(roomName) : null;
+        const sourceMatrix = baseMatrix || CostMatrixCache.get(roomName);
+
+        if (!hostiles || hostiles.size === 0) {
+            return sourceMatrix;
         }
-        return CostMatrixCache.get(roomName);
-    },
-    deleteDynamic: (roomName) => {
-        if (global.State && global.State.dynamicCostMatrices) {
-            global.State.dynamicCostMatrices.delete(roomName);
+
+        // Stronger hash logic for hostiles using primes and XOR
+        let hostileHash = hostiles.size;
+        for (const hostile of hostiles.values()) {
+            hostileHash ^= (hostile.pos.x * 73) ^ (hostile.pos.y * 191);
         }
+
+        const cachedHash = global.State.hostileHashes.get(roomName);
+        let overlay;
+
+        if (cachedHash === hostileHash && global.State.dynamicOverlays.has(roomName)) {
+            overlay = global.State.dynamicOverlays.get(roomName);
+        } else {
+            overlay = HeatmapGenerator.generateOverlay(hostiles.values());
+            global.State.hostileHashes.set(roomName, hostileHash);
+            global.State.dynamicOverlays.set(roomName, overlay);
+        }
+
+        return HeatmapGenerator.applyOverlay(sourceMatrix, overlay);
     },
     generate: (roomName) => {
         const costMatrix = new PathFinder.CostMatrix();

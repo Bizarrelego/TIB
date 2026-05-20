@@ -124,6 +124,9 @@ module.exports = {
                     }
                 }
 
+                // Inject the hostile dynamic heatmap avoiding penalty overlay over the base matrix
+                matrix = CostMatrixCache.getDynamic(roomName, matrix);
+
                 let returnMatrix = matrix;
 
                 // Let's regenerate it properly using the base matrix.

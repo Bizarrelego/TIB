@@ -3,20 +3,16 @@
  * @description Generates dynamic CostMatrices with penalty tiles around hostile creeps for auto-kiting.
  */
 
-const CostMatrixCache = require('./costMatrixCache');
-
 const HeatmapGenerator = {
     /**
-     * Generates a CostMatrix by applying a penalty around hostile creeps.
-     * @param {string} roomName - The name of the room.
+     * Generates a list of penalty tiles around hostile creeps.
      * @param {Iterable<Creep>} hostiles - An iterable of hostile creeps in the room.
-     * @returns {PathFinder.CostMatrix} The dynamically adjusted CostMatrix.
+     * @param {number} [penalty=50] - The penalty cost to add.
+     * @returns {Array<{x: number, y: number, cost: number}>} The array of penalty tiles.
      */
-    generate: (roomName, hostiles) => {
-        const baseMatrix = CostMatrixCache.get(roomName);
-        if (!baseMatrix) return new PathFinder.CostMatrix();
-
-        const costMatrix = baseMatrix.clone();
+    generateOverlay: (hostiles, penalty = 50) => {
+        const overlay = [];
+        if (!hostiles) return overlay;
 
         for (const hostile of hostiles) {
             const hx = hostile.pos.x;
@@ -28,18 +24,45 @@ const HeatmapGenerator = {
                     const y = hy + dy;
 
                     if (x >= 0 && x <= 49 && y >= 0 && y <= 49) {
-                        const currentCost = costMatrix.get(x, y);
-                        // Do not overwrite impassable terrain/structures
-                        if (currentCost !== 255) {
-                            // Apply a penalty (e.g., +50 cost) to avoid being close to hostiles
-                            costMatrix.set(x, y, Math.min(254, currentCost + 50));
-                        }
+                        overlay.push({ x, y, cost: penalty });
                     }
                 }
             }
         }
+        return overlay;
+    },
 
+    /**
+     * Applies a penalty overlay to a base CostMatrix.
+     * @param {PathFinder.CostMatrix} baseMatrix - Base matrix to clone and apply to.
+     * @param {Array<{x: number, y: number, cost: number}>} overlay - The overlay tiles.
+     * @returns {PathFinder.CostMatrix} The dynamically adjusted CostMatrix.
+     */
+    applyOverlay: (baseMatrix, overlay) => {
+        const costMatrix = baseMatrix ? baseMatrix.clone() : new PathFinder.CostMatrix();
+
+        for (let i = 0; i < overlay.length; i++) {
+            const tile = overlay[i];
+            const currentCost = costMatrix.get(tile.x, tile.y);
+            // Do not overwrite impassable terrain/structures
+            if (currentCost !== 255) {
+                costMatrix.set(tile.x, tile.y, Math.min(254, currentCost + tile.cost));
+            }
+        }
         return costMatrix;
+    },
+
+    /**
+     * Legacy wrapper to generate a CostMatrix by applying a penalty around hostile creeps.
+     * @param {string} roomName - The name of the room.
+     * @param {Iterable<Creep>} hostiles - An iterable of hostile creeps in the room.
+     * @param {PathFinder.CostMatrix} [baseMatrix] - Optional base matrix to clone.
+     * @param {number} [penalty=50] - The penalty cost to add.
+     * @returns {PathFinder.CostMatrix} The dynamically adjusted CostMatrix.
+     */
+    generate: (roomName, hostiles, baseMatrix, penalty = 50) => {
+        const overlay = HeatmapGenerator.generateOverlay(hostiles, penalty);
+        return HeatmapGenerator.applyOverlay(baseMatrix, overlay);
     }
 };
 
