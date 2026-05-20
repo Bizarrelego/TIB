@@ -24,6 +24,8 @@ const planner = require('../colonies/planner');
 const RoleManager = require('../colonies/RoleManager');
 const operationsManager = require('../operations/operationsManager');
 const trafficManager = require('../traffic/trafficManager');
+const roomEventManager = require('./RoomEventManager');
+const EnergySourceTracker = require('./EnergySourceTracker');
 
 /**
  * @file managerOrchestrator.js
@@ -84,9 +86,6 @@ function runRoomManagers() {
             { name: 'LinkManager', slice: 1 },
             { name: 'UpgraderManager', slice: 1 },
             { name: 'StorageManager', slice: 1 },
-            { name: 'RoomEventManager', slice: 1 },
-            { name: 'SpawnQueueManager', slice: 1 },
-            { name: 'PreSpawnManager', slice: 1 },
             { name: 'LogisticsManager', slice: 1 },
             { name: 'LabManager', slice: 5 },
             { name: 'RemoteEconomyManager', slice: 5 },
@@ -106,6 +105,10 @@ function runRoomManagers() {
 
         const registeredManagers = Object.keys(require('./index').managers);
         for (const name of registeredManagers) {
+            // Exclude global or static managers from per-room execution
+            if (['PreSpawnManager', 'SpawnQueueManager', 'RoomEventManager', 'AllianceIntelManager', 'CombatManager', 'EnergyRequestManager', 'VisualsManager'].includes(name)) {
+                continue;
+            }
             if (!managersConfig.find(c => c.name === name)) {
                 managersConfig.push({ name, slice: 1 });
             }
@@ -187,6 +190,9 @@ function runPhase(phase, throttlerFlags = {}) {
 
             if (!skipState) {
                 executeManager('eventLogRadar', () => { if (eventLogRadar) eventLogRadar(); });
+                executeManager('RoomEventManager', () => {
+                    if (roomEventManager) roomEventManager();
+                });
                 executeManager('stateScanner', () => { if (stateScanner) stateScanner(); });
                 executeManager('globalState.scan', () => { if (globalState && globalState.scan) globalState.scan(); });
 
@@ -198,11 +204,8 @@ function runPhase(phase, throttlerFlags = {}) {
                     }
                 });
 
-                executeManager('EnergyRequestManager', () => {
-                    const energyRequestManager = globalState.getManager('EnergyRequestManager');
-                    if (energyRequestManager && energyRequestManager.handleSourceSleep) {
-                        energyRequestManager.handleSourceSleep();
-                    }
+                executeManager('EnergySourceTracker.run', () => {
+                    if (EnergySourceTracker && EnergySourceTracker.run) EnergySourceTracker.run();
                 });
             }
             break;
@@ -238,6 +241,10 @@ function runPhase(phase, throttlerFlags = {}) {
             }
 
             if (!skipManagers) {
+                executeManager('PreSpawnManager.run', () => {
+                    const PreSpawnManager = globalState.getManager('PreSpawnManager');
+                    if (PreSpawnManager && typeof PreSpawnManager.run === 'function') PreSpawnManager.run();
+                });
                 executeManager('runRoomManagers', runRoomManagers);
                 executeManager('RoleManager', () => RoleManager.runAll());
             }
@@ -246,6 +253,10 @@ function runPhase(phase, throttlerFlags = {}) {
         case 4:
             if (!skipOperations) {
                 Logger.debug('Phase 4: Running Operations');
+                executeManager('AllianceIntelManager.run', () => {
+                    const AllianceIntelManager = globalState.getManager('AllianceIntelManager');
+                    if (AllianceIntelManager && typeof AllianceIntelManager.run === 'function') AllianceIntelManager.run();
+                });
                 executeManager('operationsManager', () => { if (operationsManager) operationsManager(); });
                 executeManager('interShardMemoryManager', () => { if (interShardMemoryManager && typeof interShardMemoryManager._loadLocal === 'function') { interShardMemoryManager._loadLocal(); } });
                 executeManager('RawMemoryManager.init', () => { if (RawMemoryManager && typeof RawMemoryManager.init === 'function') { RawMemoryManager.init(); } });

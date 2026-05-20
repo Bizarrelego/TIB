@@ -7,7 +7,6 @@ const trafficManager = require('./traffic/trafficManager');
 const Logger = require('./utils/logger');
 const cpuBucketForecaster = require('./os/cpuBucketForecaster');
 const OSInitializer = require('./os/OSInitializer');
-const EnergySourceTracker = require('./managers/EnergySourceTracker');
 const { executeManager } = require('./utils/errorHandler');
 
 module.exports.loop = function () {
@@ -35,9 +34,6 @@ module.exports.loop = function () {
 
     // Initialize managers via integration layer
     executeManager('managersIntegration.init', () => managersIntegration.init(globalState));
-
-    // Call EnergySourceTracker specifically as per prompt
-    executeManager('EnergySourceTracker.run', () => EnergySourceTracker.run());
 
     // Execute Phase 2-6 through managerOrchestrator
     managerOrchestrator.runPhase(2, throttlerFlags);
