@@ -1,4 +1,5 @@
 const { BASE_LAYOUT_STAMP } = require('../constants/baseLayout');
+const earlyGameConstructionPlanner = require('./earlyGameConstructionPlanner');
 
 class BootstrapPlanner {
     /**
@@ -71,7 +72,43 @@ class BootstrapPlanner {
             }
         }
 
+        if (rcl === 2) {
+            const spawns = structuresMap.get(STRUCTURE_SPAWN);
+            const spawn = spawns && spawns.size > 0 ? spawns.values().next().value : null;
+
+            if (spawn) {
+                const extensionPositions = earlyGameConstructionPlanner.getRCL2ExtensionPositions(spawn.pos, room.name);
+
+                for (const pos of extensionPositions) {
+                    const px = pos.x;
+                    const py = pos.y;
+
+                    let occupied = false;
+                    const existingExtensions = structuresMap.get(STRUCTURE_EXTENSION) || new Map();
+                    for (const struct of existingExtensions.values()) {
+                        if (struct.pos.x === px && struct.pos.y === py) occupied = true;
+                    }
+                    if (!occupied) {
+                        for (const site of sites) {
+                            if (site.pos.x === px && site.pos.y === py) occupied = true;
+                        }
+                    }
+
+                    const id = `early-ext-${px}-${py}`;
+                    if (!occupied && !plannedStructures.has(id)) {
+                        plannedStructures.set(id, {
+                            pos: new RoomPosition(px, py, room.name),
+                            type: STRUCTURE_EXTENSION,
+                            id: id
+                        });
+                    }
+                }
+            }
+        }
+
         for (const [structureType, offsets] of BASE_LAYOUT_STAMP.entries()) {
+            if (structureType === STRUCTURE_EXTENSION && rcl < 3) continue;
+
             const limits = CONTROLLER_STRUCTURES[structureType];
             const limit = limits ? (limits[rcl] || 0) : 0;
 

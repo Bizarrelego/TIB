@@ -87,8 +87,8 @@ module.exports = {
             const anchor = plannerState.get('anchor') || (room.controller ? room.controller.pos : null);
 
             toBuild.sort((a, b) => {
-                const pA = STRUCTURE_PRIORITIES.get(a.type) || STRUCTURE_PRIORITIES.get('default');
-                const pB = STRUCTURE_PRIORITIES.get(b.type) || STRUCTURE_PRIORITIES.get('default');
+                const pA = (a.id && a.id.startsWith('early-ext')) ? 999 : (STRUCTURE_PRIORITIES.get(a.type) || STRUCTURE_PRIORITIES.get('default'));
+                const pB = (b.id && b.id.startsWith('early-ext')) ? 999 : (STRUCTURE_PRIORITIES.get(b.type) || STRUCTURE_PRIORITIES.get('default'));
                 if (pB !== pA) {
                     return pB - pA; // Descending order
                 }
