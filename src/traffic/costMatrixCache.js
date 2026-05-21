@@ -3,25 +3,16 @@ const RoomHasher = require('../os/roomHasher');
 const RawMemoryManager = require('../os/RawMemoryManager');
 const MEMORY_SEGMENTS = require('../constants/memorySegments');
 const HeatmapGenerator = require('./heatmapGenerator');
+const CostMatrixUpdateTrigger = require('./CostMatrixUpdateTrigger');
 
 const CostMatrixCache = {
     get: (roomName) => {
         if (!global.State) global.State = new Map();
         if (!global.State.costMatrices) global.State.costMatrices = new Map();
 
-        const currentHash = RoomHasher.generate(roomName);
-        let cachedHash = null;
+        const needsUpdate = CostMatrixUpdateTrigger.shouldUpdateCostMatrix(roomName);
 
-        if (global.State.roomHashes && global.State.roomHashes.has(roomName)) {
-            cachedHash = global.State.roomHashes.get(roomName);
-        } else if (global.Cache && global.Cache.has('roomHashes')) {
-            const roomHashes = global.Cache.get('roomHashes');
-            if (roomHashes.has(roomName)) {
-                cachedHash = roomHashes.get(roomName);
-            }
-        }
-
-        if (currentHash === cachedHash) {
+        if (!needsUpdate) {
             if (global.State.costMatrices.has(roomName)) {
                 return PathFinder.CostMatrix.deserialize(global.State.costMatrices.get(roomName));
             }
@@ -40,11 +31,13 @@ const CostMatrixCache = {
                 }
             }
 
-            const matrices = global.Cache.get('costMatrices');
-            if (matrices.has(roomName)) {
-                const serialized = matrices.get(roomName);
-                global.State.costMatrices.set(roomName, serialized);
-                return PathFinder.CostMatrix.deserialize(serialized);
+            if (global.Cache && global.Cache.has('costMatrices')) {
+                const matrices = global.Cache.get('costMatrices');
+                if (matrices.has(roomName)) {
+                    const serialized = matrices.get(roomName);
+                    global.State.costMatrices.set(roomName, serialized);
+                    return PathFinder.CostMatrix.deserialize(serialized);
+                }
             }
         }
 
@@ -61,13 +54,18 @@ const CostMatrixCache = {
         const hash = RoomHasher.generate(roomName);
         global.State.roomHashes.set(roomName, hash);
 
-        const matrices = global.Cache.get('costMatrices');
-        matrices.set(roomName, serialized);
+        if (global.Cache) {
+            if (!global.Cache.has('costMatrices')) {
+                global.Cache.set('costMatrices', new Map());
+            }
+            const matrices = global.Cache.get('costMatrices');
+            matrices.set(roomName, serialized);
 
-        if (!global.Cache.has('roomHashes')) {
-            global.Cache.set('roomHashes', new Map());
+            if (!global.Cache.has('roomHashes')) {
+                global.Cache.set('roomHashes', new Map());
+            }
+            global.Cache.get('roomHashes').set(roomName, hash);
         }
-        global.Cache.get('roomHashes').set(roomName, hash);
 
         // Serialize generated base matrix to RawMemory
         const rawData = RawMemoryManager.getSegment(MEMORY_SEGMENTS.COST_MATRICES);
