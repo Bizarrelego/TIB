@@ -1,10 +1,12 @@
-const resetRecovery = require('./os/resetRecovery');
-const managerOrchestrator = require('./managers/managerOrchestrator'); // Standalone Managers
+const Profiler = require('./utils/profiler');
+const resetRecovery = Profiler.wrap('resetRecovery', require('./os/resetRecovery'));
+const managerOrchestrator = Profiler.wrap('managerOrchestrator', require('./managers/managerOrchestrator')); // Standalone Managers
 const Logger = require('./utils/logger');
-const cpuBucketForecaster = require('./os/cpuBucketForecaster');
+const cpuBucketForecaster = Profiler.wrap('cpuBucketForecaster', require('./os/cpuBucketForecaster'));
 const { executeManager } = require('./utils/errorHandler');
 
-module.exports.loop = function () {
+
+module.exports.loop = Profiler.wrap('main.loop', function () {
     if (!Memory.os_initialized && global.Cache) {
         global.Cache = undefined;
         global.State = undefined;
@@ -20,9 +22,8 @@ module.exports.loop = function () {
     managerOrchestrator.run();
 
     // Profiler output
-    const Profiler = require('./utils/profiler');
     executeManager('Profiler.report', () => Profiler.report());
 
     // Save caches state for reset recovery
     executeManager('resetRecovery.saveState', () => resetRecovery.saveState());
-};
+});
