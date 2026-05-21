@@ -30,10 +30,17 @@ const BoostManager = require('./BoostManager');
 const VisualsManager = require('./VisualsManager');
 const planner = require('../colonies/planner');
 const RoleManager = require('../colonies/RoleManager');
-const operationsManager = require('../operations/operationsManager');
 const trafficManager = require('../traffic/trafficManager');
 const roomEventManager = require('./RoomEventManager');
-const EnergySourceTracker = require('./EnergySourceTracker');
+
+// Operations Managers
+const intelManager = require('../operations/intel');
+const expansionManager = require('../operations/expansion');
+const offenseManager = require('../operations/offense');
+const scoutManager = require('../operations/scoutManager');
+const skOperationsManager = require('../operations/skOperations');
+const HarassmentManager = require('../operations/HarassmentManager');
+const powerBankManager = require('../operations/powerBankManager');
 
 /**
  * @file managerOrchestrator.js
@@ -114,7 +121,7 @@ function runRoomManagers() {
         const registeredManagers = Object.keys(require('./index').managers);
         for (const name of registeredManagers) {
             // Exclude global or static managers from per-room execution
-            if (['PreSpawnManager', 'SpawnQueueManager', 'RoomEventManager', 'AllianceIntelManager', 'CombatManager', 'EnergyRequestManager', 'VisualsManager'].includes(name)) {
+            if (['PreSpawnManager', 'SpawnQueueManager', 'RoomEventManager', 'AllianceIntelManager', 'CombatManager', 'EnergyRequestManager', 'VisualsManager', 'EnergySourceTracker'].includes(name)) {
                 continue;
             }
             if (!managersConfig.find(c => c.name === name)) {
@@ -195,7 +202,6 @@ function init() {
     registeredTopLevelManagers.set('OSInitializer', typeof OSInitializer !== 'undefined' ? OSInitializer : require('../os/OSInitializer'));
     registeredTopLevelManagers.set('globalState', typeof globalState !== 'undefined' ? globalState : require('../state/globalState'));
     registeredTopLevelManagers.set('colonyManager', typeof colonyManager !== 'undefined' ? colonyManager : require('../colonies/colonyManager'));
-    registeredTopLevelManagers.set('operationsManager', typeof operationsManager !== 'undefined' ? operationsManager : require('../operations/operationsManager'));
     registeredTopLevelManagers.set('trafficManager', typeof trafficManager !== 'undefined' ? trafficManager : require('../traffic/trafficManager'));
     registeredTopLevelManagers.set('IntentManager', typeof IntentManager !== 'undefined' ? IntentManager : require('../os/IntentManager'));
 }
@@ -261,7 +267,10 @@ function run(externalThrottlerFlags = {}) {
                 }
             }
         });
-        executeWrapped('EnergySourceTracker.run', () => { if (EnergySourceTracker && typeof EnergySourceTracker.run === 'function') EnergySourceTracker.run(); });
+        executeWrapped('EnergySourceTracker.run', () => {
+            const tracker = registeredTopLevelManagers.get('globalState') ? registeredTopLevelManagers.get('globalState').getManager('EnergySourceTracker') : null;
+            if (tracker && typeof tracker.run === 'function') tracker.run();
+        });
     }
 
     // Phase 3: Colonies
@@ -314,10 +323,13 @@ function run(externalThrottlerFlags = {}) {
             const intelMgr = registeredTopLevelManagers.get('globalState') ? registeredTopLevelManagers.get('globalState').getManager('AllianceIntelManager') : null;
             if (intelMgr && typeof intelMgr.run === 'function') intelMgr.run();
         });
-        executeWrapped('operationsManager.run', () => {
-            const opMgr = registeredTopLevelManagers.get('operationsManager');
-            if (opMgr && typeof opMgr.run === 'function') opMgr.run();
-        });
+        executeWrapped('intelManager', () => { if (intelManager) intelManager(); });
+        executeWrapped('scoutManager', () => { if (scoutManager) scoutManager(); });
+        executeWrapped('expansionManager', () => { if (expansionManager) expansionManager(); });
+        executeWrapped('offenseManager', () => { if (offenseManager) offenseManager(); });
+        executeWrapped('skOperationsManager', () => { if (skOperationsManager) skOperationsManager(); });
+        executeWrapped('HarassmentManager', () => { if (HarassmentManager) HarassmentManager(); });
+        executeWrapped('powerBankManager', () => { if (powerBankManager) powerBankManager(); });
         executeWrapped('RawMemoryManager.init', () => {
             if (RawMemoryManager && typeof RawMemoryManager.init === 'function') RawMemoryManager.init();
         });

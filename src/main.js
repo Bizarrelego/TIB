@@ -1,7 +1,6 @@
 const resetRecovery = require('./os/resetRecovery');
 const managerOrchestrator = require('./managers/managerOrchestrator'); // Standalone Managers
 const Logger = require('./utils/logger');
-const cpuBucketForecaster = require('./os/cpuBucketForecaster');
 const { executeManager } = require('./utils/errorHandler');
 
 module.exports.loop = function () {

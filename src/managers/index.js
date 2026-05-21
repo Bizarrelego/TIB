@@ -21,6 +21,7 @@ const BoostManager = require('./BoostManager');
 const VisualsManager = require('./VisualsManager');
 const PowerSpawnManager = require('./PowerSpawnManager');
 const AllianceIntelManager = require('./AllianceIntelManager');
+const EnergySourceTracker = require('./EnergySourceTracker');
 
 const managers = {
     CombatManager,
@@ -45,7 +46,8 @@ const managers = {
     BoostManager,
     VisualsManager,
     PowerSpawnManager,
-    AllianceIntelManager
+    AllianceIntelManager,
+    EnergySourceTracker
 };
 
 module.exports = {
