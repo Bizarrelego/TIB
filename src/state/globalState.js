@@ -14,6 +14,9 @@ class GlobalStateManager {
         this.controllersByRoom = new Map();
         this.sitesByRoom = new Map();
         this.mineralsByRoom = new Map();
+        this.rooms = new Map();
+        this.creeps = new Map();
+        this.structures = new Map();
         this.aggressionState = 'Growth';
     }
 
@@ -109,6 +112,8 @@ class GlobalStateManager {
 
         if (this.scannedRooms) this.scannedRooms.clear();
         if (this.rooms) this.rooms.clear();
+        if (this.creeps) this.creeps.clear();
+        if (this.structures) this.structures.clear();
         if (this.eventCache) this.eventCache.clear();
 
         this.isRehydrated = false;
