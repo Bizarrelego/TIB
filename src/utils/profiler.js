@@ -28,6 +28,9 @@ class Profiler {
      * @returns {Function|Object} The wrapped target, ready for module.exports.
      */
     static wrap(name, target) {
+        if (target.__profilerWrapped) return target;
+        target.__profilerWrapped = true;
+
         if (typeof target === 'function') {
             const props = Object.getOwnPropertyNames(target);
             let hasCustomStatic = false;
@@ -188,13 +191,25 @@ class Profiler {
     static report() {
         this.logBottlenecks();
 
+        const reportData = { bottlenecks: [], averages: {} };
+
+        const threshold = 5;
+
         if (this.metrics) {
             console.log(`[Profiler] 1000-tick Averages:`);
             for (const name of this.metrics.keys()) {
                 const avg = this.getAverage(name);
                 console.log(`  - ${name}: ${avg.toFixed(3)} CPU / tick`);
+                reportData.averages[name] = avg;
+                if (avg > threshold) {
+                    reportData.bottlenecks.push({ name, avg });
+                }
             }
         }
+
+        const MEMORY_SEGMENTS = require('../constants/memorySegments');
+        const RawMemoryManager = require('../os/RawMemoryManager');
+        RawMemoryManager.setSegment(MEMORY_SEGMENTS.PROFILER_METRICS, JSON.stringify(reportData));
     }
 }
 

@@ -194,9 +194,19 @@ const registeredTopLevelManagers = new Map();
 function init() {
     registeredTopLevelManagers.set('OSInitializer', typeof OSInitializer !== 'undefined' ? OSInitializer : require('../os/OSInitializer'));
     registeredTopLevelManagers.set('globalState', typeof globalState !== 'undefined' ? globalState : require('../state/globalState'));
-    registeredTopLevelManagers.set('colonyManager', typeof colonyManager !== 'undefined' ? colonyManager : require('../colonies/colonyManager'));
-    registeredTopLevelManagers.set('operationsManager', typeof operationsManager !== 'undefined' ? operationsManager : require('../operations/operationsManager'));
-    registeredTopLevelManagers.set('trafficManager', typeof trafficManager !== 'undefined' ? trafficManager : require('../traffic/trafficManager'));
+
+    let loadedColonyManager = typeof colonyManager !== 'undefined' ? colonyManager : require('../colonies/colonyManager');
+    loadedColonyManager = Profiler.wrap('colonyManager', loadedColonyManager);
+    registeredTopLevelManagers.set('colonyManager', loadedColonyManager);
+
+    let loadedOperationsManager = typeof operationsManager !== 'undefined' ? operationsManager : require('../operations/operationsManager');
+    loadedOperationsManager = Profiler.wrap('operationsManager', loadedOperationsManager);
+    registeredTopLevelManagers.set('operationsManager', loadedOperationsManager);
+
+    let loadedTrafficManager = typeof trafficManager !== 'undefined' ? trafficManager : require('../traffic/trafficManager');
+    loadedTrafficManager = Profiler.wrap('trafficManager', loadedTrafficManager);
+    registeredTopLevelManagers.set('trafficManager', loadedTrafficManager);
+
     registeredTopLevelManagers.set('IntentManager', typeof IntentManager !== 'undefined' ? IntentManager : require('../os/IntentManager'));
 }
 
@@ -208,8 +218,20 @@ function run(externalThrottlerFlags = {}) {
 
     const executeWrapped = (name, fn) => {
         if (!fn) return;
-        const wrapped = Profiler.wrap(name, errorHandler.wrap(name, fn));
-        wrapped();
+        const profilerEnabled = global.PROFILER_ENABLED || (typeof Memory !== 'undefined' && Memory.PROFILER_ENABLED);
+        const cpuAvailable = typeof Game !== 'undefined' && Game.cpu && typeof Game.cpu.getUsed === 'function';
+        let startCpu;
+
+        if (profilerEnabled) {
+            startCpu = cpuAvailable ? Game.cpu.getUsed() : Date.now();
+        }
+
+        errorHandler.wrap(name, fn)();
+
+        if (profilerEnabled) {
+            const endCpu = cpuAvailable ? Game.cpu.getUsed() : Date.now();
+            Profiler.record(name, endCpu - startCpu);
+        }
     };
 
     // Phase 1: OS Init & Cache
