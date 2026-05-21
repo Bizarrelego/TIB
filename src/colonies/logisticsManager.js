@@ -4,6 +4,7 @@ function hasHeap(creep, key) { return creep.heap instanceof Map ? creep.heap.has
 function getHeap(creep, key) { return creep.heap instanceof Map ? creep.heap.get(key) : creep.heap[key]; }
 const eventBus = require('../os/eventBus');
 const TrafficManager = require('../traffic/trafficManager');
+const ResourceTransferLedger = require('./ResourceTransferLedger');
 const EnergyRequestManager = require('../managers/EnergyRequestManager');
 const Profiler = require('../utils/profiler');
 
@@ -171,9 +172,9 @@ const LogisticsManager = {
                     setHeap(creep, 'parkPos', parkPos);
                 }
 
-                const creepState = TrafficManager.getVirtualState(creep, RESOURCE_ENERGY);
-                const storageState = storage ? TrafficManager.getVirtualState(storage, RESOURCE_ENERGY) : null;
-                const terminalState = terminal ? TrafficManager.getVirtualState(terminal, RESOURCE_ENERGY) : null;
+                const creepState = ResourceTransferLedger.getAvailable(creep, RESOURCE_ENERGY);
+                const storageState = storage ? ResourceTransferLedger.getAvailable(storage, RESOURCE_ENERGY) : null;
+                const terminalState = terminal ? ResourceTransferLedger.getAvailable(terminal, RESOURCE_ENERGY) : null;
 
                 let state = (creep.heap instanceof Map) ? getHeap(creep, 'state') : creep.heap.state;
                 if (!state) state = 'emptying';
@@ -197,7 +198,7 @@ const LogisticsManager = {
                         if (needyExtensions.has(adjacentIds[j])) {
                             const structObj = Game.getObjectById(adjacentIds[j]);
                             if (structObj) {
-                                const structState = TrafficManager.getVirtualState(structObj, RESOURCE_ENERGY);
+                                const structState = ResourceTransferLedger.getAvailable(structObj, RESOURCE_ENERGY);
                                 target = structObj;
                                 targetAmount = Math.min(creepState.used, structState.free);
                                 break;
@@ -225,7 +226,7 @@ const LogisticsManager = {
                         for (let j = 0; j < adjacentLinks.length; j++) {
                             const linkObj = Game.getObjectById(adjacentLinks[j]);
                             if (!linkObj) continue;
-                            const linkState = TrafficManager.getVirtualState(linkObj, RESOURCE_ENERGY);
+                            const linkState = ResourceTransferLedger.getAvailable(linkObj, RESOURCE_ENERGY);
                             if (linkState.used > 0) {
                                 source = linkObj;
                                 break;
@@ -234,7 +235,7 @@ const LogisticsManager = {
                     }
 
                     if (source) {
-                        const sourceState = TrafficManager.getVirtualState(source, RESOURCE_ENERGY);
+                        const sourceState = ResourceTransferLedger.getAvailable(source, RESOURCE_ENERGY);
                         const amount = Math.min(creepState.free, sourceState.used);
                         if (amount > 0 && TrafficManager.registerWithdraw(creep, source, RESOURCE_ENERGY, amount) === OK) {
                             TrafficManager.lockPipeline(creep.name, creep.id, source.id, RESOURCE_ENERGY, amount, 'WITHDRAW');
@@ -270,7 +271,7 @@ const LogisticsManager = {
 
                 creep.heap = creep.heap || {};
 
-                const creepState = TrafficManager.getVirtualState(creep, RESOURCE_ENERGY);
+                const creepState = ResourceTransferLedger.getAvailable(creep, RESOURCE_ENERGY);
                 const creepQuad = getQuadrant(creep.pos);
 
                 if (creepState.used === 0 || (creepState.free > 0 && creep.heap.state !== 'transfer' && supplyIndex < supplies.length)) {
@@ -283,7 +284,7 @@ const LogisticsManager = {
 
                     for (let j = supplyIndex; j < supplies.length; j++) {
                         const supply = supplies[j];
-                        const supplyState = TrafficManager.getVirtualState(supply.target, RESOURCE_ENERGY);
+                        const supplyState = ResourceTransferLedger.getAvailable(supply.target, RESOURCE_ENERGY);
 
                         if (supplyState.used > 0) {
                             if (!selectedSupply) { selectedSupply = supply; selectedIdx = j; }
@@ -301,7 +302,7 @@ const LogisticsManager = {
                     }
 
                     if (selectedSupply) {
-                        const amountToTake = Math.min(creepState.free, TrafficManager.getVirtualState(selectedSupply.target, RESOURCE_ENERGY).used);
+                        const amountToTake = Math.min(creepState.free, ResourceTransferLedger.getAvailable(selectedSupply.target, RESOURCE_ENERGY).used);
                         let status;
 
                         if (selectedSupply.target instanceof Resource) {
@@ -320,7 +321,7 @@ const LogisticsManager = {
                             creep.heap.dropId = selectedSupply.target.id;
                             creep.heap.resourceType = RESOURCE_ENERGY;
 
-                            const updatedSupplyState = TrafficManager.getVirtualState(selectedSupply.target, RESOURCE_ENERGY);
+                            const updatedSupplyState = ResourceTransferLedger.getAvailable(selectedSupply.target, RESOURCE_ENERGY);
                             if (updatedSupplyState.used <= 0 && selectedIdx === supplyIndex) {
                                 supplyIndex++;
                             }
@@ -339,7 +340,7 @@ const LogisticsManager = {
 
                     for (let j = requestIndex; j < requests.length; j++) {
                         const request = requests[j];
-                        const requestState = TrafficManager.getVirtualState(request.target, RESOURCE_ENERGY);
+                        const requestState = ResourceTransferLedger.getAvailable(request.target, RESOURCE_ENERGY);
 
                         if (requestState.free > 0) {
                             if (!selectedReq) { selectedReq = request; selectedIdx = j; }
@@ -357,14 +358,14 @@ const LogisticsManager = {
                     }
 
                     if (selectedReq) {
-                        const amountToTransfer = Math.min(creepState.used, TrafficManager.getVirtualState(selectedReq.target, RESOURCE_ENERGY).free);
+                        const amountToTransfer = Math.min(creepState.used, ResourceTransferLedger.getAvailable(selectedReq.target, RESOURCE_ENERGY).free);
                         if (TrafficManager.registerTransfer(creep, selectedReq.target, RESOURCE_ENERGY, amountToTransfer) === OK) {
                             TrafficManager.lockPipeline(creep.name, creep.id, selectedReq.target.id, RESOURCE_ENERGY, amountToTransfer, 'TRANSFER');
 
                             creep.heap.targetId = selectedReq.target.id;
                             creep.heap.resourceType = RESOURCE_ENERGY;
 
-                            const updatedRequestState = TrafficManager.getVirtualState(selectedReq.target, RESOURCE_ENERGY);
+                            const updatedRequestState = ResourceTransferLedger.getAvailable(selectedReq.target, RESOURCE_ENERGY);
                             if (updatedRequestState.free <= 0 && selectedIdx === requestIndex) {
                                 requestIndex++;
                             }
@@ -394,7 +395,7 @@ const LogisticsManager = {
                     eventBus.publish('LINK_ROUTE_ACTIVE', { roomName: room.name, route: 'controller' });
                 }
 
-                const controllerState = controllerLink ? TrafficManager.getVirtualState(controllerLink, RESOURCE_ENERGY) : null;
+                const controllerState = controllerLink ? ResourceTransferLedger.getAvailable(controllerLink, RESOURCE_ENERGY) : null;
                 const controllerNeedsEnergy = controllerState && controllerState.used < 400;
 
                 for (let i = 0; i < hubManagers.length; i++) {
@@ -409,10 +410,10 @@ const LogisticsManager = {
                         setHeap(creep, 'parkPos', parkPos);
                     }
 
-                    const creepState = TrafficManager.getVirtualState(creep, RESOURCE_ENERGY);
-                    const hubLinkState = TrafficManager.getVirtualState(hubLink, RESOURCE_ENERGY);
-                    const storageState = TrafficManager.getVirtualState(storage, RESOURCE_ENERGY);
-                    const terminalState = terminal ? TrafficManager.getVirtualState(terminal, RESOURCE_ENERGY) : null;
+                    const creepState = ResourceTransferLedger.getAvailable(creep, RESOURCE_ENERGY);
+                    const hubLinkState = ResourceTransferLedger.getAvailable(hubLink, RESOURCE_ENERGY);
+                    const storageState = ResourceTransferLedger.getAvailable(storage, RESOURCE_ENERGY);
+                    const terminalState = terminal ? ResourceTransferLedger.getAvailable(terminal, RESOURCE_ENERGY) : null;
 
                     let actionRegistered = false;
 
