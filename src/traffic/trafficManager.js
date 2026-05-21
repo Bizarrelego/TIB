@@ -1,3 +1,4 @@
+const ResourceTransferLedger = require('../colonies/ResourceTransferLedger');
 const ROLE_PRIORITIES = require('../constants/rolePriorities');
 const Logger = require('../utils/logger');
 
@@ -154,35 +155,7 @@ const TrafficManager = {
     },
 
     getVirtualState(target, resourceType) {
-        const ledger = global.State.ledger;
-        if (!ledger) return { used: 0, free: 0, cap: 0 };
-
-        if (ledger.has(target.id)) {
-            const state = ledger.get(target.id);
-            return { used: state.used, free: Math.max(0, state.cap - state.used), cap: state.cap };
-        }
-
-        let used = 0;
-        let cap = 0;
-
-        if (target.store) {
-            used = target.store.getUsedCapacity(resourceType) || 0;
-            cap = target.store.getCapacity(resourceType) || 0;
-        } else if (target.amount !== undefined) {
-            used = target.amount;
-            cap = target.amount; // For dropped resources, cap is amount
-        } else if (target.mineralAmount !== undefined) {
-            used = target.mineralAmount;
-            cap = target.mineralCapacity !== undefined ? target.mineralCapacity : target.mineralAmount;
-        } else if (target.energyCapacity !== undefined) {
-            used = target.energy;
-            cap = target.energyCapacity;
-        } else if (target.progressTotal !== undefined) {
-            used = target.progress;
-            cap = target.progressTotal;
-        }
-
-        return { used, free: Math.max(0, cap - used), cap };
+        return ResourceTransferLedger.getAvailable(target, resourceType);
     },
 
     registerTransfer(creep, target, resourceType, amount) {
@@ -198,8 +171,7 @@ const TrafficManager = {
         const creepState = this.getVirtualState(creep, resType);
         if (creepState.used < amount) return ERR_NOT_ENOUGH_RESOURCES;
 
-        ledger.set(target.id, { used: targetState.used + amount, cap: targetState.cap });
-        ledger.set(creep.id, { used: creepState.used - amount, cap: creepState.cap });
+        ResourceTransferLedger.registerTransfer(creep.id, resType, amount, target.id, 'TRANSFER');
 
         this.lockPipeline(creep.name, creep.id, target.id, resType, amount, 'TRANSFER');
 
@@ -219,8 +191,7 @@ const TrafficManager = {
         const creepState = this.getVirtualState(creep, resType);
         if (creepState.free < amount) return ERR_FULL;
 
-        ledger.set(target.id, { used: targetState.used - amount, cap: targetState.cap });
-        ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
+        ResourceTransferLedger.registerTransfer(creep.id, resType, amount, target.id, 'WITHDRAW');
 
         this.lockPipeline(creep.name, creep.id, target.id, resType, amount, 'WITHDRAW');
 
@@ -239,8 +210,7 @@ const TrafficManager = {
         const creepState = this.getVirtualState(creep, resType);
         if (creepState.free < amount) return ERR_FULL;
 
-        ledger.set(target.id, { used: targetState.used - amount, cap: targetState.cap });
-        ledger.set(creep.id, { used: creepState.used + amount, cap: creepState.cap });
+        ResourceTransferLedger.registerTransfer(creep.id, resType, amount, target.id, 'WITHDRAW');
 
         this.lockPipeline(creep.name, creep.id, target.id, resType, amount, 'PICKUP');
 
@@ -256,7 +226,7 @@ const TrafficManager = {
         const creepState = this.getVirtualState(creep, resType);
         if (creepState.used < amount) return ERR_NOT_ENOUGH_RESOURCES;
 
-        ledger.set(creep.id, { used: creepState.used - amount, cap: creepState.cap });
+        ResourceTransferLedger.registerTransfer(creep.id, resType, amount, null, 'DROP');
 
         this.lockPipeline(creep.name, creep.id, null, resType, amount, 'DROP');
 
@@ -303,8 +273,7 @@ const TrafficManager = {
 
         if (harvestAmount <= 0) return ERR_FULL;
 
-        ledger.set(target.id, { used: targetState.used - harvestAmount, cap: targetState.cap });
-        ledger.set(creep.id, { used: creepState.used + harvestAmount, cap: creepState.cap });
+        ResourceTransferLedger.registerTransfer(creep.id, resType, harvestAmount, target.id, 'HARVEST');
 
         Logger.debug(`Creep ${creep.name} registered HARVEST intent of ${harvestAmount} ${resType} on ${target.id}`);
         this.lockPipeline(creep.name, creep.id, target.id, resType, harvestAmount, 'HARVEST');
