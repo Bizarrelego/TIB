@@ -208,6 +208,14 @@ function init() {
     registeredTopLevelManagers.set('trafficManager', loadedTrafficManager);
 
     registeredTopLevelManagers.set('IntentManager', typeof IntentManager !== 'undefined' ? IntentManager : require('../os/IntentManager'));
+
+    let loadedRCLProgressionManager = typeof RCLProgressionManager !== 'undefined' ? RCLProgressionManager : require('../colonies/RCLProgressionManager');
+    loadedRCLProgressionManager = Profiler.wrap('RCLProgressionManager', loadedRCLProgressionManager);
+    registeredTopLevelManagers.set('RCLProgressionManager', loadedRCLProgressionManager);
+
+    let loadedAssignmentUtility = typeof AssignmentUtility !== 'undefined' ? AssignmentUtility : require('../utils/AssignmentUtility');
+    loadedAssignmentUtility = Profiler.wrap('AssignmentUtility', loadedAssignmentUtility);
+    registeredTopLevelManagers.set('AssignmentUtility', loadedAssignmentUtility);
 }
 
 const cpuThrottler = require('../os/cpuThrottler');
@@ -288,6 +296,10 @@ function run(externalThrottlerFlags = {}) {
 
     // Phase 3: Colonies
     if (!skipColonies) {
+        executeWrapped('AssignmentUtility.run', () => {
+            const assignUtil = registeredTopLevelManagers.get('AssignmentUtility');
+            if (assignUtil && typeof assignUtil.run === 'function') assignUtil.run();
+        });
         executeWrapped('ledgerReset', () => { if (VirtualLedger && typeof VirtualLedger.clear === 'function') VirtualLedger.clear(); });
         executeWrapped('colonyManager.run', () => {
             const colMgr = registeredTopLevelManagers.get('colonyManager');
@@ -296,6 +308,12 @@ function run(externalThrottlerFlags = {}) {
         executeWrapped('defconManager.run', () => {
             if (global.State && global.State.rooms && defconManager && typeof defconManager.run === 'function') {
                 for (const room of global.State.rooms.values()) defconManager.run(room);
+            }
+        });
+        executeWrapped('RCLProgressionManager.run', () => {
+            const rclMgr = registeredTopLevelManagers.get('RCLProgressionManager');
+            if (global.State && global.State.rooms && rclMgr && typeof rclMgr.run === 'function') {
+                for (const room of global.State.rooms.values()) rclMgr.run(room);
             }
         });
     }
