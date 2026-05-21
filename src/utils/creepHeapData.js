@@ -5,21 +5,21 @@
  */
 
 /**
- * Ensures that the creep has a valid heap object.
- * Initializes `creep.heap` as an empty object if it does not already exist.
+ * Ensures that the creep has a valid heap Map object.
+ * Initializes `creep.heap` as an empty Map if it does not already exist.
  *
  * @param {Creep} creep - The target creep.
  */
 function ensureHeap(creep) {
     if (!creep) return;
-    if (typeof creep.heap !== 'object' || creep.heap === null) {
-        creep.heap = {};
+    if (!(creep.heap instanceof Map)) {
+        creep.heap = new Map();
     }
 }
 
 /**
  * Safely sets a value on the creep's heap under the specified key.
- * Initializes the heap if it doesn't exist.
+ * Initializes the heap Map if it doesn't exist.
  *
  * @param {Creep} creep - The target creep.
  * @param {string} key - The property key to set.
@@ -28,7 +28,7 @@ function ensureHeap(creep) {
 function setHeapData(creep, key, value) {
     if (!creep) return;
     ensureHeap(creep);
-    creep.heap[key] = value;
+    creep.heap.set(key, value);
 }
 
 /**
@@ -41,7 +41,7 @@ function setHeapData(creep, key, value) {
 function getHeapData(creep, key) {
     if (!creep) return undefined;
     ensureHeap(creep);
-    return creep.heap[key];
+    return creep.heap.get(key);
 }
 
 /**
@@ -53,7 +53,7 @@ function getHeapData(creep, key) {
 function deleteHeapData(creep, key) {
     if (!creep) return;
     ensureHeap(creep);
-    delete creep.heap[key];
+    creep.heap.delete(key);
 }
 
 module.exports = {
