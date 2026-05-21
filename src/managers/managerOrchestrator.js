@@ -1,38 +1,38 @@
 const Profiler = require('../utils/profiler');
-const globalState = require('../state/globalState');
+const globalState = Profiler.wrap('globalState', require('../state/globalState'));
 const Logger = require('../utils/logger');
 const { executeManager } = require('../utils/errorHandler');
-const defconManager = require('../colonies/defconManager');
-const interShardMemoryManager = require('../os/interShardMemoryManager');
-const RawMemoryManager = require('../os/RawMemoryManager');
-const memoryProxy = require('../os/memoryProxy');
+const defconManager = Profiler.wrap('defconManager', require('../colonies/defconManager'));
+const interShardMemoryManager = Profiler.wrap('interShardMemoryManager', require('../os/interShardMemoryManager'));
+const RawMemoryManager = Profiler.wrap('RawMemoryManager', require('../os/RawMemoryManager'));
+const memoryProxy = Profiler.wrap('memoryProxy', require('../os/memoryProxy'));
 const VirtualLedger = require('../utils/VirtualLedger');
-const roomHasher = require('../os/roomHasher');
+const roomHasher = Profiler.wrap('roomHasher', require('../os/roomHasher'));
 const { wrapModuleFunctions } = require('../utils/moduleWrapper');
 const errorHandler = require('../utils/errorHandler');
-const heapValidator = require('../os/heapValidator');
-const resetRecovery = require('../os/resetRecovery');
-const objectPool = require('../os/objectPool');
-const eventBus = require('../os/eventBus');
-const cpuBucketForecaster = require('../os/cpuBucketForecaster');
+const heapValidator = Profiler.wrap('heapValidator', require('../os/heapValidator'));
+const resetRecovery = Profiler.wrap('resetRecovery', require('../os/resetRecovery'));
+const objectPool = Profiler.wrap('objectPool', require('../os/objectPool'));
+const eventBus = Profiler.wrap('eventBus', require('../os/eventBus'));
+const cpuBucketForecaster = Profiler.wrap('cpuBucketForecaster', require('../os/cpuBucketForecaster'));
 
 // Phase Managers
-const discoveryManager = require('../state/discoveryManager');
-const OSInitializer = require('../os/OSInitializer');
-const IntentManager = require('../os/IntentManager');
-const eventLogRadar = require('../os/eventLogRadar');
-const stateScanner = require('../state/stateScanner');
-const colonyManager = require('../colonies/colonyManager');
-const spawnManager = require('../colonies/spawnManager');
+const discoveryManager = Profiler.wrap('discoveryManager', require('../state/discoveryManager'));
+const OSInitializer = Profiler.wrap('OSInitializer', require('../os/OSInitializer'));
+const IntentManager = Profiler.wrap('IntentManager', require('../os/IntentManager'));
+const eventLogRadar = Profiler.wrap('eventLogRadar', require('../os/eventLogRadar'));
+const stateScanner = Profiler.wrap('stateScanner', require('../state/stateScanner'));
+const colonyManager = Profiler.wrap('colonyManager', require('../colonies/colonyManager'));
+const spawnManager = Profiler.wrap('spawnManager', require('../colonies/spawnManager'));
 const SpawnLedger = require('../colonies/spawnLedger');
-const BoostManager = require('./BoostManager');
-const VisualsManager = require('./VisualsManager');
-const planner = require('../colonies/planner');
-const RoleManager = require('../colonies/RoleManager');
-const operationsManager = require('../operations/operationsManager');
-const trafficManager = require('../traffic/trafficManager');
-const roomEventManager = require('./RoomEventManager');
-const EnergySourceTracker = require('./EnergySourceTracker');
+const BoostManager = Profiler.wrap('BoostManager', require('./BoostManager'));
+const VisualsManager = Profiler.wrap('VisualsManager', require('./VisualsManager'));
+const planner = Profiler.wrap('planner', require('../colonies/planner'));
+const RoleManager = Profiler.wrap('RoleManager', require('../colonies/RoleManager'));
+const operationsManager = Profiler.wrap('operationsManager', require('../operations/operationsManager'));
+const trafficManager = Profiler.wrap('trafficManager', require('../traffic/trafficManager'));
+const roomEventManager = Profiler.wrap('RoomEventManager', require('./RoomEventManager'));
+const EnergySourceTracker = Profiler.wrap('EnergySourceTracker', require('./EnergySourceTracker'));
 
 /**
  * @file managerOrchestrator.js
@@ -191,22 +191,12 @@ function runRoomManagers() {
 const registeredTopLevelManagers = new Map();
 
 function init() {
-    registeredTopLevelManagers.set('OSInitializer', typeof OSInitializer !== 'undefined' ? OSInitializer : require('../os/OSInitializer'));
-    registeredTopLevelManagers.set('globalState', typeof globalState !== 'undefined' ? globalState : require('../state/globalState'));
-
-    let loadedColonyManager = typeof colonyManager !== 'undefined' ? colonyManager : require('../colonies/colonyManager');
-    loadedColonyManager = Profiler.wrap('colonyManager', loadedColonyManager);
-    registeredTopLevelManagers.set('colonyManager', loadedColonyManager);
-
-    let loadedOperationsManager = typeof operationsManager !== 'undefined' ? operationsManager : require('../operations/operationsManager');
-    loadedOperationsManager = Profiler.wrap('operationsManager', loadedOperationsManager);
-    registeredTopLevelManagers.set('operationsManager', loadedOperationsManager);
-
-    let loadedTrafficManager = typeof trafficManager !== 'undefined' ? trafficManager : require('../traffic/trafficManager');
-    loadedTrafficManager = Profiler.wrap('trafficManager', loadedTrafficManager);
-    registeredTopLevelManagers.set('trafficManager', loadedTrafficManager);
-
-    registeredTopLevelManagers.set('IntentManager', typeof IntentManager !== 'undefined' ? IntentManager : require('../os/IntentManager'));
+    registeredTopLevelManagers.set('OSInitializer', typeof OSInitializer !== 'undefined' ? OSInitializer : Profiler.wrap('OSInitializer', require('../os/OSInitializer')));
+    registeredTopLevelManagers.set('globalState', typeof globalState !== 'undefined' ? globalState : Profiler.wrap('globalState', require('../state/globalState')));
+    registeredTopLevelManagers.set('colonyManager', typeof colonyManager !== 'undefined' ? colonyManager : Profiler.wrap('colonyManager', require('../colonies/colonyManager')));
+    registeredTopLevelManagers.set('operationsManager', typeof operationsManager !== 'undefined' ? operationsManager : Profiler.wrap('operationsManager', require('../operations/operationsManager')));
+    registeredTopLevelManagers.set('trafficManager', typeof trafficManager !== 'undefined' ? trafficManager : Profiler.wrap('trafficManager', require('../traffic/trafficManager')));
+    registeredTopLevelManagers.set('IntentManager', typeof IntentManager !== 'undefined' ? IntentManager : Profiler.wrap('IntentManager', require('../os/IntentManager')));
 
     let loadedRCLProgressionManager = require('../colonies/RCLProgressionManager');
     loadedRCLProgressionManager = Profiler.wrap('RCLProgressionManager', loadedRCLProgressionManager);
@@ -217,8 +207,8 @@ function init() {
     registeredTopLevelManagers.set('AssignmentUtility', loadedAssignmentUtility);
 }
 
-const cpuThrottler = require('../os/cpuThrottler');
-const managersIntegration = require('./index');
+const cpuThrottler = Profiler.wrap('cpuThrottler', require('../os/cpuThrottler'));
+const managersIntegration = Profiler.wrap('managersIntegration', require('./index'));
 
 function run(externalThrottlerFlags = {}) {
     let throttlerFlags = externalThrottlerFlags;
