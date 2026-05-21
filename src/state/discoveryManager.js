@@ -28,21 +28,31 @@ module.exports = function discoveryManager() {
     if (!state.roomExits) state.roomExits = new Map();
     if (!state.sourceWalkableTiles) state.sourceWalkableTiles = new Map();
     
+    if (!state.currentTickEvents) state.currentTickEvents = new Map();
+    if (!state.eventTick) state.eventTick = Game.time;
+    if (state.eventTick !== Game.time) {
+        state.currentTickEvents.clear();
+        state.eventTick = Game.time;
+    }
+
     if (!state.getEvents) {
         state.getEvents = function(roomName) {
+            if (global.State.eventTick !== Game.time) {
+                global.State.currentTickEvents.clear();
+                global.State.eventTick = Game.time;
+            }
+
+            if (global.State.currentTickEvents.has(roomName)) {
+                return global.State.currentTickEvents.get(roomName);
+            }
+
             const room = Game.rooms[roomName];
             if (!room) return [];
 
-            const currentEventLog = room.getEventLog() || [];
-            const previousEventLog = global.State.eventCache.get(roomName) || [];
+            const events = room.getEventLog() || [];
+            global.State.currentTickEvents.set(roomName, events);
 
-            // Event logs are append-only. New events are at the end.
-            const newEvents = currentEventLog.slice(previousEventLog.length);
-
-            // Update cache so the next call diffs against this
-            global.State.eventCache.set(roomName, currentEventLog);
-
-            return newEvents;
+            return events;
         };
     }
 
@@ -53,8 +63,6 @@ module.exports = function discoveryManager() {
         // Only run the heavy native polling if the room isn't already scanned
         if (!state.scannedRooms.has(roomName)) {
             state.rooms.set(roomName, room);
-            // Cache event log to establish baseline during init. Should not be polled here after init.
-            state.eventCache.set(roomName, room.getEventLog());
 
                 // Populate structuresByRoom and structureCache
                 const roomStructures = new Map();

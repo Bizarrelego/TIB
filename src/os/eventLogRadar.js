@@ -10,11 +10,8 @@ function eventLogRadar() {
 
     for (const room of Object.values(Game.rooms)) {
         const roomName = room.name;
-        // Parse the native engine event log directly
-        const currentEventLog = room.getEventLog() || [];
-
-        // Event log in screeps is generated per tick. We process the entire log.
-        const events = currentEventLog;
+        // Retrieve the tick-scoped cached event log
+        const events = global.State && global.State.getEvents ? global.State.getEvents(roomName) : (room.getEventLog() || []);
 
         if (!events || events.length === 0) continue;
 

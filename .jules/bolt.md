@@ -4,3 +4,5 @@
 ## 2024-05-19 - [Zero Native Polling] Learning: `room.find()` calls in tick loops are CPU-expensive and violate the Zero Native Polling constraint. Action: When iterating over room creeps, always use `global.State.creepsByRoom.get(roomName)` instead of `FIND_MY_CREEPS`.
 ## 2025-02-28 - CPU Optimization Learning: Replaced room.find(exitDir) with an O(1) global cache of exit tiles populated at scan-time. Action: Enforce roomExits caching during discovery for 0-CPU cross-room routing.
 ## 2025-02-28 - CPU Optimization Learning: Enforced V8 Map usage in Global Cache. Replaced global.Cache = {} in managerOrchestrator with proper CacheRegistry initialization to prevent de-optimization.
+## 2025-02-28 - CPU Optimization Learning: Caching `room.getEventLog()` output per tick into `global.State.currentTickEvents`.
+Action: Eliminate redundant JSON string parsing by calling `room.getEventLog()` exactly once per room, per tick.

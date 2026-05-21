@@ -1,7 +1,7 @@
 /* global EVENT_OBJECT_SPAWN */
 const Scanner = {
     updateHostiles(room) {
-        const log = room.getEventLog();
+        const log = global.State && global.State.getEvents ? global.State.getEvents(room.name) : room.getEventLog();
         let roomCacheMap = global.Cache.get('rooms');
         if (!roomCacheMap.has(room.name)) {
             roomCacheMap.set(room.name, new Map());
@@ -30,7 +30,7 @@ const Scanner = {
     },
 
     updateDropped(room) {
-        const log = room.getEventLog();
+        const log = global.State && global.State.getEvents ? global.State.getEvents(room.name) : room.getEventLog();
         let roomCacheMap = global.Cache.get('rooms');
         if (!roomCacheMap.has(room.name)) {
             roomCacheMap.set(room.name, new Map());
