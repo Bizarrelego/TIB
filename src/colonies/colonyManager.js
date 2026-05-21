@@ -2,6 +2,7 @@ const SpawnLedger = require('./spawnLedger');
 const defense = require('./defense');
 const scavengingManager = require('./scavengingManager');
 const spawnManager = require('./spawnManager');
+const MiningPlanner = require('./MiningPlanner');
 
 /**
  * O(N) Top-Down Assignment for Early RCL (1-2) Progression.
@@ -75,6 +76,10 @@ module.exports = { run: function colonyManager() {
                 spawnManager.run(room, spawnLedger);
                 
                 manageEarlyProgression(room, spawnLedger);
+
+                if (Memory.rooms && Memory.rooms[room.name] && !Memory.rooms[room.name].miningSpots) {
+                    MiningPlanner.planMiningSpots(room.name);
+                }
 
                 if (room.controller && room.controller.level >= 1 && room.controller.level <= 4) {
                     const sites = global.State.sitesByRoom.get(room.name);

@@ -38,10 +38,29 @@ module.exports = {
                     continue;
                 }
 
-                if (!creep.pos.isNearTo(target)) {
-                    movement.moveTo(creep, target);
-                    continue;
+                let isAtOptimalSpot = false;
+                const memoryRooms = Memory.rooms || {};
+                const roomMemory = memoryRooms[room.name] || {};
+                const miningSpots = roomMemory.miningSpots || {};
+                const optimalSpot = miningSpots[targetId];
+
+                if (optimalSpot) {
+                    if (creep.pos.x === optimalSpot.x && creep.pos.y === optimalSpot.y) {
+                        isAtOptimalSpot = true;
+                    } else {
+                        movement.moveTo(creep, new RoomPosition(optimalSpot.x, optimalSpot.y, room.name));
+                        continue;
+                    }
+                } else {
+                    if (!creep.pos.isNearTo(target)) {
+                        movement.moveTo(creep, target);
+                        continue;
+                    } else {
+                        isAtOptimalSpot = true;
+                    }
                 }
+
+                if (!isAtOptimalSpot) continue;
 
                 // Zero-Pathing Drop Mining
                 if (creep.store.getUsedCapacity() > 0) {
