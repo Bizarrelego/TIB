@@ -5,7 +5,6 @@ const { executeManager } = require('../utils/errorHandler');
 const defconManager = require('../colonies/defconManager');
 const interShardMemoryManager = require('../os/interShardMemoryManager');
 const RawMemoryManager = require('../os/RawMemoryManager');
-const { PipelineLock } = require('../os/PipelineLock');
 const memoryProxy = require('../os/memoryProxy');
 const VirtualLedger = require('../utils/VirtualLedger');
 const roomHasher = require('../os/roomHasher');
@@ -209,11 +208,11 @@ function init() {
 
     registeredTopLevelManagers.set('IntentManager', typeof IntentManager !== 'undefined' ? IntentManager : require('../os/IntentManager'));
 
-    let loadedRCLProgressionManager = typeof RCLProgressionManager !== 'undefined' ? RCLProgressionManager : require('../colonies/RCLProgressionManager');
+    let loadedRCLProgressionManager = require('../colonies/RCLProgressionManager');
     loadedRCLProgressionManager = Profiler.wrap('RCLProgressionManager', loadedRCLProgressionManager);
     registeredTopLevelManagers.set('RCLProgressionManager', loadedRCLProgressionManager);
 
-    let loadedAssignmentUtility = typeof AssignmentUtility !== 'undefined' ? AssignmentUtility : require('../utils/AssignmentUtility');
+    let loadedAssignmentUtility = require('../utils/AssignmentUtility');
     loadedAssignmentUtility = Profiler.wrap('AssignmentUtility', loadedAssignmentUtility);
     registeredTopLevelManagers.set('AssignmentUtility', loadedAssignmentUtility);
 }

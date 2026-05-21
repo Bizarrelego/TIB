@@ -7,9 +7,9 @@ const { wrapManager } = require('../utils/ManagerErrorBoundary');
 
 /**
  * Runs the RCL progression logic for a given room.
- * @param {Room} room - The room to process.
+ * @param {Room} _room - The room to process.
  */
-function run(room) {
+function run(_room) {
     // RCL progression logic
 }
 
