@@ -39,10 +39,23 @@ module.exports = {
                 }
 
                 let isAtOptimalSpot = false;
-                const memoryRooms = Memory.rooms || {};
-                const roomMemory = memoryRooms[room.name] || {};
-                const miningSpots = roomMemory.miningSpots || {};
-                const optimalSpot = miningSpots[targetId];
+                let optimalSpot = null;
+
+                if (global.State && global.State.miningSpotsByRoom) {
+                    const roomSpots = global.State.miningSpotsByRoom.get(room.name);
+                    if (roomSpots && roomSpots instanceof Map) {
+                        optimalSpot = roomSpots.get(targetId);
+                    }
+                } else {
+                    const memoryRooms = Memory.rooms || {};
+                    const roomMemory = memoryRooms[room.name] || {};
+                    if (roomMemory.miningSpots && Array.isArray(roomMemory.miningSpots)) {
+                        const spotEntry = roomMemory.miningSpots.find(entry => entry[0] === targetId);
+                        if (spotEntry) {
+                            optimalSpot = spotEntry[1];
+                        }
+                    }
+                }
 
                 if (optimalSpot) {
                     if (creep.pos.x === optimalSpot.x && creep.pos.y === optimalSpot.y) {
