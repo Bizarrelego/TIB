@@ -247,12 +247,6 @@ function run(externalThrottlerFlags = {}) {
 
     const { skipState, skipColonies, skipManagers, skipOperations } = throttlerFlags;
 
-    // Phase 1: OS Init & Cache
-    executeWrapped('OSInitializer', () => {
-        const OSInitializer = require('../os/OSInitializer');
-        if (OSInitializer && typeof OSInitializer.init === 'function') OSInitializer.init();
-    });
-
     // Phase 2: Global State (Residual tasks specific to orchestrator)
     executeWrapped('globalState.update', () => {
         if (globalState && typeof globalState.update === 'function') globalState.update();
