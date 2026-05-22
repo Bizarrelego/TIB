@@ -1,4 +1,5 @@
 const MarketDataProcessor = require('../utils/MarketDataProcessor');
+const MarketOrderAnalyzer = require('../colonies/MarketOrderAnalyzer');
 
 /**
  * Handles global market trade execution based on EMA values.
@@ -80,27 +81,20 @@ class MarketManager {
             const sellOrders = sellOrdersByResource.get(resourceType) || [];
             if (sellOrders.length === 0 || buyOrders.length === 0) continue;
 
-            // Apply IQR Filter to reject troll orders
-            const buyPrices = buyOrders.map(o => o.price);
-            const filteredBuyPrices = MarketDataProcessor.filterOutliers(buyPrices);
+            // Update historical market insights
+            MarketOrderAnalyzer.analyzeMarketHistory(resourceType, buyOrders, sellOrders);
 
-            const sellPrices = sellOrders.map(o => o.price);
-            const filteredSellPrices = MarketDataProcessor.filterOutliers(sellPrices);
+            // Apply IQR Filter using MarketOrderAnalyzer to reject troll orders
+            const outliers = MarketOrderAnalyzer.detectOutliers(buyOrders, sellOrders);
+            const outlierIds = new Set(outliers.map(o => o.id));
 
-            if (filteredBuyPrices.length === 0 || filteredSellPrices.length === 0) continue;
-
-            // Valid bounds
-            const minBuyPrice = Math.min(...filteredBuyPrices);
-            const maxBuyPrice = Math.max(...filteredBuyPrices);
-            const validBuyOrders = buyOrders.filter(o => o.price >= minBuyPrice && o.price <= maxBuyPrice);
-
-            const minSellPrice = Math.min(...filteredSellPrices);
-            const maxSellPrice = Math.max(...filteredSellPrices);
-            const validSellOrders = sellOrders.filter(o => o.price >= minSellPrice && o.price <= maxSellPrice);
+            const validBuyOrders = buyOrders.filter(o => !outlierIds.has(o.id));
+            const validSellOrders = sellOrders.filter(o => !outlierIds.has(o.id));
 
             if (validBuyOrders.length === 0 || validSellOrders.length === 0) continue;
 
             // EMA Baseline
+            const filteredBuyPrices = validBuyOrders.map(o => o.price);
             const currentAvgBuyPrice = filteredBuyPrices.reduce((sum, p) => sum + p, 0) / filteredBuyPrices.length;
 
             if (!global.State.marketEMA) global.State.marketEMA = new Map();
