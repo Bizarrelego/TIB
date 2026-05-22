@@ -46,7 +46,6 @@ class OSInitializer {
         VirtualLedger.clear();
         garbageCollector();
 
-        resetRecovery.checkAndRecover();
         heapValidator.validate();
     }
 
