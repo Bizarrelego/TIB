@@ -123,6 +123,14 @@ function runRoomManagers() {
             }
         }
 
+        // Tick Slicer execution gating
+        let TickSlicer;
+        try {
+            TickSlicer = require('../os/TickSlicer');
+        } catch (e) {
+            // TickSlicer not yet implemented, proceed with default logic
+        }
+
         // Initialize Process Table in Heap
         if (!global.Cache) {
             const { CacheRegistry } = require('../os/cache');
@@ -131,16 +139,21 @@ function runRoomManagers() {
         if (!global.Cache.has('processes')) global.Cache.set('processes', new Map());
 
         for (const config of managersConfig) {
-            // Process Scheduler (OS Sleep/Wake)
-            const processId = `${room.name}_${config.name}`;
-            const process = global.Cache.get('processes').get(processId);
+            // TickSlicer integration overrides legacy slice logic
+            if (TickSlicer && typeof TickSlicer.shouldRun === 'function') {
+                if (!TickSlicer.shouldRun(config.name, room.name)) continue;
+            } else {
+                // Process Scheduler (OS Sleep/Wake)
+                const processId = `${room.name}_${config.name}`;
+                const process = global.Cache.get('processes').get(processId);
 
-            if (process && process.wakeTick && Game.time < process.wakeTick) {
-                continue; // Process is asleep, drop idle execution cost to 0
+                if (process && process.wakeTick && Game.time < process.wakeTick) {
+                    continue; // Process is asleep, drop idle execution cost to 0
+                }
+
+                // Fallback to legacy modulo tick-slicing if wakeTick is not set
+                if ((!process || !process.wakeTick) && Game.time % config.slice !== 0) continue;
             }
-
-            // Fallback to legacy modulo tick-slicing if wakeTick is not set
-            if ((!process || !process.wakeTick) && Game.time % config.slice !== 0) continue;
 
             let manager = globalState.getManager(config.name);
             if (manager && typeof manager.run === 'function') {
@@ -241,25 +254,6 @@ function run(externalThrottlerFlags = {}) {
         }
     };
 
-    // Phase 1: OS Init & Cache
-    executeWrapped('OSInitializer.run', () => {
-        const osInit = registeredTopLevelManagers.get('OSInitializer');
-        if (osInit && typeof osInit.run === 'function') osInit.run();
-    });
-    executeWrapped('resetRecovery.check', () => { if (resetRecovery && typeof resetRecovery.check === 'function') resetRecovery.check(); });
-    executeWrapped('heapValidator.validate', () => { if (heapValidator && typeof heapValidator.validate === 'function') heapValidator.validate(); });
-    executeWrapped('memoryProxy.init', () => { if (memoryProxy && typeof memoryProxy.init === 'function') memoryProxy.init(); });
-    executeWrapped('objectPool.init', () => { if (objectPool && typeof objectPool.init === 'function') objectPool.init(); });
-    executeWrapped('eventBus.init', () => { if (eventBus && typeof eventBus.init === 'function') eventBus.init(); });
-    executeWrapped('cpuBucketForecaster.update', () => { if (cpuBucketForecaster && typeof cpuBucketForecaster.update === 'function') cpuBucketForecaster.update(); });
-    executeWrapped('trafficManager.setup', () => {
-        const trfMgr = registeredTopLevelManagers.get('trafficManager');
-        if (trfMgr && typeof trfMgr.setup === 'function') trfMgr.setup();
-    });
-    executeWrapped('interShardMemoryManager._loadLocal', () => {
-        if (interShardMemoryManager && typeof interShardMemoryManager._loadLocal === 'function') interShardMemoryManager._loadLocal();
-    });
-
     executeWrapped('cpuThrottler.throttle', () => {
         if (cpuThrottler && typeof cpuThrottler.throttle === 'function') {
             throttlerFlags = cpuThrottler.throttle() || {};
@@ -273,16 +267,11 @@ function run(externalThrottlerFlags = {}) {
 
     const { skipState, skipColonies, skipManagers, skipOperations } = throttlerFlags;
 
-    // Phase 2: Global State
+    // Phase 2: Global State (Residual tasks specific to orchestrator)
     executeWrapped('discoveryManager', () => { if (discoveryManager) discoveryManager(); });
     if (!skipState) {
-        executeWrapped('eventLogRadar', () => { if (eventLogRadar) eventLogRadar(); });
         executeWrapped('RoomEventManager', () => { if (roomEventManager) roomEventManager(); });
         executeWrapped('stateScanner.scan', () => { if (stateScanner && typeof stateScanner.scan === 'function') stateScanner.scan(); });
-        executeWrapped('globalState.scan', () => {
-            const gState = registeredTopLevelManagers.get('globalState');
-            if (gState && typeof gState.scan === 'function') gState.scan();
-        });
         executeWrapped('roomHasher.generate', () => {
             if (global.State && global.State.rooms) {
                 for (const roomName of global.State.rooms.keys()) {
@@ -372,36 +361,7 @@ function run(externalThrottlerFlags = {}) {
             const opMgr = registeredTopLevelManagers.get('operationsManager');
             if (opMgr && typeof opMgr.run === 'function') opMgr.run();
         });
-        executeWrapped('RawMemoryManager.init', () => {
-            if (RawMemoryManager && typeof RawMemoryManager.init === 'function') RawMemoryManager.init();
-        });
     }
-
-    // Phase 5: Traffic Control
-    executeWrapped('trafficManager.run', () => {
-        const trfMgr = registeredTopLevelManagers.get('trafficManager');
-        if (trfMgr && typeof trfMgr.run === 'function') trfMgr.run();
-    });
-    executeWrapped('PipelineLock.clear', () => {
-        if (global.State && global.State.pipelineLedger) {
-            global.State.pipelineLedger.clear();
-        }
-    });
-
-    // Phase 6: Intents & Sleep
-    executeWrapped('trafficManager.executeIntents', () => {
-        const trfMgr = registeredTopLevelManagers.get('trafficManager');
-        if (trfMgr && typeof trfMgr.executeIntents === 'function') trfMgr.executeIntents();
-    });
-    executeWrapped('IntentManager.fire', () => {
-        if (global.State && global.State.intentManager && typeof global.State.intentManager.fire === 'function') {
-            global.State.intentManager.fire();
-        } else {
-            const intMgr = registeredTopLevelManagers.get('IntentManager');
-            if (intMgr && typeof intMgr.fire === 'function') intMgr.fire();
-        }
-    });
-    executeWrapped('memoryProxy.serialize', () => { if (memoryProxy && typeof memoryProxy.serialize === 'function') memoryProxy.serialize(); });
 
     if (typeof Game !== 'undefined' && Game.cpu && Game.cpu.bucket > 5000 && VisualsManager && typeof VisualsManager.run === 'function') {
         executeWrapped('VisualsManager.run', () => VisualsManager.run());
