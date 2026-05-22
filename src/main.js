@@ -1,4 +1,5 @@
 const Profiler = require('./utils/profiler');
+const GlobalResetDetector = require('./os/GlobalResetDetector');
 const resetRecovery = Profiler.wrap('resetRecovery', require('./os/resetRecovery'));
 const managerOrchestrator = Profiler.wrap('managerOrchestrator', require('./managers/managerOrchestrator')); // Standalone Managers
 const Logger = require('./utils/logger');
@@ -8,6 +9,8 @@ const { wrap } = require('./utils/ManagerExecutionWrapper');
 
 
 module.exports.loop = Profiler.wrap('main.loop', function () {
+    GlobalResetDetector.detectAndHandleReset();
+
     if (!Memory.os_initialized && global.Cache) {
         global.Cache = undefined;
         global.State = undefined;
