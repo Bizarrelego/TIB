@@ -20,17 +20,16 @@ class CreepRoleBalancer {
      */
     static calculateDesiredRoleCounts(roomName) {
         const room = Game.rooms[roomName];
-        if (!room) return {};
+        if (!room) return new Map();
 
-        const counts = {
-            worker: 0,
-            harvester: 0,
-            domesticHauler: 0,
-            upgrader: 0,
-            fastFiller: 0,
-            hubManager: 0,
-            scout: 0
-        };
+        const counts = new Map();
+        counts.set('worker', 0);
+        counts.set('harvester', 0);
+        counts.set('domesticHauler', 0);
+        counts.set('upgrader', 0);
+        counts.set('fastFiller', 0);
+        counts.set('hubManager', 0);
+        counts.set('scout', 0);
 
         const rcl = room.controller ? room.controller.level : 0;
         const spawnLedger = new SpawnLedger(room);
@@ -46,25 +45,28 @@ class CreepRoleBalancer {
         const currentDefcon = defconManager.getDefconLevel(roomName);
 
         // Worker count
-        counts.worker = bootstrapReqs.worker;
+        let workerCount = bootstrapReqs.worker;
 
         // Dynamic construction logic based on ConstructionManager dependencies:
         // Increase workers slightly if there's active construction and we're at RCL 4+
         if (hasSites && rcl >= 4) {
-            counts.worker = Math.max(counts.worker, 2);
+            workerCount = Math.max(workerCount, 2);
         }
+        counts.set('worker', workerCount);
 
         // Harvester count
-        counts.harvester = rcl <= 4 ? bootstrapReqs.harvester : spawnLedger.calculateHarvesterTarget(room, counts.worker);
+        let harvesterCount = rcl <= 4 ? bootstrapReqs.harvester : spawnLedger.calculateHarvesterTarget(room, workerCount);
+        counts.set('harvester', harvesterCount);
 
         // Domestic Hauler count (retired at RCL 5 if Link network exists)
-        counts.domesticHauler = rcl <= 4 ? bootstrapReqs.domesticHauler : 2;
+        let domesticHaulerCount = rcl <= 4 ? bootstrapReqs.domesticHauler : 2;
         if (rcl >= 5 && spawnLedger.isLinkNetworkPresent(room)) {
-            counts.domesticHauler = 0;
+            domesticHaulerCount = 0;
         }
+        counts.set('domesticHauler', domesticHaulerCount);
 
         // Upgrader count
-        let desiredUpgraders = rcl <= 4 ? bootstrapReqs.upgrader : spawnLedger.calculateUpgraderTarget(room, counts.harvester);
+        let desiredUpgraders = rcl <= 4 ? bootstrapReqs.upgrader : spawnLedger.calculateUpgraderTarget(room, harvesterCount);
         if (rcl >= 5) {
             desiredUpgraders = UpgraderManager.getDesiredCount(room);
         }
@@ -74,20 +76,20 @@ class CreepRoleBalancer {
             desiredUpgraders = 0; // High threat, halt upgrades
         }
 
-        counts.upgrader = desiredUpgraders;
+        counts.set('upgrader', desiredUpgraders);
 
         // Hub Manager count
         if (rcl >= 5 && spawnLedger.isLinkNetworkPresent(room)) {
-            counts.hubManager = 1;
+            counts.set('hubManager', 1);
         }
 
         // Fast Filler count
-        counts.fastFiller = spawnLedger.calculateFastFillerTarget(room);
+        counts.set('fastFiller', spawnLedger.calculateFastFillerTarget(room));
 
         // Scout count (globally managed in spawnManager, but we can set 1 per room > rcl 0 here if needed or let spawnManager handle global count)
         // Usually 1 global scout, so we'll just set it to 0 and let spawnManager handle it if it does it globally, or 1 if rcl >= 1
         if (rcl >= 1) {
-            counts.scout = 1; // It will be globally capped in spawnManager
+            counts.set('scout', 1); // It will be globally capped in spawnManager
         }
 
         return counts;

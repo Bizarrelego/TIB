@@ -92,9 +92,9 @@ module.exports = {
             }
 
             const desiredCounts = CreepRoleBalancer.calculateDesiredRoleCounts(room.name);
-            const targetWorkers = desiredCounts.worker || 0;
-            const targetHarvesters = desiredCounts.harvester || 0;
-            const targetHaulers = desiredCounts.domesticHauler || 0;
+            const targetWorkers = desiredCounts.get('worker') || 0;
+            const targetHarvesters = desiredCounts.get('harvester') || 0;
+            const targetHaulers = desiredCounts.get('domesticHauler') || 0;
 
             // Spawns the initial bootstrap worker exclusively to start the colony economy
             if (workerCount < targetWorkers) {
@@ -156,7 +156,7 @@ module.exports = {
             if (upgraders) upgraderCount = upgraders.length;
         }
 
-        const desiredUpgraders = desiredCounts.upgrader || 0;
+        const desiredUpgraders = desiredCounts.get('upgrader') || 0;
 
         if (upgraderCount < desiredUpgraders) {
             const body = BodyCalc.calculateUpgrader(capacity);
@@ -177,7 +177,7 @@ module.exports = {
                     if (hubManagers) hubManagerCount = hubManagers.length;
                 }
 
-                const targetHubManagers = desiredCounts.hubManager || 0;
+                const targetHubManagers = desiredCounts.get('hubManager') || 0;
                 if (hubManagerCount < targetHubManagers) {
                     const body = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE];
                     const cost = (16 * BODYPART_COST[CARRY]) + BODYPART_COST[MOVE];
@@ -196,7 +196,7 @@ module.exports = {
             const fastFillers = roomCreeps.get('fastFiller');
             if (fastFillers) fastFillerCount = fastFillers.length;
         }
-        const desiredFastFillers = desiredCounts.fastFiller || 0;
+        const desiredFastFillers = desiredCounts.get('fastFiller') || 0;
 
         if (fastFillerCount < desiredFastFillers) {
             let body = [];
