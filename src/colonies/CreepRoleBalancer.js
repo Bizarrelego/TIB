@@ -8,8 +8,6 @@ const BootstrapPlanner = require('./BootstrapPlanner');
 const SpawnLedger = require('./spawnLedger');
 const UpgraderManager = require('../managers/UpgraderManager');
 const defconManager = require('./defconManager');
-const RCLProgressionManager = require('./RCLProgressionManager');
-const ConstructionManager = require('../managers/ConstructionManager');
 
 class CreepRoleBalancer {
     /**

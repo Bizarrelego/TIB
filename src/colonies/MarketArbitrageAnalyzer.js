@@ -188,7 +188,7 @@ function findArbitrageOpportunities(energyPrice, myRoomName) {
     const opportunities = [];
 
     // Process each resource type individually
-    for (const [resourceType, group] of ordersByResource.entries()) {
+    for (const group of ordersByResource.values()) {
         const flaggedBuyOrders = flagOrderOutliers(group.buy);
         const flaggedSellOrders = flagOrderOutliers(group.sell);
 

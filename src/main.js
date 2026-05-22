@@ -3,7 +3,6 @@ const GlobalResetDetector = require('./os/GlobalResetDetector');
 const resetRecovery = Profiler.wrap('resetRecovery', require('./os/resetRecovery'));
 const managerOrchestrator = Profiler.wrap('managerOrchestrator', require('./managers/managerOrchestrator')); // Standalone Managers
 const Logger = require('./utils/logger');
-const cpuBucketForecaster = Profiler.wrap('cpuBucketForecaster', require('./os/cpuBucketForecaster'));
 const { executeManager } = require('./utils/errorHandler');
 const { wrap } = require('./utils/ManagerExecutionWrapper');
 

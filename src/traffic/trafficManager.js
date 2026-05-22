@@ -408,7 +408,6 @@ const TrafficManager = {
                 buckets[priority].push(intent);
             }
 
-            const processedSwaps = new Set();
             const currentPositions = global.State.currentPositions || new Map();
 
             for (let p = 100; p >= 0; p--) {

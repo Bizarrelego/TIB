@@ -1,8 +1,6 @@
 const BodyCalc = require('../utils/bodyCalc');
 const SpawnQueueManager = require('../managers/SpawnQueueManager');
-const UpgraderManager = require('../managers/UpgraderManager');
 const Profiler = require('../utils/profiler');
-const BootstrapPlanner = require('./BootstrapPlanner');
 const CreepRoleBalancer = require('./CreepRoleBalancer');
 
 let lastCensusTick = 0;

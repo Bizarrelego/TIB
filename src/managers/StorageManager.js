@@ -1,5 +1,3 @@
-const { determineDefcon, DEFCON } = require('../constants/defcon');
-
 function run(room) {
     try {
         if (!room.controller || room.controller.level < 4) return;

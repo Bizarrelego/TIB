@@ -3,18 +3,9 @@ const globalState = Profiler.wrap('globalState', require('../state/globalState')
 const Logger = require('../utils/logger');
 const { executeManager } = require('../utils/errorHandler');
 const defconManager = Profiler.wrap('defconManager', require('../colonies/defconManager'));
-const interShardMemoryManager = Profiler.wrap('interShardMemoryManager', require('../os/interShardMemoryManager'));
-const RawMemoryManager = Profiler.wrap('RawMemoryManager', require('../os/RawMemoryManager'));
-const memoryProxy = Profiler.wrap('memoryProxy', require('../os/memoryProxy'));
 const VirtualLedger = require('../utils/VirtualLedger');
-const roomHasher = Profiler.wrap('roomHasher', require('../os/roomHasher'));
 const { wrapModuleFunctions } = require('../utils/moduleWrapper');
 const errorHandler = require('../utils/errorHandler');
-const heapValidator = Profiler.wrap('heapValidator', require('../os/heapValidator'));
-const resetRecovery = Profiler.wrap('resetRecovery', require('../os/resetRecovery'));
-const objectPool = Profiler.wrap('objectPool', require('../os/objectPool'));
-const eventBus = Profiler.wrap('eventBus', require('../os/eventBus'));
-const cpuBucketForecaster = Profiler.wrap('cpuBucketForecaster', require('../os/cpuBucketForecaster'));
 
 // Phase Managers
 const discoveryManager = Profiler.wrap('discoveryManager', require('../state/discoveryManager'));
@@ -32,7 +23,6 @@ const { wrap } = require('../utils/ManagerExecutionWrapper');
 
 const RoleManager = Profiler.wrap('RoleManager', require('../colonies/RoleManager'));
 const operationsManager = Profiler.wrap('operationsManager', require('../operations/operationsManager'));
-const trafficManager = Profiler.wrap('trafficManager', require('../traffic/trafficManager'));
 const roomEventManager = Profiler.wrap('RoomEventManager', require('./RoomEventManager'));
 const EnergySourceTracker = Profiler.wrap('EnergySourceTracker', require('./EnergySourceTracker'));
 
@@ -139,27 +129,28 @@ function runRoomManagers() {
         if (!global.Cache.has('processes')) global.Cache.set('processes', new Map());
 
         for (const config of managersConfig) {
+            let processId = `${room.name}_${config.name}`;
+            let processObj = global.Cache.get('processes').get(processId);
+
             // TickSlicer integration overrides legacy slice logic
             if (TickSlicer && typeof TickSlicer.shouldRun === 'function') {
                 if (!TickSlicer.shouldRun(config.name, room.name)) continue;
             } else {
                 // Process Scheduler (OS Sleep/Wake)
-                const processId = `${room.name}_${config.name}`;
-                const process = global.Cache.get('processes').get(processId);
-
-                if (process && process.wakeTick && Game.time < process.wakeTick) {
+                if (processObj && processObj.wakeTick && Game.time < processObj.wakeTick) {
                     continue; // Process is asleep, drop idle execution cost to 0
                 }
 
                 // Fallback to legacy modulo tick-slicing if wakeTick is not set
-                if ((!process || !process.wakeTick) && Game.time % config.slice !== 0) continue;
+                if ((!processObj || !processObj.wakeTick) && Game.time % config.slice !== 0) continue;
             }
 
             let manager = globalState.getManager(config.name);
             if (manager && typeof manager.run === 'function') {
                 // Ensure process object exists for the manager to modify its own wakeTick
-                if (!process) {
-                    global.Cache.get('processes').set(processId, { id: processId });
+                if (!processObj) {
+                    processObj = { id: processId };
+                    global.Cache.get('processes').set(processId, processObj);
                 }
                 // Ensure the manager's methods are wrapped by the error handler
                 if (!manager.__errorWrapped) {
@@ -185,7 +176,7 @@ function runRoomManagers() {
                 }
 
                 // Call directly since wrapModuleFunctions provides the error boundary now
-                manager.run(room, global.Cache.get('processes').get(processId));
+                manager.run(room, processObj);
 
                 if (profilerEnabled) {
                     const endCpu = cpuAvailable ? Game.cpu.getUsed() : Date.now();
@@ -210,8 +201,6 @@ function init() {
     registeredTopLevelManagers.set('globalState', typeof globalState !== 'undefined' ? globalState : Profiler.wrap('globalState', require('../state/globalState')));
     registeredTopLevelManagers.set('colonyManager', typeof colonyManager !== 'undefined' ? colonyManager : Profiler.wrap('colonyManager', require('../colonies/colonyManager')));
     registeredTopLevelManagers.set('operationsManager', typeof operationsManager !== 'undefined' ? operationsManager : Profiler.wrap('operationsManager', require('../operations/operationsManager')));
-    registeredTopLevelManagers.set('trafficManager', typeof trafficManager !== 'undefined' ? trafficManager : Profiler.wrap('trafficManager', require('../traffic/trafficManager')));
-    registeredTopLevelManagers.set('IntentManager', typeof IntentManager !== 'undefined' ? IntentManager : Profiler.wrap('IntentManager', require('../os/IntentManager')));
 
     let loadedRCLProgressionManager = require('../colonies/RCLProgressionManager');
     loadedRCLProgressionManager = Profiler.wrap('RCLProgressionManager', loadedRCLProgressionManager);

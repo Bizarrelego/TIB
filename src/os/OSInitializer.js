@@ -13,7 +13,6 @@ const cpuBucketForecaster = require('./cpuBucketForecaster');
 const SystemScheduler = require('./SystemScheduler');
 const roomHasher = require('./roomHasher');
 const eventLogRadar = require('./eventLogRadar');
-const BucketGatedDT = require('./BucketGatedDT');
 const PipelineLock = require('./PipelineLock');
 
 class OSInitializer {

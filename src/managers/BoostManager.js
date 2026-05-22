@@ -5,9 +5,9 @@
 class BoostManager {
     /**
      * Executes the boosting logic for a specific room.
-     * @param {Room} room - The room object.
+     * @param {Room} _room - The room object.
      */
-    static run(room) {
+    static run(_room) {
         // Implementation for boosting creeps in the room
     }
 }
