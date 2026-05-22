@@ -18,6 +18,8 @@ class GlobalStateManager {
         this.creeps = new Map();
         this.structures = new Map();
         this.aggressionState = 'Growth';
+        this.sourceAssignments = new Map();
+        this.miningSpotsByRoom = new Map();
     }
 
     registerManager(name, instance) {
@@ -109,6 +111,8 @@ class GlobalStateManager {
         this.sitesByRoom.clear();
         this.mineralsByRoom.clear();
         this.aggressionState = 'Growth';
+        this.sourceAssignments.clear();
+        this.miningSpotsByRoom.clear();
 
         if (this.scannedRooms) this.scannedRooms.clear();
         if (this.rooms) this.rooms.clear();
