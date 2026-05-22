@@ -1,6 +1,9 @@
 /**
  * Wasm-ready Scaffold for Ford-Fulkerson Min-Cut
  * Calculates optimal choke points by treating room tiles as graph nodes.
+ *
+ * Attempts to offload heavy computations to WASM, falling back to pure JS
+ * if WASM is unavailable.
  */
 
 const MinCutInterface = require('./wasm/minCutInterface');

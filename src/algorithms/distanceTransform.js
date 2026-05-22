@@ -1,7 +1,12 @@
+const DistanceTransformInterface = require('./wasm/distanceTransformInterface');
+
 /**
  * Calculates a Distance Transform for a given room.
  * This is a fundamental algorithm for assessing spawn-to-source distances,
  * building heatmaps, and feeding into Min-Cut (Ford-Fulkerson).
+ *
+ * Attempts to offload heavy computations to WASM, falling back to pure JS
+ * if WASM is unavailable.
  */
 class DistanceTransform {
     /**
@@ -11,6 +16,11 @@ class DistanceTransform {
      * @returns {CostMatrix} The distance transform
      */
     static compute(roomName, initialMatrix) {
+        const wasmResult = DistanceTransformInterface.computeWasm(roomName, initialMatrix);
+        if (wasmResult !== null) {
+            return wasmResult;
+        }
+
         let dt = new PathFinder.CostMatrix();
 
         // Pass 1: Top-Left to Bottom-Right
