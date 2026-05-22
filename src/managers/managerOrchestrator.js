@@ -10,8 +10,6 @@ const errorHandler = require('../utils/errorHandler');
 // Phase Managers
 const discoveryManager = Profiler.wrap('discoveryManager', require('../state/discoveryManager'));
 const OSInitializer = Profiler.wrap('OSInitializer', require('../os/OSInitializer'));
-const IntentManager = Profiler.wrap('IntentManager', require('../os/IntentManager'));
-const eventLogRadar = Profiler.wrap('eventLogRadar', require('../os/eventLogRadar'));
 const stateScanner = Profiler.wrap('stateScanner', require('../state/stateScanner'));
 const colonyManager = Profiler.wrap('colonyManager', require('../colonies/colonyManager'));
 const spawnManager = Profiler.wrap('spawnManager', require('../colonies/spawnManager'));
@@ -261,13 +259,7 @@ function run(externalThrottlerFlags = {}) {
     if (!skipState) {
         executeWrapped('RoomEventManager', () => { if (roomEventManager) roomEventManager(); });
         executeWrapped('stateScanner.scan', () => { if (stateScanner && typeof stateScanner.scan === 'function') stateScanner.scan(); });
-        executeWrapped('roomHasher.generate', () => {
-            if (global.State && global.State.rooms) {
-                for (const roomName of global.State.rooms.keys()) {
-                    if (roomHasher && typeof roomHasher.generate === 'function') roomHasher.generate(roomName);
-                }
-            }
-        });
+        // roomHasher is handled directly in main.js
         executeWrapped('EnergySourceTracker.run', () => { if (EnergySourceTracker && typeof EnergySourceTracker.run === 'function') EnergySourceTracker.run(); });
     }
 

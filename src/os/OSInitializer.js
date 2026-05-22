@@ -11,7 +11,6 @@ const VirtualLedger = require('../utils/VirtualLedger');
 const eventBus = require('./eventBus');
 const cpuBucketForecaster = require('./cpuBucketForecaster');
 const SystemScheduler = require('./SystemScheduler');
-const roomHasher = require('./roomHasher');
 const eventLogRadar = require('./eventLogRadar');
 const PipelineLock = require('./PipelineLock');
 
