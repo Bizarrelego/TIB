@@ -27,12 +27,17 @@ function register(managerId, interval, callback) {
     tasks.set(managerId, { interval, callback });
 }
 
+const cpuThrottler = require('./cpuThrottler');
+
 /**
  * Runs the scheduled tasks if their interval matches the current game time.
  * Iterates through registered managers and executes their callbacks only if Game.time % interval === 0.
  * @returns {void}
  */
 function run() {
+    const throttlerFlags = cpuThrottler.throttle();
+    if (throttlerFlags && throttlerFlags.skipManagers) return;
+
     for (const task of tasks.values()) {
         if (Game.time % task.interval === 0) {
             task.callback();
@@ -46,6 +51,7 @@ function run() {
 module.exports = {
     register,
     run,
+    throttle: () => cpuThrottler.throttle(),
     // Expose tasks for testing purposes
     tasks
 };

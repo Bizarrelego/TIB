@@ -18,11 +18,17 @@ const BoostManager = Profiler.wrap('BoostManager', require('./BoostManager'));
 const VisualsManager = Profiler.wrap('VisualsManager', require('./VisualsManager'));
 const planner = Profiler.wrap('planner', require('../colonies/planner'));
 const { wrap } = require('../utils/ManagerExecutionWrapper');
+const { wrapManager } = require('../utils/ManagerErrorBoundary');
 
 const RoleManager = Profiler.wrap('RoleManager', require('../colonies/RoleManager'));
 const operationsManager = Profiler.wrap('operationsManager', require('../operations/operationsManager'));
 const roomEventManager = Profiler.wrap('RoomEventManager', require('./RoomEventManager'));
 const EnergySourceTracker = Profiler.wrap('EnergySourceTracker', require('./EnergySourceTracker'));
+
+const trafficManager = require('../traffic/trafficManager');
+const IntentManager = require('../os/IntentManager');
+const SystemScheduler = require('../os/SystemScheduler');
+const roomHasher = require('../os/roomHasher');
 
 /**
  * @file managerOrchestrator.js
@@ -225,20 +231,7 @@ function run(externalThrottlerFlags = {}) {
 
     const executeWrapped = (name, fn) => {
         if (!fn) return;
-        const profilerEnabled = global.PROFILER_ENABLED || (typeof Memory !== 'undefined' && Memory.PROFILER_ENABLED);
-        const cpuAvailable = typeof Game !== 'undefined' && Game.cpu && typeof Game.cpu.getUsed === 'function';
-        let startCpu;
-
-        if (profilerEnabled) {
-            startCpu = cpuAvailable ? Game.cpu.getUsed() : Date.now();
-        }
-
-        errorHandler.wrap(name, fn)();
-
-        if (profilerEnabled) {
-            const endCpu = cpuAvailable ? Game.cpu.getUsed() : Date.now();
-            Profiler.record(name, endCpu - startCpu);
-        }
+        wrapManager(fn, name)();
     };
 
     executeWrapped('cpuThrottler.throttle', () => {
@@ -254,7 +247,24 @@ function run(externalThrottlerFlags = {}) {
 
     const { skipState, skipColonies, skipManagers, skipOperations } = throttlerFlags;
 
+    // Phase 1: OS Init & Cache
+    executeWrapped('OSInitializer', () => {
+        const OSInitializer = require('../os/OSInitializer');
+        if (OSInitializer && typeof OSInitializer.init === 'function') OSInitializer.init();
+    });
+
     // Phase 2: Global State (Residual tasks specific to orchestrator)
+    executeWrapped('globalState.update', () => {
+        if (globalState && typeof globalState.update === 'function') globalState.update();
+    });
+    executeWrapped('roomHasher', () => {
+        if (global.State && global.State.rooms) {
+            for (const roomName of global.State.rooms.keys()) {
+                if (roomHasher && typeof roomHasher.generate === 'function') roomHasher.generate(roomName);
+            }
+        }
+    });
+
     executeWrapped('discoveryManager', () => { if (discoveryManager) discoveryManager(); });
     if (!skipState) {
         executeWrapped('RoomEventManager', () => { if (roomEventManager) roomEventManager(); });
@@ -347,6 +357,23 @@ function run(externalThrottlerFlags = {}) {
     if (typeof Game !== 'undefined' && Game.cpu && Game.cpu.bucket > 5000 && VisualsManager && typeof VisualsManager.run === 'function') {
         executeWrapped('VisualsManager.run', () => VisualsManager.run());
     }
+
+    // Phase 5: Traffic Control
+    executeWrapped('trafficManager.run', () => {
+        if (trafficManager && typeof trafficManager.run === 'function') trafficManager.run();
+    });
+
+    // Phase 6: Intents & Sleep
+    executeWrapped('trafficManager.executeIntents', () => {
+        if (trafficManager && typeof trafficManager.executeIntents === 'function') trafficManager.executeIntents();
+    });
+    executeWrapped('IntentManager.fire', () => {
+        if (global.State && global.State.intentManager && typeof global.State.intentManager.fire === 'function') {
+            global.State.intentManager.fire();
+        } else if (IntentManager && typeof IntentManager.fire === 'function') {
+            IntentManager.fire();
+        }
+    });
 }
 
 
