@@ -47,13 +47,20 @@ module.exports = {
                         if (roomSpots && roomSpots instanceof Map) {
                             optimalSpot = roomSpots.get(targetId);
                         }
-                    } else {
+                    }
+
+                    if (!optimalSpot) {
                         const memoryRooms = Memory.rooms || {};
                         const roomMemory = memoryRooms[room.name] || {};
                         if (roomMemory.miningSpots && Array.isArray(roomMemory.miningSpots)) {
-                            const spotEntry = roomMemory.miningSpots.find(entry => entry[0] === targetId);
-                            if (spotEntry) {
-                                optimalSpot = spotEntry[1];
+                            const spotsMap = new Map(roomMemory.miningSpots);
+                            optimalSpot = spotsMap.get(targetId);
+
+                            if (global.State) {
+                                if (!global.State.miningSpotsByRoom) {
+                                    global.State.miningSpotsByRoom = new Map();
+                                }
+                                global.State.miningSpotsByRoom.set(room.name, spotsMap);
                             }
                         }
                     }
