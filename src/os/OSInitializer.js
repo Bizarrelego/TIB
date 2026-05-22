@@ -8,6 +8,11 @@ const garbageCollector = require('./garbageCollector');
 const Logger = require('../utils/logger');
 const IntentManager = require('./IntentManager');
 const VirtualLedger = require('../utils/VirtualLedger');
+const eventBus = require('./eventBus');
+const cpuBucketForecaster = require('./cpuBucketForecaster');
+const SystemScheduler = require('./SystemScheduler');
+const eventLogRadar = require('./eventLogRadar');
+const PipelineLock = require('./PipelineLock');
 
 class OSInitializer {
     static init() {
@@ -34,6 +39,14 @@ class OSInitializer {
             Logger.error(`[Phase 1 Error] RawMemoryManager: ${e.stack}`);
         }
 
+        if (eventBus && typeof eventBus.init === 'function') {
+            eventBus.init();
+        }
+
+        if (cpuBucketForecaster && typeof cpuBucketForecaster.update === 'function') {
+            cpuBucketForecaster.update();
+        }
+
         globalState.rehydrate();
 
         if (!global.State) {
@@ -47,6 +60,22 @@ class OSInitializer {
         garbageCollector();
 
         heapValidator.validate();
+
+        if (resetRecovery && typeof resetRecovery.check === 'function') {
+            resetRecovery.check();
+        }
+
+        if (eventLogRadar && typeof eventLogRadar === 'function') {
+            eventLogRadar();
+        }
+
+        if (PipelineLock && typeof PipelineLock.clear === 'function') {
+            PipelineLock.clear();
+        }
+
+        if (SystemScheduler && typeof SystemScheduler.run === 'function') {
+            SystemScheduler.run();
+        }
     }
 
     static run() {

@@ -85,11 +85,11 @@ class CombatManager {
     /**
      * Analyzes enemy tower targets and pre-heals expected damage on the same tick.
      * @param {Creep} creep
-     * @param {StructureTower[]} enemyTowers
-     * @param {Creep[]} enemyCreeps
+     * @param {StructureTower[]} _enemyTowers
+     * @param {Creep[]} _enemyCreeps
      * @returns {number} The calculated incoming damage
      */
-    static predictivePreHeal(creep, enemyTowers, enemyCreeps) {
+    static predictivePreHeal(creep, _enemyTowers, _enemyCreeps) {
         const intents = CombatTacticsEngine.predictiveHeal([creep], creep, 0);
         if (intents && intents.length > 0) {
             for (const intent of intents) {

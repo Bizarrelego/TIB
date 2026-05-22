@@ -3,24 +3,13 @@ const globalState = Profiler.wrap('globalState', require('../state/globalState')
 const Logger = require('../utils/logger');
 const { executeManager } = require('../utils/errorHandler');
 const defconManager = Profiler.wrap('defconManager', require('../colonies/defconManager'));
-const interShardMemoryManager = Profiler.wrap('interShardMemoryManager', require('../os/interShardMemoryManager'));
-const RawMemoryManager = Profiler.wrap('RawMemoryManager', require('../os/RawMemoryManager'));
-const memoryProxy = Profiler.wrap('memoryProxy', require('../os/memoryProxy'));
 const VirtualLedger = require('../utils/VirtualLedger');
-const roomHasher = Profiler.wrap('roomHasher', require('../os/roomHasher'));
 const { wrapModuleFunctions } = require('../utils/moduleWrapper');
 const errorHandler = require('../utils/errorHandler');
-const heapValidator = Profiler.wrap('heapValidator', require('../os/heapValidator'));
-const resetRecovery = Profiler.wrap('resetRecovery', require('../os/resetRecovery'));
-const objectPool = Profiler.wrap('objectPool', require('../os/objectPool'));
-const eventBus = Profiler.wrap('eventBus', require('../os/eventBus'));
-const cpuBucketForecaster = Profiler.wrap('cpuBucketForecaster', require('../os/cpuBucketForecaster'));
 
 // Phase Managers
 const discoveryManager = Profiler.wrap('discoveryManager', require('../state/discoveryManager'));
 const OSInitializer = Profiler.wrap('OSInitializer', require('../os/OSInitializer'));
-const IntentManager = Profiler.wrap('IntentManager', require('../os/IntentManager'));
-const eventLogRadar = Profiler.wrap('eventLogRadar', require('../os/eventLogRadar'));
 const stateScanner = Profiler.wrap('stateScanner', require('../state/stateScanner'));
 const colonyManager = Profiler.wrap('colonyManager', require('../colonies/colonyManager'));
 const spawnManager = Profiler.wrap('spawnManager', require('../colonies/spawnManager'));
@@ -32,7 +21,6 @@ const { wrap } = require('../utils/ManagerExecutionWrapper');
 
 const RoleManager = Profiler.wrap('RoleManager', require('../colonies/RoleManager'));
 const operationsManager = Profiler.wrap('operationsManager', require('../operations/operationsManager'));
-const trafficManager = Profiler.wrap('trafficManager', require('../traffic/trafficManager'));
 const roomEventManager = Profiler.wrap('RoomEventManager', require('./RoomEventManager'));
 const EnergySourceTracker = Profiler.wrap('EnergySourceTracker', require('./EnergySourceTracker'));
 
@@ -123,6 +111,14 @@ function runRoomManagers() {
             }
         }
 
+        // Tick Slicer execution gating
+        let TickSlicer;
+        try {
+            TickSlicer = require('../os/TickSlicer');
+        } catch (e) {
+            // TickSlicer not yet implemented, proceed with default logic
+        }
+
         // Initialize Process Table in Heap
         if (!global.Cache) {
             const { CacheRegistry } = require('../os/cache');
@@ -131,22 +127,28 @@ function runRoomManagers() {
         if (!global.Cache.has('processes')) global.Cache.set('processes', new Map());
 
         for (const config of managersConfig) {
-            // Process Scheduler (OS Sleep/Wake)
-            const processId = `${room.name}_${config.name}`;
-            const process = global.Cache.get('processes').get(processId);
+            let processId = `${room.name}_${config.name}`;
+            let processObj = global.Cache.get('processes').get(processId);
 
-            if (process && process.wakeTick && Game.time < process.wakeTick) {
-                continue; // Process is asleep, drop idle execution cost to 0
+            // TickSlicer integration overrides legacy slice logic
+            if (TickSlicer && typeof TickSlicer.shouldRun === 'function') {
+                if (!TickSlicer.shouldRun(config.name, room.name)) continue;
+            } else {
+                // Process Scheduler (OS Sleep/Wake)
+                if (processObj && processObj.wakeTick && Game.time < processObj.wakeTick) {
+                    continue; // Process is asleep, drop idle execution cost to 0
+                }
+
+                // Fallback to legacy modulo tick-slicing if wakeTick is not set
+                if ((!processObj || !processObj.wakeTick) && Game.time % config.slice !== 0) continue;
             }
-
-            // Fallback to legacy modulo tick-slicing if wakeTick is not set
-            if ((!process || !process.wakeTick) && Game.time % config.slice !== 0) continue;
 
             let manager = globalState.getManager(config.name);
             if (manager && typeof manager.run === 'function') {
                 // Ensure process object exists for the manager to modify its own wakeTick
-                if (!process) {
-                    global.Cache.get('processes').set(processId, { id: processId });
+                if (!processObj) {
+                    processObj = { id: processId };
+                    global.Cache.get('processes').set(processId, processObj);
                 }
                 // Ensure the manager's methods are wrapped by the error handler
                 if (!manager.__errorWrapped) {
@@ -172,7 +174,7 @@ function runRoomManagers() {
                 }
 
                 // Call directly since wrapModuleFunctions provides the error boundary now
-                manager.run(room, global.Cache.get('processes').get(processId));
+                manager.run(room, processObj);
 
                 if (profilerEnabled) {
                     const endCpu = cpuAvailable ? Game.cpu.getUsed() : Date.now();
@@ -197,8 +199,6 @@ function init() {
     registeredTopLevelManagers.set('globalState', typeof globalState !== 'undefined' ? globalState : Profiler.wrap('globalState', require('../state/globalState')));
     registeredTopLevelManagers.set('colonyManager', typeof colonyManager !== 'undefined' ? colonyManager : Profiler.wrap('colonyManager', require('../colonies/colonyManager')));
     registeredTopLevelManagers.set('operationsManager', typeof operationsManager !== 'undefined' ? operationsManager : Profiler.wrap('operationsManager', require('../operations/operationsManager')));
-    registeredTopLevelManagers.set('trafficManager', typeof trafficManager !== 'undefined' ? trafficManager : Profiler.wrap('trafficManager', require('../traffic/trafficManager')));
-    registeredTopLevelManagers.set('IntentManager', typeof IntentManager !== 'undefined' ? IntentManager : Profiler.wrap('IntentManager', require('../os/IntentManager')));
 
     let loadedRCLProgressionManager = require('../colonies/RCLProgressionManager');
     loadedRCLProgressionManager = Profiler.wrap('RCLProgressionManager', loadedRCLProgressionManager);
@@ -241,25 +241,6 @@ function run(externalThrottlerFlags = {}) {
         }
     };
 
-    // Phase 1: OS Init & Cache
-    executeWrapped('OSInitializer.run', () => {
-        const osInit = registeredTopLevelManagers.get('OSInitializer');
-        if (osInit && typeof osInit.run === 'function') osInit.run();
-    });
-    executeWrapped('resetRecovery.check', () => { if (resetRecovery && typeof resetRecovery.check === 'function') resetRecovery.check(); });
-    executeWrapped('heapValidator.validate', () => { if (heapValidator && typeof heapValidator.validate === 'function') heapValidator.validate(); });
-    executeWrapped('memoryProxy.init', () => { if (memoryProxy && typeof memoryProxy.init === 'function') memoryProxy.init(); });
-    executeWrapped('objectPool.init', () => { if (objectPool && typeof objectPool.init === 'function') objectPool.init(); });
-    executeWrapped('eventBus.init', () => { if (eventBus && typeof eventBus.init === 'function') eventBus.init(); });
-    executeWrapped('cpuBucketForecaster.update', () => { if (cpuBucketForecaster && typeof cpuBucketForecaster.update === 'function') cpuBucketForecaster.update(); });
-    executeWrapped('trafficManager.setup', () => {
-        const trfMgr = registeredTopLevelManagers.get('trafficManager');
-        if (trfMgr && typeof trfMgr.setup === 'function') trfMgr.setup();
-    });
-    executeWrapped('interShardMemoryManager._loadLocal', () => {
-        if (interShardMemoryManager && typeof interShardMemoryManager._loadLocal === 'function') interShardMemoryManager._loadLocal();
-    });
-
     executeWrapped('cpuThrottler.throttle', () => {
         if (cpuThrottler && typeof cpuThrottler.throttle === 'function') {
             throttlerFlags = cpuThrottler.throttle() || {};
@@ -273,23 +254,12 @@ function run(externalThrottlerFlags = {}) {
 
     const { skipState, skipColonies, skipManagers, skipOperations } = throttlerFlags;
 
-    // Phase 2: Global State
+    // Phase 2: Global State (Residual tasks specific to orchestrator)
     executeWrapped('discoveryManager', () => { if (discoveryManager) discoveryManager(); });
     if (!skipState) {
-        executeWrapped('eventLogRadar', () => { if (eventLogRadar) eventLogRadar(); });
         executeWrapped('RoomEventManager', () => { if (roomEventManager) roomEventManager(); });
         executeWrapped('stateScanner.scan', () => { if (stateScanner && typeof stateScanner.scan === 'function') stateScanner.scan(); });
-        executeWrapped('globalState.scan', () => {
-            const gState = registeredTopLevelManagers.get('globalState');
-            if (gState && typeof gState.scan === 'function') gState.scan();
-        });
-        executeWrapped('roomHasher.generate', () => {
-            if (global.State && global.State.rooms) {
-                for (const roomName of global.State.rooms.keys()) {
-                    if (roomHasher && typeof roomHasher.generate === 'function') roomHasher.generate(roomName);
-                }
-            }
-        });
+        // roomHasher is handled directly in main.js
         executeWrapped('EnergySourceTracker.run', () => { if (EnergySourceTracker && typeof EnergySourceTracker.run === 'function') EnergySourceTracker.run(); });
     }
 
@@ -372,36 +342,7 @@ function run(externalThrottlerFlags = {}) {
             const opMgr = registeredTopLevelManagers.get('operationsManager');
             if (opMgr && typeof opMgr.run === 'function') opMgr.run();
         });
-        executeWrapped('RawMemoryManager.init', () => {
-            if (RawMemoryManager && typeof RawMemoryManager.init === 'function') RawMemoryManager.init();
-        });
     }
-
-    // Phase 5: Traffic Control
-    executeWrapped('trafficManager.run', () => {
-        const trfMgr = registeredTopLevelManagers.get('trafficManager');
-        if (trfMgr && typeof trfMgr.run === 'function') trfMgr.run();
-    });
-    executeWrapped('PipelineLock.clear', () => {
-        if (global.State && global.State.pipelineLedger) {
-            global.State.pipelineLedger.clear();
-        }
-    });
-
-    // Phase 6: Intents & Sleep
-    executeWrapped('trafficManager.executeIntents', () => {
-        const trfMgr = registeredTopLevelManagers.get('trafficManager');
-        if (trfMgr && typeof trfMgr.executeIntents === 'function') trfMgr.executeIntents();
-    });
-    executeWrapped('IntentManager.fire', () => {
-        if (global.State && global.State.intentManager && typeof global.State.intentManager.fire === 'function') {
-            global.State.intentManager.fire();
-        } else {
-            const intMgr = registeredTopLevelManagers.get('IntentManager');
-            if (intMgr && typeof intMgr.fire === 'function') intMgr.fire();
-        }
-    });
-    executeWrapped('memoryProxy.serialize', () => { if (memoryProxy && typeof memoryProxy.serialize === 'function') memoryProxy.serialize(); });
 
     if (typeof Game !== 'undefined' && Game.cpu && Game.cpu.bucket > 5000 && VisualsManager && typeof VisualsManager.run === 'function') {
         executeWrapped('VisualsManager.run', () => VisualsManager.run());

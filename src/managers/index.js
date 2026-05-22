@@ -23,6 +23,7 @@ const VisualsManager = require('./VisualsManager');
 const PowerSpawnManager = require('./PowerSpawnManager');
 const AllianceIntelManager = require('./AllianceIntelManager');
 const SourceManager = require('./SourceManager');
+const { wrap } = require('../utils/ManagerExecutionWrapper');
 
 const managers = {
     CombatManager,
@@ -56,6 +57,12 @@ module.exports = {
     managers,
     init: function(globalState) {
         for (const [name, manager] of Object.entries(managers)) {
+            // Ensure each manager's run function is wrapped with error boundaries and profiler
+            if (manager && typeof manager.run === 'function' && !manager.__wrapped) {
+                const originalRun = manager.run;
+                manager.run = wrap(name, (...args) => originalRun.apply(manager, args));
+                manager.__wrapped = true;
+            }
             globalState.registerManager(name, manager);
         }
     }

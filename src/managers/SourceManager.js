@@ -31,7 +31,7 @@ const SourceManager = {
     getOptimalMiningSpot(sourceId) {
         if (!global.State || !global.State.miningSpotsByRoom) return null;
 
-        for (const [roomName, spotsMap] of global.State.miningSpotsByRoom.entries()) {
+        for (const spotsMap of global.State.miningSpotsByRoom.values()) {
             if (spotsMap.has(sourceId)) {
                 return spotsMap.get(sourceId);
             }
