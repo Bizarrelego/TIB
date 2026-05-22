@@ -1,4 +1,4 @@
-const { determineDefcon } = require('../constants/defcon');
+const { determineDefcon, DEFCON_BEHAVIOR } = require('../constants/defcon');
 const Logger = require('../utils/logger');
 
 /**
@@ -18,6 +18,14 @@ module.exports = {
 
             // Set the defcon level in room memory
             room.memory.defcon = defconLevel;
+
+            // Apply system-wide behaviors based on defcon
+            if (DEFCON_BEHAVIOR[defconLevel]) {
+                const behaviors = DEFCON_BEHAVIOR[defconLevel];
+                room.memory.haltUpgrades = behaviors.haltUpgrades;
+                room.memory.emergencyFortify = behaviors.emergencyFortify;
+                room.memory.restrictStorageOutflow = behaviors.restrictStorageOutflow;
+            }
         } catch (e) {
             Logger.error(`[DefconManager Error] Room ${room.name}: ${e.stack}`);
         }

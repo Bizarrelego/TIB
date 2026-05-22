@@ -53,13 +53,6 @@ function run(room) {
             }
         }
 
-        // Energy management based on DEFCON
-        const defcon = determineDefcon(room.name);
-        if (defcon <= DEFCON.ALERT) {
-            room.memory.restrictStorageOutflow = true;
-        } else {
-            room.memory.restrictStorageOutflow = false;
-        }
     } catch (e) {
         console.log(`[StorageManager Error] Room ${room.name}: ${e.stack}`);
     }

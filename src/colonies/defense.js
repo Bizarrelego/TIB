@@ -17,12 +17,6 @@ module.exports = {
         try {
             const defconLevel = determineDefcon(room.name);
 
-            if (defconLevel <= DEFCON.CRITICAL) {
-                room.memory.haltUpgrades = true;
-            } else {
-                room.memory.haltUpgrades = false;
-            }
-
             let defenseRepairTarget = null;
 
             // Event-Driven O(1) Repair Queue lookup

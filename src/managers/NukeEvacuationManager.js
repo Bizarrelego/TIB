@@ -19,22 +19,12 @@ class NukeEvacuationManager {
 
         const nukes = global.State.nukesByRoom.get(room.name);
 
-        // Clear emergency flag if there are no nukes
+        // Check if there are nukes
         if (!nukes || nukes.length === 0) {
-            if (room.memory.emergencyFortify) {
-                Logger.info(`[NukeEvacuation] Nukes cleared in room ${room.name}. Removing emergency fortify flag.`);
-                room.memory.emergencyFortify = false;
-            }
             return;
         }
 
         Logger.warn(`[NukeEvacuation] DETECTED ${nukes.length} INCOMING NUKE(S) IN ROOM ${room.name}!`);
-
-        // Trigger temporary logistics redirection flag
-        if (!room.memory.emergencyFortify) {
-            Logger.warn(`[NukeEvacuation] Triggering emergency logistics fortify flag in room ${room.name}.`);
-            room.memory.emergencyFortify = true;
-        }
 
         const TrafficManager = getTrafficManager();
         const roomCreepsMap = global.State.creepsByRoom ? global.State.creepsByRoom.get(room.name) : null;
