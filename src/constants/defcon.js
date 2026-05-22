@@ -54,7 +54,16 @@ function determineDefcon(roomName) {
     return DEFCON.CAUTION; // Non-combat hostiles (scouts)
 }
 
+const DEFCON_BEHAVIOR = {
+    [DEFCON.NORMAL]: { haltUpgrades: false, emergencyFortify: false, restrictStorageOutflow: false },
+    [DEFCON.CAUTION]: { haltUpgrades: false, emergencyFortify: false, restrictStorageOutflow: false },
+    [DEFCON.ALERT]: { haltUpgrades: false, emergencyFortify: false, restrictStorageOutflow: true },
+    [DEFCON.CRITICAL]: { haltUpgrades: true, emergencyFortify: false, restrictStorageOutflow: true },
+    [DEFCON.EMERGENCY]: { haltUpgrades: true, emergencyFortify: true, restrictStorageOutflow: true }
+};
+
 module.exports = {
     DEFCON,
+    DEFCON_BEHAVIOR,
     determineDefcon
 };
