@@ -1,8 +1,12 @@
+/**
+ * Utility class for hashing room properties to optimize CostMatrix updates.
+ * @namespace RoomHasher
+ */
 const RoomHasher = {
     /**
      * Simple djb2 string hashing to avoid heavy crypto packages in Screeps environment.
-     * @param {string} str
-     * @returns {number}
+     * @param {string} str - The string to hash.
+     * @returns {number} The computed hash value.
      */
     hashString: (str) => {
         let hash = 5381;
@@ -13,7 +17,7 @@ const RoomHasher = {
     },
 
     /**
-     * Generates a hash for a room based on terrain and static structures/sources.
+     * Generates a hash for a room based on terrain, sources, structures, and construction sites.
      * @param {string} roomName - The name of the room.
      * @returns {number} The generated numeric hash.
      */
@@ -54,7 +58,6 @@ const RoomHasher = {
 
             for (const type of sortedTypes) {
                 const structures = structuresMap.get(type);
-                str += `${type}[`;
 
                 // Sort IDs to ensure deterministic hash order
                 let ids = [];
@@ -65,8 +68,29 @@ const RoomHasher = {
                 }
 
                 ids.sort();
-                str += `${ids.join(',')}`;
-                str += '];';
+                // Format: type:count[id1,id2,...]
+                str += `${type}:${ids.length}[${ids.join(',')}];`;
+            }
+        }
+
+        // Include construction sites that affect CostMatrix
+        if (global.State.sitesByRoom && global.State.sitesByRoom.has(roomName)) {
+            const sitesMap = global.State.sitesByRoom.get(roomName);
+            const sortedTypes = Array.from(sitesMap.keys()).sort();
+
+            for (const type of sortedTypes) {
+                const sites = sitesMap.get(type);
+
+                let ids = [];
+                if (sites instanceof Map) {
+                    ids = Array.from(sites.keys());
+                } else if (Array.isArray(sites)) {
+                    ids = sites.map(s => s.id);
+                }
+
+                ids.sort();
+                // Format: site_type:count[id1,id2,...]
+                str += `site_${type}:${ids.length}[${ids.join(',')}];`;
             }
         }
 

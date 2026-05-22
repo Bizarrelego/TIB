@@ -15,7 +15,7 @@ const CostMatrixUpdateTrigger = {
      * @returns {boolean} True if the CostMatrix should be updated, false otherwise.
      */
     shouldUpdateCostMatrix: (roomName) => {
-        if (!global.State) global.State = new Map();
+        if (!global.State) global.State = {};
         if (!global.State.roomHashes) global.State.roomHashes = new Map();
 
         const currentHash = RoomHasher.generate(roomName);
