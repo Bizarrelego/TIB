@@ -16,13 +16,15 @@ const CostMatrixUpdateTrigger = {
      */
     shouldUpdateCostMatrix: (roomName) => {
         if (!global.State) global.State = new Map();
-        if (!global.State.roomHashes) global.State.roomHashes = new Map();
+        if (!global.State.has('roomHashes')) global.State.set('roomHashes', new Map());
 
         const currentHash = RoomHasher.generate(roomName);
         let cachedHash = null;
 
-        if (global.State.roomHashes.has(roomName)) {
-            cachedHash = global.State.roomHashes.get(roomName);
+        const roomHashes = global.State.get('roomHashes');
+
+        if (roomHashes.has(roomName)) {
+            cachedHash = roomHashes.get(roomName);
         } else if (global.Cache && global.Cache.has('roomHashes')) {
             const roomHashesCache = global.Cache.get('roomHashes');
             if (roomHashesCache.has(roomName)) {
@@ -35,7 +37,7 @@ const CostMatrixUpdateTrigger = {
         }
 
         // Hash changed or doesn't exist, update cache and trigger recalculation
-        global.State.roomHashes.set(roomName, currentHash);
+        roomHashes.set(roomName, currentHash);
 
         if (global.Cache) {
             if (!global.Cache.has('roomHashes')) {
