@@ -5,6 +5,7 @@
 
 const ROLE_PRIORITIES = require('../constants/rolePriorities');
 const eventBus = require('../os/eventBus');
+const CreepRoleBalancer = require('../colonies/CreepRoleBalancer');
 
 /**
  * @class SpawnQueueManager
@@ -32,7 +33,7 @@ class SpawnQueueManager {
         }
 
         const buckets = SpawnQueueManager.globalQueue.get(roomName);
-        const priority = ROLE_PRIORITIES.has(role) ? ROLE_PRIORITIES.get(role) : (ROLE_PRIORITIES.get('default') || 0);
+        const priority = CreepRoleBalancer.getRolePriority(role);
         const bucket = buckets[priority];
 
         // Prevent duplicate requests in O(1) priority bucket
