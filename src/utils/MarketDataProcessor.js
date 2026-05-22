@@ -99,7 +99,16 @@ function calculateEMA(newValue, prevEma, periods = 100) {
     return (newValue * k) + (prevEma * (1 - k));
 }
 
+/**
+ * Fetches raw market orders.
+ * @returns {Order[]} Array of market orders.
+ */
+function getRawData() {
+    return Game.market.getAllOrders();
+}
+
 module.exports = {
+    getRawData,
     calculateMedian,
     calculateQuartiles,
     filterOutliers,
