@@ -28,30 +28,30 @@ const RoomHasher = {
 
         // Include terrain properties - hash of walkable tiles around sources as proxy for terrain layout
         // to save CPU instead of serializing the whole 50x50 grid.
-        if (global.State.sourceWalkableTiles && global.State.sourceWalkableTiles.has(roomName)) {
-            const walkableMap = global.State.sourceWalkableTiles.get(roomName);
+        if (global.State.has('sourceWalkableTiles') && global.State.get('sourceWalkableTiles').has(roomName)) {
+            const walkableMap = global.State.get('sourceWalkableTiles').get(roomName);
             const sortedSources = Array.from(walkableMap.keys()).sort();
             str += `terrain[`;
             for (const sourceId of sortedSources) {
                 str += `${sourceId}:${walkableMap.get(sourceId)},`;
             }
             str += `];`;
-        } else if (global.State.roomTerrain && global.State.roomTerrain.has(roomName)) {
+        } else if (global.State.has('roomTerrain') && global.State.get('roomTerrain').has(roomName)) {
             // A crude fallback if walkable tiles isn't available, but we want terrain changes reflected.
             // (Terrain rarely changes, but this ensures strict compliance with acceptance criteria).
              str += `terrain_loaded;`;
         }
 
         // Include Sources explicitly as requested
-        if (global.State.sourcesByRoom && global.State.sourcesByRoom.has(roomName)) {
-            const sources = global.State.sourcesByRoom.get(roomName);
+        if (global.State.has('sourcesByRoom') && global.State.get('sourcesByRoom').has(roomName)) {
+            const sources = global.State.get('sourcesByRoom').get(roomName);
             const sourceIds = sources.map(s => s.id).sort();
             str += `sources[${sourceIds.join(',')}];`;
         }
 
         // Include static structures that affect CostMatrix
-        if (global.State.structuresByRoom && global.State.structuresByRoom.has(roomName)) {
-            const structuresMap = global.State.structuresByRoom.get(roomName);
+        if (global.State.has('structuresByRoom') && global.State.get('structuresByRoom').has(roomName)) {
+            const structuresMap = global.State.get('structuresByRoom').get(roomName);
 
             // To ensure the hash is consistent, sort the keys (structure types)
             const sortedTypes = Array.from(structuresMap.keys()).sort();
@@ -74,8 +74,8 @@ const RoomHasher = {
         }
 
         // Include construction sites that affect CostMatrix
-        if (global.State.sitesByRoom && global.State.sitesByRoom.has(roomName)) {
-            const sitesMap = global.State.sitesByRoom.get(roomName);
+        if (global.State.has('sitesByRoom') && global.State.get('sitesByRoom').has(roomName)) {
+            const sitesMap = global.State.get('sitesByRoom').get(roomName);
             const sortedTypes = Array.from(sitesMap.keys()).sort();
 
             for (const type of sortedTypes) {
