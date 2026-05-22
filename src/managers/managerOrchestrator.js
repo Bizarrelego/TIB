@@ -28,6 +28,8 @@ const SpawnLedger = require('../colonies/spawnLedger');
 const BoostManager = Profiler.wrap('BoostManager', require('./BoostManager'));
 const VisualsManager = Profiler.wrap('VisualsManager', require('./VisualsManager'));
 const planner = Profiler.wrap('planner', require('../colonies/planner'));
+const { wrap } = require('../utils/ManagerExecutionWrapper');
+
 const RoleManager = Profiler.wrap('RoleManager', require('../colonies/RoleManager'));
 const operationsManager = Profiler.wrap('operationsManager', require('../operations/operationsManager'));
 const trafficManager = Profiler.wrap('trafficManager', require('../traffic/trafficManager'));
@@ -205,6 +207,14 @@ function init() {
     let loadedAssignmentUtility = require('../utils/AssignmentUtility');
     loadedAssignmentUtility = Profiler.wrap('AssignmentUtility', loadedAssignmentUtility);
     registeredTopLevelManagers.set('AssignmentUtility', loadedAssignmentUtility);
+    let loadedPowerSpawnManager = require('./PowerSpawnManager');
+    loadedPowerSpawnManager = Profiler.wrap('PowerSpawnManager', loadedPowerSpawnManager);
+    registeredTopLevelManagers.set('PowerSpawnManager', loadedPowerSpawnManager);
+
+    let loadedCreepAssignmentManager = require('./CreepAssignmentManager');
+    loadedCreepAssignmentManager = Profiler.wrap('CreepAssignmentManager', loadedCreepAssignmentManager);
+    registeredTopLevelManagers.set('CreepAssignmentManager', loadedCreepAssignmentManager);
+
 }
 
 const cpuThrottler = Profiler.wrap('cpuThrottler', require('../os/cpuThrottler'));
@@ -299,6 +309,21 @@ function run(externalThrottlerFlags = {}) {
                 for (const room of global.State.rooms.values()) defconManager.run(room);
             }
         });
+
+        executeWrapped('CreepAssignmentManager.run', () => {
+            const assignMgr = registeredTopLevelManagers.get('CreepAssignmentManager');
+            if (global.State && global.State.rooms && assignMgr && typeof assignMgr.run === 'function') {
+                for (const room of global.State.rooms.values()) wrap('CreepAssignmentManager', () => assignMgr.run(room))();
+            }
+        });
+
+        executeWrapped('PowerSpawnManager.run', () => {
+            const psMgr = registeredTopLevelManagers.get('PowerSpawnManager');
+            if (global.State && global.State.rooms && psMgr && typeof psMgr.run === 'function') {
+                for (const room of global.State.rooms.values()) wrap('PowerSpawnManager', () => psMgr.run(room))();
+            }
+        });
+
         executeWrapped('RCLProgressionManager.run', () => {
             const rclMgr = registeredTopLevelManagers.get('RCLProgressionManager');
             if (global.State && global.State.rooms && rclMgr && typeof rclMgr.run === 'function') {

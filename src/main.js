@@ -4,6 +4,7 @@ const managerOrchestrator = Profiler.wrap('managerOrchestrator', require('./mana
 const Logger = require('./utils/logger');
 const cpuBucketForecaster = Profiler.wrap('cpuBucketForecaster', require('./os/cpuBucketForecaster'));
 const { executeManager } = require('./utils/errorHandler');
+const { wrap } = require('./utils/ManagerExecutionWrapper');
 
 
 module.exports.loop = Profiler.wrap('main.loop', function () {
@@ -16,10 +17,10 @@ module.exports.loop = Profiler.wrap('main.loop', function () {
 
     // Tick-level utilities
 
-    managerOrchestrator.init();
+    executeManager('managerOrchestrator.init', () => managerOrchestrator.init());
 
     // The single orchestrator call that handles all 6 phases.
-    managerOrchestrator.run();
+    wrap('managerOrchestrator.run', () => managerOrchestrator.run())();
 
     // Profiler output
     executeManager('Profiler.report', () => Profiler.report());
