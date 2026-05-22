@@ -29,6 +29,9 @@ const trafficManager = require('../traffic/trafficManager');
 const IntentManager = require('../os/IntentManager');
 const SystemScheduler = require('../os/SystemScheduler');
 const roomHasher = require('../os/roomHasher');
+const GlobalResetDetector = require('../os/GlobalResetDetector');
+const interShardMemoryManager = require('../os/interShardMemoryManager');
+const memoryProxy = require('../os/memoryProxy');
 
 /**
  * @file managerOrchestrator.js
@@ -248,12 +251,24 @@ function run(externalThrottlerFlags = {}) {
     const { skipState, skipColonies, skipManagers, skipOperations } = throttlerFlags;
 
     // Phase 1: OS Init & Cache
+    // heapValidator and GlobalStateRehydrator are handled intrinsically within OSInitializer,
+    // but the pipeline explicit memory constraint mentions calling them in Phase 1 context.
+    executeWrapped('GlobalResetDetector', () => {
+        if (GlobalResetDetector && typeof GlobalResetDetector.detectAndHandleReset === 'function') {
+            GlobalResetDetector.detectAndHandleReset();
+        }
+    });
     executeWrapped('OSInitializer', () => {
         const OSInitializer = require('../os/OSInitializer');
         if (OSInitializer && typeof OSInitializer.init === 'function') OSInitializer.init();
     });
+    executeWrapped('interShardMemoryManager._loadLocal', () => {
+        if (interShardMemoryManager && typeof interShardMemoryManager._loadLocal === 'function') {
+            interShardMemoryManager._loadLocal();
+        }
+    });
 
-    // Phase 2: Global State (Residual tasks specific to orchestrator)
+    // Phase 2: Global State (Iterate game objects exactly once to build O(1) dicts)
     executeWrapped('globalState.update', () => {
         if (globalState && typeof globalState.update === 'function') globalState.update();
     });
@@ -269,7 +284,6 @@ function run(externalThrottlerFlags = {}) {
     if (!skipState) {
         executeWrapped('RoomEventManager', () => { if (roomEventManager) roomEventManager(); });
         executeWrapped('stateScanner.scan', () => { if (stateScanner && typeof stateScanner.scan === 'function') stateScanner.scan(); });
-        // roomHasher is handled directly in main.js
         executeWrapped('EnergySourceTracker.run', () => { if (EnergySourceTracker && typeof EnergySourceTracker.run === 'function') EnergySourceTracker.run(); });
     }
 
@@ -348,6 +362,7 @@ function run(externalThrottlerFlags = {}) {
             const intelMgr = registeredTopLevelManagers.get('globalState') ? registeredTopLevelManagers.get('globalState').getManager('AllianceIntelManager') : null;
             if (intelMgr && typeof intelMgr.run === 'function') intelMgr.run();
         });
+
         executeWrapped('operationsManager.run', () => {
             const opMgr = registeredTopLevelManagers.get('operationsManager');
             if (opMgr && typeof opMgr.run === 'function') opMgr.run();
@@ -359,6 +374,9 @@ function run(externalThrottlerFlags = {}) {
     }
 
     // Phase 5: Traffic Control
+    executeWrapped('trafficManager.setup', () => {
+        if (trafficManager && typeof trafficManager.setup === 'function') trafficManager.setup();
+    });
     executeWrapped('trafficManager.run', () => {
         if (trafficManager && typeof trafficManager.run === 'function') trafficManager.run();
     });
@@ -367,12 +385,15 @@ function run(externalThrottlerFlags = {}) {
     executeWrapped('trafficManager.executeIntents', () => {
         if (trafficManager && typeof trafficManager.executeIntents === 'function') trafficManager.executeIntents();
     });
-    executeWrapped('IntentManager.fire', () => {
-        if (global.State && global.State.intentManager && typeof global.State.intentManager.fire === 'function') {
+    executeWrapped('IntentManager.fireIntents', () => {
+        if (global.State && global.State.intentManager && typeof global.State.intentManager.fireIntents === 'function') {
+            global.State.intentManager.fireIntents();
+        } else if (global.State && global.State.intentManager && typeof global.State.intentManager.fire === 'function') {
             global.State.intentManager.fire();
-        } else if (IntentManager && typeof IntentManager.fire === 'function') {
-            IntentManager.fire();
         }
+    });
+    executeWrapped('memoryProxy.serialize', () => {
+        if (memoryProxy && typeof memoryProxy.serialize === 'function') memoryProxy.serialize();
     });
 }
 
