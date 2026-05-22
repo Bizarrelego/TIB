@@ -13,6 +13,8 @@ module.exports = {
     },
 
     moveTo: function(creep, target, opts = {}) {
+        if (!creep || creep.fatigue > 0) return;
+
         if (creep.heap.needsDetour) {
             delete creep.heap._path;
             delete creep.heap.path;

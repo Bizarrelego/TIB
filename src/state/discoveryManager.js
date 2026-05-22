@@ -103,7 +103,7 @@ module.exports = function discoveryManager() {
                 state.roomTerrain.set(roomName, new Room.Terrain(roomName));
 
                 // Cache walkable tiles around sources
-                const sources = room.find(FIND_SOURCES);
+                const sources = state.sourcesByRoom.get(roomName) || [];
                 const terrain = state.roomTerrain.get(roomName);
                 const walkableTilesMap = new Map();
 
