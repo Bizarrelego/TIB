@@ -85,6 +85,14 @@ class IntentManager {
         // Clear state for the next tick
         this.pipelineLock.clear();
     }
+
+    /**
+     * Alias for fire() to meet pipeline integration requirements.
+     * @returns {void}
+     */
+    fireIntents() {
+        this.fire();
+    }
 }
 
 module.exports = IntentManager;
