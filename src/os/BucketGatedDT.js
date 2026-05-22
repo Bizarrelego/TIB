@@ -1,5 +1,6 @@
 const DistanceTransform = require('../algorithms/distanceTransform');
 const MinCut = require('../algorithms/minCut');
+const ExpensiveAlgorithmScheduler = require('./ExpensiveAlgorithmScheduler');
 
 class BucketGatedDT {
     /**
@@ -12,6 +13,17 @@ class BucketGatedDT {
     static compute(roomName, initialMatrix, threshold = 8000) {
         if (typeof Game !== 'undefined' && Game.cpu && Game.cpu.bucket !== undefined) {
             if (Game.cpu.bucket <= threshold) {
+                ExpensiveAlgorithmScheduler.scheduleAlgorithm(
+                    'DistanceTransform',
+                    roomName,
+                    { threshold: threshold, checkRoomHash: false },
+                    () => {
+                        const result = DistanceTransform.compute(roomName, initialMatrix);
+                        if (!global.State) global.State = new Map();
+                        // Cache the result. A planner using this would check the cache later.
+                        global.State.set(`dtMatrix_${roomName}`, result);
+                    }
+                );
                 return 'deferred';
             }
         }
@@ -29,6 +41,17 @@ class BucketGatedDT {
     static getCutTiles(roomName, sources, bounds, threshold = 8000) {
         if (typeof Game !== 'undefined' && Game.cpu && Game.cpu.bucket !== undefined) {
             if (Game.cpu.bucket <= threshold) {
+                ExpensiveAlgorithmScheduler.scheduleAlgorithm(
+                    'MinCut',
+                    roomName,
+                    { threshold: threshold, checkRoomHash: false },
+                    () => {
+                        const result = MinCut.getCutTiles(roomName, sources, bounds);
+                        if (!global.State) global.State = new Map();
+                        // Cache the result.
+                        global.State.set(`minCut_${roomName}`, result);
+                    }
+                );
                 return 'deferred';
             }
         }
