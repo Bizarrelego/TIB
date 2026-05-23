@@ -16,9 +16,8 @@ class CreepOperationalDataManager {
     }
 
     /**
-     * Helper to get a creep by its ID or Name using the global state lookup, Game.creeps, or Game.getObjectById.
-     * Since screeps sometimes calls this ID but it is often the name (e.g. in Game.creeps and creepLookup),
-     * we attempt both lookups to ensure robust retrieval.
+     * Helper to get a creep by its ID or Name using exclusively the global state lookup
+     * to adhere to the Zero Native Polling mandate.
      *
      * @param {string} creepId - The ID or name of the creep.
      * @returns {Creep|undefined} The creep object.
@@ -27,21 +26,9 @@ class CreepOperationalDataManager {
         if (!creepId) return undefined;
 
         if (global.State && global.State.creepLookup) {
-            const creep = global.State.creepLookup.get(creepId);
-            if (creep) return creep;
+            return global.State.creepLookup.get(creepId);
         }
 
-        if (typeof Game !== 'undefined') {
-            if (Game.creeps && Game.creeps[creepId]) {
-                return Game.creeps[creepId];
-            }
-            if (Game.getObjectById) {
-                const creepById = Game.getObjectById(creepId);
-                if (creepById && creepById.id === creepId) {
-                    return creepById;
-                }
-            }
-        }
         return undefined;
     }
 
@@ -94,17 +81,9 @@ class CreepOperationalDataManager {
      */
     clearAllData() {
         // Iterate through all creeps and clear only the tracked operational data keys
-        let creepsIterable;
+        if (!global.State || !global.State.creepLookup) return;
 
-        if (global.State && global.State.creepLookup && global.State.creepLookup.size > 0) {
-            creepsIterable = global.State.creepLookup.values();
-        } else if (typeof Game !== 'undefined' && Game.creeps) {
-            creepsIterable = Object.values(Game.creeps);
-        } else {
-            return;
-        }
-
-        for (const creep of creepsIterable) {
+        for (const creep of global.State.creepLookup.values()) {
             for (const key of this.trackedKeys) {
                 deleteHeapData(creep, key);
             }
