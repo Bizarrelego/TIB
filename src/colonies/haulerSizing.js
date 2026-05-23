@@ -7,6 +7,7 @@ const BodyCalc = require('../utils/bodyCalc');
 
 /**
  * @class HaulerSizing
+ * @description Utilized by RemoteHaulerOptimizer to calculate required carry capacity and dynamically size remote haulers.
  */
 class HaulerSizing {
     /**
@@ -17,12 +18,26 @@ class HaulerSizing {
      * @returns {number} The required number of CARRY parts.
      */
     static getRequiredCarryParts(pathLength, droppedEnergy, energyPerTick) {
-        // Distance * 2 is round trip
+        // Distance * 2 is round trip. A hauler will take `pathLength` ticks to arrive.
         const roundTrip = pathLength * 2;
-        const generatedEnergy = roundTrip * energyPerTick;
-        // Energy decays at Math.ceil(amount / 1000) per tick. We need to grab it before decay destroys too much.
-        // We size the hauler to grab the total generated + whatever is dropped right now.
-        const totalEnergyToSweep = generatedEnergy + droppedEnergy;
+
+        let projectedEnergy = droppedEnergy;
+
+        // Simulate decay and generation for the duration the hauler takes to arrive (one way)
+        for (let i = 0; i < pathLength; i++) {
+            if (projectedEnergy > 0) {
+                // Energy decays on the ground
+                projectedEnergy -= Math.ceil(projectedEnergy / 1000);
+            }
+            // Energy generated per tick by miners
+            projectedEnergy += energyPerTick;
+        }
+
+        // The hauler must be able to pick up whatever is there when it arrives,
+        // but it ALSO needs to be sized for steady-state round-trip generation.
+        const steadyStateGeneration = roundTrip * energyPerTick;
+        const totalEnergyToSweep = Math.max(steadyStateGeneration, projectedEnergy);
+
         return Math.ceil(totalEnergyToSweep / 50);
     }
 

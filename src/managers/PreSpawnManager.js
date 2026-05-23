@@ -1,4 +1,6 @@
 const SpawnQueueManager = require('./SpawnQueueManager');
+const RemoteHaulerOptimizer = require('../colonies/RemoteHaulerOptimizer');
+const BodyCalc = require('../utils/bodyCalc');
 
 /**
  * @file PreSpawnManager.js
@@ -30,6 +32,28 @@ class PreSpawnManager {
      */
     static registerPreSpawn(roomName, role, body, name, opts, cost, creepToReplaceId, spawnTime, pathLength) {
         PreSpawnManager.initLedger();
+
+        if (role === 'remoteHauler' && opts && opts.memory && opts.memory.targetSourceId) {
+            let storageId = opts.memory.storageId;
+            if (!storageId && global.State && global.State.structuresByRoom) {
+                const structures = global.State.structuresByRoom.get(roomName);
+                if (structures && structures.has(STRUCTURE_STORAGE)) {
+                    const storagesMap = structures.get(STRUCTURE_STORAGE);
+                    if (storagesMap) {
+                        const firstStorage = storagesMap.values().next().value;
+                        if (firstStorage) {
+                            storageId = firstStorage.id;
+                        }
+                    }
+                }
+            }
+
+            const newBody = RemoteHaulerOptimizer.calculateOptimalHaulerBody(roomName, opts.memory.targetSourceId, storageId);
+            if (newBody && newBody.length > 0) {
+                body = newBody;
+                cost = BodyCalc.getCost(newBody);
+            }
+        }
 
         // Prevent duplicate pre-spawn requests for the same creep
         if (global.State.preSpawnLedger.has(creepToReplaceId)) {
