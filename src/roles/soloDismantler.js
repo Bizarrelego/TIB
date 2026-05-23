@@ -48,12 +48,17 @@ module.exports = {
                             const nextPos = creep.heap.penetrationPath[0];
 
                             // Replace lookFor with global state check
-                            const blocking = allStructures.find(s =>
-                                s.pos.x === nextPos.x &&
-                                s.pos.y === nextPos.y &&
-                                s.structureType !== STRUCTURE_ROAD &&
-                                s.structureType !== STRUCTURE_CONTAINER
-                            );
+                            let blocking = null;
+                            for (let i = 0; i < allStructures.length; i++) {
+                                const s = allStructures[i];
+                                if (s.pos.x === nextPos.x &&
+                                    s.pos.y === nextPos.y &&
+                                    s.structureType !== STRUCTURE_ROAD &&
+                                    s.structureType !== STRUCTURE_CONTAINER) {
+                                    blocking = s;
+                                    break;
+                                }
+                            }
 
                             if (blocking) {
                                 creep.dismantle(blocking);

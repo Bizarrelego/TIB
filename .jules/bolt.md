@@ -6,3 +6,4 @@
 ## 2025-02-28 - CPU Optimization Learning: Enforced V8 Map usage in Global Cache. Replaced global.Cache = {} in managerOrchestrator with proper CacheRegistry initialization to prevent de-optimization.
 ## 2025-02-28 - CPU Optimization Learning: Caching `room.getEventLog()` output per tick into `global.State.currentTickEvents`.
 Action: Eliminate redundant JSON string parsing by calling `room.getEventLog()` exactly once per room, per tick.
+## 2026-05-23 - [Array Iteration Methods] Learning: Array chaining (`.map().filter().reduce()`) and methods like `.find()` cause significant GC overhead and CPU usage when applied to large lists inside the tick loop. Action: Always use traditional `for` and `for...in` loops to process arrays and objects in high-frequency execution paths to preserve O(1) performance.

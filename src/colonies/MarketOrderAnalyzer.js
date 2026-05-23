@@ -182,13 +182,24 @@ class MarketOrderAnalyzer {
     static _getOutliersFromGroup(orders) {
         if (!orders || orders.length < 4) return []; // Not enough data for reliable IQR
 
-        const prices = orders.map(o => o.price);
+        const prices = [];
+        for (let i = 0; i < orders.length; i++) {
+            prices.push(orders[i].price);
+        }
+
         const filteredPrices = MarketDataProcessor.filterOutliers(prices);
 
         // If an order's price is not in the filtered prices array, it's an outlier.
         // Or we can calculate bounds again. Using filterOutliers directly:
         const validPricesSet = new Set(filteredPrices);
-        return orders.filter(o => !validPricesSet.has(o.price));
+
+        const outliers = [];
+        for (let i = 0; i < orders.length; i++) {
+            if (!validPricesSet.has(orders[i].price)) {
+                outliers.push(orders[i]);
+            }
+        }
+        return outliers;
     }
 }
 
