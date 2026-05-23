@@ -227,12 +227,256 @@ function init() {
 }
 
 const cpuThrottler = Profiler.wrap('cpuThrottler', require('../os/cpuThrottler'));
+const cpuBucketForecaster = require('../os/cpuBucketForecaster');
 const managersIntegration = Profiler.wrap('managersIntegration', require('./index'));
+const { wrap } = require('../utils/ManagerExecutionWrapper');
 
+// Required modules for phases (Top level to avoid tick-time synchronous requires)
+const heapValidator = require('../os/heapValidator');
+const GlobalResetDetector = require('../os/GlobalResetDetector');
+const GlobalStateRehydrator = require('../os/GlobalStateRehydrator');
+const OSInitializer = require('../os/OSInitializer');
+const interShardMemoryManager = require('../os/interShardMemoryManager');
+const stateScanner = require('../state/stateScanner');
+const globalState = require('../state/globalState');
+const trafficManager = require('../traffic/trafficManager');
+const IntentManager = require('../os/IntentManager');
+const memoryProxy = require('../os/memoryProxy');
+const SystemScheduler = require('../os/SystemScheduler');
+const roomHasher = require('../os/roomHasher');
+const discoveryManager = require('../state/discoveryManager');
+const roomEventManager = require('./RoomEventManager');
+const EnergySourceTracker = require('./EnergySourceTracker');
+const VirtualLedger = require('../utils/VirtualLedger');
+const defconManager = require('../colonies/defconManager');
+const spawnManager = require('../colonies/spawnManager');
+const SpawnLedger = require('../colonies/spawnLedger');
+const BoostManager = require('./BoostManager');
+const planner = require('../colonies/planner');
+const RoleManager = require('../colonies/RoleManager');
+const AllianceIntelManager = require('./AllianceIntelManager');
+const PreSpawnManager = require('./PreSpawnManager');
+
+
+/**
+ * Runs the 6-phase execution pipeline.
+ */
+function runPipeline() {
+    // Update Bucket Forecaster early in the pipeline
+    if (cpuBucketForecaster && typeof cpuBucketForecaster.update === 'function') {
+        cpuBucketForecaster.update();
+    }
+
+    let throttlerFlags = {};
+    const executeWrapped = (name, fn) => {
+        if (!fn) return;
+        wrap(name, fn)();
+    };
+
+    executeWrapped('cpuThrottler.run', () => {
+        if (cpuThrottler && typeof cpuThrottler.run === 'function') {
+            throttlerFlags = cpuThrottler.run() || {};
+        }
+    });
+
+    const { skipState, skipColonies, skipManagers, skipOperations } = throttlerFlags;
+
+    // Phase 1: OS Init & Cache
+    executeWrapped('heapValidator.validate', () => {
+        if (heapValidator && typeof heapValidator.validate === 'function') {
+            heapValidator.validate();
+        }
+    });
+    executeWrapped('GlobalResetDetector.detectAndHandleReset', () => {
+        if (GlobalResetDetector && typeof GlobalResetDetector.detectAndHandleReset === 'function') {
+            GlobalResetDetector.detectAndHandleReset();
+        }
+    });
+    executeWrapped('GlobalStateRehydrator.rehydrateGlobalState', () => {
+        if (GlobalStateRehydrator && typeof GlobalStateRehydrator.rehydrateGlobalState === 'function') {
+            GlobalStateRehydrator.rehydrateGlobalState();
+        }
+    });
+    executeWrapped('OSInitializer.init', () => {
+        if (OSInitializer && typeof OSInitializer.init === 'function') {
+            OSInitializer.init();
+        }
+    });
+    executeWrapped('CacheRegistry.init', () => {
+        if (!global.Cache) {
+            const { CacheRegistry } = require('../os/cache');
+            if (CacheRegistry && typeof CacheRegistry.init === 'function') {
+                CacheRegistry.init();
+            }
+        }
+    });
+    executeWrapped('interShardMemoryManager._loadLocal', () => {
+        if (interShardMemoryManager && typeof interShardMemoryManager._loadLocal === 'function') {
+            interShardMemoryManager._loadLocal();
+        }
+    });
+    executeWrapped('SystemScheduler.run', () => {
+        if (SystemScheduler && typeof SystemScheduler.run === 'function') SystemScheduler.run();
+    });
+
+    // Phase 2: Global State
+    executeWrapped('globalState.update', () => {
+        if (globalState && typeof globalState.update === 'function') {
+            globalState.update();
+        }
+    });
+    executeWrapped('roomHasher', () => {
+        if (global.State && global.State.rooms) {
+            for (const roomName of global.State.rooms.keys()) {
+                if (roomHasher && typeof roomHasher.generate === 'function') roomHasher.generate(roomName);
+            }
+        }
+    });
+    executeWrapped('discoveryManager', () => { if (discoveryManager) discoveryManager(); });
+
+    if (!skipState) {
+        executeWrapped('RoomEventManager', () => { if (roomEventManager) roomEventManager(); });
+        executeWrapped('stateScanner.scan', () => {
+            if (stateScanner && typeof stateScanner.scan === 'function') {
+                stateScanner.scan();
+            }
+        });
+        executeWrapped('EnergySourceTracker.run', () => { if (EnergySourceTracker && typeof EnergySourceTracker.run === 'function') EnergySourceTracker.run(); });
+    }
+
+    // Phase 3: Colonies
+    if (!skipColonies) {
+        executeWrapped('ledgerReset', () => { if (VirtualLedger && typeof VirtualLedger.clear === 'function') VirtualLedger.clear(); });
+
+        const AssignmentUtility = registeredTopLevelManagers.get('AssignmentUtility');
+        executeWrapped('AssignmentUtility.run', () => {
+            if (AssignmentUtility && typeof AssignmentUtility.run === 'function') AssignmentUtility.run();
+        });
+
+        const colonyManager = registeredTopLevelManagers.get('colonyManager');
+        executeWrapped('colonyManager.run', () => {
+            if (colonyManager && typeof colonyManager.run === 'function') {
+                colonyManager.run();
+            }
+        });
+
+        executeWrapped('defconManager.run', () => {
+            if (global.State && global.State.rooms && defconManager && typeof defconManager.run === 'function') {
+                for (const room of global.State.rooms.values()) defconManager.run(room);
+            }
+        });
+
+        const CreepAssignmentManager = registeredTopLevelManagers.get('CreepAssignmentManager');
+        executeWrapped('CreepAssignmentManager.run', () => {
+            if (global.State && global.State.rooms && CreepAssignmentManager && typeof CreepAssignmentManager.run === 'function') {
+                for (const room of global.State.rooms.values()) {
+                    const wrapMethod = require('../utils/ManagerExecutionWrapper').wrap;
+                    wrapMethod('CreepAssignmentManager', () => CreepAssignmentManager.run(room))();
+                }
+            }
+        });
+
+        const PowerSpawnManager = registeredTopLevelManagers.get('PowerSpawnManager');
+        executeWrapped('PowerSpawnManager.run', () => {
+            if (global.State && global.State.rooms && PowerSpawnManager && typeof PowerSpawnManager.run === 'function') {
+                for (const room of global.State.rooms.values()) {
+                    const wrapMethod = require('../utils/ManagerExecutionWrapper').wrap;
+                    wrapMethod('PowerSpawnManager', () => PowerSpawnManager.run(room))();
+                }
+            }
+        });
+
+        const RCLProgressionManager = registeredTopLevelManagers.get('RCLProgressionManager');
+        executeWrapped('RCLProgressionManager.run', () => {
+            if (global.State && global.State.rooms && RCLProgressionManager && typeof RCLProgressionManager.run === 'function') {
+                for (const room of global.State.rooms.values()) RCLProgressionManager.run(room);
+            }
+        });
+    }
+
+    if (global.State && global.State.rooms) {
+        if (typeof Game !== 'undefined' && Game.time % 10 === 0) {
+            for (const room of global.State.rooms.values()) {
+                if (room.controller && room.controller.my && spawnManager && typeof spawnManager.run === 'function') {
+                    const ledger = new SpawnLedger(room);
+                    executeWrapped('spawnManager.run', () => spawnManager.run(room, ledger));
+                }
+                if (room.controller && room.controller.my && BoostManager && typeof BoostManager.run === 'function') {
+                    executeWrapped('BoostManager.run', () => BoostManager.run(room));
+                }
+            }
+        }
+        if (typeof Game !== 'undefined' && Game.time % 1000 === 0) {
+            for (const room of global.State.rooms.values()) {
+                if (room.controller && room.controller.my && planner && typeof planner.run === 'function') {
+                    executeWrapped('planner.run', () => planner.run(room));
+                }
+            }
+        }
+    }
+
+    if (!skipManagers) {
+        executeWrapped('PreSpawnManager.run', () => {
+            const preMgr = globalState ? globalState.getManager('PreSpawnManager') : (PreSpawnManager || null);
+            if (preMgr && typeof preMgr.run === 'function') preMgr.run();
+        });
+        executeWrapped('runRoomManagers', () => {
+            if (typeof runRoomManagers === 'function') runRoomManagers();
+        });
+        executeWrapped('RoleManager.runAll', () => { if (RoleManager && typeof RoleManager.runAll === 'function') RoleManager.runAll(); });
+    }
+
+    // Phase 4: Operations
+    if (!skipOperations) {
+        executeWrapped('AllianceIntelManager.run', () => {
+            const intelMgr = globalState ? globalState.getManager('AllianceIntelManager') : (AllianceIntelManager || null);
+            if (intelMgr && typeof intelMgr.run === 'function') intelMgr.run();
+        });
+
+        const operationsManager = registeredTopLevelManagers.get('operationsManager');
+        executeWrapped('operationsManager.run', () => {
+            if (operationsManager && typeof operationsManager.run === 'function') {
+                operationsManager.run();
+            }
+        });
+    }
+
+    // Phase 5: Traffic Control
+    executeWrapped('trafficManager.setup', () => {
+        if (trafficManager && typeof trafficManager.setup === 'function') {
+            trafficManager.setup();
+        }
+    });
+    executeWrapped('trafficManager.run', () => {
+        if (trafficManager && typeof trafficManager.run === 'function') {
+            trafficManager.run();
+        }
+    });
+
+    // Phase 6: Intents & Sleep
+    executeWrapped('trafficManager.executeIntents', () => {
+        if (trafficManager && typeof trafficManager.executeIntents === 'function') {
+            trafficManager.executeIntents();
+        }
+    });
+    executeWrapped('IntentManager.fireIntents', () => {
+        if (global.State && global.State.intentManager && typeof global.State.intentManager.fireIntents === 'function') {
+            global.State.intentManager.fireIntents();
+        } else if (global.State && global.State.intentManager && typeof global.State.intentManager.fire === 'function') {
+            global.State.intentManager.fire();
+        }
+    });
+    executeWrapped('memoryProxy.serialize', () => {
+        if (memoryProxy && typeof memoryProxy.serialize === 'function') {
+            memoryProxy.serialize();
+        }
+    });
+}
 
 
 module.exports = {
     getRegisteredManager: (name) => registeredTopLevelManagers.get(name),
     init,
-    runRoomManagers // Exported for testing/mocking if needed
+    runRoomManagers, // Exported for testing/mocking if needed
+    runPipeline
 };
