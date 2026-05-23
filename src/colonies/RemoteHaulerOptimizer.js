@@ -38,15 +38,16 @@ class RemoteHaulerOptimizer {
 
         let droppedEnergy = 0;
         if (sourceRoomName && global.State && global.State.droppedByRoom && global.State.droppedByRoom.has(sourceRoomName)) {
-            const dropped = global.State.droppedByRoom.get(sourceRoomName) || [];
-            // In the case dropped is an array or Map. values() handles Map or Set. Iterating over it directly handles Array.
-            // Based on previous traces, global.State.droppedByRoom is sometimes an array or a map.
-            const droppedItems = typeof dropped.values === 'function' ? Array.from(dropped.values()) : dropped;
-
-            for (let i = 0; i < droppedItems.length; i++) {
-                const drop = droppedItems[i];
-                if (drop.resourceType === RESOURCE_ENERGY) {
-                    droppedEnergy += drop.amount;
+            const droppedMap = global.State.droppedByRoom.get(sourceRoomName);
+            if (droppedMap) {
+                const iterator = droppedMap.values();
+                let next = iterator.next();
+                while (!next.done) {
+                    const drop = next.value;
+                    if (drop.resourceType === RESOURCE_ENERGY) {
+                        droppedEnergy += drop.amount;
+                    }
+                    next = iterator.next();
                 }
             }
         }
