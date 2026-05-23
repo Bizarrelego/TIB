@@ -86,16 +86,32 @@ class MarketManager {
 
             // Apply IQR Filter using MarketOrderAnalyzer to reject troll orders
             const outliers = MarketOrderAnalyzer.detectOutliers(buyOrders, sellOrders);
-            const outlierIds = new Set(outliers.map(o => o.id));
 
-            const validBuyOrders = buyOrders.filter(o => !outlierIds.has(o.id));
-            const validSellOrders = sellOrders.filter(o => !outlierIds.has(o.id));
+            const outlierIds = new Set();
+            for (let i = 0; i < outliers.length; i++) {
+                outlierIds.add(outliers[i].id);
+            }
+
+            const validBuyOrders = [];
+            let sumBuyPrices = 0;
+            for (let i = 0; i < buyOrders.length; i++) {
+                if (!outlierIds.has(buyOrders[i].id)) {
+                    validBuyOrders.push(buyOrders[i]);
+                    sumBuyPrices += buyOrders[i].price;
+                }
+            }
+
+            const validSellOrders = [];
+            for (let i = 0; i < sellOrders.length; i++) {
+                if (!outlierIds.has(sellOrders[i].id)) {
+                    validSellOrders.push(sellOrders[i]);
+                }
+            }
 
             if (validBuyOrders.length === 0 || validSellOrders.length === 0) continue;
 
             // EMA Baseline
-            const filteredBuyPrices = validBuyOrders.map(o => o.price);
-            const currentAvgBuyPrice = filteredBuyPrices.reduce((sum, p) => sum + p, 0) / filteredBuyPrices.length;
+            const currentAvgBuyPrice = sumBuyPrices / validBuyOrders.length;
 
             if (!global.State.marketEMA) global.State.marketEMA = new Map();
             const prevEma = global.State.marketEMA.get(resourceType) || currentAvgBuyPrice;

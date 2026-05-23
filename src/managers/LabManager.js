@@ -132,8 +132,21 @@ class LabManager {
 
         if (!input1 || !input2) return;
 
-        const in1Resource = Object.keys(input1.store).find(k => k !== RESOURCE_ENERGY);
-        const in2Resource = Object.keys(input2.store).find(k => k !== RESOURCE_ENERGY);
+        let in1Resource = null;
+        for (const key in input1.store) {
+            if (key !== RESOURCE_ENERGY) {
+                in1Resource = key;
+                break;
+            }
+        }
+
+        let in2Resource = null;
+        for (const key in input2.store) {
+            if (key !== RESOURCE_ENERGY) {
+                in2Resource = key;
+                break;
+            }
+        }
 
         // Ensure inputs contain correct minerals
         if (in1Resource !== labReaction.reagent1 || in2Resource !== labReaction.reagent2) return;
@@ -142,7 +155,13 @@ class LabManager {
         for (const outId of labCache.outputLabIds) {
             const outLab = Game.getObjectById(outId);
             if (outLab && outLab.cooldown === 0) {
-                const outResource = Object.keys(outLab.store).find(k => k !== RESOURCE_ENERGY);
+                let outResource = null;
+                for (const key in outLab.store) {
+                    if (key !== RESOURCE_ENERGY) {
+                        outResource = key;
+                        break;
+                    }
+                }
                 // If it has wrong mineral type, wait for creep to empty it
                 if (outResource && outResource !== labReaction.product) continue;
                 // If full, wait
@@ -206,7 +225,13 @@ class LabManager {
             for (const outId of labCache.outputLabIds) {
                 const outLab = Game.getObjectById(outId);
                 if (outLab) {
-                    const outRes = Object.keys(outLab.store).find(k => k !== RESOURCE_ENERGY);
+                    let outRes = null;
+                    for (const key in outLab.store) {
+                        if (key !== RESOURCE_ENERGY) {
+                            outRes = key;
+                            break;
+                        }
+                    }
                     if (outRes) {
                         if (outRes !== labReaction.product || outLab.store[outRes] > 2000) {
                             outputToEmpty = outLab;
@@ -220,7 +245,13 @@ class LabManager {
             if (outputToEmpty) {
                 if (creep.store.getUsedCapacity() > 0) {
                     // Deadlock fix: drop whatever wrong item we are carrying first
-                    const carriedRes = Object.keys(creep.store).find(k => k !== RESOURCE_ENERGY);
+                    let carriedRes = null;
+                    for (const key in creep.store) {
+                        if (key !== RESOURCE_ENERGY) {
+                            carriedRes = key;
+                            break;
+                        }
+                    }
                     if (carriedRes) {
                         creep.heap.state = 'store_output';
                         creep.heap.targetId = storage ? storage.id : terminal ? terminal.id : null;
@@ -235,10 +266,22 @@ class LabManager {
             }
 
             // Priority 3: Empty input labs if wrong mineral
-            const in1Res = Object.keys(input1.store).find(k => k !== RESOURCE_ENERGY);
+            let in1Res = null;
+            for (const key in input1.store) {
+                if (key !== RESOURCE_ENERGY) {
+                    in1Res = key;
+                    break;
+                }
+            }
             if (in1Res && in1Res !== labReaction.reagent1) {
                 if (creep.store.getUsedCapacity() > 0) {
-                    const carriedRes = Object.keys(creep.store).find(k => k !== RESOURCE_ENERGY);
+                    let carriedRes = null;
+                    for (const key in creep.store) {
+                        if (key !== RESOURCE_ENERGY) {
+                            carriedRes = key;
+                            break;
+                        }
+                    }
                     if (carriedRes) {
                         creep.heap.state = 'store_wrong';
                         creep.heap.targetId = storage ? storage.id : null;
@@ -252,10 +295,22 @@ class LabManager {
                 continue;
             }
 
-            const in2Res = Object.keys(input2.store).find(k => k !== RESOURCE_ENERGY);
+            let in2Res = null;
+            for (const key in input2.store) {
+                if (key !== RESOURCE_ENERGY) {
+                    in2Res = key;
+                    break;
+                }
+            }
             if (in2Res && in2Res !== labReaction.reagent2) {
                 if (creep.store.getUsedCapacity() > 0) {
-                    const carriedRes = Object.keys(creep.store).find(k => k !== RESOURCE_ENERGY);
+                    let carriedRes = null;
+                    for (const key in creep.store) {
+                        if (key !== RESOURCE_ENERGY) {
+                            carriedRes = key;
+                            break;
+                        }
+                    }
                     if (carriedRes) {
                         creep.heap.state = 'store_wrong';
                         creep.heap.targetId = storage ? storage.id : null;

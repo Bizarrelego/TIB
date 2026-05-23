@@ -193,8 +193,19 @@ function findArbitrageOpportunities(energyPrice, myRoomName) {
         const flaggedSellOrders = flagOrderOutliers(group.sell);
 
         // Filter out flagged outliers
-        const validBuyOrders = flaggedBuyOrders.filter(order => !order.isOutlier);
-        const validSellOrders = flaggedSellOrders.filter(order => !order.isOutlier);
+        const validBuyOrders = [];
+        for (let i = 0; i < flaggedBuyOrders.length; i++) {
+            if (!flaggedBuyOrders[i].isOutlier) {
+                validBuyOrders.push(flaggedBuyOrders[i]);
+            }
+        }
+
+        const validSellOrders = [];
+        for (let i = 0; i < flaggedSellOrders.length; i++) {
+            if (!flaggedSellOrders[i].isOutlier) {
+                validSellOrders.push(flaggedSellOrders[i]);
+            }
+        }
 
         for (const sellOrder of validSellOrders) { // We buy from these
             for (const buyOrder of validBuyOrders) { // We sell to these

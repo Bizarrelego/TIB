@@ -88,7 +88,12 @@ module.exports = {
                                     if (lairs instanceof Map) {
                                         bestLair = lairs.get(bestLairId);
                                     } else if (Array.isArray(lairs)) {
-                                        bestLair = lairs.find(l => l.id === bestLairId);
+                                        for (let i = 0; i < lairs.length; i++) {
+                                            if (lairs[i].id === bestLairId) {
+                                                bestLair = lairs[i];
+                                                break;
+                                            }
+                                        }
                                     }
 
                                     if (bestLair && !creep.pos.isNearTo(bestLair)) {
