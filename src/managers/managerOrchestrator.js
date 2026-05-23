@@ -5,7 +5,6 @@ const { executeManager } = require('../utils/errorHandler');
 const defconManager = Profiler.wrap('defconManager', require('../colonies/defconManager'));
 const VirtualLedger = require('../utils/VirtualLedger');
 const { wrapModuleFunctions } = require('../utils/moduleWrapper');
-const errorHandler = require('../utils/errorHandler');
 
 // Phase Managers
 const discoveryManager = Profiler.wrap('discoveryManager', require('../state/discoveryManager'));
@@ -15,10 +14,8 @@ const colonyManager = Profiler.wrap('colonyManager', require('../colonies/colony
 const spawnManager = Profiler.wrap('spawnManager', require('../colonies/spawnManager'));
 const SpawnLedger = require('../colonies/spawnLedger');
 const BoostManager = Profiler.wrap('BoostManager', require('./BoostManager'));
-const VisualsManager = Profiler.wrap('VisualsManager', require('./VisualsManager'));
 const planner = Profiler.wrap('planner', require('../colonies/planner'));
 const { wrap } = require('../utils/ManagerExecutionWrapper');
-const { wrapManager } = require('../utils/ManagerErrorBoundary');
 
 const RoleManager = Profiler.wrap('RoleManager', require('../colonies/RoleManager'));
 const operationsManager = Profiler.wrap('operationsManager', require('../operations/operationsManager'));
@@ -26,7 +23,6 @@ const roomEventManager = Profiler.wrap('RoomEventManager', require('./RoomEventM
 const EnergySourceTracker = Profiler.wrap('EnergySourceTracker', require('./EnergySourceTracker'));
 
 const trafficManager = require('../traffic/trafficManager');
-const IntentManager = require('../os/IntentManager');
 const SystemScheduler = require('../os/SystemScheduler');
 const roomHasher = require('../os/roomHasher');
 const GlobalResetDetector = require('../os/GlobalResetDetector');
@@ -228,32 +224,11 @@ function init() {
 
 const cpuThrottler = Profiler.wrap('cpuThrottler', require('../os/cpuThrottler'));
 const cpuBucketForecaster = require('../os/cpuBucketForecaster');
-const managersIntegration = Profiler.wrap('managersIntegration', require('./index'));
-const { wrap } = require('../utils/ManagerExecutionWrapper');
+// 'wrap' is already imported at line 20
 
 // Required modules for phases (Top level to avoid tick-time synchronous requires)
 const heapValidator = require('../os/heapValidator');
-const GlobalResetDetector = require('../os/GlobalResetDetector');
 const GlobalStateRehydrator = require('../os/GlobalStateRehydrator');
-const OSInitializer = require('../os/OSInitializer');
-const interShardMemoryManager = require('../os/interShardMemoryManager');
-const stateScanner = require('../state/stateScanner');
-const globalState = require('../state/globalState');
-const trafficManager = require('../traffic/trafficManager');
-const IntentManager = require('../os/IntentManager');
-const memoryProxy = require('../os/memoryProxy');
-const SystemScheduler = require('../os/SystemScheduler');
-const roomHasher = require('../os/roomHasher');
-const discoveryManager = require('../state/discoveryManager');
-const roomEventManager = require('./RoomEventManager');
-const EnergySourceTracker = require('./EnergySourceTracker');
-const VirtualLedger = require('../utils/VirtualLedger');
-const defconManager = require('../colonies/defconManager');
-const spawnManager = require('../colonies/spawnManager');
-const SpawnLedger = require('../colonies/spawnLedger');
-const BoostManager = require('./BoostManager');
-const planner = require('../colonies/planner');
-const RoleManager = require('../colonies/RoleManager');
 const AllianceIntelManager = require('./AllianceIntelManager');
 const PreSpawnManager = require('./PreSpawnManager');
 

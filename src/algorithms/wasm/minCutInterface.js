@@ -17,12 +17,12 @@ try {
 
 class MinCutInterface {
     /**
-     * @param {string} roomName
-     * @param {Object[]} sources
-     * @param {CostMatrix} bounds
+     * @param {string} _roomName
+     * @param {Object[]} _sources
+     * @param {CostMatrix} _bounds
      * @returns {RoomPosition[]|null}
      */
-    static getCutTilesWasm(roomName, sources, bounds) {
+    static getCutTilesWasm(_roomName, _sources, _bounds) {
         if (!wasmModule || !wasmModule.getCutTiles) {
             return null; // Fallback to JS implementation
         }
@@ -32,7 +32,7 @@ class MinCutInterface {
 
         try {
             // Placeholder for actual Wasm call
-            // e.g. return wasmModule.getCutTiles(roomName, sources, bounds);
+            // e.g. return wasmModule.getCutTiles(_roomName, _sources, _bounds);
         } catch (e) {
             // Ignore error
         }
