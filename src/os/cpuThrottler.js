@@ -6,6 +6,7 @@
 
 const Logger = require('../utils/logger');
 const cpuBucketForecaster = require('./cpuBucketForecaster');
+const AusterityManager = require('./AusterityManager');
 
 /**
  * @typedef {Object} ThrottlingConfig
@@ -49,7 +50,7 @@ function run() {
         // Cascading CPU Throttling based on Game.cpu.bucket
         let forceAusterity = false;
         try {
-            forceAusterity = cpuBucketForecaster.shouldTriggerAusterity();
+            forceAusterity = AusterityManager.isActive();
         } catch (e) {
             Logger.error(`[CPU Throttler] Error checking austerity: ${e.stack}`);
         }

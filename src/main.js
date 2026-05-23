@@ -26,6 +26,7 @@ const defconManager = Profiler.wrap('defconManager', require('./colonies/defconM
 const VirtualLedger = require('./utils/VirtualLedger');
 const globalState = Profiler.wrap('globalState', require('./state/globalState'));
 const cpuThrottler = Profiler.wrap('cpuThrottler', require('./os/cpuThrottler'));
+const AusterityManager = require('./os/AusterityManager');
 const managersIntegration = Profiler.wrap('managersIntegration', require('./managers/index'));
 
 const { wrap } = require('./utils/ManagerExecutionWrapper');
@@ -59,6 +60,11 @@ module.exports.loop = wrapManager(Profiler.wrap('main.loop', function () {
         wrapManager(fn, name)();
     };
 
+    executeWrapped('AusterityManager.run', () => {
+        if (AusterityManager && typeof AusterityManager.run === 'function') {
+            AusterityManager.run();
+        }
+    });
     executeWrapped('cpuThrottler.throttle', () => {
         if (cpuThrottler && typeof cpuThrottler.throttle === 'function') {
             throttlerFlags = cpuThrottler.throttle() || {};
