@@ -35,5 +35,3 @@
  * @property {number} time - The Game.time when the matrix was generated.
  * @property {string} hash - The hash of the room state used to generate this matrix.
  */
-
-export {};
