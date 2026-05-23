@@ -1,29 +1,32 @@
+const TrafficResourceLedger = require('../traffic/TrafficResourceLedger');
+
 class VirtualLedger {
     static get ledger() {
-        if (!global.VirtualLedgerMap) global.VirtualLedgerMap = new Map();
-        return global.VirtualLedgerMap;
+        return TrafficResourceLedger.ledger;
     }
 
     static clear() {
-        this.ledger.clear();
+        TrafficResourceLedger.clear();
     }
 
     static registerIntent(targetId, resourceType, amount) {
-        if (!this.ledger.has(targetId)) {
-            this.ledger.set(targetId, new Map());
-        }
-        const targetLedger = this.ledger.get(targetId);
-        const current = targetLedger.get(resourceType) || 0;
-        targetLedger.set(resourceType, current + amount);
+        // VirtualLedger used to register positive amounts for what was claimed/intended to be withdrawn.
+        // TrafficResourceLedger tracks the sub-tick inventory, so a withdrawal intent should be a negative delta.
+        TrafficResourceLedger.registerTransfer(targetId, resourceType, -amount);
     }
 
     static getClaimedAmount(targetId, resourceType) {
+        // VirtualLedger used to return a positive amount for claims.
+        // Since we registered it as negative in TrafficResourceLedger, we return the absolute value of negative deltas
+        // (representing how much has been claimed/removed) or 0 if it's positive (meaning stuff was added).
         if (!this.ledger.has(targetId)) return 0;
-        return this.ledger.get(targetId).get(resourceType) || 0;
+        const delta = this.ledger.get(targetId).get(resourceType) || 0;
+        return delta < 0 ? Math.abs(delta) : 0;
     }
+
     static claim(target, resourceType, amount) {
-        const available = target.store ? target.store[resourceType] : target.amount;
-        const remaining = available - this.getClaimedAmount(target.id, resourceType);
+        // queryAvailable returns the true available amount considering all deltas (including what was already claimed)
+        const remaining = TrafficResourceLedger.queryAvailable(target.id, resourceType);
 
         if (remaining >= amount) {
             this.registerIntent(target.id, resourceType, amount);
