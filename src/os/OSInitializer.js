@@ -73,9 +73,7 @@ class OSInitializer {
             PipelineLock.clear();
         }
 
-        if (SystemScheduler && typeof SystemScheduler.run === 'function') {
-            SystemScheduler.run();
-        }
+
     }
 
     static run() {
