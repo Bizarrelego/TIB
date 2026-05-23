@@ -23,6 +23,7 @@ const VisualsManager = require('./VisualsManager');
 const PowerSpawnManager = require('./PowerSpawnManager');
 const AllianceIntelManager = require('./AllianceIntelManager');
 const SourceManager = require('./SourceManager');
+const CreepOperationalDataManager = require('./CreepOperationalDataManager');
 const { wrap } = require('../utils/ManagerExecutionWrapper');
 
 const managers = {
@@ -50,7 +51,8 @@ const managers = {
     VisualsManager,
     PowerSpawnManager,
     AllianceIntelManager,
-    SourceManager
+    SourceManager,
+    CreepOperationalDataManager
 };
 
 module.exports = {
