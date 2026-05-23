@@ -28,6 +28,7 @@ function register(managerId, interval, callback) {
 }
 
 const cpuThrottler = require('./cpuThrottler');
+const AusterityManager = require('./AusterityManager');
 
 /**
  * Runs the scheduled tasks if their interval matches the current game time.
@@ -39,7 +40,12 @@ function run() {
     if (throttlerFlags && throttlerFlags.skipManagers) return;
 
     for (const task of tasks.values()) {
-        if (Game.time % task.interval === 0) {
+        let activeInterval = task.interval;
+        if (AusterityManager.isActive()) {
+            activeInterval *= 2; // Double the interval to save CPU during austerity
+        }
+
+        if (Game.time % activeInterval === 0) {
             task.callback();
         }
     }
