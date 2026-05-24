@@ -5,11 +5,15 @@
 const CostMatrixVisualizer = require('../utils/CostMatrixVisualizer');
 const CostMatrixCache = require('../traffic/costMatrixCache');
 
+const cpuThrottler = require('../os/cpuThrottler');
+
 class VisualsManager {
     /**
      * Executes the room visuals logic.
      */
     static run() {
+        const throttlerFlags = cpuThrottler.run() || {};
+        if (throttlerFlags.skipVisuals) return;
         // Implementation for rendering room visuals
 
         // Toggle CostMatrix visualization based on a memory flag

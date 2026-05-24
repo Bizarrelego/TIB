@@ -14,7 +14,11 @@ const AusterityManager = require('./AusterityManager');
  * @property {boolean} skipColonies - Indicates if colonies phase should be skipped.
  * @property {boolean} skipManagers - Indicates if standalone managers phase should be skipped.
  * @property {boolean} skipOperations - Indicates if operations orchestration phase should be skipped.
+ * @property {boolean} skipVisuals - Indicates if visuals phase should be skipped.
  */
+
+let cachedConfig = null;
+let cacheTick = -1;
 
 /**
  * Runs the CPU throttler to determine which operations to skip based on the current CPU bucket.
@@ -23,10 +27,15 @@ const AusterityManager = require('./AusterityManager');
  * @returns {ThrottlingConfig} The throttling configuration dictating which phases to skip.
  */
 function run() {
+    if (typeof Game !== 'undefined' && Game.time === cacheTick && cachedConfig) {
+        return cachedConfig;
+    }
+
     let skipState = false;
     let skipColonies = false;
     let skipManagers = false;
     let skipOperations = false;
+    let skipVisuals = false;
 
     // Ensure Game and Game.cpu are available (important for mock environments)
     if (typeof Game !== 'undefined' && Game.cpu) {
@@ -37,8 +46,10 @@ function run() {
             Logger.error(`[CPU Throttler] Error updating forecaster: ${e.stack}`);
         }
 
+        const currentBucket = Game.cpu.bucket;
+
         // Pixel Generation
-        if (Game.cpu.bucket === 10000 && typeof Game.cpu.generatePixel === 'function') {
+        if (currentBucket === 10000 && typeof Game.cpu.generatePixel === 'function') {
             try {
                 Game.cpu.generatePixel();
                 Logger.info('Generated a pixel via Game.cpu.generatePixel()');
@@ -47,7 +58,7 @@ function run() {
             }
         }
 
-        // Cascading CPU Throttling based on Game.cpu.bucket
+        // Cascading CPU Throttling based on currentBucket (before any pixel generation drop)
         let forceAusterity = false;
         try {
             forceAusterity = AusterityManager.isActive();
@@ -56,27 +67,38 @@ function run() {
         }
 
         switch (true) {
-            case Game.cpu.bucket < 100:
+            case currentBucket < 100:
                 skipState = true;
                 // fallthrough
-            case Game.cpu.bucket < 500 || forceAusterity:
+            case currentBucket < 500 || forceAusterity:
                 skipColonies = true;
                 skipManagers = true;
                 // fallthrough
-            case Game.cpu.bucket < 2000:
+            case currentBucket < 2000:
                 skipOperations = true;
+                // fallthrough
+            case currentBucket < 5000:
+                skipVisuals = true;
                 // fallthrough
             default:
                 break;
         }
     }
 
-    return {
+    const config = {
         skipState,
         skipColonies,
         skipManagers,
-        skipOperations
+        skipOperations,
+        skipVisuals
     };
+
+    if (typeof Game !== 'undefined') {
+        cacheTick = Game.time;
+        cachedConfig = config;
+    }
+
+    return config;
 }
 
 module.exports = {

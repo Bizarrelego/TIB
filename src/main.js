@@ -65,9 +65,9 @@ module.exports.loop = wrapManager(Profiler.wrap('main.loop', function () {
             AusterityManager.run();
         }
     });
-    executeWrapped('cpuThrottler.throttle', () => {
-        if (cpuThrottler && typeof cpuThrottler.throttle === 'function') {
-            throttlerFlags = cpuThrottler.throttle() || {};
+    executeWrapped('cpuThrottler.run', () => {
+        if (cpuThrottler && typeof cpuThrottler.run === 'function') {
+            throttlerFlags = cpuThrottler.run() || {};
         }
     });
     executeWrapped('managersIntegration.init', () => {
@@ -200,7 +200,7 @@ module.exports.loop = wrapManager(Profiler.wrap('main.loop', function () {
         });
     }
 
-    if (typeof Game !== 'undefined' && Game.cpu && Game.cpu.bucket > 5000 && VisualsManager && typeof VisualsManager.run === 'function') {
+    if (typeof Game !== 'undefined' && Game.cpu && VisualsManager && typeof VisualsManager.run === 'function') {
         executeWrapped('VisualsManager.run', () => VisualsManager.run());
     }
 
