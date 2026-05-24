@@ -9,6 +9,7 @@
  * @typedef {Object} ScheduledTask
  * @property {number} interval - The tick interval at which the callback should run.
  * @property {function(): void} callback - The function to execute.
+ * @property {number} cpuBudget - The maximum CPU used before execution is skipped.
  */
 
 /**
@@ -21,10 +22,11 @@ const tasks = new Map();
  * @param {string} managerId - The unique identifier for the manager/system.
  * @param {number} interval - The tick interval at which the callback should run.
  * @param {function(): void} callback - The callback function to execute.
+ * @param {number} [cpuBudget=Infinity] - The CPU budget for the task.
  * @returns {void}
  */
-function register(managerId, interval, callback) {
-    tasks.set(managerId, { interval, callback });
+function register(managerId, interval, callback, cpuBudget = Infinity) {
+    tasks.set(managerId, { interval, callback, cpuBudget });
 }
 
 const cpuThrottler = require('./cpuThrottler');
@@ -46,7 +48,10 @@ function run() {
         }
 
         if (Game.time % activeInterval === 0) {
-            task.callback();
+            const currentCpu = typeof Game !== 'undefined' && Game.cpu && typeof Game.cpu.getUsed === 'function' ? Game.cpu.getUsed() : 0;
+            if (currentCpu <= task.cpuBudget) {
+                task.callback();
+            }
         }
     }
 }
