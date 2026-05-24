@@ -2,7 +2,11 @@
  * @fileoverview Utility module for standardized storage and retrieval of operational data on `creep.heap`.
  * This module ensures `creep.heap` exists before access or modification and provides a safe API to manage heap data
  * to support the 'Heap Exclusivity' principle.
+ *
+ * See `src/types/creepHeapSchema.js` for the expected schema and typings of operational data.
  */
+
+require('../types/creepHeapSchema.js'); // For IDE intellisense
 
 /**
  * Ensures that the creep has a valid heap Map object.
@@ -13,6 +17,7 @@
 function ensureHeap(creep) {
     if (!creep) return;
     if (!(creep.heap instanceof Map)) {
+        /** @type {CreepHeapMap} */
         creep.heap = new Map();
     }
 }
