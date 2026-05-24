@@ -1,4 +1,4 @@
-const cpuBucketForecaster = require('./cpuBucketForecaster');
+const AusterityTrigger = require('./AusterityTrigger');
 const CostMatrixUpdateTrigger = require('../traffic/CostMatrixUpdateTrigger');
 
 /**
@@ -56,7 +56,7 @@ class ExpensiveAlgorithmScheduler {
         if (queue.length === 0) return;
 
         // Check global bucket trajectory to avoid running expensive operations if a crash is imminent
-        if (cpuBucketForecaster.shouldTriggerAusterity()) {
+        if (AusterityTrigger.shouldTriggerAusterity()) {
             return;
         }
 

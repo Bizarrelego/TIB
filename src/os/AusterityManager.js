@@ -5,9 +5,24 @@
  */
 
 const Logger = require('../utils/logger');
-const cpuBucketForecaster = require('./cpuBucketForecaster');
 
 let isAusterityActive = false;
+
+/**
+ * Activates austerity mode and logs the activation.
+ */
+function activate() {
+    isAusterityActive = true;
+    Logger.info('[AusterityManager] 🚨 CPU Austerity Mode ACTIVATED - Reducing tick rates and throttling operations.');
+}
+
+/**
+ * Deactivates austerity mode and logs the deactivation.
+ */
+function deactivate() {
+    isAusterityActive = false;
+    Logger.info('[AusterityManager] ✅ CPU Austerity Mode DEACTIVATED - Resuming normal operations.');
+}
 
 /**
  * Evaluates the CPU bucket forecast and toggles austerity mode.
@@ -15,19 +30,11 @@ let isAusterityActive = false;
  * @returns {boolean} True if austerity mode is active.
  */
 function run() {
-    let shouldTrigger = false;
+    const AusterityTrigger = require('./AusterityTrigger');
     try {
-        shouldTrigger = cpuBucketForecaster.shouldTriggerAusterity();
+        AusterityTrigger.evaluateAndTriggerAusterity();
     } catch (e) {
-        Logger.error(`[AusterityManager] Error checking forecaster: ${e.stack}`);
-    }
-
-    if (shouldTrigger && !isAusterityActive) {
-        isAusterityActive = true;
-        Logger.info('[AusterityManager] 🚨 CPU Austerity Mode ACTIVATED - Reducing tick rates and throttling operations.');
-    } else if (!shouldTrigger && isAusterityActive) {
-        isAusterityActive = false;
-        Logger.info('[AusterityManager] ✅ CPU Austerity Mode DEACTIVATED - Resuming normal operations.');
+        Logger.error(`[AusterityManager] Error evaluating austerity trigger: ${e.stack}`);
     }
 
     return isAusterityActive;
@@ -51,5 +58,7 @@ function reset() {
 module.exports = {
     run,
     isActive,
-    reset
+    reset,
+    activate,
+    deactivate
 };
