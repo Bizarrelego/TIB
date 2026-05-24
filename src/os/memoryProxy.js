@@ -1,4 +1,5 @@
 const objectPool = require('./objectPool');
+const CreepMemorySchemaEnforcer = require('../utils/CreepMemorySchemaEnforcer');
 
 Object.defineProperty(Creep.prototype, 'heap', {
     get() {
@@ -21,6 +22,9 @@ function installMemoryProxy() {
 module.exports = {
     init: installMemoryProxy,
     serialize: function serialize() {
+        if (Game.time % 100 === 0) {
+            CreepMemorySchemaEnforcer.validateAll();
+        }
         if (typeof RawMemory !== 'undefined') {
             RawMemory._parsed = Memory;
         }
