@@ -4,6 +4,7 @@
  */
 
 const GlobalStateRehydrator = require('./GlobalStateRehydrator');
+const OSInitializer = require('./OSInitializer');
 const Logger = require('../utils/logger');
 
 class GlobalResetDetector {
@@ -13,7 +14,9 @@ class GlobalResetDetector {
     static detectAndHandleReset() {
         if (!global.hasRunThisTick) {
             global.hasRunThisTick = true;
-            Logger.info('[GlobalResetDetector] VM Reset detected. Initiating global state rehydration...');
+            Logger.info('[GlobalResetDetector] VM Reset detected. Initiating global OS initialization and state rehydration...');
+            OSInitializer.init();
+            require('./OSOrchestrator').init(); // Initialize OS Orchestrator scheduler tasks
             GlobalStateRehydrator.rehydrateGlobalState();
         }
     }
