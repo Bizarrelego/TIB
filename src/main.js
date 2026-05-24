@@ -1,6 +1,6 @@
 const Profiler = require('./utils/profiler');
 const GlobalStateRehydrator = require('./os/GlobalStateRehydrator');
-const OSInitializer = require('./os/OSInitializer');
+const OSOrchestrator = require('./os/OSOrchestrator');
 const resetRecovery = Profiler.wrap('resetRecovery', require('./os/resetRecovery'));
 const managerOrchestrator = Profiler.wrap('managerOrchestrator', require('./managers/managerOrchestrator')); // Standalone Managers
 
@@ -36,11 +36,7 @@ const { wrapManager } = require('./utils/ManagerErrorBoundary');
 
 
 module.exports.loop = wrapManager(Profiler.wrap('main.loop', function () {
-    if (!global.hasRunThisTick) {
-        global.hasRunThisTick = true;
-        OSInitializer.init();
-        GlobalStateRehydrator.rehydrateGlobalState();
-    }
+
 
     if (!Memory.os_initialized && global.Cache) {
         global.Cache = undefined;
@@ -60,11 +56,7 @@ module.exports.loop = wrapManager(Profiler.wrap('main.loop', function () {
         wrapManager(fn, name)();
     };
 
-    executeWrapped('AusterityManager.run', () => {
-        if (AusterityManager && typeof AusterityManager.run === 'function') {
-            AusterityManager.run();
-        }
-    });
+
     executeWrapped('cpuThrottler.run', () => {
         if (cpuThrottler && typeof cpuThrottler.run === 'function') {
             throttlerFlags = cpuThrottler.run() || {};
@@ -79,34 +71,16 @@ module.exports.loop = wrapManager(Profiler.wrap('main.loop', function () {
     const { skipState, skipColonies, skipManagers, skipOperations } = throttlerFlags;
 
     // Phase 1: OS Init & Cache
-    executeWrapped('GlobalResetDetector', () => {
-        if (GlobalResetDetector && typeof GlobalResetDetector.detectAndHandleReset === 'function') {
-            GlobalResetDetector.detectAndHandleReset();
-        }
-    });
-    executeWrapped('OSInitializer', () => {
-        if (OSInitializer && typeof OSInitializer.init === 'function') OSInitializer.init();
-    });
-    executeWrapped('interShardMemoryManager._loadLocal', () => {
-        if (interShardMemoryManager && typeof interShardMemoryManager._loadLocal === 'function') {
-            interShardMemoryManager._loadLocal();
-        }
-    });
-
-    executeWrapped('SystemScheduler', () => {
-        if (SystemScheduler && typeof SystemScheduler.run === 'function') SystemScheduler.run();
+    executeWrapped('OSOrchestrator', () => {
+        if (OSOrchestrator && typeof OSOrchestrator.run === 'function') OSOrchestrator.run();
     });
 
     // Phase 2: Global State
     executeWrapped('globalState.update', () => {
         if (globalState && typeof globalState.update === 'function') globalState.update();
     });
-    executeWrapped('roomHasher', () => {
-        if (global.State && global.State.rooms) {
-            for (const roomName of global.State.rooms.keys()) {
-                if (roomHasher && typeof roomHasher.generate === 'function') roomHasher.generate(roomName);
-            }
-        }
+    executeWrapped('OSOrchestrator.updateRoomHashes', () => {
+        if (OSOrchestrator && typeof OSOrchestrator.updateRoomHashes === 'function') OSOrchestrator.updateRoomHashes();
     });
 
     executeWrapped('discoveryManager', () => { if (discoveryManager) discoveryManager(); });
