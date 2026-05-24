@@ -91,7 +91,6 @@ module.exports = {
                 // Zero-Pathing Drop Mining
                 if (creep.store.getUsedCapacity() > 0) {
                     let hasLink = false;
-
                     const structuresByRoom = global.State.structuresByRoom ? global.State.structuresByRoom.get(room.name) : null;
                     if (structuresByRoom) {
                         const links = structuresByRoom.get(STRUCTURE_LINK);
@@ -111,6 +110,7 @@ module.exports = {
                     }
 
                     if (!hasLink) {
+                        // Containerless drop mining: drop directly on ground unconditionally
                         creep.drop(RESOURCE_ENERGY);
                     }
                 }

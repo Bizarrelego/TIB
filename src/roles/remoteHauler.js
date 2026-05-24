@@ -48,14 +48,20 @@ function run(room) {
                 }
 
                 // Find energy to pick up
-                // Strict containerless scavenging: target dropped energy directly
+                // Strict containerless scavenging: target dropped energy efficiently by proximity/amount
                 let target = null;
+                let bestScore = -Infinity;
+
                 const droppedArray = global.State.droppedByRoom.get(creep.room.name);
                 if (droppedArray) {
                     for (const dropped of droppedArray.values()) {
                         if (dropped.resourceType === RESOURCE_ENERGY && dropped.amount > 0) {
-                            if (!target || dropped.amount > target.amount) {
-                                target = dropped; // Largest pile priority
+                            // Score based on amount and distance to sweep efficiently
+                            const distance = creep.pos.getRangeTo(dropped);
+                            const score = dropped.amount - (distance * 10);
+                            if (!target || score > bestScore) {
+                                target = dropped;
+                                bestScore = score;
                             }
                         }
                     }

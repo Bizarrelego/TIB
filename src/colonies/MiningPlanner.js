@@ -7,9 +7,11 @@ const MiningPlanner = {
     /**
      * Calculates and caches the optimal mining spot for each source in the given room.
      * Evaluates adjacent tiles for terrain and existing structures (containers/links).
+     * Also calculates exact path length to home storage for remote rooms to optimize hauler sizing.
      * @param {string} roomName - The name of the room to plan mining spots for.
+     * @param {string} [homeRoomName] - The name of the home room (used for remote mining path length).
      */
-    planMiningSpots(roomName) {
+    planMiningSpots(roomName, homeRoomName) {
         if (!Memory.rooms) {
             Memory.rooms = {};
         }
@@ -22,6 +24,33 @@ const MiningPlanner = {
 
         const terrain = Game.map.getRoomTerrain(roomName);
         const structures = global.State.structuresByRoom ? global.State.structuresByRoom.get(roomName) : null;
+
+        let storagePos = null;
+        if (homeRoomName && global.State.structuresByRoom) {
+            const homeStructures = global.State.structuresByRoom.get(homeRoomName);
+            if (homeStructures) {
+                const storages = homeStructures.get(STRUCTURE_STORAGE);
+                if (storages && storages.length > 0) {
+                    storagePos = storages[0].pos;
+                } else {
+                    const spawns = global.State.spawnsByRoom ? global.State.spawnsByRoom.get(homeRoomName) : null;
+                    if (spawns && spawns.length > 0) {
+                        storagePos = spawns[0].pos;
+                    }
+                }
+            }
+        } else if (!homeRoomName && structures) {
+            // For domestic rooms, try to find local storage
+            const storages = structures.get(STRUCTURE_STORAGE);
+            if (storages && storages.length > 0) {
+                storagePos = storages[0].pos;
+            } else {
+                const spawns = global.State.spawnsByRoom ? global.State.spawnsByRoom.get(roomName) : null;
+                if (spawns && spawns.length > 0) {
+                    storagePos = spawns[0].pos;
+                }
+            }
+        }
 
         // Ensure V8 Map usage at runtime level (store persistent memory as serialized map later)
         // Note: Memory inherently deserializes to standard objects.
@@ -89,6 +118,16 @@ const MiningPlanner = {
             }
 
             if (bestSpot) {
+                if (storagePos) {
+                    const ret = PathFinder.search(
+                        new RoomPosition(bestSpot.x, bestSpot.y, roomName),
+                        { pos: storagePos, range: 1 },
+                        { plainCost: 2, swampCost: 10 }
+                    );
+                    if (!ret.incomplete) {
+                        bestSpot.pathLength = ret.path.length;
+                    }
+                }
                 miningSpots.set(source.id, bestSpot);
             }
         }
