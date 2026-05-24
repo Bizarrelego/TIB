@@ -24,11 +24,7 @@ class GlobalStatePopulator {
                 const room = Game.rooms[roomName];
                 state.rooms.set(roomName, room);
 
-                // Populate sources efficiently if not already cached
-                if (!state.sourcesByRoom) state.sourcesByRoom = new Map();
-                if (!state.sourcesByRoom.has(roomName)) {
-                    state.sourcesByRoom.set(roomName, room.find(FIND_SOURCES));
-                }
+
             }
         }
 
