@@ -5,8 +5,6 @@
  */
 
 const HISTORY_LENGTH = 10;
-const AUSTERITY_THRESHOLD = 500;
-const DRAIN_RATE_THRESHOLD = -20; // Example: losing more than 20 bucket per tick on average
 
 let bucketHistory = [];
 
@@ -60,28 +58,25 @@ function getForecastedBucket(ticksAhead) {
 }
 
 /**
- * Determines whether austerity measures should be preemptively triggered.
- * Checks if the bucket will fall below the threshold within a short window,
- * or if the drain rate exceeds a critical limit.
- * @returns {boolean} True if austerity should be triggered.
+ * Gets the current length of the bucket history.
+ * @returns {number} The number of history entries.
  */
-function shouldTriggerAusterity() {
-    if (bucketHistory.length < 5) return false; // Need enough data
+function getHistoryLength() {
+    return bucketHistory.length;
+}
 
-    const currentBucket = bucketHistory[bucketHistory.length - 1];
-    if (currentBucket < AUSTERITY_THRESHOLD) return true; // Already below threshold
-
-    const drainRate = getDrainRate();
-
-    // If we're draining fast and will hit threshold soon (e.g. 10 ticks)
-    if (drainRate < DRAIN_RATE_THRESHOLD) {
-        const forecasted10Ticks = getForecastedBucket(10);
-        if (forecasted10Ticks < AUSTERITY_THRESHOLD) {
-            return true;
+/**
+ * Gets the current (most recent) CPU bucket value from the history.
+ * @returns {number} The current CPU bucket value, or 10000 if empty.
+ */
+function getCurrentBucket() {
+    if (bucketHistory.length === 0) {
+        if (typeof Game !== 'undefined' && Game.cpu && Game.cpu.bucket !== undefined) {
+            return Game.cpu.bucket;
         }
+        return 10000;
     }
-
-    return false;
+    return bucketHistory[bucketHistory.length - 1];
 }
 
 /**
@@ -94,7 +89,8 @@ function reset() {
 module.exports = {
     update,
     getForecastedBucket,
-    shouldTriggerAusterity,
     reset,
-    getDrainRate
+    getDrainRate,
+    getHistoryLength,
+    getCurrentBucket
 };
