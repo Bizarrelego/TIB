@@ -2,7 +2,6 @@ const PreSpawnManager = require('./PreSpawnManager');
 const CombatManager = require('./CombatManager');
 const ConstructionManager = require('./ConstructionManager');
 const CreepAssignmentManager = require('./CreepAssignmentManager');
-const LogisticsManager = require('../colonies/logisticsManager');
 const EnergyRequestManager = require('./EnergyRequestManager');
 const LabManager = require('./LabManager');
 const LinkManager = require('./LinkManager');
@@ -46,7 +45,6 @@ const managers = {
     UpgraderManager,
     workerManager,
     QuadSquadManager,
-    LogisticsManager,
     BoostManager,
     VisualsManager,
     PowerSpawnManager,
