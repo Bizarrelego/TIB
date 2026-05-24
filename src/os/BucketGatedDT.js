@@ -4,7 +4,7 @@ const ExpensiveAlgorithmScheduler = require('./ExpensiveAlgorithmScheduler');
 
 class BucketGatedDT {
     /**
-     * Compute a distance transform, delaying if CPU bucket is below threshold.
+     * Compute a WASM-accelerated distance transform, delaying if CPU bucket is below threshold.
      * @param {string} roomName
      * @param {CostMatrix} initialMatrix
      * @param {number} threshold
@@ -31,7 +31,7 @@ class BucketGatedDT {
     }
 
     /**
-     * Compute min cut, delaying if CPU bucket is below threshold.
+     * Compute WASM-accelerated min cut, delaying if CPU bucket is below threshold.
      * @param {string} roomName
      * @param {Object[]} sources
      * @param {CostMatrix} bounds

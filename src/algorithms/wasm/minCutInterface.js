@@ -31,12 +31,11 @@ class MinCutInterface {
         // and retrieving the resulting cut tiles.
 
         try {
-            // Placeholder for actual Wasm call
-            // e.g. return wasmModule.getCutTiles(roomName, sources, bounds);
+            return wasmModule.getCutTiles(roomName, sources, bounds);
         } catch (e) {
             // Ignore error
+            return null;
         }
-        return null;
     }
 }
 

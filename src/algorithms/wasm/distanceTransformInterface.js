@@ -33,12 +33,11 @@ class DistanceTransformInterface {
         // and retrieving the resulting distance transform matrix.
 
         try {
-            // Placeholder for actual Wasm call
-            // e.g. return wasmModule.compute(roomName, initialMatrix);
+            return wasmModule.compute(roomName, initialMatrix);
         } catch (e) {
             // Ignore error
+            return null;
         }
-        return null;
     }
 }
 
