@@ -2,7 +2,7 @@ const Profiler = require('../utils/profiler');
 const STRUCTURE_PRIORITIES = require('../constants/structurePriorities');
 const BootstrapPlanner = require('../colonies/BootstrapPlanner');
 
-const MAX_CONSTRUCTION_SITES = 5;
+const MAX_CONSTRUCTION_SITES = 3;
 
 module.exports = {
     /**
