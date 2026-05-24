@@ -6,6 +6,7 @@
 const ROLE_PRIORITIES = require('../constants/rolePriorities');
 const eventBus = require('../os/eventBus');
 const CreepRoleBalancer = require('../colonies/CreepRoleBalancer');
+const SpawnEnergyReservations = require('../colonies/SpawnEnergyReservations');
 
 /**
  * @class SpawnQueueManager
@@ -26,6 +27,20 @@ class SpawnQueueManager {
      * @param {number} cost
      */
     static requestSpawn(roomName, role, body, name, opts, cost) {
+        // Gatekeep using the reservation system.
+        // Prevent adding to the queue if virtual available energy is less than the cost.
+        const room = Game.rooms[roomName];
+        if (!room) return;
+
+        // "Sub-Tick Spawn Ledger: Virtual ledger for room energy capacity."
+        // We track against the room's current energy capacity so managers don't over-queue total spawn potential for the tick.
+        const capacity = room.energyCapacityAvailable;
+        const virtualAvailable = SpawnEnergyReservations.getAvailableEnergy(roomName, capacity);
+
+        if (virtualAvailable < cost) {
+            return; // Not enough virtual capacity left to queue this creep
+        }
+
         if (!SpawnQueueManager.globalQueue.has(roomName)) {
             const buckets = new Array(120);
             for (let i = 0; i < 120; i++) buckets[i] = [];
@@ -44,6 +59,7 @@ class SpawnQueueManager {
         );
 
         if (!isDuplicate) {
+            SpawnEnergyReservations.reserveEnergy(roomName, cost);
             bucket.push({ role, body, name, opts, cost });
         }
     }
