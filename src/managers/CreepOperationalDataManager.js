@@ -4,7 +4,11 @@ const { setHeapData, getHeapData, deleteHeapData } = require('../utils/creepHeap
  * @fileoverview Manager for handling creep operational data exclusively on the heap.
  * This ensures that transient, tick-specific creep data does not pollute `creep.memory`,
  * adhering to the 'Heap Exclusivity' principle.
+ *
+ * See `src/types/creepHeapSchema.js` for the expected schema and typings of operational data.
  */
+
+require('../types/creepHeapSchema.js'); // For IDE intellisense
 
 class CreepOperationalDataManager {
     /**
@@ -37,7 +41,7 @@ class CreepOperationalDataManager {
      *
      * @param {string} creepId - The ID or name of the creep.
      * @param {string} key - The key for the data.
-     * @param {*} value - The value to store.
+     * @param {CreepMovementData|CreepTargetData|CreepHarvestData|CreepCombatData|*} value - The value to store.
      */
     setOperationalData(creepId, key, value) {
         const creep = this._getCreep(creepId);
@@ -52,7 +56,7 @@ class CreepOperationalDataManager {
      *
      * @param {string} creepId - The ID or name of the creep.
      * @param {string} key - The key for the data to retrieve.
-     * @returns {*} The value stored, or undefined if not found.
+     * @returns {CreepMovementData|CreepTargetData|CreepHarvestData|CreepCombatData|undefined} The value stored, or undefined if not found.
      */
     getOperationalData(creepId, key) {
         const creep = this._getCreep(creepId);
