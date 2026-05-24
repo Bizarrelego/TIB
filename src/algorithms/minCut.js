@@ -17,7 +17,9 @@ class MinCut {
     }
 
     /**
-     * Compute min cut rampart placement
+     * Compute min cut rampart placement.
+     * Attempts to use the WASM interface (MinCutInterface.getCutTilesWasm) first,
+     * falling back to pure JavaScript if unavailable or fails.
      * Returns an array of RoomPositions to build ramparts on.
      * @param {string} roomName
      * @param {Object[]} sources E.g., [{x1: 10, y1: 10, x2: 15, y2: 15}]

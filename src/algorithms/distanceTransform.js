@@ -10,7 +10,9 @@ const DistanceTransformInterface = require('./wasm/distanceTransformInterface');
  */
 class DistanceTransform {
     /**
-     * Compute a distance transform from a set of target points
+     * Compute a distance transform from a set of target points.
+     * Attempts to use the WASM interface (DistanceTransformInterface.computeWasm) first,
+     * falling back to pure JavaScript if unavailable or fails.
      * @param {string} roomName
      * @param {CostMatrix} initialMatrix 255 = unwalkable, 0 = walkable
      * @returns {CostMatrix} The distance transform
