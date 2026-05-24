@@ -13,6 +13,8 @@ const cpuBucketForecaster = require('./cpuBucketForecaster');
 const SystemScheduler = require('./SystemScheduler');
 const eventLogRadar = require('./eventLogRadar');
 const PipelineLock = require('./PipelineLock');
+const DistanceTransformInterface = require('../algorithms/wasm/distanceTransformInterface');
+const MinCutInterface = require('../algorithms/wasm/minCutInterface');
 
 class OSInitializer {
     static init() {
@@ -73,7 +75,9 @@ class OSInitializer {
             PipelineLock.clear();
         }
 
-
+        // Initialize WASM modules asynchronously (fire and forget)
+        DistanceTransformInterface.init().catch(e => Logger.error(`[OSInitializer] Failed to init DistanceTransform WASM: ${e.stack || e}`));
+        MinCutInterface.init().catch(e => Logger.error(`[OSInitializer] Failed to init MinCut WASM: ${e.stack || e}`));
     }
 
     static run() {

@@ -2,20 +2,32 @@
  * Wasm Interface for Distance Transform
  */
 
+const WasmLoader = require('./WasmLoader');
+
 let wasmModule = null;
 
-try {
-    // Attempt to load the Wasm module if it's available in the environment
-    const wasmCode = require('./distanceTransform.wasm');
-    if (wasmCode) {
-        const wasmInstance = new WebAssembly.Instance(new WebAssembly.Module(wasmCode));
-        wasmModule = wasmInstance.exports;
-    }
-} catch (e) {
-    // Wasm not available or failed to load, handled gracefully
-}
-
 class DistanceTransformInterface {
+    /**
+     * Initializes the WASM module.
+     * @returns {Promise<void>}
+     */
+    static async init() {
+        if (wasmModule) return;
+
+        let wasmCode;
+        try {
+            wasmCode = require('./distanceTransform.wasm');
+        } catch (e) {
+            // Wasm not available
+            return;
+        }
+
+        const instance = await WasmLoader.loadWasmModule('distanceTransform', wasmCode);
+        if (instance) {
+            wasmModule = instance.exports;
+        }
+    }
+
     /**
      * Compute a distance transform from a set of target points using Wasm.
      * The Wasm module should be able to process a raw terrain array or a boolean occupancy grid.

@@ -2,20 +2,32 @@
  * Wasm Interface for Min-Cut
  */
 
+const WasmLoader = require('./WasmLoader');
+
 let wasmModule = null;
 
-try {
-    // Attempt to load the Wasm module if it's available in the environment
-    const wasmCode = require('./minCut.wasm');
-    if (wasmCode) {
-        const wasmInstance = new WebAssembly.Instance(new WebAssembly.Module(wasmCode));
-        wasmModule = wasmInstance.exports;
-    }
-} catch (e) {
-    // Wasm not available or failed to load, handled gracefully
-}
-
 class MinCutInterface {
+    /**
+     * Initializes the WASM module.
+     * @returns {Promise<void>}
+     */
+    static async init() {
+        if (wasmModule) return;
+
+        let wasmCode;
+        try {
+            wasmCode = require('./minCut.wasm');
+        } catch (e) {
+            // Wasm not available
+            return;
+        }
+
+        const instance = await WasmLoader.loadWasmModule('minCut', wasmCode);
+        if (instance) {
+            wasmModule = instance.exports;
+        }
+    }
+
     /**
      * @param {string} roomName
      * @param {Object[]} sources
