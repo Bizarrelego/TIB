@@ -33,8 +33,18 @@ class RemoteHaulerOptimizer {
             }
         }
 
-        // If we can't find the source room, fallback to 100 distance (2 rooms away)
-        const pathLength = sourceRoomName ? Game.map.getRoomLinearDistance(roomName, sourceRoomName) * 50 : 100;
+        let pathLength = sourceRoomName ? Game.map.getRoomLinearDistance(roomName, sourceRoomName) * 50 : 100;
+
+        // Try to get exact path length from precalculated mining spots
+        if (sourceRoomName && global.State && global.State.miningSpotsByRoom) {
+            const roomSpots = global.State.miningSpotsByRoom.get(sourceRoomName);
+            if (roomSpots) {
+                const spot = roomSpots.get(sourceId);
+                if (spot && spot.pathLength) {
+                    pathLength = spot.pathLength;
+                }
+            }
+        }
 
         let droppedEnergy = 0;
         if (sourceRoomName && global.State && global.State.droppedByRoom && global.State.droppedByRoom.has(sourceRoomName)) {
