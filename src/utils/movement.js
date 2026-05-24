@@ -157,10 +157,7 @@ module.exports = {
                     if (global.State && global.State.creepsByRoom) {
                         const roomCreeps = global.State.creepsByRoom.get(roomName);
                         if (roomCreeps) {
-                            // Ensure array conversion per "V8 Map Optimization Constraint" memory entry
-                            const roleGroups = Array.from(roomCreeps.values());
-                            for (let r = 0; r < roleGroups.length; r++) {
-                                const roleCreeps = roleGroups[r];
+                            for (const roleCreeps of roomCreeps.values()) {
                                 if (Array.isArray(roleCreeps)) {
                                     for (let i = 0; i < roleCreeps.length; i++) {
                                         const c = roleCreeps[i];
