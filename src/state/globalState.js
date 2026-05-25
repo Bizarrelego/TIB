@@ -1,26 +1,64 @@
 const globalStatePopulator = require('./GlobalStatePopulator');
 class GlobalStateManager {
     constructor() {
+        /** @type {Map<string, any>} */
         this.heapCache = new Map();
+        /** @type {boolean} */
         this.isRehydrated = false;
+        /** @type {Map<string, any>} */
         this.managers = new Map();
+        /** @type {Map<string, Array<Creep>>} */
         this.creepsByRole = new Map();
+        /** @type {Map<string, Map<string, Array<Creep>>>} */
         this.creepsByRoom = new Map();
+        /** @type {Map<string, Map<string, Map<string, Structure>>>} */
         this.structuresByRoom = new Map();
+        /** @type {Map<string, Map<string, Creep>>} */
         this.hostilesByRoom = new Map();
+        /** @type {Map<string, Map<string, any>>} */
         this.logisticsByRoom = new Map();
+        /** @type {Map<string, Creep>} */
         this.creepLookup = new Map();
+        /** @type {Map<string, Map<string, Source>>} */
         this.sourcesByRoom = new Map();
+        /** @type {Map<string, Map<string, StructureSpawn>>} */
         this.spawnsByRoom = new Map();
+        /** @type {Map<string, StructureController>} */
         this.controllersByRoom = new Map();
+        /** @type {Map<string, Map<string, ConstructionSite>>} */
         this.sitesByRoom = new Map();
+        /** @type {Map<string, Map<string, Mineral>>} */
         this.mineralsByRoom = new Map();
+        /** @type {Map<string, Room>} */
         this.rooms = new Map();
+        /** @type {Map<string, Creep>} */
         this.creeps = new Map();
+        /** @type {Map<string, Structure>} */
         this.structures = new Map();
+        /** @type {string} */
         this.aggressionState = 'Growth';
+        /** @type {Map<string, any>} */
         this.sourceAssignments = new Map();
+        /** @type {Map<string, any>} */
         this.miningSpotsByRoom = new Map();
+
+        // New properties for optimized global state populator
+        /** @type {Map<string, Creep>} */
+        this.creepsById = new Map();
+        /** @type {Map<string, Map<string, Structure>>} */
+        this.structuresByType = new Map();
+        /** @type {Map<string, Flag>} */
+        this.flags = new Map();
+        /** @type {Map<string, Map<string, Flag>>} */
+        this.flagsByRoom = new Map();
+        /** @type {Map<string, Resource>} */
+        this.resources = new Map();
+        /** @type {Map<string, ConstructionSite>} */
+        this.constructionSites = new Map();
+        /** @type {Map<string, Map<string, ConstructionSite>>} */
+        this.constructionSitesByType = new Map();
+        /** @type {Map<string, StructureSpawn>} */
+        this.spawns = new Map();
     }
 
     registerManager(name, instance) {
@@ -124,6 +162,15 @@ class GlobalStateManager {
         if (this.creeps) this.creeps.clear();
         if (this.structures) this.structures.clear();
         if (this.eventCache) this.eventCache.clear();
+
+        this.creepsById.clear();
+        this.structuresByType.clear();
+        this.flags.clear();
+        this.flagsByRoom.clear();
+        this.resources.clear();
+        this.constructionSites.clear();
+        this.constructionSitesByType.clear();
+        this.spawns.clear();
 
         this.isRehydrated = false;
     }
