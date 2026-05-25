@@ -1,7 +1,7 @@
 const Profiler = require('./utils/profiler');
 const managerOrchestrator = Profiler.wrap('managerOrchestrator', require('./managers/managerOrchestrator')); // Standalone Managers
 
-const cpuThrottler = Profiler.wrap('cpuThrottler', require('./os/cpuThrottler'));
+const OSOrchestrator = require('./os/OSOrchestrator');
 const managersIntegration = Profiler.wrap('managersIntegration', require('./managers/index'));
 const globalState = Profiler.wrap('globalState', require('./state/globalState'));
 const resetRecovery = Profiler.wrap('resetRecovery', require('./os/resetRecovery'));
@@ -23,17 +23,10 @@ module.exports.loop = wrapManager(Profiler.wrap('main.loop', function () {
     // Tick-level utilities
     executeManager('managerOrchestrator.init', () => managerOrchestrator.init());
 
-    let throttlerFlags = {};
     const executeWrapped = (name, fn) => {
         if (!fn) return;
         wrapManager(fn, name)();
     };
-
-    executeWrapped('cpuThrottler.run', () => {
-        if (cpuThrottler && typeof cpuThrottler.run === 'function') {
-            throttlerFlags = cpuThrottler.run() || {};
-        }
-    });
 
     executeWrapped('managersIntegration.init', () => {
         if (managersIntegration && typeof managersIntegration.init === 'function') {
@@ -42,8 +35,8 @@ module.exports.loop = wrapManager(Profiler.wrap('main.loop', function () {
     });
 
     // Run the centralized 6-phase pipeline
-    executeWrapped('managerOrchestrator.runPipeline', () => {
-        managerOrchestrator.runPipeline(throttlerFlags);
+    executeWrapped('OSOrchestrator.run', () => {
+        Profiler.wrap('OSOrchestrator', () => OSOrchestrator.run())();
     });
 
     // Profiler output
