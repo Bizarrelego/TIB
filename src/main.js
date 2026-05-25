@@ -35,8 +35,8 @@ module.exports.loop = wrapManager(Profiler.wrap('main.loop', function () {
     });
 
     // Run the centralized 6-phase pipeline
-    executeWrapped('OSOrchestrator.run', () => {
-        Profiler.wrap('OSOrchestrator', () => OSOrchestrator.run())();
+    executeWrapped('managerOrchestrator.run', () => {
+        Profiler.wrap('managerOrchestrator', () => managerOrchestrator.run())();
     });
 
     // Profiler output

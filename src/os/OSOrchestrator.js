@@ -34,11 +34,6 @@ class OSOrchestrator {
     }
 
     static run() {
-        let throttlerFlags = {};
-        if (cpuThrottler && typeof cpuThrottler.run === 'function') {
-            throttlerFlags = cpuThrottler.run() || {};
-        }
-
         const executeWrapped = (name, fn) => {
             if (!fn) return;
             wrapManager(fn, name)();
@@ -70,115 +65,6 @@ class OSOrchestrator {
                 }
             }
             if (interShardMemoryManager && typeof interShardMemoryManager._loadLocal === 'function') interShardMemoryManager._loadLocal();
-        });
-
-        // Phase 2: Global State
-        if (!throttlerFlags.skipState) {
-            executeWrapped('OSOrchestrator.Phase2', () => {
-                if (GlobalStatePopulator && typeof GlobalStatePopulator.populate === 'function') {
-                    // It uses global.State if we pass state, but GlobalStatePopulator usually manages it.
-                    GlobalStatePopulator.populate(global.State);
-                }
-
-                // Fallback for legacy state scanner logic that populated state if GlobalStatePopulator doesn't.
-                // It was handled in Phase 2.
-                const stateScanner = require('../state/stateScanner');
-                if (stateScanner && typeof stateScanner.scan === 'function') {
-                    stateScanner.scan();
-                }
-
-                const globalState = require('../state/globalState');
-                if (globalState && typeof globalState.update === 'function') {
-                    globalState.update();
-                }
-
-                OSOrchestrator.updateRoomHashes();
-
-                const discoveryManager = require('../state/discoveryManager');
-                if (discoveryManager && typeof discoveryManager === 'function') discoveryManager();
-
-                const roomEventManager = require('../managers/RoomEventManager');
-                if (roomEventManager && typeof roomEventManager === 'function') roomEventManager();
-
-                const EnergySourceTracker = require('../managers/EnergySourceTracker');
-                if (EnergySourceTracker && typeof EnergySourceTracker.run === 'function') EnergySourceTracker.run();
-            });
-        }
-
-        // Phase 3: Colonies
-        if (!throttlerFlags.skipColonies) {
-            executeWrapped('OSOrchestrator.Phase3', () => {
-                if (colonyManager && typeof colonyManager.run === 'function') {
-                    colonyManager.run();
-                }
-
-                // Incorporating remaining legacy manager logic that was part of phase 3
-                const defconManager = require('../colonies/defconManager');
-                if (global.State && global.State.rooms && defconManager && typeof defconManager.run === 'function') {
-                    for (const room of global.State.rooms.values()) defconManager.run(room);
-                }
-
-                // Call runRoomManagers logic from managerOrchestrator
-                const { runRoomManagers } = require('../managers/managerOrchestrator');
-                if (typeof runRoomManagers === 'function') {
-                    runRoomManagers();
-                }
-            });
-        }
-
-        // Phase 4: Operations
-        if (!throttlerFlags.skipOperations) {
-            executeWrapped('OSOrchestrator.Phase4', () => {
-                if (operationsManager && typeof operationsManager.run === 'function') {
-                    operationsManager.run();
-                }
-            });
-        }
-
-        // Phase 5: Traffic Control
-        executeWrapped('OSOrchestrator.Phase5', () => {
-            if (trafficManager && typeof trafficManager.setup === 'function') {
-                trafficManager.setup();
-            }
-            if (trafficManager && typeof trafficManager.run === 'function') {
-                trafficManager.run();
-            }
-        });
-
-        // Phase 6: Intents & Sleep
-        executeWrapped('OSOrchestrator.Phase6', () => {
-            if (trafficManager && typeof trafficManager.executeIntents === 'function') {
-                trafficManager.executeIntents();
-            }
-
-            if (global.State && global.State.intentManager) {
-                if (typeof global.State.intentManager.fireIntents === 'function') {
-                    global.State.intentManager.fireIntents();
-                } else if (typeof global.State.intentManager.fire === 'function') {
-                    global.State.intentManager.fire();
-                }
-            } else if (IntentManager && typeof IntentManager.processIntents === 'function') {
-                IntentManager.processIntents();
-            }
-
-            executeWrapped('VisualsManager.run', () => {
-                if (VisualsManager && typeof VisualsManager.run === 'function') {
-                    VisualsManager.run();
-                }
-            });
-
-            const memoryProxy = require('./memoryProxy');
-            if (memoryProxy && typeof memoryProxy.serialize === 'function') {
-                memoryProxy.serialize();
-            }
-
-            if (SystemScheduler && typeof SystemScheduler.run === 'function') {
-                SystemScheduler.run();
-            }
-
-            if (SystemScheduler && typeof SystemScheduler.sleepNonCriticalSystems === 'function') {
-                SystemScheduler.sleepNonCriticalSystems();
-            }
         });
     }
 
