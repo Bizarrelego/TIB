@@ -9,6 +9,7 @@ const skOperationsManager = require('./skOperations');
 const HarassmentManager = require('./HarassmentManager');
 const powerBankManager = require('./powerBankManager');
 const PowerSpawnManager = require('../managers/PowerSpawnManager');
+const QuadSquadManager = require('../managers/QuadSquadManager');
 
 /**
  * The main entry point for the Operations module, acting as a high-level orchestrator.
@@ -26,6 +27,7 @@ const exportedModule = Profiler.wrap('operationsManager', function operationsMan
         if (global.State && global.State.rooms) {
             for (const room of global.State.rooms.values()) {
                 PowerSpawnManager.run(room);
+                QuadSquadManager.run(room);
             }
         }
 });

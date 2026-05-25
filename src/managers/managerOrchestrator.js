@@ -84,23 +84,16 @@ function runRoomManagers() {
 
         // Managers configuration for tick-slicing
         const managersConfig = [
-            { name: 'NukeEvacuationManager', slice: 1 },
-            { name: 'RampartDefenseManager', slice: 1 },
-            { name: 'TowerManager', slice: 1 },
             { name: 'ConstructionManager', slice: 1 },
             { name: 'LinkManager', slice: 1 },
-            { name: 'UpgraderManager', slice: 1 },
             { name: 'StorageManager', slice: 1 },
             { name: 'LogisticsManager', slice: 1 },
             { name: 'LabManager', slice: 5 },
-            { name: 'RemoteEconomyManager', slice: 5 },
-            { name: 'MarketManager', slice: 10 },
-            { name: 'TerminalManager', slice: 10 },
-            { name: 'QuadSquadManager', slice: 1 }
+            { name: 'MarketManager', slice: 10 }
         ];
 
         if (room.controller.level < 6) {
-            const prune = ['NukeEvacuationManager', 'TerminalManager', 'LabManager'];
+            const prune = ['LabManager'];
             for (let i = managersConfig.length - 1; i >= 0; i--) {
                 if (prune.includes(managersConfig[i].name)) {
                     managersConfig.splice(i, 1);
@@ -111,7 +104,7 @@ function runRoomManagers() {
         const registeredManagers = Object.keys(require('./index').managers);
         for (const name of registeredManagers) {
             // Exclude global or static managers from per-room execution
-            if (['PreSpawnManager', 'SpawnQueueManager', 'RoomEventManager', 'AllianceIntelManager', 'CombatManager', 'EnergyRequestManager', 'VisualsManager'].includes(name)) {
+            if (['PreSpawnManager', 'SpawnQueueManager', 'RoomEventManager', 'AllianceIntelManager', 'CombatManager', 'EnergyRequestManager', 'VisualsManager', 'NukeEvacuationManager', 'RampartDefenseManager', 'TowerManager', 'UpgraderManager', 'RemoteEconomyManager', 'TerminalManager', 'QuadSquadManager'].includes(name)) {
                 continue;
             }
             if (!managersConfig.find(c => c.name === name)) {

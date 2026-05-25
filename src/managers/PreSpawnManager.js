@@ -85,7 +85,7 @@ class PreSpawnManager {
     /**
      * Called by managerOrchestrator to evaluate pre-spawn requests.
      */
-    run() {
+    static run(room) {
         PreSpawnManager.initLedger();
 
         if (global.State.preSpawnLedger.size === 0) return;
@@ -93,6 +93,8 @@ class PreSpawnManager {
         const creepsToRemove = [];
 
         for (const [creepId, request] of global.State.preSpawnLedger.entries()) {
+            if (request.roomName !== room.name) continue;
+
             // Must adhere to Zero Native Polling: fetch creep from global.State.creepLookup if possible, or Game.getObjectById
             let creepToReplace = null;
             if (global.State.creepLookup && global.State.creepLookup.has(creepId)) {
