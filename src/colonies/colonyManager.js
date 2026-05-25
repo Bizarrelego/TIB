@@ -28,59 +28,6 @@ const planner = require('./planner');
 const rampartPlanner = require('./rampartPlanner');
 
 /**
- * O(N) Top-Down Assignment for Early RCL (1-2) Progression.
- * Evaluates room state and assigns exact targets to workers.
- * @param {Room} room - The game room to evaluate.
- * @param {SpawnLedger} _spawnLedger - The virtual ledger for energy capacity tracking.
- */
-function manageEarlyProgression(room, _spawnLedger) {
-    if (!room.controller || room.controller.level > 3) return;
-
-    const roomCreeps = global.State.creepsByRoom.get(room.name);
-    if (!roomCreeps) return;
-
-    // Maintain harvester assignments
-    const sources = global.State.sourcesByRoom.get(room.name) || [];
-    const harvesters = roomCreeps.get('harvester') || [];
-
-    for (let i = 0; i < harvesters.length; i++) {
-        const creep = harvesters[i];
-        if (!creep.heap) creep.heap = {};
-        if (!creep.heap.targetId && sources.length > 0) {
-            creep.heap.targetId = sources[i % sources.length].id;
-        }
-        if (!creep.memory.targetSourceId && sources.length > 0) {
-            creep.memory.targetSourceId = sources[i % sources.length].id;
-        }
-    }
-
-    if (room.controller.level === 3 && room.energyAvailable >= room.energyCapacityAvailable - 50) {
-        global.State.aggressionState = 'Expansion';
-        if (global.State.intel) {
-            const intelArray = Array.from(global.State.intel.entries());
-            let bestRoom = null;
-            let highestScore = 0;
-
-            for (const [roomName, data] of intelArray) {
-                if (data.expansionScore && data.expansionScore > highestScore) {
-                    highestScore = data.expansionScore;
-                    bestRoom = roomName;
-                }
-            }
-
-            if (bestRoom) {
-                const SpawnQueueManager = require('../managers/SpawnQueueManager');
-                if (SpawnQueueManager.getQueuedCount(room.name, 'reserver', bestRoom) === 0) {
-                    const body = room.energyCapacityAvailable >= 1300 ? [CLAIM, CLAIM, MOVE, MOVE] : [CLAIM, MOVE];
-                    const cost = room.energyCapacityAvailable >= 1300 ? 1300 : 650;
-                    SpawnQueueManager.requestSpawn(room.name, 'reserver', body, 'claimer_' + Game.time, { memory: { role: 'reserver', colony: room.name, targetRoom: bestRoom, claimFlag: true } }, cost);
-                }
-            }
-        }
-    }
-}
-
-/**
  * Executes core colony management loop.
  * Orchestrates all colony-level managers, grouping them into logical phases:
  * 1. Global Ledger & Tracking Updates
@@ -114,7 +61,6 @@ module.exports = { run: function colonyManager() {
                 executeWrapped('planner.run', () => planner.run(room));
                 executeWrapped('rampartPlanner.run', () => rampartPlanner.run(room));
                 executeWrapped('killboxPlanner.planKillboxes', () => killboxPlanner.planKillboxes(room));
-                executeWrapped('earlyGameConstructionPlanner.getRCL2ExtensionPositions', () => earlyGameConstructionPlanner.getRCL2ExtensionPositions(room));
                 executeWrapped('BaseLayoutOptimizer.run', () => BaseLayoutOptimizer.run && BaseLayoutOptimizer.run(room));
 
                 // Phase 3: Execution, Market & Logistics
@@ -128,15 +74,12 @@ module.exports = { run: function colonyManager() {
                 executeWrapped('labs.run', () => labs.run(room));
                 executeWrapped('market.run', () => market.run(room));
                 executeWrapped('haulerSizing.run', () => haulerSizing.run && haulerSizing.run(room));
-                executeWrapped('RemoteHaulerOptimizer.run', () => RemoteHaulerOptimizer.run && RemoteHaulerOptimizer.run(room));
 
                 // Phase 4: Roles & Spawning
                 executeWrapped('CreepRoleBalancer.run', () => CreepRoleBalancer.run && CreepRoleBalancer.run(room));
                 executeWrapped('SpawnEnergyReservations.run', () => SpawnEnergyReservations.run && SpawnEnergyReservations.run(room));
                 executeWrapped('spawnManager.run', () => spawnManager.run(room, spawnLedger));
                 executeWrapped('RCLProgressionManager.run', () => RCLProgressionManager.run(room));
-                
-                manageEarlyProgression(room, spawnLedger);
 
                 executeWrapped('MiningPlanner.planMiningSpots', () => {
                     if (Memory.rooms && Memory.rooms[room.name] && !Memory.rooms[room.name].miningSpots) {
