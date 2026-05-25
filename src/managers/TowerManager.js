@@ -4,7 +4,7 @@ function getDistance(pos1, pos2) {
     return Math.max(Math.abs(pos1.x - pos2.x), Math.abs(pos1.y - pos2.y));
 }
 
-function run(room, defenseRepairTarget = null) {
+function run(room) {
     if (Game.cpu.bucket < 500) return;
 
     try {
@@ -23,7 +23,7 @@ function run(room, defenseRepairTarget = null) {
             let minDistance = Infinity;
 
             for (const hostile of hostilesMap.values()) {
-                let danger = 10;
+                let danger = 0;
                 let healParts = 0;
                 let attackParts = 0;
                 
@@ -33,16 +33,18 @@ function run(room, defenseRepairTarget = null) {
                     attackParts = profile.attackParts || 0;
                 }
 
-                // Strict targeting array: Hostile Attackers > Hostile Healers
+                // Strict targeting array: Hostile Attackers > Hostile Healers. Ignore others.
                 if (attackParts > 0) danger = 100;
                 else if (healParts > 0) danger = 50;
 
-                const dist = getDistance(referencePos, hostile.pos);
+                if (danger > 0) {
+                    const dist = getDistance(referencePos, hostile.pos);
 
-                if (danger > maxDanger || (danger === maxDanger && dist < minDistance)) {
-                    maxDanger = danger;
-                    minDistance = dist;
-                    targetHostile = hostile;
+                    if (danger > maxDanger || (danger === maxDanger && dist < minDistance)) {
+                        maxDanger = danger;
+                        minDistance = dist;
+                        targetHostile = hostile;
+                    }
                 }
             }
         }
@@ -67,31 +69,24 @@ function run(room, defenseRepairTarget = null) {
                     enemyHeal = global.State.enemyProfiles.get(targetHostile.id).healParts * 12;
                 }
 
-                if (enemyHeal > damage) {
-                    // Stall the enemy infinitely by repairing/healing instead of wasting energy
-                    if (defenseRepairTarget) {
-                        tower.repair(defenseRepairTarget);
-                    }
-                } else {
-                    if (dist <= 50) {
-                        tower.attack(targetHostile);
-                    }
+                if (dist <= 50) {
+                    tower.attack(targetHostile);
                 }
             }
         }
-        } catch (e) {
+    } catch (e) {
         console.log(`[TowerManager Error] Room ${room.name}: ${e.stack}`);
     }
 }
 
 const runTicks = new Map();
 
-function executeRun(room, defenseRepairTarget = null) {
-    const key = room.name + (defenseRepairTarget ? '_repair' : '_attack');
+function executeRun(room) {
+    const key = room.name + '_attack';
     if (runTicks.get(key) === Game.time) return;
     runTicks.set(key, Game.time);
 
-    run(room, defenseRepairTarget);
+    run(room);
 }
 
 eventBus.subscribe('HOSTILE_SPOTTED', (payload) => {
@@ -99,12 +94,6 @@ eventBus.subscribe('HOSTILE_SPOTTED', (payload) => {
     const room = global.State && global.State.rooms ? global.State.rooms.get(roomName) : (typeof Game !== 'undefined' && Game.rooms ? Game.rooms[roomName] : null);
     if (room) {
         executeRun(room);
-    }
-});
-
-eventBus.subscribe('DEFENSE_REPAIR_REQUEST', (payload) => {
-    if (payload && payload.room) {
-        executeRun(payload.room, payload.defenseRepairTarget);
     }
 });
 
