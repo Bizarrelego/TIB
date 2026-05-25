@@ -18,11 +18,23 @@ const exportedModule = Profiler.wrap('HarassmentManager', function HarassmentMan
         const roomCreeps = global.State.creepsByRoom.get(room.name);
         if (!roomCreeps) continue;
 
+        const myUsername = room.controller.owner.username;
+
         const exits = Game.map.describeExits(room.name);
         if (!exits) continue;
 
         for (const direction in exits) {
             const targetRoomName = exits[direction];
+
+            let isNeutral = true;
+            if (global.State.intel && global.State.intel.has(targetRoomName)) {
+                const intel = global.State.intel.get(targetRoomName);
+                if (intel.owner && intel.owner !== myUsername) isNeutral = false;
+                if (intel.reservation && intel.reservation !== myUsername) isNeutral = false;
+            } else if (Game.rooms[targetRoomName] && Game.rooms[targetRoomName].controller && Game.rooms[targetRoomName].controller.owner) {
+                if (Game.rooms[targetRoomName].controller.owner.username !== myUsername) isNeutral = false;
+            }
+            if (!isNeutral) continue;
 
             // Check if room has a tower
             let hasTower = false;
@@ -65,7 +77,7 @@ const exportedModule = Profiler.wrap('HarassmentManager', function HarassmentMan
             // Target found: Unarmored harvester and no defender
             if (enemyHarvester && !enemyDefender) {
                 let defenderExists = false;
-                const remoteDefenders = roomCreeps.get('remoteDefender') || [];
+                const remoteDefenders = roomCreeps.get('harassment') || [];
                 for (const d of remoteDefenders) {
                     if (d.memory.targetRoom === targetRoomName) {
                         defenderExists = true;
@@ -73,11 +85,11 @@ const exportedModule = Profiler.wrap('HarassmentManager', function HarassmentMan
                     }
                 }
 
-                if (!defenderExists && SpawnQueueManager.getQueuedCount(room.name, 'remoteDefender', targetRoomName) === 0) {
+                if (!defenderExists && SpawnQueueManager.getQueuedCount(room.name, 'harassment', targetRoomName) === 0) {
                     const cost = BODYPART_COST[ATTACK] + BODYPART_COST[MOVE];
                     if (room.energyCapacityAvailable >= cost) {
-                        SpawnQueueManager.requestSpawn(room.name, 'remoteDefender', [ATTACK, MOVE], 'remoteDefender_' + Game.time, {
-                            memory: { role: 'remoteDefender', colony: room.name, targetRoom: targetRoomName }
+                        SpawnQueueManager.requestSpawn(room.name, 'harassment', [ATTACK, MOVE], 'harassment_' + Game.time, {
+                            memory: { role: 'harassment', colony: room.name, targetRoom: targetRoomName }
                         }, cost);
                     }
                 }

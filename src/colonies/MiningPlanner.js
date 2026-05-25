@@ -12,13 +12,6 @@ const MiningPlanner = {
      * @param {string} [homeRoomName] - The name of the home room (used for remote mining path length).
      */
     planMiningSpots(roomName, homeRoomName) {
-        if (!Memory.rooms) {
-            Memory.rooms = {};
-        }
-        if (!Memory.rooms[roomName]) {
-            Memory.rooms[roomName] = {};
-        }
-
         const sources = global.State.sourcesByRoom ? global.State.sourcesByRoom.get(roomName) : null;
         if (!sources || sources.length === 0) return;
 
@@ -136,11 +129,7 @@ const MiningPlanner = {
         if (!global.State.miningSpotsByRoom) global.State.miningSpotsByRoom = new Map();
         global.State.miningSpotsByRoom.set(roomName, miningSpots);
 
-        // Serialize to memory (since Memory only takes standard objects or arrays, we stringify if needed, or serialize to obj)
-        // Wait, the error complains about storing in standard {}. Let's see how memory serialization handles Map...
-        // Usually `Array.from(miningSpots.entries())`
-        // The feedback says "uses a standard {} object for miningSpots".
-        Memory.rooms[roomName].miningSpots = Array.from(miningSpots.entries());
+        // Cached exclusively in global.State to adhere to zero native memory serialization rules.
     }
 };
 
