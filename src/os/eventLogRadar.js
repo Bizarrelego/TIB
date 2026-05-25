@@ -1,5 +1,16 @@
 const eventBus = require('./eventBus');
 const Profiler = require('../utils/profiler');
+const {
+    EVENT_HOSTILE_SPOTTED,
+    EVENT_HOSTILE_ATTACK,
+    EVENT_CONSTRUCTION_STARTED,
+    EVENT_INVALIDATE_COSTMATRIX,
+    EVENT_STRUCTURE_DECAY,
+    EVENT_CREEP_DEATH,
+    EVENT_ROOM_HARVEST,
+    EVENT_ROOM_REPAIR,
+    EVENT_ROOM_TRANSFER
+} = require('../constants/eventTypes');
 
 /**
  * Parses room event logs and publishes them to the event bus.
@@ -20,21 +31,34 @@ function eventLogRadar() {
 
             switch (event.event) {
                 case EVENT_ATTACK:
-                    eventBus.publish('HOSTILE_SPOTTED', eventPayload);
+                    eventBus.publish(EVENT_HOSTILE_SPOTTED, eventPayload);
+                    eventBus.publish(EVENT_HOSTILE_ATTACK, {
+                        roomName,
+                        targetId: event.data.targetId,
+                        attackerId: event.objectId,
+                        damage: event.data.damage
+                    });
                     break;
                 case EVENT_BUILD:
-                    eventBus.publish('CONSTRUCTION_STARTED', eventPayload);
-                    eventBus.publish('INVALIDATE_COSTMATRIX', roomName);
+                    eventBus.publish(EVENT_CONSTRUCTION_STARTED, eventPayload);
+                    eventBus.publish(EVENT_INVALIDATE_COSTMATRIX, roomName);
                     break;
                 case EVENT_OBJECT_DESTROYED:
-                    eventBus.publish('STRUCTURE_DECAY', eventPayload);
-                    eventBus.publish('INVALIDATE_COSTMATRIX', roomName);
+                    if (event.data && event.data.type === 'creep') {
+                        eventBus.publish(EVENT_CREEP_DEATH, eventPayload);
+                    } else {
+                        eventBus.publish(EVENT_STRUCTURE_DECAY, eventPayload);
+                        eventBus.publish(EVENT_INVALIDATE_COSTMATRIX, roomName);
+                    }
                     break;
                 case EVENT_HARVEST:
-                    eventBus.publish('ROOM_EVENT_HARVEST', eventPayload);
+                    eventBus.publish(EVENT_ROOM_HARVEST, eventPayload);
                     break;
                 case EVENT_REPAIR:
-                    eventBus.publish('ROOM_EVENT_REPAIR', eventPayload);
+                    eventBus.publish(EVENT_ROOM_REPAIR, eventPayload);
+                    break;
+                case EVENT_TRANSFER:
+                    eventBus.publish(EVENT_ROOM_TRANSFER, eventPayload);
                     break;
                 default:
                     // Ignore other events
