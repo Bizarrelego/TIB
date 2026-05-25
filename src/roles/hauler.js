@@ -44,16 +44,11 @@ module.exports = {
                 }
 
 
-                if (creep.heap.state === 'pickup') {
-                    let dropId = creep.heap.dropId;
-                    let target = dropId ? Game.getObjectById(dropId) : null;
+                if (!creep.heap.state || !creep.heap.targetId) continue;
 
-                    if (target) {
-                        if ((target.amount !== undefined && target.amount === 0) || (target.store && target.store.getUsedCapacity(RESOURCE_ENERGY) === 0)) {
-                            creep.heap.dropId = null;
-                            target = null;
-                        }
-                    }
+                const target = Game.getObjectById(creep.heap.targetId);
+
+                if (creep.heap.state === 'pickup' || creep.heap.state === 'withdraw') {
                     if (target) {
                         if (target.amount !== undefined) {
                             const status = TrafficManager.registerPickup(creep, target, RESOURCE_ENERGY, creep.store.getFreeCapacity());
@@ -66,69 +61,8 @@ module.exports = {
                                 movement.moveTo(creep, target);
                             }
                         }
-                    } else {
-                        // Fallback: move to storage or center if no target
-                        const storage = room.storage;
-                        if (storage) {
-                            movement.moveTo(creep, storage);
-                        } else {
-                            movement.moveTo(creep, new RoomPosition(25, 25, room.name));
-                        }
                     }
                 } else if (creep.heap.state === 'transfer') {
-                    let targetId = creep.heap.targetId;
-                    let target = targetId ? Game.getObjectById(targetId) : null;
-
-                    // If we have a fast filler, prioritize drops specifically to bridge containers and core
-                    if (ignoreCore) {
-                        // Priority 1: Anchor/Core Container (if Storage is missing)
-                        // Priority 2: Controller Container
-                        // Priority 3: TOWER (under 70% capacity)
-                        let bestTarget = null;
-                        const structures = global.State.structuresByRoom.get(room.name);
-                        const storage = room.storage;
-
-                        if (storage && storage.isActive() && storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                            bestTarget = storage;
-                        } else {
-                            // Priority 1: Spawns and Extensions
-                            const spawns = structures ? (structures.get(STRUCTURE_SPAWN) || []) : [];
-                            const extensions = structures ? (structures.get(STRUCTURE_EXTENSION) || []) : [];
-                            for (const s of spawns) {
-                                if (s.store.getFreeCapacity(RESOURCE_ENERGY) > 0) { bestTarget = s; break; }
-                            }
-                            if (!bestTarget) {
-                                for (const e of extensions) {
-                                    if (e.store.getFreeCapacity(RESOURCE_ENERGY) > 0) { bestTarget = e; break; }
-                                }
-                            }
-
-                            // Priority 3: Upgrader Drop Pile
-                            if (!bestTarget) {
-                                const upgraders = global.State.creepsByRoom.get(room.name)?.get('upgrader') || [];
-                                if (upgraders.length > 0 && !storage) {
-                                    creep.heap.targetId = 'controller';
-                                    target = null;
-                                    bestTarget = null;
-                                }
-                            }
-                        }
-
-                        target = bestTarget;
-                        if (target) {
-                            creep.heap.targetId = target.id;
-                        } else {
-                            creep.heap.targetId = null;
-                        }
-                    }
-
-                    if (target) {
-                        if (target.store && target.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
-                            creep.heap.targetId = null;
-                            target = null;
-                        }
-                    }
-
                     if (target) {
                         const amount = Math.min(creep.store.getUsedCapacity(RESOURCE_ENERGY), TrafficManager.getVirtualState(target, RESOURCE_ENERGY).free);
                         if (amount > 0 && TrafficManager.registerTransfer(creep, target, RESOURCE_ENERGY, amount) === OK) {
@@ -136,7 +70,7 @@ module.exports = {
                         } else if (creep.pos.getRangeTo(target) > 1) {
                             movement.moveTo(creep, target);
                         }
-                    } else if (targetId === 'controller' && room.controller) {
+                    } else if (creep.heap.targetId === 'controller' && room.controller) {
                         const anchor = getUpgraderAnchor(room);
                         if (anchor) {
                             if (creep.pos.getRangeTo(anchor) > 1) {
@@ -146,14 +80,6 @@ module.exports = {
                             }
                         } else {
                             movement.moveTo(creep, room.controller);
-                        }
-                    } else {
-                        // Fallback
-                        const storage = room.storage;
-                        if (storage && storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                            if (creep.transfer(storage, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
-                                movement.moveTo(creep, storage);
-                            }
                         }
                     }
                 }

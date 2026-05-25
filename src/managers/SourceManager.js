@@ -119,6 +119,30 @@ const SourceManager = {
         if (!assigned.includes(creepId)) {
             assigned.push(creepId);
         }
+
+        // Top-Down Assignment: explicitly set the optimal mining spot to the creep's heap
+        let creep = null;
+        if (global.State.creepLookup) {
+            creep = global.State.creepLookup.get(creepId);
+        } else if (typeof Game !== 'undefined' && Game.creeps) {
+            // Fallback to name search if lookup isn't available
+            for (const name in Game.creeps) {
+                if (Game.creeps[name].id === creepId) {
+                    creep = Game.creeps[name];
+                    break;
+                }
+            }
+        }
+
+        if (creep) {
+            if (!creep.heap) creep.heap = {};
+            const optimalSpot = this.getOptimalMiningSpot(sourceId);
+            if (optimalSpot && !creep.heap.targetPos) {
+                const sourceObj = Game.getObjectById(sourceId);
+                const rName = sourceObj ? sourceObj.room.name : creep.pos.roomName;
+                creep.heap.targetPos = { x: optimalSpot.x, y: optimalSpot.y, roomName: rName };
+            }
+        }
     }
 };
 

@@ -41,33 +41,21 @@ function run(creep, room) {
         } else {
             TrafficManager.registerStatic(creep);
 
-            const storage = room.storage;
-            if (storage && storage.isActive()) {
-                if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                    const status = TrafficManager.registerWithdraw(creep, storage, RESOURCE_ENERGY, creep.store.getFreeCapacity(RESOURCE_ENERGY));
-                    if (status !== OK && creep.pos.getRangeTo(storage) > 1) {
-                        movement.moveTo(creep, storage);
-                    }
-                }
-            } else {
-                // Find dropped energy on exact tile
-                const dropped = global.State.droppedByRoom.get(room.name);
-                let targetDrop = null;
-
-                if (dropped) {
-                    for (const drop of dropped.values()) {
-                        if (drop.resourceType === RESOURCE_ENERGY && drop.pos.x === creep.pos.x && drop.pos.y === creep.pos.y) {
-                            targetDrop = drop;
-                            break;
-                        }
-                    }
-                }
-
-                if (targetDrop && creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                    creep.pickup(targetDrop);
-                }
+            let energyTarget = null;
+            if (creep.heap.energyTargetId) {
+                energyTarget = Game.getObjectById(creep.heap.energyTargetId);
             }
 
+            if (energyTarget && creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                if (energyTarget.amount !== undefined) {
+                    creep.pickup(energyTarget);
+                } else {
+                    const status = TrafficManager.registerWithdraw(creep, energyTarget, RESOURCE_ENERGY, creep.store.getFreeCapacity(RESOURCE_ENERGY));
+                    if (status !== OK && creep.pos.getRangeTo(energyTarget) > 1) {
+                        movement.moveTo(creep, energyTarget);
+                    }
+                }
+            }
             if (creep.heap && creep.heap.overrideTask === 'build') {
                 const sites = global.State.sitesByRoom.get(room.name);
                 if (sites && sites.length > 0) {
