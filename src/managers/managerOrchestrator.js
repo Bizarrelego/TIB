@@ -88,7 +88,6 @@ function runRoomManagers() {
             { name: 'RampartDefenseManager', slice: 1 },
             { name: 'TowerManager', slice: 1 },
             { name: 'ConstructionManager', slice: 1 },
-            { name: 'workerManager', slice: 1 },
             { name: 'LinkManager', slice: 1 },
             { name: 'UpgraderManager', slice: 1 },
             { name: 'StorageManager', slice: 1 },
