@@ -252,114 +252,125 @@ function run() {
         wrapManager(Profiler.wrap(name, fn), name)();
     };
 
+    const ManagerExecutionWrapper = require('../utils/ManagerExecutionWrapper');
+
     // Phase 1: OS Init & Cache
-    executeWrapped('managerOrchestrator.Phase1', () => {
-        if (OSOrchestrator && typeof OSOrchestrator.run === 'function') {
-            OSOrchestrator.run();
-        }
-    });
+    const OSInitializer = require('../os/OSInitializer');
+    if (OSInitializer && typeof OSInitializer.init === 'function') {
+        ManagerExecutionWrapper.wrap('OSInitializer.init', () => OSInitializer.init())();
+    }
+
+    const { CacheRegistry } = require('../os/cache');
+    if (CacheRegistry && typeof CacheRegistry.init === 'function') {
+        ManagerExecutionWrapper.wrap('CacheRegistry.init', () => CacheRegistry.init())();
+    }
+
+    const heapValidator = require('../os/heapValidator');
+    if (heapValidator && typeof heapValidator.validate === 'function') {
+        ManagerExecutionWrapper.wrap('heapValidator.validate', () => heapValidator.validate())();
+    }
+
+    if (OSOrchestrator && typeof OSOrchestrator.run === 'function') {
+        ManagerExecutionWrapper.wrap('OSOrchestrator.run', () => OSOrchestrator.run())();
+    }
 
     // Phase 2: Global State
     if (!throttlerFlags.skipState) {
-        executeWrapped('managerOrchestrator.Phase2', () => {
-            if (GlobalStatePopulator && typeof GlobalStatePopulator.populate === 'function') {
-                GlobalStatePopulator.populate(global.State);
-            }
+        if (GlobalStatePopulator && typeof GlobalStatePopulator.populate === 'function') {
+            ManagerExecutionWrapper.wrap('GlobalStatePopulator.populate', () => GlobalStatePopulator.populate(global.State))();
+        }
 
-            const stateScanner = require('../state/stateScanner');
-            if (stateScanner && typeof stateScanner.scan === 'function') {
-                stateScanner.scan();
-            }
+        const stateScanner = require('../state/stateScanner');
+        if (stateScanner && typeof stateScanner.scan === 'function') {
+            ManagerExecutionWrapper.wrap('stateScanner.scan', () => stateScanner.scan())();
+        }
 
-            if (globalState && typeof globalState.update === 'function') {
-                globalState.update();
-            }
+        if (globalState && typeof globalState.update === 'function') {
+            ManagerExecutionWrapper.wrap('globalState.update', () => globalState.update())();
+        }
 
-            if (OSOrchestrator && typeof OSOrchestrator.updateRoomHashes === 'function') {
-                OSOrchestrator.updateRoomHashes();
-            }
+        if (OSOrchestrator && typeof OSOrchestrator.updateRoomHashes === 'function') {
+            ManagerExecutionWrapper.wrap('OSOrchestrator.updateRoomHashes', () => OSOrchestrator.updateRoomHashes())();
+        }
 
-            const discoveryManager = require('../state/discoveryManager');
-            if (discoveryManager && typeof discoveryManager === 'function') discoveryManager();
+        const discoveryManager = require('../state/discoveryManager');
+        if (discoveryManager && typeof discoveryManager === 'function') {
+            ManagerExecutionWrapper.wrap('discoveryManager', () => discoveryManager())();
+        }
 
-            const roomEventManager = require('./RoomEventManager');
-            if (roomEventManager && typeof roomEventManager === 'function') roomEventManager();
+        const roomEventManager = require('./RoomEventManager');
+        if (roomEventManager && typeof roomEventManager === 'function') {
+            ManagerExecutionWrapper.wrap('roomEventManager', () => roomEventManager())();
+        }
 
-            const EnergySourceTracker = require('./EnergySourceTracker');
-            if (EnergySourceTracker && typeof EnergySourceTracker.run === 'function') EnergySourceTracker.run();
-        });
+        const EnergySourceTracker = require('./EnergySourceTracker');
+        if (EnergySourceTracker && typeof EnergySourceTracker.run === 'function') {
+            ManagerExecutionWrapper.wrap('EnergySourceTracker.run', () => EnergySourceTracker.run())();
+        }
     }
 
     // Phase 3: Colonies
     if (!throttlerFlags.skipColonies) {
-        executeWrapped('managerOrchestrator.Phase3', () => {
-            if (colonyManager && typeof colonyManager.run === 'function') {
-                colonyManager.run();
-            }
+        if (colonyManager && typeof colonyManager.run === 'function') {
+            ManagerExecutionWrapper.wrap('colonyManager.run', () => colonyManager.run())();
+        }
 
-            const defconManager = require('../colonies/defconManager');
-            if (global.State && global.State.rooms && defconManager && typeof defconManager.run === 'function') {
+        const defconManager = require('../colonies/defconManager');
+        if (global.State && global.State.rooms && defconManager && typeof defconManager.run === 'function') {
+            ManagerExecutionWrapper.wrap('defconManager.run', () => {
                 for (const room of global.State.rooms.values()) defconManager.run(room);
-            }
+            })();
+        }
 
-            // Execute legacy standalone room managers
-            runRoomManagers();
-        });
+        // Execute legacy standalone room managers
+        ManagerExecutionWrapper.wrap('runRoomManagers', () => runRoomManagers())();
     }
 
     // Phase 4: Operations
     if (!throttlerFlags.skipOperations) {
-        executeWrapped('managerOrchestrator.Phase4', () => {
-            if (operationsManager && typeof operationsManager.run === 'function') {
-                operationsManager.run();
-            }
-        });
+        if (operationsManager && typeof operationsManager.run === 'function') {
+            ManagerExecutionWrapper.wrap('operationsManager.run', () => operationsManager.run())();
+        }
     }
 
     // Phase 5: Traffic Control
-    executeWrapped('managerOrchestrator.Phase5', () => {
-        if (trafficManager && typeof trafficManager.setup === 'function') {
-            trafficManager.setup();
-        }
-        if (trafficManager && typeof trafficManager.run === 'function') {
-            trafficManager.run();
-        }
-    });
+    if (trafficManager && typeof trafficManager.setup === 'function') {
+        ManagerExecutionWrapper.wrap('trafficManager.setup', () => trafficManager.setup())();
+    }
+    if (trafficManager && typeof trafficManager.run === 'function') {
+        ManagerExecutionWrapper.wrap('trafficManager.run', () => trafficManager.run())();
+    }
 
     // Phase 6: Intents & Sleep
-    executeWrapped('managerOrchestrator.Phase6', () => {
-        if (trafficManager && typeof trafficManager.executeIntents === 'function') {
-            trafficManager.executeIntents();
-        }
+    if (trafficManager && typeof trafficManager.executeIntents === 'function') {
+        ManagerExecutionWrapper.wrap('trafficManager.executeIntents', () => trafficManager.executeIntents())();
+    }
 
-        if (global.State && global.State.intentManager) {
-            if (typeof global.State.intentManager.fireIntents === 'function') {
-                global.State.intentManager.fireIntents();
-            } else if (typeof global.State.intentManager.fire === 'function') {
-                global.State.intentManager.fire();
-            }
-        } else if (IntentManager && typeof IntentManager.processIntents === 'function') {
-            IntentManager.processIntents();
+    if (global.State && global.State.intentManager) {
+        if (typeof global.State.intentManager.fireIntents === 'function') {
+            ManagerExecutionWrapper.wrap('intentManager.fireIntents', () => global.State.intentManager.fireIntents())();
+        } else if (typeof global.State.intentManager.fire === 'function') {
+            ManagerExecutionWrapper.wrap('intentManager.fire', () => global.State.intentManager.fire())();
         }
+    } else if (IntentManager && typeof IntentManager.processIntents === 'function') {
+        ManagerExecutionWrapper.wrap('IntentManager.processIntents', () => IntentManager.processIntents())();
+    }
 
-        executeWrapped('VisualsManager.run', () => {
-            if (VisualsManager && typeof VisualsManager.run === 'function') {
-                VisualsManager.run();
-            }
-        });
+    if (VisualsManager && typeof VisualsManager.run === 'function') {
+        ManagerExecutionWrapper.wrap('VisualsManager.run', () => VisualsManager.run())();
+    }
 
-        if (memoryProxy && typeof memoryProxy.serialize === 'function') {
-            memoryProxy.serialize();
-        }
+    if (memoryProxy && typeof memoryProxy.serialize === 'function') {
+        ManagerExecutionWrapper.wrap('memoryProxy.serialize', () => memoryProxy.serialize())();
+    }
 
-        if (SystemScheduler && typeof SystemScheduler.run === 'function') {
-            SystemScheduler.run();
-        }
+    if (SystemScheduler && typeof SystemScheduler.run === 'function') {
+        ManagerExecutionWrapper.wrap('SystemScheduler.run', () => SystemScheduler.run())();
+    }
 
-        if (SystemScheduler && typeof SystemScheduler.sleepNonCriticalSystems === 'function') {
-            SystemScheduler.sleepNonCriticalSystems();
-        }
-    });
+    if (SystemScheduler && typeof SystemScheduler.sleepNonCriticalSystems === 'function') {
+        ManagerExecutionWrapper.wrap('SystemScheduler.sleepNonCriticalSystems', () => SystemScheduler.sleepNonCriticalSystems())();
+    }
 }
 
 module.exports = {
