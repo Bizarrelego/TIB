@@ -13,6 +13,14 @@ const eventLogRadar = require('./eventLogRadar');
 const PipelineLock = require('./PipelineLock');
 const AusterityTrigger = require('./AusterityTrigger');
 const Logger = require('../utils/logger');
+const OSInitializer = require('./OSInitializer');
+const GlobalStatePopulator = require('../state/GlobalStatePopulator');
+const colonyManager = require('../colonies/colonyManager');
+const operationsManager = require('../operations/operationsManager');
+const trafficManager = require('../traffic/trafficManager');
+const IntentManager = require('./IntentManager');
+const cpuThrottler = require('./cpuThrottler');
+const { wrapManager } = require('../utils/ManagerErrorBoundary');
 
 class OSOrchestrator {
     static init() {
@@ -25,65 +33,146 @@ class OSOrchestrator {
     }
 
     static run() {
-        // Handle global resets
-        GlobalResetDetector.detectAndHandleReset();
-
-        // Perform heap validation early in the tick
-        heapValidator.validate();
-
-        // Clear sub-tick ledger
-        if (VirtualLedger && typeof VirtualLedger.clear === 'function') {
-            VirtualLedger.clear();
+        let throttlerFlags = {};
+        if (cpuThrottler && typeof cpuThrottler.run === 'function') {
+            throttlerFlags = cpuThrottler.run() || {};
         }
 
-        // Check reset recovery
-        if (resetRecovery && typeof resetRecovery.check === 'function') {
-            resetRecovery.check();
-        }
+        const executeWrapped = (name, fn) => {
+            if (!fn) return;
+            wrapManager(fn, name)();
+        };
 
-        // Run event log radar
-        if (eventLogRadar && typeof eventLogRadar === 'function') {
-            eventLogRadar();
-        }
-
-        // Clear pipeline lock
-        if (PipelineLock && typeof PipelineLock.clear === 'function') {
-            PipelineLock.clear();
-        }
-
-        // Austerity trigger
-        if (AusterityTrigger && typeof AusterityTrigger.evaluateAndTriggerAusterity === 'function') {
-            AusterityTrigger.evaluateAndTriggerAusterity();
-        }
-
-        // Update CPU bucket forecaster
-        if (cpuBucketForecaster && typeof cpuBucketForecaster.update === 'function') {
-            cpuBucketForecaster.update();
-        }
-
-        // Run Austerity Manager to check bucket trajectory and set austerity mode
-        if (AusterityManager && typeof AusterityManager.run === 'function') {
-            AusterityManager.run();
-        }
-
-        // Initialize RawMemory segments and load intel for the current tick
-        if (RawMemoryManager && typeof RawMemoryManager.init === 'function') {
-            try {
-                RawMemoryManager.init();
-            } catch (e) {
-                Logger.error(`[OSOrchestrator] RawMemoryManager init failed: ${e.stack}`);
+        // Phase 1: OS Init & Cache
+        executeWrapped('OSOrchestrator.Phase1', () => {
+            if (OSInitializer && typeof OSInitializer.init === 'function') {
+                OSInitializer.init();
             }
+            if (GlobalResetDetector && typeof GlobalResetDetector.detectAndHandleReset === 'function') {
+                GlobalResetDetector.detectAndHandleReset();
+            }
+
+            // Legacy OS run tasks
+            if (heapValidator && typeof heapValidator.validate === 'function') heapValidator.validate();
+            if (VirtualLedger && typeof VirtualLedger.clear === 'function') VirtualLedger.clear();
+            if (resetRecovery && typeof resetRecovery.check === 'function') resetRecovery.check();
+            if (eventLogRadar && typeof eventLogRadar === 'function') eventLogRadar();
+            if (PipelineLock && typeof PipelineLock.clear === 'function') PipelineLock.clear();
+            if (AusterityTrigger && typeof AusterityTrigger.evaluateAndTriggerAusterity === 'function') AusterityTrigger.evaluateAndTriggerAusterity();
+            if (cpuBucketForecaster && typeof cpuBucketForecaster.update === 'function') cpuBucketForecaster.update();
+            if (AusterityManager && typeof AusterityManager.run === 'function') AusterityManager.run();
+            if (RawMemoryManager && typeof RawMemoryManager.init === 'function') {
+                try {
+                    RawMemoryManager.init();
+                } catch (e) {
+                    Logger.error(`[OSOrchestrator] RawMemoryManager init failed: ${e.stack}`);
+                }
+            }
+            if (interShardMemoryManager && typeof interShardMemoryManager._loadLocal === 'function') interShardMemoryManager._loadLocal();
+        });
+
+        // Phase 2: Global State
+        if (!throttlerFlags.skipState) {
+            executeWrapped('OSOrchestrator.Phase2', () => {
+                if (GlobalStatePopulator && typeof GlobalStatePopulator.populate === 'function') {
+                    // It uses global.State if we pass state, but GlobalStatePopulator usually manages it.
+                    GlobalStatePopulator.populate(global.State);
+                }
+
+                // Fallback for legacy state scanner logic that populated state if GlobalStatePopulator doesn't.
+                // It was handled in Phase 2.
+                const stateScanner = require('../state/stateScanner');
+                if (stateScanner && typeof stateScanner.scan === 'function') {
+                    stateScanner.scan();
+                }
+
+                const globalState = require('../state/globalState');
+                if (globalState && typeof globalState.update === 'function') {
+                    globalState.update();
+                }
+
+                OSOrchestrator.updateRoomHashes();
+
+                const discoveryManager = require('../state/discoveryManager');
+                if (discoveryManager && typeof discoveryManager === 'function') discoveryManager();
+
+                const roomEventManager = require('../managers/RoomEventManager');
+                if (roomEventManager && typeof roomEventManager === 'function') roomEventManager();
+
+                const EnergySourceTracker = require('../managers/EnergySourceTracker');
+                if (EnergySourceTracker && typeof EnergySourceTracker.run === 'function') EnergySourceTracker.run();
+            });
         }
 
-        // Load inter-shard memory for the current tick
-        if (interShardMemoryManager && typeof interShardMemoryManager._loadLocal === 'function') {
-            interShardMemoryManager._loadLocal();
+        // Phase 3: Colonies
+        if (!throttlerFlags.skipColonies) {
+            executeWrapped('OSOrchestrator.Phase3', () => {
+                if (colonyManager && typeof colonyManager.run === 'function') {
+                    colonyManager.run();
+                }
+
+                // Incorporating remaining legacy manager logic that was part of phase 3
+                const defconManager = require('../colonies/defconManager');
+                if (global.State && global.State.rooms && defconManager && typeof defconManager.run === 'function') {
+                    for (const room of global.State.rooms.values()) defconManager.run(room);
+                }
+
+                // Call runRoomManagers logic from managerOrchestrator
+                const { runRoomManagers } = require('../managers/managerOrchestrator');
+                if (typeof runRoomManagers === 'function') {
+                    runRoomManagers();
+                }
+            });
         }
 
-        // Run the SystemScheduler to execute scheduled tasks
-        if (SystemScheduler && typeof SystemScheduler.run === 'function') {
-            SystemScheduler.run();
+        // Phase 4: Operations
+        if (!throttlerFlags.skipOperations) {
+            executeWrapped('OSOrchestrator.Phase4', () => {
+                if (operationsManager && typeof operationsManager.run === 'function') {
+                    operationsManager.run();
+                }
+            });
         }
+
+        // Phase 5: Traffic Control
+        executeWrapped('OSOrchestrator.Phase5', () => {
+            if (trafficManager && typeof trafficManager.setup === 'function') {
+                trafficManager.setup();
+            }
+            if (trafficManager && typeof trafficManager.run === 'function') {
+                trafficManager.run();
+            }
+        });
+
+        // Phase 6: Intents & Sleep
+        executeWrapped('OSOrchestrator.Phase6', () => {
+            if (trafficManager && typeof trafficManager.executeIntents === 'function') {
+                trafficManager.executeIntents();
+            }
+
+            if (global.State && global.State.intentManager) {
+                if (typeof global.State.intentManager.fireIntents === 'function') {
+                    global.State.intentManager.fireIntents();
+                } else if (typeof global.State.intentManager.fire === 'function') {
+                    global.State.intentManager.fire();
+                }
+            } else if (IntentManager && typeof IntentManager.processIntents === 'function') {
+                IntentManager.processIntents();
+            }
+
+            const memoryProxy = require('./memoryProxy');
+            if (memoryProxy && typeof memoryProxy.serialize === 'function') {
+                memoryProxy.serialize();
+            }
+
+            if (SystemScheduler && typeof SystemScheduler.run === 'function') {
+                SystemScheduler.run();
+            }
+
+            if (SystemScheduler && typeof SystemScheduler.sleepNonCriticalSystems === 'function') {
+                SystemScheduler.sleepNonCriticalSystems();
+            }
+        });
     }
 
     static updateRoomHashes() {
