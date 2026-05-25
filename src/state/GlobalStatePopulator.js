@@ -19,6 +19,15 @@ class GlobalStatePopulator {
         state.sitesByRoom.clear();
         state.creepLookup.clear();
 
+        state.creepsById.clear();
+        state.structuresByType.clear();
+        state.flags.clear();
+        state.flagsByRoom.clear();
+        state.resources.clear();
+        state.constructionSites.clear();
+        state.constructionSitesByType.clear();
+        state.spawns.clear();
+
         if (Game.rooms) {
             for (const roomName in Game.rooms) {
                 const room = Game.rooms[roomName];
@@ -33,6 +42,7 @@ class GlobalStatePopulator {
                 const creep = Game.creeps[creepName];
                 state.creeps.set(creepName, creep);
                 state.creepLookup.set(creepName, creep);
+                state.creepsById.set(creep.id, creep);
 
                 if (creep.pos && creep.pos.roomName) {
                     const roomName = creep.pos.roomName;
@@ -57,6 +67,13 @@ class GlobalStatePopulator {
                 const struct = Game.structures[structId];
                 state.structures.set(structId, struct);
 
+                let structsOfTypeGlobal = state.structuresByType.get(struct.structureType);
+                if (!structsOfTypeGlobal) {
+                    structsOfTypeGlobal = new Map();
+                    state.structuresByType.set(struct.structureType, structsOfTypeGlobal);
+                }
+                structsOfTypeGlobal.set(structId, struct);
+
                 if (struct.pos && struct.pos.roomName) {
                     const roomName = struct.pos.roomName;
                     let roomStructures = state.structuresByRoom.get(roomName);
@@ -77,6 +94,7 @@ class GlobalStatePopulator {
         if (Game.spawns) {
             for (const spawnName in Game.spawns) {
                 const spawn = Game.spawns[spawnName];
+                state.spawns.set(spawnName, spawn);
                 if (spawn.pos && spawn.pos.roomName) {
                     const roomName = spawn.pos.roomName;
                     let roomSpawns = state.spawnsByRoom.get(roomName);
@@ -92,6 +110,14 @@ class GlobalStatePopulator {
         if (Game.constructionSites) {
             for (const siteId in Game.constructionSites) {
                 const site = Game.constructionSites[siteId];
+                state.constructionSites.set(siteId, site);
+
+                let sitesOfType = state.constructionSitesByType.get(site.structureType);
+                if (!sitesOfType) {
+                    sitesOfType = new Map();
+                    state.constructionSitesByType.set(site.structureType, sitesOfType);
+                }
+                sitesOfType.set(siteId, site);
                 if (site.pos && site.pos.roomName) {
                     const roomName = site.pos.roomName;
                     let roomSites = state.sitesByRoom.get(roomName);
@@ -101,6 +127,29 @@ class GlobalStatePopulator {
                     }
                     roomSites.set(siteId, site);
                 }
+            }
+        }
+
+        if (Game.flags) {
+            for (const flagName in Game.flags) {
+                const flag = Game.flags[flagName];
+                state.flags.set(flagName, flag);
+
+                if (flag.pos && flag.pos.roomName) {
+                    const roomName = flag.pos.roomName;
+                    let roomFlags = state.flagsByRoom.get(roomName);
+                    if (!roomFlags) {
+                        roomFlags = new Map();
+                        state.flagsByRoom.set(roomName, roomFlags);
+                    }
+                    roomFlags.set(flagName, flag);
+                }
+            }
+        }
+
+        if (Game.resources) {
+            for (const resId in Game.resources) {
+                state.resources.set(resId, Game.resources[resId]);
             }
         }
 
