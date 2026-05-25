@@ -12,6 +12,15 @@ const LogisticsManager = require('./logisticsManager');
 const defconManager = require('./defconManager');
 const BaseLayoutOptimizer = require('./BaseLayoutOptimizer');
 const CreepRoleBalancer = require('./CreepRoleBalancer');
+const TowerManager = require('../managers/TowerManager');
+const RampartDefenseManager = require('../managers/RampartDefenseManager');
+const NukeEvacuationManager = require('../managers/NukeEvacuationManager');
+const UpgraderManager = require('../managers/UpgraderManager');
+const RemoteEconomyManager = require('../managers/RemoteEconomyManager');
+const TerminalManager = require('../managers/TerminalManager');
+const SpawnQueueManager = require('../managers/SpawnQueueManager');
+const PreSpawnManager = require('../managers/PreSpawnManager');
+const EnergyRequestManager = require('../managers/EnergyRequestManager');
 const MarketArbitrageAnalyzer = require('./MarketArbitrageAnalyzer');
 const MarketOrderAnalyzer = require('./MarketOrderAnalyzer');
 const MarketOrderExecutor = require('./MarketOrderExecutor');
@@ -49,7 +58,7 @@ module.exports = { run: function colonyManager() {
 
     // Phase 1: Global Trackers
     executeWrapped('ResourceTransferLedger.init', () => ResourceTransferLedger.init());
-
+    executeWrapped('EnergyRequestManager.init', () => EnergyRequestManager.init && EnergyRequestManager.init());
 
     for (const room of global.State.rooms.values()) {
         if (room.controller && room.controller.my === true) {
@@ -68,7 +77,11 @@ module.exports = { run: function colonyManager() {
                 executeWrapped('MarketArbitrageAnalyzer.run', () => MarketArbitrageAnalyzer.run && MarketArbitrageAnalyzer.run(room));
                 executeWrapped('MarketOrderAnalyzer.run', () => MarketOrderAnalyzer.run && MarketOrderAnalyzer.run(room));
                 executeWrapped('MarketOrderExecutor.run', () => MarketOrderExecutor.run && MarketOrderExecutor.run(room));
+                executeWrapped('TerminalManager.run', () => TerminalManager.run && TerminalManager.run(room));
                 executeWrapped('defense.run', () => defense.run(room));
+                executeWrapped('TowerManager.run', () => TowerManager.run && TowerManager.run(room));
+                executeWrapped('RampartDefenseManager.run', () => RampartDefenseManager.run && RampartDefenseManager.run(room));
+                executeWrapped('NukeEvacuationManager.run', () => NukeEvacuationManager.run && NukeEvacuationManager.run(room));
                 executeWrapped('scavengingManager.run', () => scavengingManager.run(room));
                 executeWrapped('logistics.run', () => logistics.run(room));
                 executeWrapped('LogisticsManager.run', () => LogisticsManager.run(room));
@@ -76,9 +89,12 @@ module.exports = { run: function colonyManager() {
                 executeWrapped('market.run', () => market.run(room));
                 executeWrapped('haulerSizing.run', () => haulerSizing.run && haulerSizing.run(room));
                 executeWrapped('workerManager.run', () => workerManager.run(room));
+                executeWrapped('UpgraderManager.run', () => UpgraderManager.run && UpgraderManager.run(room));
+                executeWrapped('RemoteEconomyManager.run', () => RemoteEconomyManager.run && RemoteEconomyManager.run(room));
 
                 // Phase 4: Roles & Spawning
                 executeWrapped('CreepRoleBalancer.run', () => CreepRoleBalancer.run && CreepRoleBalancer.run(room));
+                executeWrapped('PreSpawnManager.run', () => PreSpawnManager.run(room));
                 executeWrapped('SpawnEnergyReservations.run', () => SpawnEnergyReservations.run && SpawnEnergyReservations.run(room));
                 executeWrapped('spawnManager.run', () => spawnManager.run(room, spawnLedger));
                 executeWrapped('RCLProgressionManager.run', () => RCLProgressionManager.run(room));

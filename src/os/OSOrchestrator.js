@@ -21,6 +21,7 @@ const trafficManager = require('../traffic/trafficManager');
 const IntentManager = require('./IntentManager');
 const cpuThrottler = require('./cpuThrottler');
 const { wrapManager } = require('../utils/ManagerErrorBoundary');
+const VisualsManager = require('../managers/VisualsManager');
 
 class OSOrchestrator {
     static init() {
@@ -159,6 +160,12 @@ class OSOrchestrator {
             } else if (IntentManager && typeof IntentManager.processIntents === 'function') {
                 IntentManager.processIntents();
             }
+
+            executeWrapped('VisualsManager.run', () => {
+                if (VisualsManager && typeof VisualsManager.run === 'function') {
+                    VisualsManager.run();
+                }
+            });
 
             const memoryProxy = require('./memoryProxy');
             if (memoryProxy && typeof memoryProxy.serialize === 'function') {

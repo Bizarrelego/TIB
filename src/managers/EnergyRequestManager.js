@@ -7,6 +7,11 @@
 const resourceUtils = require('../utils/resourceUtils');
 
 class EnergyRequestManager {
+    static init() {
+        // EnergyRequestManager is an on-demand virtual ledger that recalculates state via global getters.
+        // No per-tick caches need clearing at this time.
+    }
+
     /**
      * Tracks source regeneration and skips logic for harvesters assigned to empty sources.
      * Iterates over all rooms and sources via global.State.sourcesByRoom.
