@@ -1,5 +1,6 @@
 const { wrap } = require('../utils/ManagerExecutionWrapper');
 const { wrapManager } = require('../utils/ManagerErrorBoundary');
+const workerManager = require('../managers/workerManager');
 
 const SpawnLedger = require('./spawnLedger');
 const defense = require('./defense');
@@ -48,7 +49,7 @@ module.exports = { run: function colonyManager() {
 
     // Phase 1: Global Trackers
     executeWrapped('ResourceTransferLedger.init', () => ResourceTransferLedger.init());
-    executeWrapped('RoleManager.runAll', () => RoleManager.runAll());
+
 
     for (const room of global.State.rooms.values()) {
         if (room.controller && room.controller.my === true) {
@@ -74,6 +75,7 @@ module.exports = { run: function colonyManager() {
                 executeWrapped('labs.run', () => labs.run(room));
                 executeWrapped('market.run', () => market.run(room));
                 executeWrapped('haulerSizing.run', () => haulerSizing.run && haulerSizing.run(room));
+                executeWrapped('workerManager.run', () => workerManager.run(room));
 
                 // Phase 4: Roles & Spawning
                 executeWrapped('CreepRoleBalancer.run', () => CreepRoleBalancer.run && CreepRoleBalancer.run(room));
@@ -107,4 +109,7 @@ module.exports = { run: function colonyManager() {
             }
         }
     }
+
+    // Phase 5: Role Execution
+    executeWrapped('RoleManager.runAll', () => RoleManager.runAll());
 } };
