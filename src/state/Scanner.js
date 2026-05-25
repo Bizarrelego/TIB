@@ -26,7 +26,13 @@ const Scanner = {
             }
         }
 
-        return Array.from(hostileIds).map(id => Game.getObjectById(id)).filter(Boolean);
+        const hostiles = [];
+        for (const id of hostileIds) {
+            const obj = Game.getObjectById(id);
+            if (obj) hostiles.push(obj);
+            else hostileIds.delete(id); // Cleanup dead ids
+        }
+        return hostiles;
     },
 
     updateDropped(room) {
@@ -54,7 +60,13 @@ const Scanner = {
             }
         }
 
-        return Array.from(droppedIds).map(id => Game.getObjectById(id)).filter(Boolean);
+        const dropped = [];
+        for (const id of droppedIds) {
+            const obj = Game.getObjectById(id);
+            if (obj) dropped.push(obj);
+            else droppedIds.delete(id); // Cleanup dead ids
+        }
+        return dropped;
     }
 };
 
