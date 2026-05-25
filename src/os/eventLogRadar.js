@@ -30,15 +30,16 @@ function eventLogRadar() {
             const eventPayload = { roomName, event };
 
             switch (event.event) {
-                case EVENT_ATTACK:
+                case EVENT_ATTACK: {
                     eventBus.publish(EVENT_HOSTILE_SPOTTED, eventPayload);
-                    eventBus.publish(EVENT_HOSTILE_ATTACK, {
-                        roomName,
-                        targetId: event.data.targetId,
-                        attackerId: event.objectId,
-                        damage: event.data.damage
-                    });
+                    const attackPayload = new Map();
+                    attackPayload.set('roomName', roomName);
+                    attackPayload.set('targetId', event.data.targetId);
+                    attackPayload.set('attackerId', event.objectId);
+                    attackPayload.set('damage', event.data.damage);
+                    eventBus.publish(EVENT_HOSTILE_ATTACK, attackPayload);
                     break;
+                }
                 case EVENT_BUILD:
                     eventBus.publish(EVENT_CONSTRUCTION_STARTED, eventPayload);
                     eventBus.publish(EVENT_INVALIDATE_COSTMATRIX, roomName);
