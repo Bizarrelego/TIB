@@ -28,23 +28,27 @@ class OSOrchestrator {
         });
     }
 
-    static run() {
-        const executeWrapped = (name, fn) => {
-            if (!fn) return;
-            wrapManager(fn, name)();
-        };
+    static runPhase1() {
+        const { wrap } = require('../utils/ManagerExecutionWrapper');
 
-        // Phase 1: OS Init & Cache
-        executeWrapped('OSOrchestrator.Phase1', () => {
-            if (OSInitializer && typeof OSInitializer.init === 'function') {
-                OSInitializer.init();
-            }
+        if (OSInitializer && typeof OSInitializer.init === 'function') {
+            wrap('OSInitializer.init', () => OSInitializer.init())();
+        }
+
+        const { CacheRegistry } = require('./cache');
+        if (CacheRegistry && typeof CacheRegistry.init === 'function') {
+            wrap('CacheRegistry.init', () => CacheRegistry.init())();
+        }
+
+        if (heapValidator && typeof heapValidator.validate === 'function') {
+            wrap('heapValidator.validate', () => heapValidator.validate())();
+        }
+
+        wrap('OSOrchestrator.run', () => {
             if (GlobalResetDetector && typeof GlobalResetDetector.detectAndHandleReset === 'function') {
                 GlobalResetDetector.detectAndHandleReset();
             }
 
-            // Legacy OS run tasks
-            if (heapValidator && typeof heapValidator.validate === 'function') heapValidator.validate();
             if (VirtualLedger && typeof VirtualLedger.clear === 'function') VirtualLedger.clear();
             if (resetRecovery && typeof resetRecovery.check === 'function') resetRecovery.check();
             if (eventLogRadar && typeof eventLogRadar === 'function') eventLogRadar();
@@ -60,7 +64,82 @@ class OSOrchestrator {
                 }
             }
             if (interShardMemoryManager && typeof interShardMemoryManager._loadLocal === 'function') interShardMemoryManager._loadLocal();
-        });
+        })();
+    }
+
+    static runPhase2(throttlerFlags = {}) {
+        const { wrap } = require('../utils/ManagerExecutionWrapper');
+        const GlobalStatePopulator = require('../state/GlobalStatePopulator');
+        const stateScanner = require('../state/stateScanner');
+        const globalState = require('../state/globalState');
+        const discoveryManager = require('../state/discoveryManager');
+        const roomEventManager = require('../managers/RoomEventManager');
+        const EnergySourceTracker = require('../managers/EnergySourceTracker');
+
+        if (!throttlerFlags.skipState) {
+            if (GlobalStatePopulator && typeof GlobalStatePopulator.populate === 'function') {
+                wrap('GlobalStatePopulator.populate', () => GlobalStatePopulator.populate(global.State))();
+            }
+
+            if (stateScanner && typeof stateScanner.scan === 'function') {
+                wrap('stateScanner.scan', () => stateScanner.scan())();
+            }
+
+            if (globalState && typeof globalState.update === 'function') {
+                wrap('globalState.update', () => globalState.update())();
+            }
+
+            wrap('OSOrchestrator.updateRoomHashes', () => OSOrchestrator.updateRoomHashes())();
+
+            if (discoveryManager && typeof discoveryManager === 'function') {
+                wrap('discoveryManager', () => discoveryManager())();
+            }
+
+            if (roomEventManager && typeof roomEventManager === 'function') {
+                wrap('roomEventManager', () => roomEventManager())();
+            }
+
+            if (EnergySourceTracker && typeof EnergySourceTracker.run === 'function') {
+                wrap('EnergySourceTracker.run', () => EnergySourceTracker.run())();
+            }
+        }
+    }
+
+    static runPhase6() {
+        const { wrap } = require('../utils/ManagerExecutionWrapper');
+        const trafficManager = require('../traffic/trafficManager');
+        const VisualsManager = require('../managers/VisualsManager');
+        const memoryProxy = require('./memoryProxy');
+
+        if (trafficManager && typeof trafficManager.executeIntents === 'function') {
+            wrap('trafficManager.executeIntents', () => trafficManager.executeIntents())();
+        }
+
+        if (global.State && global.State.intentManager) {
+            if (typeof global.State.intentManager.fireIntents === 'function') {
+                wrap('intentManager.fireIntents', () => global.State.intentManager.fireIntents())();
+            } else if (typeof global.State.intentManager.fire === 'function') {
+                wrap('intentManager.fire', () => global.State.intentManager.fire())();
+            }
+        } else if (IntentManager && typeof IntentManager.processIntents === 'function') {
+            wrap('IntentManager.processIntents', () => IntentManager.processIntents())();
+        }
+
+        if (VisualsManager && typeof VisualsManager.run === 'function') {
+            wrap('VisualsManager.run', () => VisualsManager.run())();
+        }
+
+        if (memoryProxy && typeof memoryProxy.serialize === 'function') {
+            wrap('memoryProxy.serialize', () => memoryProxy.serialize())();
+        }
+
+        if (SystemScheduler && typeof SystemScheduler.run === 'function') {
+            wrap('SystemScheduler.run', () => SystemScheduler.run())();
+        }
+
+        if (SystemScheduler && typeof SystemScheduler.sleepNonCriticalSystems === 'function') {
+            wrap('SystemScheduler.sleepNonCriticalSystems', () => SystemScheduler.sleepNonCriticalSystems())();
+        }
     }
 
     static updateRoomHashes() {

@@ -70,6 +70,8 @@ const TrafficManager = {
      */
     run() {
         try {
+            this.setup();
+
             if (!global.State || !global.State.trafficIntents || global.State.trafficIntents.size === 0) return;
 
             // Phase 1: Build bitwise position map

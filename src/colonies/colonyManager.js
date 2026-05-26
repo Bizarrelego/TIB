@@ -44,6 +44,132 @@ const rampartPlanner = require('./rampartPlanner');
  * Instantiates the SpawnLedger to track energy use during the tick,
  * passing it as a singleton-like service to spawnManager.
  */
+const { executeManager } = require('../utils/errorHandler');
+const Profiler = require('../utils/profiler');
+const Logger = require('../utils/logger');
+const globalState = require('../state/globalState');
+const { wrapModuleFunctions } = require('../utils/moduleWrapper');
+
+function runRoomManagers() {
+    if (!global.State || !global.State.rooms) return;
+
+    for (const roomName of global.State.rooms.keys()) {
+        const room = global.State.rooms.get(roomName);
+
+        if (!room || !room.controller || !room.controller.my) continue;
+
+        const roomCreeps = global.State.creepsByRoom.get(room.name);
+        if (roomCreeps) {
+            const haulers = roomCreeps.get('hauler') || [];
+            const domHaulers = roomCreeps.get('domesticHauler') || [];
+            const harvesters = roomCreeps.get('harvester') || [];
+
+            if (room.energyAvailable < 300 && haulers.length === 0 && domHaulers.length === 0 && harvesters.length > 0) {
+                const overridden = [];
+                for (let i = harvesters.length - 1; i >= 0; i--) {
+                    const h = harvesters[i];
+                    if (h.store.getUsedCapacity() > 0) {
+                        h.heap.state = 'transfer';
+                    } else {
+                        h.heap.state = 'pickup';
+                    }
+                    overridden.push(h);
+                    harvesters.splice(i, 1);
+                }
+                roomCreeps.set('domesticHauler', domHaulers.concat(overridden));
+            }
+        }
+
+        const managersConfig = [
+            { name: 'ConstructionManager', slice: 1 },
+            { name: 'LinkManager', slice: 1 },
+            { name: 'StorageManager', slice: 1 },
+            { name: 'LogisticsManager', slice: 1 },
+            { name: 'LabManager', slice: 5 },
+            { name: 'MarketManager', slice: 10 }
+        ];
+
+        if (room.controller.level < 6) {
+            const prune = ['LabManager'];
+            for (let i = managersConfig.length - 1; i >= 0; i--) {
+                if (prune.includes(managersConfig[i].name)) {
+                    managersConfig.splice(i, 1);
+                }
+            }
+        }
+
+        const registeredManagers = Object.keys(require('../managers/index').managers);
+        for (const name of registeredManagers) {
+            if (['PreSpawnManager', 'SpawnQueueManager', 'RoomEventManager', 'AllianceIntelManager', 'CombatManager', 'EnergyRequestManager', 'VisualsManager', 'NukeEvacuationManager', 'RampartDefenseManager', 'TowerManager', 'UpgraderManager', 'RemoteEconomyManager', 'TerminalManager', 'QuadSquadManager'].includes(name)) {
+                continue;
+            }
+            if (!managersConfig.find(c => c.name === name)) {
+                managersConfig.push({ name, slice: 1 });
+            }
+        }
+
+        let TickSlicer;
+        try {
+            TickSlicer = require('../os/TickSlicer');
+        } catch (e) {}
+
+        if (!global.Cache) {
+            const { CacheRegistry } = require('../os/cache');
+            CacheRegistry.init();
+        }
+        if (!global.Cache.has('processes')) global.Cache.set('processes', new Map());
+
+        for (const config of managersConfig) {
+            let processId = `${room.name}_${config.name}`;
+            let processObj = global.Cache.get('processes').get(processId);
+
+            if (TickSlicer && typeof TickSlicer.shouldRun === 'function') {
+                if (!TickSlicer.shouldRun(config.name, room.name)) continue;
+            } else {
+                if (processObj && processObj.wakeTick && Game.time < processObj.wakeTick) {
+                    continue;
+                }
+
+                if ((!processObj || !processObj.wakeTick) && Game.time % config.slice !== 0) continue;
+            }
+
+            let manager = globalState.getManager(config.name);
+            if (manager && typeof manager.run === 'function') {
+                if (!processObj) {
+                    processObj = { id: processId };
+                    global.Cache.get('processes').set(processId, processObj);
+                }
+                if (!manager.__errorWrapped) {
+                    manager = wrapModuleFunctions(manager, (funcName, originalFunc, ...args) => {
+                        return executeManager(`${config.name}.${funcName}`, originalFunc, ...args);
+                    });
+                    manager.__errorWrapped = true;
+                }
+
+                if (!manager.__profilerWrapped) {
+                    manager = Profiler.wrap(config.name, manager);
+                    manager.__profilerWrapped = true;
+                }
+
+                Logger.debug(`Running manager ${config.name} in room ${room.name}`);
+                const profilerEnabled = global.PROFILER_ENABLED || (typeof Memory !== 'undefined' && Memory.PROFILER_ENABLED);
+                const cpuAvailable = typeof Game !== 'undefined' && Game.cpu && typeof Game.cpu.getUsed === 'function';
+                let startCpu;
+                if (profilerEnabled) {
+                    startCpu = cpuAvailable ? Game.cpu.getUsed() : Date.now();
+                }
+
+                manager.run(room, processObj);
+
+                if (profilerEnabled) {
+                    const endCpu = cpuAvailable ? Game.cpu.getUsed() : Date.now();
+                    Profiler.record(config.name, endCpu - startCpu);
+                }
+            }
+        }
+    }
+}
+
 module.exports = { run: function colonyManager() {
     if (!global.State || !global.State.rooms) return;
 
@@ -57,6 +183,12 @@ module.exports = { run: function colonyManager() {
     executeWrapped('ResourceTransferLedger.init', () => ResourceTransferLedger.init());
     executeWrapped('EnergyRequestManager.init', () => EnergyRequestManager.init && EnergyRequestManager.init());
 
+    if (global.State && global.State.rooms && defconManager && typeof defconManager.run === 'function') {
+        executeWrapped('defconManager.run', () => {
+            for (const room of global.State.rooms.values()) defconManager.run(room);
+        });
+    }
+
     for (const room of global.State.rooms.values()) {
         if (room.controller && room.controller.my === true) {
             try {
@@ -64,7 +196,6 @@ module.exports = { run: function colonyManager() {
                 const spawnLedger = new SpawnLedger(room);
                 
                 // Phase 2: Analysis & Planning
-                executeWrapped('defconManager.run', () => defconManager.run(room));
                 executeWrapped('planner.run', () => planner.run(room));
                 executeWrapped('rampartPlanner.run', () => rampartPlanner.run(room));
                 executeWrapped('killboxPlanner.planKillboxes', () => killboxPlanner.planKillboxes(room));
@@ -139,6 +270,5 @@ module.exports = { run: function colonyManager() {
         }
     }
 
-    // Phase 5: Role Execution
-    // Removed RoleManager.runAll() from here to execute it globally after managers.
+    executeWrapped('runRoomManagers', () => runRoomManagers());
 } };
