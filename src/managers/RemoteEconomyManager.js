@@ -6,7 +6,7 @@ const SpawnQueueManager = require('./SpawnQueueManager');
 const haulerSizing = require('../colonies/haulerSizing');
 const BodyCalc = require('../utils/bodyCalc');
 
-const RemoteEconomyManager = {
+module.exports = {
     /**
      * Evaluates room state and assigns target sources and containers directly to creep memory/heap.
      * @param {Room} room
@@ -14,24 +14,20 @@ const RemoteEconomyManager = {
     run(room) {
         let colonyRemoteHarvesters = [];
         let colonyRemoteHaulers = [];
+        let colonyRemoteDefenders = [];
         const remoteRoomsTargeted = new Set();
 
         // Gather all creeps globally that belong to this colony
-        for (const roomCreeps of global.State.creepsByRoom.values()) {
-            const rHarvesters = roomCreeps.get('remoteHarvester');
-            if (rHarvesters) {
-                for (let i = 0; i < rHarvesters.length; i++) {
-                    if (rHarvesters[i].memory.colony === room.name) {
-                        colonyRemoteHarvesters.push(rHarvesters[i]);
-                        remoteRoomsTargeted.add(rHarvesters[i].memory.targetRoom);
-                    }
-                }
-            }
-
-            const rHaulers = roomCreeps.get('remoteHauler');
-            if (rHaulers) {
-                for (let i = 0; i < rHaulers.length; i++) {
-                    if (rHaulers[i].memory.colony === room.name) colonyRemoteHaulers.push(rHaulers[i]);
+        for (const name in Game.creeps) {
+            const creep = Game.creeps[name];
+            if (creep.memory.colony === room.name) {
+                if (creep.memory.role === 'remoteHarvester') {
+                    colonyRemoteHarvesters.push(creep);
+                    if (creep.memory.targetRoom) remoteRoomsTargeted.add(creep.memory.targetRoom);
+                } else if (creep.memory.role === 'remoteHauler') {
+                    colonyRemoteHaulers.push(creep);
+                } else if (creep.memory.role === 'remoteDefender') {
+                    colonyRemoteDefenders.push(creep);
                 }
             }
         }
@@ -49,8 +45,7 @@ const RemoteEconomyManager = {
             if (Memory.rooms[remoteRoomName].threatExpiry > Game.time) {
                 // Check if defender already deployed
                 let activeDefenders = 0;
-                const defenders = global.State.creepsByRoom.get(room.name)?.get('remoteDefender') || [];
-                for (const d of defenders) {
+                for (const d of colonyRemoteDefenders) {
                     if (d.memory.targetRoom === remoteRoomName) activeDefenders++;
                 }
                 if (activeDefenders === 0) {
@@ -130,24 +125,24 @@ const RemoteEconomyManager = {
                 // Ensure homeRoom and targetRoom are consistent
                 if (!creep.memory.homeRoom) creep.memory.homeRoom = room.name;
 
-                if (!creep.heap.targetSourceId && creep.room.name === creep.memory.targetRoom) {
+                if (!creep.memory.targetSourceId && creep.room.name === creep.memory.targetRoom) {
                     const roomSources = global.State.sourcesByRoom.get(creep.room.name) || [];
                     const assignedSources = colonyRemoteHarvesters.map(c => c.memory.targetSourceId).filter(id => id);
 
                     for (const src of roomSources) {
                         if (!assignedSources.includes(src.id)) {
-                            creep.heap.targetSourceId = src.id;
+                            creep.memory.targetSourceId = src.id;
                             break;
                         }
                     }
                 }
 
                 // Container lifecycle awareness for harvesters
-                if (creep.heap.containerId && Game.rooms[creep.memory.targetRoom]) {
+                if (creep.memory.containerId && Game.rooms[creep.memory.targetRoom]) {
                     // Room is visible, check if container exists
-                    const container = Game.getObjectById(creep.heap.containerId);
+                    const container = Game.getObjectById(creep.memory.containerId);
                     if (!container) {
-                        creep.heap.containerId = null; // Container destroyed or invalid
+                        creep.memory.containerId = null; // Container destroyed or invalid
                     }
                 }
             }
@@ -159,103 +154,35 @@ const RemoteEconomyManager = {
                 if (!creep.memory.homeRoom) creep.memory.homeRoom = room.name;
 
                 // Container lifecycle awareness for haulers
-                if (creep.heap.containerId && Game.rooms[creep.memory.remoteRoom]) {
+                if (creep.memory.containerId && Game.rooms[creep.memory.remoteRoom]) {
                     // Room is visible, check if container exists
-                    const container = Game.getObjectById(creep.heap.containerId);
+                    const container = Game.getObjectById(creep.memory.containerId);
                     if (!container) {
-                        creep.heap.containerId = null; // Container destroyed or invalid
+                        creep.memory.containerId = null; // Container destroyed or invalid
                     }
                 }
 
-                // Drop mining sweep logic
-                if (creep.store.getUsedCapacity() === 0) {
-                    creep.heap.state = 'pickup';
-                } else if (creep.store.getFreeCapacity() === 0) {
-                    creep.heap.state = 'transfer';
-                }
-
-                if (!creep.heap.state) {
-                    creep.heap.state = 'pickup';
-                }
-
-                if (creep.heap.state === 'pickup' && creep.room.name === creep.memory.remoteRoom) {
-                    const droppedArray = global.State.droppedByRoom.get(creep.room.name);
-                    let target = null;
-                    let bestScore = -Infinity;
-                    if (droppedArray) {
-                        for (const dropped of droppedArray.values()) {
-                            if (dropped.resourceType === RESOURCE_ENERGY && dropped.amount > 0) {
-                                const distance = creep.pos.getRangeTo(dropped);
-                                const score = dropped.amount - (distance * 10);
-                                if (!target || score > bestScore) {
-                                    target = dropped;
-                                    bestScore = score;
-                                }
-                            }
-                        }
-                    }
-                    if (target) {
-                        creep.heap.targetId = target.id;
-                    } else {
-                        creep.heap.targetId = null;
-                    }
-                } else if (creep.heap.state === 'transfer' && creep.room.name === creep.memory.homeRoom) {
+                if (!creep.memory.containerId && creep.room.name === creep.memory.remoteRoom) {
                     const structuresMap = global.State.structuresByRoom.get(creep.room.name);
                     if (structuresMap) {
-                        let target = null;
-                        const restrictStorageOutflow = Game.rooms[creep.memory.homeRoom] && Game.rooms[creep.memory.homeRoom].memory.restrictStorageOutflow;
+                        const containers = structuresMap.get(STRUCTURE_CONTAINER) || [];
+                        if (containers.length > 0) {
+                            // Assign hauler to the container with the highest energy
+                            let bestContainer = containers[0];
+                            let maxEnergy = bestContainer.store ? bestContainer.store.getUsedCapacity('energy') : 0;
 
-                        if (!restrictStorageOutflow) {
-                            const storages = structuresMap.get(STRUCTURE_STORAGE) || [];
-                            if (storages.length > 0 && storages[0].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                                target = storages[0];
-                            }
-                        }
-
-                        if (!target && !restrictStorageOutflow) {
-                            const terminals = structuresMap.get(STRUCTURE_TERMINAL) || [];
-                            if (terminals.length > 0 && terminals[0].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                                target = terminals[0];
-                            }
-                        }
-
-                        if (!target) {
-                            const spawns = global.State.spawnsByRoom.get(creep.memory.homeRoom) || [];
-                            for (let i = 0; i < spawns.length; i++) {
-                                if (spawns[i].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                                    target = spawns[i];
-                                    break;
+                            for (let i = 1; i < containers.length; i++) {
+                                const energy = containers[i].store ? containers[i].store.getUsedCapacity('energy') : 0;
+                                if (energy > maxEnergy) {
+                                    bestContainer = containers[i];
+                                    maxEnergy = energy;
                                 }
                             }
-                        }
-                        if (!target) {
-                            const extensions = structuresMap.get(STRUCTURE_EXTENSION) || [];
-                            for (let i = 0; i < extensions.length; i++) {
-                                if (extensions[i].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                                    target = extensions[i];
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (!target) {
-                            const storages = structuresMap.get(STRUCTURE_STORAGE) || [];
-                            if (storages.length > 0) {
-                                target = storages[0];
-                            }
-                        }
-
-                        if (target) {
-                            creep.heap.targetId = target.id;
-                        } else {
-                            creep.heap.targetId = null;
+                            creep.memory.containerId = bestContainer.id;
                         }
                     }
                 }
-
             }
         }
     }
 };
-
-module.exports = RemoteEconomyManager;

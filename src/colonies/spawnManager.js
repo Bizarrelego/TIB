@@ -13,29 +13,20 @@ const remoteCensus = new Map();
 function buildRemoteCensus() {
     if (Game.time === lastCensusTick) return;
     remoteCensus.clear();
-    for (const rmCreeps of global.State.creepsByRoom.values()) {
-        const rHarvesters = rmCreeps.get('remoteHarvester') || [];
-        for (let i = 0; i < rHarvesters.length; i++) {
-            const c = rHarvesters[i];
-            if (c.memory.colony) {
-                if (!remoteCensus.has(c.memory.colony)) remoteCensus.set(c.memory.colony, { remoteHarvester: [], remoteHauler: [], reserver: [] });
-                remoteCensus.get(c.memory.colony).remoteHarvester.push(c);
+    // Iterate over live creeps to build census, avoiding stale cache objects.
+    for (const name in Game.creeps) {
+        const c = Game.creeps[name];
+        if (c.memory.colony) {
+            if (!remoteCensus.has(c.memory.colony)) {
+                remoteCensus.set(c.memory.colony, { remoteHarvester: [], remoteHauler: [], reserver: [] });
             }
-        }
-        const rHaulers = rmCreeps.get('remoteHauler') || [];
-        for (let i = 0; i < rHaulers.length; i++) {
-            const c = rHaulers[i];
-            if (c.memory.colony) {
-                if (!remoteCensus.has(c.memory.colony)) remoteCensus.set(c.memory.colony, { remoteHarvester: [], remoteHauler: [], reserver: [] });
-                remoteCensus.get(c.memory.colony).remoteHauler.push(c);
-            }
-        }
-        const rReservers = rmCreeps.get('reserver') || [];
-        for (let i = 0; i < rReservers.length; i++) {
-            const c = rReservers[i];
-            if (c.memory.colony) {
-                if (!remoteCensus.has(c.memory.colony)) remoteCensus.set(c.memory.colony, { remoteHarvester: [], remoteHauler: [], reserver: [] });
-                remoteCensus.get(c.memory.colony).reserver.push(c);
+            const colonyCensus = remoteCensus.get(c.memory.colony);
+            if (c.memory.role === 'remoteHarvester') {
+                colonyCensus.remoteHarvester.push(c);
+            } else if (c.memory.role === 'remoteHauler') {
+                colonyCensus.remoteHauler.push(c);
+            } else if (c.memory.role === 'reserver') {
+                colonyCensus.reserver.push(c);
             }
         }
     }
