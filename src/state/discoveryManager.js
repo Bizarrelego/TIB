@@ -6,7 +6,11 @@ module.exports = function discoveryManager() {
     if (!global.State) global.State = new Map();
     const state = global.State;
 
-    if (!state.rooms) state.rooms = new Map();
+    if (!state.rooms) {
+        state.rooms = new Map();
+    } else {
+        state.rooms.clear();
+    }
     if (!state.structuresByRoom) state.structuresByRoom = new Map();
     if (!state.creepsByRoom) state.creepsByRoom = new Map();
     if (!state.hostilesByRoom) state.hostilesByRoom = new Map();

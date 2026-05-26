@@ -108,6 +108,7 @@ class OSOrchestrator {
         const trafficManager = require('../traffic/trafficManager');
         const VisualsManager = require('../managers/VisualsManager');
         const memoryProxy = require('./memoryProxy');
+        const SegmentManager = require('../managers/SegmentManager');
 
         if (trafficManager && typeof trafficManager.executeIntents === 'function') {
             wrap('trafficManager.executeIntents', () => trafficManager.executeIntents())();
@@ -129,6 +130,10 @@ class OSOrchestrator {
 
         if (memoryProxy && typeof memoryProxy.serialize === 'function') {
             wrap('memoryProxy.serialize', () => memoryProxy.serialize())();
+        }
+
+        if (SegmentManager && typeof SegmentManager.run === 'function') {
+            wrap('SegmentManager.run', () => SegmentManager.run())();
         }
 
         if (SystemScheduler && typeof SystemScheduler.run === 'function') {
