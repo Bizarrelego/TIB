@@ -42,17 +42,6 @@ function run(room) {
             global.State.linkCache.set(room.name, linkCache);
         }
 
-        // Check if any link is at capacity to bypass tick slicing
-        let isAnyLinkFull = false;
-        for (let i = 0; i < links.length; i++) {
-            if (links[i].store.getUsedCapacity(RESOURCE_ENERGY) >= 700) {
-                isAnyLinkFull = true;
-                break;
-            }
-        }
-
-        if (!isAnyLinkFull && Game.time % 5 !== 0) return; // Aggressive Tick Slicing unless immediate action is needed
-
         let hubLink = linkCache.hubLinkId ? Game.getObjectById(linkCache.hubLinkId) : null;
         let controllerLink = linkCache.controllerLinkId ? Game.getObjectById(linkCache.controllerLinkId) : null;
         const sourceLinks = [];

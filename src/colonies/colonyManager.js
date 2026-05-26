@@ -86,16 +86,23 @@ module.exports = { run: function colonyManager() {
                 executeWrapped('market.run', () => market.run(room));
                 executeWrapped('haulerSizing.run', () => haulerSizing.run && haulerSizing.run(room));
                 executeWrapped('SourceManager.run', () => {
-                    const sources = SourceManager.getAvailableSources(room.name);
-                    const harvesters = global.State.creepsByRoom.get(room.name)?.get('harvester') || [];
-                    for (let i = 0; i < harvesters.length; i++) {
-                        if (sources.length > 0 && !harvesters[i].heap.targetId) {
-                            SourceManager.assignHarvester(sources[0].id, harvesters[i].id);
+                    if (typeof SourceManager.run === 'function') {
+                        SourceManager.run(room);
+                    } else {
+                        const sources = SourceManager.getAvailableSources(room.name);
+                        const harvesters = global.State.creepsByRoom.get(room.name)?.get('harvester') || [];
+                        for (let i = 0; i < harvesters.length; i++) {
+                            if (sources.length > 0 && !harvesters[i].heap.targetId) {
+                                SourceManager.assignHarvester(sources[0].id, harvesters[i].id);
+                            }
                         }
                     }
                 });
                 executeWrapped('workerManager.run', () => workerManager.run(room));
                 executeWrapped('UpgraderManager.run', () => UpgraderManager.run && UpgraderManager.run(room));
+
+                // LinkManager is handled centrally via managerOrchestrator but leaving un-wrapped here
+
                 executeWrapped('RemoteEconomyManager.run', () => RemoteEconomyManager.run && RemoteEconomyManager.run(room));
 
                 // Phase 4: Roles & Spawning

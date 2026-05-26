@@ -87,6 +87,32 @@ class UpgraderManager {
             const upgraders = global.State.creepsByRoom.get(room.name)?.get('upgrader') || [];
             if (upgraders.length === 0) return;
 
+            // Deficit-Driven Execution / Tick Slicing
+            if (!global.State.upgraderManagerLastExecution) global.State.upgraderManagerLastExecution = new Map();
+            if (!global.State.upgraderManagerLastCount) global.State.upgraderManagerLastCount = new Map();
+
+            const lastExecution = global.State.upgraderManagerLastExecution.get(room.name) || 0;
+            const lastCount = global.State.upgraderManagerLastCount.get(room.name) || 0;
+            const currentCount = upgraders.length;
+
+            let forceRun = false;
+            if (currentCount !== lastCount) {
+                forceRun = true;
+            } else {
+                for (let i = 0; i < upgraders.length; i++) {
+                    // Check if an upgrader needs a new task or just completed one
+                    if (!upgraders[i].heap.state || !upgraders[i].heap.targetId || (upgraders[i].heap.state === 'upgrade' && upgraders[i].store.getUsedCapacity() === 0)) {
+                        forceRun = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!forceRun && Game.time - lastExecution < 5) return; // Fallback execution every 5 ticks
+
+            global.State.upgraderManagerLastExecution.set(room.name, Game.time);
+            global.State.upgraderManagerLastCount.set(room.name, currentCount);
+
             const optimalData = this.getOptimalParkPositions(room);
 
             for (let i = 0; i < upgraders.length; i++) {
