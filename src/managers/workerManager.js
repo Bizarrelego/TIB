@@ -90,12 +90,16 @@ module.exports = {
             if (creep.heap.state === 'get_energy') {
                 if (room.controller && room.controller.level < 3) {
                     // RCL 1-2 Logic: Find dropped energy or harvest directly
-                    const dropped = room.find(FIND_DROPPED_RESOURCES, { filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 50 });
-                    if (dropped.length > 0) {
-                        creep.heap.targetId = dropped[0].id;
+                    let targetDropped = null;
+                    if (global.State.droppedByRoom) {
+                        const roomDropped = global.State.droppedByRoom.get(room.name) || [];
+                        targetDropped = roomDropped.find(r => r.resourceType === RESOURCE_ENERGY && r.amount > 50);
+                    }
+                    if (targetDropped) {
+                        creep.heap.targetId = targetDropped.id;
                         creep.heap.subState = 'pickup';
                     } else {
-                        const source = room.find(FIND_SOURCES_ACTIVE)[0];
+                        const source = sources.length > 0 ? sources[0] : null;
                         creep.heap.targetId = source ? source.id : null;
                         creep.heap.subState = 'harvest';
                     }
@@ -128,8 +132,15 @@ module.exports = {
                 }
             } else if (creep.heap.state === 'work') {
                 if (room.controller && room.controller.level < 3) {
-                    const buildSites = room.find(FIND_MY_CONSTRUCTION_SITES);
-                    const spawn = room.find(FIND_MY_SPAWNS)[0];
+                    const buildSites = sites;
+
+                    let spawn = null;
+                    if (structures) {
+                        const spawnsMap = structures.get(STRUCTURE_SPAWN);
+                        if (spawnsMap && spawnsMap.size > 0) {
+                            spawn = Array.from(spawnsMap.values())[0];
+                        }
+                    }
                     if (spawn && spawn.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
                         creep.heap.targetId = spawn.id;
                         creep.heap.subState = 'fill';

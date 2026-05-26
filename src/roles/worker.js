@@ -44,21 +44,44 @@ module.exports = {
                 }
 
                 if (state === 'pickup') {
-                    if (creep.pickup(target) === ERR_NOT_IN_RANGE) movement.moveTo(creep, target);
+                    if (creep.pos.isNearTo(target)) {
+                        let amount = creep.heap.amount;
+                        if (amount === undefined) amount = creep.store.getFreeCapacity(RESOURCE_ENERGY);
+                        TrafficManager.registerPickup(creep, target, RESOURCE_ENERGY, amount);
+                    } else movement.moveTo(creep, target);
                 } else if (state === 'harvest') {
-                    if (creep.harvest(target) === ERR_NOT_IN_RANGE) movement.moveTo(creep, target, { range: 1 });
+                    if (creep.pos.isNearTo(target)) {
+                        TrafficManager.setStatic(creep);
+                        creep.heap.isStatic = true;
+                        TrafficManager.registerHarvest(creep, target);
+                    } else movement.moveTo(creep, target, { range: 1 });
                 } else if (state === 'build') {
-                    if (creep.build(target) === ERR_NOT_IN_RANGE) movement.moveTo(creep, target, { range: 3 });
+                    if (creep.pos.inRangeTo(target, 3)) {
+                        TrafficManager.setStatic(creep);
+                        TrafficManager.registerBuild(creep, target);
+                    } else movement.moveTo(creep, target, { range: 3 });
                 } else if (state === 'upgrade') {
-                    if (creep.upgradeController(target) === ERR_NOT_IN_RANGE) movement.moveTo(creep, target, { range: 3 });
+                    if (creep.pos.inRangeTo(target, 3)) {
+                        TrafficManager.setStatic(creep);
+                        TrafficManager.registerUpgrade(creep, target);
+                    } else movement.moveTo(creep, target, { range: 3 });
                 } else if (state === 'fill' || state === 'refill') {
-                    const amount = creep.heap.amount !== undefined ? Math.min(creep.store.getUsedCapacity(RESOURCE_ENERGY), creep.heap.amount) : undefined;
-                    if (creep.transfer(target, RESOURCE_ENERGY, amount) === ERR_NOT_IN_RANGE) movement.moveTo(creep, target, { range: 1 });
+                    if (creep.pos.isNearTo(target)) {
+                        let amount = creep.heap.amount;
+                        if (amount === undefined) amount = creep.store.getUsedCapacity(RESOURCE_ENERGY);
+                        TrafficManager.registerTransfer(creep, target, RESOURCE_ENERGY, amount);
+                    } else movement.moveTo(creep, target, { range: 1 });
                 } else if (state === 'withdraw') {
-                    const amount = creep.heap.amount !== undefined ? Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), creep.heap.amount) : undefined;
-                    if (creep.withdraw(target, RESOURCE_ENERGY, amount) === ERR_NOT_IN_RANGE) movement.moveTo(creep, target, { range: 1 });
+                    if (creep.pos.isNearTo(target)) {
+                        let amount = creep.heap.amount;
+                        if (amount === undefined) amount = creep.store.getFreeCapacity(RESOURCE_ENERGY);
+                        TrafficManager.registerWithdraw(creep, target, RESOURCE_ENERGY, amount);
+                    } else movement.moveTo(creep, target, { range: 1 });
                 } else if (state === 'repair') {
-                    if (creep.repair(target) === ERR_NOT_IN_RANGE) movement.moveTo(creep, target, { range: 3 });
+                    if (creep.pos.inRangeTo(target, 3)) {
+                        TrafficManager.setStatic(creep);
+                        TrafficManager.registerRepair(creep, target);
+                    } else movement.moveTo(creep, target, { range: 3 });
                 }
             } catch (e) {
                 console.log(`[worker Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
