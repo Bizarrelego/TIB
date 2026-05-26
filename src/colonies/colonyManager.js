@@ -54,7 +54,7 @@ function runRoomManagers() {
     if (!global.State || !global.State.rooms) return;
 
     for (const roomName of global.State.rooms.keys()) {
-        const room = global.State.rooms.get(roomName);
+        const room = Game.rooms[roomName];
 
         if (!room || !room.controller || !room.controller.my) continue;
 
@@ -187,12 +187,16 @@ module.exports = { run: function colonyManager() {
 
     if (global.State && global.State.rooms && defconManager && typeof defconManager.run === 'function') {
         executeWrapped('defconManager.run', () => {
-            for (const room of global.State.rooms.values()) defconManager.run(room);
+            for (const roomName of global.State.rooms.keys()) {
+                const freshRoom = Game.rooms[roomName];
+                if (freshRoom) defconManager.run(freshRoom);
+            }
         });
     }
 
-    for (const room of global.State.rooms.values()) {
-        if (room.controller && room.controller.my === true) {
+    for (const roomName of global.State.rooms.keys()) {
+        const room = Game.rooms[roomName];
+        if (room && room.controller && room.controller.my === true) {
             try {
                 // Instantiate SpawnLedger globally for the room per tick
                 const spawnLedger = new SpawnLedger(room);

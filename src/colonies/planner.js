@@ -6,6 +6,7 @@ const BucketGatedDT = require('../os/BucketGatedDT');
 const rampartPlanner = require('./rampartPlanner');
 const { BASE_LAYOUT_STAMP, FAST_FILLER_SPOTS } = require('../constants/baseLayout');
 const roomPositionUtils = require('../utils/roomPositionUtils');
+const SegmentManager = require('../managers/SegmentManager');
 
 module.exports = {
     run: function(room) {
@@ -378,8 +379,8 @@ module.exports = {
                     if (count > 0) compressed += `${count}:${currentVal}`;
 
                     // Save to RawMemory segment (e.g. segment 10)
-                    RawMemory.segments[10] = compressed;
-                    RawMemory.setActiveSegments([10]);
+                    SegmentManager.queueWrite(10, compressed);
+                    SegmentManager.requestActive(10);
                 }
             }
 
