@@ -1,4 +1,3 @@
-const upgrader = require('../roles/upgrader');
 const LinkManager = require('./LinkManager');
 
 class UpgraderManager {
@@ -120,8 +119,23 @@ class UpgraderManager {
                 }
                 creep.heap.energyTargetId = energyTargetId;
 
-                upgrader.run(creep, room);
-            }
+                if (creep.store.getUsedCapacity() === 0) {
+                    creep.heap.state = 'withdraw';
+                } else if (creep.heap.overrideTask === 'build') {
+                    const sites = global.State.sitesByRoom.get(room.name);
+                    if (sites && sites.length > 0) {
+                        creep.heap.targetId = sites[0].id;
+                        creep.heap.state = 'build';
+                    } else {
+                        creep.heap.targetId = room.controller.id;
+                        creep.heap.state = 'upgrade';
+                    }
+                } else {
+                    creep.heap.targetId = room.controller.id;
+                    creep.heap.state = 'upgrade';
+                }
+
+                }
         } catch (e) {
             console.log(`[UpgraderManager Error] Room ${room.name}: ${e.stack}`);
         }

@@ -14,14 +14,9 @@ const PipelineLock = require('./PipelineLock');
 const AusterityTrigger = require('./AusterityTrigger');
 const Logger = require('../utils/logger');
 const OSInitializer = require('./OSInitializer');
-const GlobalStatePopulator = require('../state/GlobalStatePopulator');
-const colonyManager = require('../colonies/colonyManager');
-const operationsManager = require('../operations/operationsManager');
-const trafficManager = require('../traffic/trafficManager');
 const IntentManager = require('./IntentManager');
 const cpuThrottler = require('./cpuThrottler');
 const { wrapManager } = require('../utils/ManagerErrorBoundary');
-const VisualsManager = require('../managers/VisualsManager');
 
 class OSOrchestrator {
     static init() {

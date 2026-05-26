@@ -69,14 +69,21 @@ module.exports = {
         // Pre-count active tasks to hydrate the assignment tracking
         for (let i = 0; i < workers.length; i++) {
             const creep = workers[i];
-            if (creep.heap.activeTask === 'harvest' && creep.heap.targetId) {
-                const count = sourceAssignments.get(creep.heap.targetId) || 0;
-                sourceAssignments.set(creep.heap.targetId, count + 1);
-            }
-        }
 
-        for (let i = 0; i < workers.length; i++) {
-            const creep = workers[i];
+            if (creep.heap.isHarvesting && creep.store.getFreeCapacity() === 0) {
+                creep.heap.isHarvesting = false;
+                creep.heap.activeTask = null;
+                creep.heap.isStatic = false; // Un-anchor from the source
+                creep.heap.state = null;
+                creep.heap.targetId = null;
+            }
+            if (!creep.heap.isHarvesting && creep.store.getUsedCapacity() === 0) {
+                creep.heap.isHarvesting = true;
+                creep.heap.activeTask = null;
+                creep.heap.isStatic = false; // Un-anchor from the controller/hub
+                creep.heap.state = null;
+                creep.heap.targetId = null;
+            }
 
             if (creep.heap.activeTask) continue;
 

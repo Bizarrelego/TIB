@@ -1,7 +1,6 @@
 const Profiler = require('./utils/profiler');
 const managerOrchestrator = Profiler.wrap('managerOrchestrator', require('./managers/managerOrchestrator')); // Standalone Managers
 
-const OSOrchestrator = require('./os/OSOrchestrator');
 const managersIntegration = Profiler.wrap('managersIntegration', require('./managers/index'));
 const globalState = Profiler.wrap('globalState', require('./state/globalState'));
 const resetRecovery = Profiler.wrap('resetRecovery', require('./os/resetRecovery'));

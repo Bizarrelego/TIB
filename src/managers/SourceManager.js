@@ -137,6 +137,7 @@ const SourceManager = {
         if (creep) {
             if (!creep.heap) creep.heap = {};
             const optimalSpot = this.getOptimalMiningSpot(sourceId);
+            creep.heap.targetId = sourceId;
             if (optimalSpot && !creep.heap.targetPos) {
                 const sourceObj = Game.getObjectById(sourceId);
                 const rName = sourceObj ? sourceObj.room.name : creep.pos.roomName;
