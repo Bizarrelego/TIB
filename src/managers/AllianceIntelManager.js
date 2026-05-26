@@ -1,4 +1,5 @@
 const AllianceIntelShare = require('../utils/AllianceIntelShare');
+const SegmentManager = require('./SegmentManager');
 
 /**
  * @file AllianceIntelManager.js
@@ -58,7 +59,7 @@ class AllianceIntelManager {
      */
     writeSegment(segmentId) {
         const intelObj = Object.fromEntries(this.localIntel);
-        AllianceIntelShare.publishIntel(intelObj, segmentId);
+        SegmentManager.queueWrite(segmentId, intelObj);
     }
 
     /**
