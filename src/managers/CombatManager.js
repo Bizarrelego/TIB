@@ -215,6 +215,52 @@ class CombatManager {
                 creep.heap.targetId = null;
             }
         }
+
+        // coreSnipers
+        const coreSnipers = roomCreeps.get('coreSniper') || [];
+        for (let i = 0; i < coreSnipers.length; i++) {
+            const creep = coreSnipers[i];
+            const targetRoomName = creep.memory.targetRoom;
+
+            if (creep.room.name === targetRoomName) {
+                const targetController = Game.rooms[targetRoomName] && Game.rooms[targetRoomName].controller;
+                if (!targetController || targetController.my) {
+                    creep.heap.targetId = null;
+                    creep.heap.state = null;
+                    continue;
+                }
+
+                let target = null;
+                const roomHostiles = global.State.hostilesByRoom.get(targetRoomName) || [];
+
+                for (const hostile of roomHostiles) {
+                    if (hostile.pos.getRangeTo(targetController) <= 3) {
+                        let isUpgrader = false;
+                        if (hostile.body) {
+                            isUpgrader = hostile.body.some(p => p.type === WORK || p.type === CARRY);
+                        } else {
+                            isUpgrader = true;
+                        }
+
+                        if (isUpgrader) {
+                            target = hostile;
+                            break;
+                        }
+                    }
+                }
+
+                if (target) {
+                    creep.heap.targetId = target.id;
+                    creep.heap.state = 'attack';
+                } else {
+                    creep.heap.targetId = targetController.id;
+                    creep.heap.state = 'attackController';
+                }
+            } else {
+                creep.heap.targetId = null;
+                creep.heap.state = 'move';
+            }
+        }
     }
 
     static getBestTarget(creep, hostiles) {

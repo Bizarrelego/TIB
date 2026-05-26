@@ -25,6 +25,8 @@ module.exports = {
                     if (creep.attack(target) === ERR_NOT_IN_RANGE) {
                         movement.moveTo(creep, target);
                     }
+                } else {
+                    creep.heap.targetId = null;
                 }
             } catch (e) {
                 console.log(`[drainerHunter Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);

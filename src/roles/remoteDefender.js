@@ -43,6 +43,8 @@ module.exports = {
                         const kiteTarget = Game.getObjectById(targetId);
                         if (kiteTarget && creep.pos.isNearTo(kiteTarget)) {
                             creep.attack(kiteTarget);
+                        } else if (!kiteTarget) {
+                            creep.heap.targetId = null;
                         }
                     }
                     continue; // Kiting movement already handled or should be handled by manager, or fallback
@@ -54,6 +56,10 @@ module.exports = {
                         if (creep.attack(target) === ERR_NOT_IN_RANGE) {
                             movement.moveTo(creep, target);
                         }
+                    } else {
+                        creep.heap.targetId = null;
+                        creep.heap.state = null;
+                        movement.moveTo(creep, new RoomPosition(25, 25, targetRoomName));
                     }
                 } else {
                     // Go to center if no targets found

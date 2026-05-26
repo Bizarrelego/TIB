@@ -4,7 +4,7 @@ function getDistance(pos1, pos2) {
     return Math.max(Math.abs(pos1.x - pos2.x), Math.abs(pos1.y - pos2.y));
 }
 
-function run(room) {
+function run(room, defenseRepairTarget) {
     if (Game.cpu.bucket < 500) return;
 
     try {
@@ -12,10 +12,12 @@ function run(room) {
         const structuresMap = global.State.structuresByRoom.get(room.name);
         if (!structuresMap) return;
 
-        const towers = structuresMap.get(STRUCTURE_TOWER) || [];
+        const towers = Array.from(structuresMap.get(STRUCTURE_TOWER) || []).map(t => (Array.isArray(t) ? t[1] : t));
         if (towers.length === 0) return;
 
-        let targetHostile = null;
+        let primaryTarget = null;
+        let action = null;
+
         const hostilesMap = global.State.hostilesByRoom ? global.State.hostilesByRoom.get(room.name) : null;
         if (hostilesMap && hostilesMap.size > 0) {
             const referencePos = towers[0].pos;
@@ -43,35 +45,26 @@ function run(room) {
                     if (danger > maxDanger || (danger === maxDanger && dist < minDistance)) {
                         maxDanger = danger;
                         minDistance = dist;
-                        targetHostile = hostile;
+                        primaryTarget = hostile.id;
+                        action = 'attack';
                     }
                 }
             }
         }
 
-        for (let i = 0; i < towers.length; i++) {
-            const tower = towers[i];
-            if (tower.store.getUsedCapacity(RESOURCE_ENERGY) >= 10 && targetHostile) {
-                const dist = getDistance(tower.pos, targetHostile.pos);
-                
-                // Component 61: Tower Calculus (Damage vs. Heal)
-                let damage = 150;
-                if (dist > 5) {
-                    if (dist > 20) {
-                        damage = 60;
-                    } else {
-                        damage -= (dist - 5) * 6; // 150 - (dist-5) * 6
-                    }
-                }
-                
-                let enemyHeal = 0;
-                if (global.State && global.State.enemyProfiles && global.State.enemyProfiles.has(targetHostile.id)) {
-                    enemyHeal = global.State.enemyProfiles.get(targetHostile.id).healParts * 12;
-                }
+        if (!primaryTarget && defenseRepairTarget) {
+            primaryTarget = defenseRepairTarget.id;
+            action = 'repair';
+        }
 
-                if (dist <= 50) {
-                    tower.attack(targetHostile);
-                }
+        // Write intents top-down
+        if (!global.State.towerIntents) global.State.towerIntents = new Map();
+
+        for (const tower of towers) {
+            if (primaryTarget) {
+                global.State.towerIntents.set(tower.id, { action: action, targetId: primaryTarget });
+            } else {
+                global.State.towerIntents.delete(tower.id);
             }
         }
     } catch (e) {
@@ -81,12 +74,12 @@ function run(room) {
 
 const runTicks = new Map();
 
-function executeRun(room) {
+function executeRun(room, defenseRepairTarget) {
     const key = room.name + '_attack';
     if (runTicks.get(key) === Game.time) return;
     runTicks.set(key, Game.time);
 
-    run(room);
+    run(room, defenseRepairTarget);
 }
 
 eventBus.subscribe('HOSTILE_SPOTTED', (payload) => {
