@@ -27,7 +27,7 @@ function run(room) {
             if (!state || state === 'idle' || !targetId) continue;
 
             const target = Game.getObjectById(targetId);
-            if (!target) continue;
+            if (!target) { creep.heap.targetId = null; creep.heap.state = null; continue; }
 
             if (!creep.pos.isNearTo(target)) {
                 movement.moveTo(creep, target.pos);

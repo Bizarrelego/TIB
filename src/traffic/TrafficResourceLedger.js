@@ -1,12 +1,4 @@
-/**
- * @typedef {Object} ResourceLedgerEntry
- * @property {number} amount
- */
-
 class TrafficResourceLedger {
-    /**
-     * @returns {Map<string, Map<string, number>>}
-     */
     static get ledger() {
         if (!global.TrafficResourceLedgerMap) {
             global.TrafficResourceLedgerMap = new Map();
@@ -15,38 +7,31 @@ class TrafficResourceLedger {
     }
 
     /**
-     * Clears the ledger. Intended to be called at the start of a tick.
+     * Do NOT call clear() blindly every tick.
+     * The ledger manages its own memory via TTL pruning in queryAvailable.
      */
     static clear() {
-        this.ledger.clear();
+        // Obsolete. If you clear this every tick, multi-tick intents are deleted.
     }
 
-    /**
-     * Registers a transfer intent.
-     * @param {string} targetId The ID of the target (creep or structure).
-     * @param {string} resourceType The type of resource.
-     * @param {number} amount The amount to register.
-     */
-    static registerTransfer(targetId, resourceType, amount) {
+    static registerTransfer(targetId, resourceType, amount, ttl = 15) {
         const ledger = this.ledger;
         if (!ledger.has(targetId)) {
             ledger.set(targetId, new Map());
         }
+
         const targetLedger = ledger.get(targetId);
-        const currentAmount = targetLedger.get(resourceType) || 0;
-        targetLedger.set(resourceType, currentAmount + amount);
+        if (!targetLedger.has(resourceType)) {
+            targetLedger.set(resourceType, []);
+        }
+
+        const claims = targetLedger.get(resourceType);
+        claims.push({ amount: amount, expiryTick: Game.time + ttl });
     }
 
-    /**
-     * Queries the available sub-tick amount for a target.
-     * @param {string} targetId The ID of the target (creep or structure).
-     * @param {string} resourceType The type of resource.
-     * @returns {number} The available amount considering sub-tick registered intents.
-     */
     static queryAvailable(targetId, resourceType) {
         let currentStored = 0;
 
-        // Attempt to get the actual game object
         let target = null;
         if (typeof Game !== 'undefined' && Game.getObjectById) {
             target = Game.getObjectById(targetId);
@@ -68,9 +53,19 @@ class TrafficResourceLedger {
 
         const ledger = this.ledger;
         let registeredDelta = 0;
+
         if (ledger.has(targetId)) {
             const targetLedger = ledger.get(targetId);
-            registeredDelta = targetLedger.get(resourceType) || 0;
+            let claims = targetLedger.get(resourceType) || [];
+
+            // Garbage Collection: Prune expired intents
+            claims = claims.filter(claim => claim.expiryTick > Game.time);
+            targetLedger.set(resourceType, claims);
+
+            // Sum active deltas
+            for (let i = 0; i < claims.length; i++) {
+                registeredDelta += claims[i].amount;
+            }
         }
 
         return currentStored + registeredDelta;

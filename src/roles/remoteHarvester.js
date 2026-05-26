@@ -38,19 +38,19 @@ function run(room) {
             }
 
             // In the target room and off the exit.
-            const targetSourceId = creep.memory.targetSourceId;
+            const targetSourceId = creep.heap.targetSourceId;
             if (!targetSourceId) {
                 // For early poaching we might not have a target source set, just find the closest
                 const sources = global.State.sourcesByRoom.get(creep.room.name) || [];
                 if (sources.length > 0) {
-                    creep.memory.targetSourceId = sources[0].id;
+                    creep.heap.targetSourceId = sources[0].id;
                 } else {
                     continue;
                 }
             }
 
-            const source = Game.getObjectById(creep.memory.targetSourceId);
-            if (!source) continue;
+            const source = Game.getObjectById(creep.heap.targetSourceId);
+            if (!source) { creep.heap.targetSourceId = null; creep.heap.state = null; continue; }
 
             // Strict containerless remote mining: drop energy on the ground unconditionally.
             if (creep.harvest(source) === ERR_NOT_IN_RANGE) {

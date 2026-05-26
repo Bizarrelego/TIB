@@ -100,8 +100,8 @@ module.exports = {
                             creep.heap.state = 'transfer';
                         } else {
                             // Wait around the target ID if known, else center
-                            if (creep.memory.targetId) {
-                                const powerBank = Game.getObjectById(creep.memory.targetId);
+                            if (creep.heap.targetId) {
+                                const powerBank = Game.getObjectById(creep.heap.targetId);
                                 if (powerBank && !creep.pos.inRangeTo(powerBank, 3)) {
                                     movement.moveTo(creep, powerBank);
                                 }

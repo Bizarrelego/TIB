@@ -34,8 +34,8 @@ function manageEarlyProgression(room, _spawnLedger) {
         if (!creep.heap.targetId && sources.length > 0) {
             creep.heap.targetId = sources[i % sources.length].id;
         }
-        if (!creep.memory.targetSourceId && sources.length > 0) {
-            creep.memory.targetSourceId = sources[i % sources.length].id;
+        if (!creep.heap.targetSourceId && sources.length > 0) {
+            creep.heap.targetSourceId = sources[i % sources.length].id;
         }
     }
 

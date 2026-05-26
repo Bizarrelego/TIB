@@ -26,6 +26,8 @@ function garbageCollector() {
             }
         }
 
+
+
         if (global.State && global.State.creepLookup) {
             for (const name of global.State.creepLookup.keys()) {
                 if (!Game.creeps[name]) {

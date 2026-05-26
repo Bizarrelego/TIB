@@ -20,7 +20,7 @@ module.exports = {
             try {
                 if (creep.fatigue > 0 || TrafficManager.checkPipeline(creep.id)) continue;
 
-                const targetSourceId = creep.memory.targetSourceId;
+                const targetSourceId = creep.heap.targetSourceId;
                 const targetRoomName = creep.memory.targetRoom;
 
                 if (!targetSourceId || !targetRoomName) continue;
