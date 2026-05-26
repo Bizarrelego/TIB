@@ -2,7 +2,7 @@ const ResourceTransferLedger = require('../colonies/ResourceTransferLedger');
 const ROLE_PRIORITIES = require('../constants/rolePriorities');
 const Logger = require('../utils/logger');
 const ShovingLogic = require('./ShovingLogic');
-
+const DeadlockEngine = require('./deadlock');
 
 /**
  * @typedef {Object} PipelineLock
@@ -116,6 +116,57 @@ const TrafficManager = {
 
                 if (intendedNextPos) {
                     intent.intendedNextPos = intendedNextPos;
+                }
+            }
+
+            // Phase 2: Build Dependency Graph for Deadlock Resolution
+            const dependencyGraph = new Map();
+            for (const intent of global.State.trafficIntents.values()) {
+                const { creep, intendedNextPos } = intent;
+                if (!creep || !intendedNextPos) continue;
+
+                const roomMap = currentPositions.get(intendedNextPos.roomName);
+                if (roomMap) {
+                    const posKey = (intendedNextPos.x << 6) | intendedNextPos.y;
+                    const blockingCreepName = roomMap.get(posKey);
+                    if (blockingCreepName && blockingCreepName !== creep.name) {
+                        dependencyGraph.set(creep.name, blockingCreepName);
+                    }
+                }
+            }
+
+            // Detect and resolve deadlocks
+            DeadlockEngine.detectAndResolve(global.State.trafficIntents, dependencyGraph);
+
+            // Phase 3: Execute Moves (O(1) Priority Buckets)
+            const buckets = new Array(101);
+            for (let i = 0; i <= 100; i++) buckets[i] = [];
+
+            for (const intent of global.State.trafficIntents.values()) {
+                let priority = (intent.creep && intent.creep.memory && intent.creep.memory.role) ? (ROLE_PRIORITIES.get(intent.creep.memory.role) || 0) : 0;
+                priority = Math.max(0, Math.min(100, priority));
+                buckets[priority].push(intent);
+            }
+
+            for (let p = 100; p >= 0; p--) {
+                const bucket = buckets[p];
+                for (let i = 0; i < bucket.length; i++) {
+                    const intent = bucket[i];
+                    const { creep, intendedNextPos } = intent;
+                    if (!creep) continue;
+
+                    if (intendedNextPos) {
+                        const swapped = ShovingLogic.processShove(creep, intendedNextPos, currentPositions);
+                        if (swapped) {
+                            global.State.trafficIntents.delete(creep.name);
+                            continue;
+                        }
+
+                        const dir = creep.pos.getDirectionTo(intendedNextPos);
+                        if (dir) creep.move(dir);
+                    }
+
+                    global.State.trafficIntents.delete(creep.name);
                 }
             }
         } catch (e) {
@@ -399,41 +450,6 @@ const TrafficManager = {
                 }
             }
 
-            if (!global.State || !global.State.trafficIntents || global.State.trafficIntents.size === 0) return;
-
-            // Phase 3: Execute Moves (O(1) Priority Buckets)
-            const buckets = new Array(101);
-            for (let i = 0; i <= 100; i++) buckets[i] = [];
-
-            for (const intent of global.State.trafficIntents.values()) {
-                let priority = (intent.creep && intent.creep.memory && intent.creep.memory.role) ? (ROLE_PRIORITIES.get(intent.creep.memory.role) || 0) : 0;
-                priority = Math.max(0, Math.min(100, priority));
-                buckets[priority].push(intent);
-            }
-
-            const currentPositions = global.State.currentPositions || new Map();
-
-            for (let p = 100; p >= 0; p--) {
-                const bucket = buckets[p];
-                for (let i = 0; i < bucket.length; i++) {
-                    const intent = bucket[i];
-                    const { creep, intendedNextPos } = intent;
-                    if (!creep) continue;
-
-                if (intendedNextPos) {
-                    const swapped = ShovingLogic.processShove(creep, intendedNextPos, currentPositions);
-                    if (swapped) {
-                        global.State.trafficIntents.delete(creep.name);
-                        continue;
-                    }
-
-                    const dir = creep.pos.getDirectionTo(intendedNextPos);
-                    if (dir) creep.move(dir);
-                }
-
-                global.State.trafficIntents.delete(creep.name);
-            }
-            }
         } catch (e) {
             console.log(`[TrafficManager Execution Error]: ${e.stack}`);
         }
