@@ -383,7 +383,7 @@ const LogisticsManager = {
 
 
         // HAULER & DOMESTIC HAULER ASSIGNMENT LOGIC
-        const domesticHaulers = roomCreeps.get('domesticHauler') || [];
+        // domesticHaulers already declared above
         const structures = global.State.structuresByRoom.get(room.name);
         const fastFillers = roomCreeps.get('fastFiller') || [];
         const ignoreCore = fastFillers.length > 0;

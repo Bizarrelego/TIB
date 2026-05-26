@@ -30,7 +30,6 @@ module.exports = {
         const haulers = roomCreeps.get('hauler');
         if (!haulers) return;
 
-        const fastFillers = roomCreeps.get('fastFiller') || [];
 
         for (const creep of haulers) {
             try {
