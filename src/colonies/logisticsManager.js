@@ -385,7 +385,7 @@ const LogisticsManager = {
         // HAULER & DOMESTIC HAULER ASSIGNMENT LOGIC
         // domesticHaulers already declared above
         const structures = global.State.structuresByRoom.get(room.name);
-        const fastFillers = roomCreeps.get('fastFiller') || [];
+        // fastFillers already declared above
         const ignoreCore = fastFillers.length > 0;
 
         // Domestic Haulers (Source: Drops/Containers/Storage -> Sink: Spawns/Ext/Towers/Storage)
