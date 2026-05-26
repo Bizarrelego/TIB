@@ -1,4 +1,5 @@
 const MEMORY_SEGMENTS = require('../constants/memorySegments');
+const SegmentManager = require('../managers/SegmentManager');
 
 /**
  * Manages storage and retrieval of data in RawMemory segments.
@@ -128,7 +129,9 @@ class RawMemoryManager {
             }
         }
 
-        RawMemory.setActiveSegments(Array.from(segmentsToActivate));
+        for (const seg of segmentsToActivate) {
+            SegmentManager.requestActive(seg);
+        }
     }
 
     /**

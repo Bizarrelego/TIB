@@ -1,6 +1,7 @@
 const Profiler = require('../utils/profiler');
 const { wrapModuleFunctions } = require('../utils/moduleWrapper');
 const { executeManager } = require('../utils/errorHandler');
+const SegmentManager = require('../managers/SegmentManager');
 /**
  * @file intel.js
  * @description Manages cross-room intel, heatmaps, and RawMemory mapping.
@@ -215,7 +216,8 @@ function buildHeatmaps() {
  */
 function mapToRawMemory() {
     // Request segments
-    RawMemory.setActiveSegments([0, 1]);
+    SegmentManager.requestActive(0);
+    SegmentManager.requestActive(1);
 
     // Segment 0: Intel
     if (global.State.intel) {
