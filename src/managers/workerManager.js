@@ -70,78 +70,97 @@ module.exports = {
         for (let i = 0; i < workers.length; i++) {
             const creep = workers[i];
 
-            if (creep.heap.isHarvesting && creep.store.getFreeCapacity() === 0) {
-                creep.heap.isHarvesting = false;
-                creep.heap.activeTask = null;
-                creep.heap.isStatic = false; // Un-anchor from the source
-                creep.heap.state = null;
-                creep.heap.targetId = null;
-            }
-            if (!creep.heap.isHarvesting && creep.store.getUsedCapacity() === 0) {
-                creep.heap.isHarvesting = true;
-                creep.heap.activeTask = null;
-                creep.heap.isStatic = false; // Un-anchor from the controller/hub
-                creep.heap.state = null;
-                creep.heap.targetId = null;
-            }
-
-            if (creep.heap.activeTask) continue;
-
             if (isFatigued(creep)) continue;
 
-            if (creep.heap.state === 'harvest' && creep.heap.targetId) {
-                const source = Game.getObjectById(creep.heap.targetId);
-                if (source && isSleeping(source)) continue;
+            // 1. Evaluate State Transition
+            if (creep.store.getUsedCapacity() === 0) {
+                creep.heap.state = 'get_energy';
+                creep.heap.subState = null;
+                creep.heap.targetId = null;
+            } else if (creep.store.getFreeCapacity() === 0) {
+                creep.heap.state = 'work';
+                creep.heap.subState = null;
+                creep.heap.targetId = null;
             }
-            
+
             // Only assign if idle or task is finished
-            if (creep.heap.state && creep.heap.targetId) continue;
-            
-            if (!creep.heap.isHarvesting) {
-                // Find highest priority valid task
-                for (let j = 0; j < tasks.length; j++) {
-                    const task = tasks[j];
-                    if (task && task.target) {
-                        if (task.type === 'fill' || task.type === 'repair' || task.type === 'build' || task.type === 'upgrade') {
-                            const VirtualLedger = require('../utils/VirtualLedger');
-                            // Refill tasks should pull amount from the free space, and we'll use creep.heap.amount
-                            // We aren't strictly claiming positive space on target, but the ledger is about reserving space
-                            // For simplicity to meet the strict bounds, if task.free is defined (like for spawns/extensions), set amount
-                            if (task.type === 'fill' && task.free !== undefined) {
-                                const claimAmount = Math.min(creep.store.getUsedCapacity(RESOURCE_ENERGY), task.free);
-                                VirtualLedger.registerIntent(task.target.id, RESOURCE_ENERGY, claimAmount);
-                                creep.heap.amount = claimAmount;
+            if (creep.heap.subState && creep.heap.targetId) continue;
+
+            // 2. Assign Targets Based on State
+            if (creep.heap.state === 'get_energy') {
+                if (room.controller && room.controller.level < 3) {
+                    // RCL 1-2 Logic: Find dropped energy or harvest directly
+                    const dropped = room.find(FIND_DROPPED_RESOURCES, { filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 50 });
+                    if (dropped.length > 0) {
+                        creep.heap.targetId = dropped[0].id;
+                        creep.heap.subState = 'pickup';
+                    } else {
+                        const source = room.find(FIND_SOURCES_ACTIVE)[0];
+                        creep.heap.targetId = source ? source.id : null;
+                        creep.heap.subState = 'harvest';
+                    }
+                } else {
+                    // RCL 3+ Logic: Use VirtualLedger and Storage
+                    // Find highest priority valid supply task
+                    for (let j = 0; j < supplyTasks.length; j++) {
+                        const task = supplyTasks[j];
+                        if (task && task.target) {
+                            if (task.type === 'pickup' || task.type === 'withdraw') {
+                                const VirtualLedger = require('../utils/VirtualLedger');
+                                const maxWanted = creep.store.getFreeCapacity(RESOURCE_ENERGY);
+                                const claimed = VirtualLedger.claim(creep, task.target, RESOURCE_ENERGY, maxWanted);
+                                if (claimed < 0) continue;
+                                creep.heap.amount = claimed;
                             }
+                            if (task.type === 'harvest') {
+                                const assignedCount = sourceAssignments.get(task.target.id) || 0;
+                                if (assignedCount >= 3) continue;
+                                sourceAssignments.set(task.target.id, assignedCount + 1);
+                            }
+                            creep.heap.subState = task.type;
+                            creep.heap.targetId = task.target.id;
+                            if (task.type === 'harvest') {
+                                creep.heap.activeTask = 'harvest';
+                            }
+                            break;
                         }
-                        creep.heap.state = task.type;
-                        creep.heap.targetId = task.target.id;
-                        // For non-repeatable tasks, we could splice it out here.
-                        break;
                     }
                 }
-            } else {
-                // Find highest priority valid supply task
-                for (let j = 0; j < supplyTasks.length; j++) {
-                    const task = supplyTasks[j];
-                    if (task && task.target) {
-                        if (task.type === 'pickup' || task.type === 'withdraw') {
-                            const VirtualLedger = require('../utils/VirtualLedger');
-                            const maxWanted = creep.store.getFreeCapacity(RESOURCE_ENERGY);
-                            const claimed = VirtualLedger.claim(creep, task.target, RESOURCE_ENERGY, maxWanted);
-                            if (claimed < 0) continue;
-                            creep.heap.amount = claimed;
+            } else if (creep.heap.state === 'work') {
+                if (room.controller && room.controller.level < 3) {
+                    const buildSites = room.find(FIND_MY_CONSTRUCTION_SITES);
+                    const spawn = room.find(FIND_MY_SPAWNS)[0];
+                    if (spawn && spawn.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                        creep.heap.targetId = spawn.id;
+                        creep.heap.subState = 'fill';
+                    } else if (buildSites.length > 0) {
+                        creep.heap.targetId = buildSites[0].id;
+                        creep.heap.subState = 'build';
+                    } else if (room.controller) {
+                        creep.heap.targetId = room.controller.id;
+                        creep.heap.subState = 'upgrade';
+                    }
+                } else {
+                    // Find highest priority valid task
+                    for (let j = 0; j < tasks.length; j++) {
+                        const task = tasks[j];
+                        if (task && task.target) {
+                            if (task.type === 'fill' || task.type === 'repair' || task.type === 'build' || task.type === 'upgrade') {
+                                const VirtualLedger = require('../utils/VirtualLedger');
+                                // Refill tasks should pull amount from the free space, and we'll use creep.heap.amount
+                                // We aren't strictly claiming positive space on target, but the ledger is about reserving space
+                                // For simplicity to meet the strict bounds, if task.free is defined (like for spawns/extensions), set amount
+                                if (task.type === 'fill' && task.free !== undefined) {
+                                    const claimAmount = Math.min(creep.store.getUsedCapacity(RESOURCE_ENERGY), task.free);
+                                    VirtualLedger.registerIntent(task.target.id, RESOURCE_ENERGY, claimAmount);
+                                    creep.heap.amount = claimAmount;
+                                }
+                            }
+                            creep.heap.subState = task.type;
+                            creep.heap.targetId = task.target.id;
+                            // For non-repeatable tasks, we could splice it out here.
+                            break;
                         }
-                        if (task.type === 'harvest') {
-                            const assignedCount = sourceAssignments.get(task.target.id) || 0;
-                            if (assignedCount >= 3) continue;
-                            sourceAssignments.set(task.target.id, assignedCount + 1);
-                        }
-                        creep.heap.state = task.type;
-                        creep.heap.targetId = task.target.id;
-                        if (task.type === 'harvest') {
-                            creep.heap.activeTask = 'harvest';
-                        }
-                        break;
                     }
                 }
             }

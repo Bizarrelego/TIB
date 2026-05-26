@@ -26,9 +26,9 @@ module.exports = {
                 // State resets are now handled directly by the manager
 
                 if (TrafficManager.checkPipeline(creep.id)) continue;
-                const isFatigued = fatigueGating.isFatigued(creep);
+                if (fatigueGating.isFatigued(creep)) continue;
 
-                const state = creep.heap.state;
+                const state = creep.heap.subState || creep.heap.state;
                 const targetId = creep.heap.targetId;
 
                 creep.heap.isStatic = false;
@@ -38,118 +38,27 @@ module.exports = {
                 const target = Game.getObjectById(targetId);
                 if (!target) {
                     creep.heap.targetId = null;
-                    creep.heap.state = null;
+                    creep.heap.subState = null;
+                    // Do not clear creep.heap.state, so the manager can re-evaluate the target
                     continue;
                 }
 
-                if (state === 'harvest') {
-                    if (creep.pos.isNearTo(target)) {
-                        TrafficManager.setStatic(creep);
-                        creep.heap.isStatic = true;
-                        const status = TrafficManager.registerHarvest(creep, target);
-                        if (status === ERR_NOT_ENOUGH_RESOURCES) {
-                            creep.heap.targetId = null;
-                            creep.heap.state = null;
-                        }
-                    } else if (!isFatigued) {
-                        movement.moveTo(creep, target, { range: 1 });
-                    }
-                } else if (state === 'pickup') {
-                    if ((target.store && target.store[RESOURCE_ENERGY] === 0) || (target.amount !== undefined && target.amount === 0)) {
-                        creep.heap.targetId = null;
-                        creep.heap.state = null;
-                        continue;
-                    }
-                    if (creep.pos.isNearTo(target)) {
-                        let status;
-                        const amountToWithdraw = creep.heap.amount !== undefined ?
-                            Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), creep.heap.amount) :
-                            creep.store.getFreeCapacity(RESOURCE_ENERGY);
-
-                        if (amountToWithdraw <= 0) {
-                            creep.heap.targetId = null;
-                            creep.heap.state = null;
-                            continue;
-                        }
-
-                        if (target.amount !== undefined) {
-                            status = TrafficManager.registerPickup(creep, target, RESOURCE_ENERGY, amountToWithdraw);
-                        } else if (target.store !== undefined) {
-                            status = TrafficManager.registerWithdraw(creep, target, RESOURCE_ENERGY, amountToWithdraw);
-                        }
-                        if (status === ERR_NOT_ENOUGH_RESOURCES) {
-                            creep.heap.targetId = null;
-                            creep.heap.state = null;
-                        }
-                    } else if (!isFatigued) {
-                        movement.moveTo(creep, target);
-                    }
-                } else if (state === 'withdraw') {
-                    if ((target.store && target.store[RESOURCE_ENERGY] === 0) || (target.amount !== undefined && target.amount === 0)) {
-                        creep.heap.targetId = null;
-                        creep.heap.state = null;
-                        continue;
-                    }
-                    if (creep.pos.isNearTo(target)) {
-                        let status;
-                        const amountToWithdraw = creep.heap.amount !== undefined ?
-                            Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), creep.heap.amount) :
-                            creep.store.getFreeCapacity(RESOURCE_ENERGY);
-
-                        if (amountToWithdraw <= 0) {
-                            creep.heap.targetId = null;
-                            creep.heap.state = null;
-                            continue;
-                        }
-
-                        if (target.store !== undefined) {
-                            status = TrafficManager.registerWithdraw(creep, target, RESOURCE_ENERGY, amountToWithdraw);
-                        } else if (target.amount !== undefined) {
-                            status = TrafficManager.registerPickup(creep, target, RESOURCE_ENERGY, amountToWithdraw);
-                        }
-                        if (status === ERR_NOT_ENOUGH_RESOURCES) {
-                            creep.heap.targetId = null;
-                            creep.heap.state = null;
-                        }
-                    } else if (!isFatigued) {
-                        movement.moveTo(creep, target);
-                    }
-                } else if (state === 'fill' || state === 'refill') { // Fixes the string bug
-                    if (creep.pos.isNearTo(target)) {
-                        const amountToFill = creep.heap.amount !== undefined ?
-                            Math.min(creep.store.getUsedCapacity(RESOURCE_ENERGY), creep.heap.amount) :
-                            creep.store.getUsedCapacity(RESOURCE_ENERGY);
-
-                        if (amountToFill > 0) {
-                            TrafficManager.registerTransfer(creep, target, RESOURCE_ENERGY, amountToFill);
-                        } else {
-                            creep.heap.targetId = null;
-                            creep.heap.state = null;
-                        }
-                    } else if (!isFatigued) {
-                        movement.moveTo(creep, target);
-                    }
+                if (state === 'pickup') {
+                    if (creep.pickup(target) === ERR_NOT_IN_RANGE) movement.moveTo(creep, target);
+                } else if (state === 'harvest') {
+                    if (creep.harvest(target) === ERR_NOT_IN_RANGE) movement.moveTo(creep, target, { range: 1 });
                 } else if (state === 'build') {
-                    if (creep.pos.inRangeTo(target, 3)) {
-                        TrafficManager.setStatic(creep);
-                        TrafficManager.registerBuild(creep, target);
-                    } else if (!isFatigued) {
-                        movement.moveTo(creep, target, { range: 3 });
-                    }
+                    if (creep.build(target) === ERR_NOT_IN_RANGE) movement.moveTo(creep, target, { range: 3 });
                 } else if (state === 'upgrade') {
-                    if (creep.pos.inRangeTo(target, 3)) {
-                        TrafficManager.setStatic(creep);
-                        TrafficManager.registerUpgrade(creep, target);
-                    } else if (!isFatigued) {
-                        movement.moveTo(creep, target, { range: 3 });
-                    }
+                    if (creep.upgradeController(target) === ERR_NOT_IN_RANGE) movement.moveTo(creep, target, { range: 3 });
+                } else if (state === 'fill' || state === 'refill') {
+                    const amount = creep.heap.amount !== undefined ? Math.min(creep.store.getUsedCapacity(RESOURCE_ENERGY), creep.heap.amount) : undefined;
+                    if (creep.transfer(target, RESOURCE_ENERGY, amount) === ERR_NOT_IN_RANGE) movement.moveTo(creep, target, { range: 1 });
+                } else if (state === 'withdraw') {
+                    const amount = creep.heap.amount !== undefined ? Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), creep.heap.amount) : undefined;
+                    if (creep.withdraw(target, RESOURCE_ENERGY, amount) === ERR_NOT_IN_RANGE) movement.moveTo(creep, target, { range: 1 });
                 } else if (state === 'repair') {
-                    if (creep.pos.inRangeTo(target, 3)) {
-                        TrafficManager.setStatic(creep);
-                        TrafficManager.registerRepair(creep, target);
-                    } else if (!isFatigued) {
-                        movement.moveTo(creep, target, { range: 3 });
-                    }
+                    if (creep.repair(target) === ERR_NOT_IN_RANGE) movement.moveTo(creep, target, { range: 3 });
                 }
             } catch (e) {
                 console.log(`[worker Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);

@@ -89,6 +89,16 @@ module.exports = {
                 }
             }
 
+            // Emergency Bootstrap Override
+            if (workerCount === 0 && harvesterCount === 0) {
+                // Bypass all ledger and queue logic. Force an immediate spawn.
+                if (spawns.length > 0 && room.energyAvailable >= 200) {
+                    const spawn = spawns[0];
+                    spawn.spawnCreep([WORK, CARRY, MOVE], `bootstrap_${Game.time}`, { memory: { role: 'worker', colony: room.name }});
+                    return; // Halt all other spawn logic for this room this tick
+                }
+            }
+
             const desiredCounts = CreepRoleBalancer.calculateDesiredRoleCounts(room.name);
             const targetWorkers = desiredCounts.get('worker') || 0;
             const targetHarvesters = desiredCounts.get('harvester') || 0;
