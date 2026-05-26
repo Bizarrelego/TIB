@@ -11,6 +11,8 @@
         "FIND_TOMBSTONES": "readonly",
         "InterShardMemory": "readonly",
         "STRUCTURE_FACTORY": "readonly",
+        "STRUCTURE_RUIN": "readonly",
+        "STRUCTURE_TOMBSTONE": "readonly",
         "EVENT_ATTACK": "readonly",
         "EVENT_BUILD": "readonly",
         "EVENT_OBJECT_DESTROYED": "readonly",
