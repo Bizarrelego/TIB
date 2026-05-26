@@ -127,7 +127,7 @@ module.exports = {
                         if (task.type === 'pickup' || task.type === 'withdraw') {
                             const VirtualLedger = require('../utils/VirtualLedger');
                             const maxWanted = creep.store.getFreeCapacity(RESOURCE_ENERGY);
-                            const claimed = VirtualLedger.claim(task.target, RESOURCE_ENERGY, maxWanted);
+                            const claimed = VirtualLedger.claim(creep, task.target, RESOURCE_ENERGY, maxWanted);
                             if (claimed < 0) continue;
                             creep.heap.amount = claimed;
                         }

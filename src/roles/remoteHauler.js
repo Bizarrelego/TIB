@@ -25,11 +25,11 @@ function run(room) {
 
             if (!remoteRoomName || !homeRoomName) continue;
 
-            if (creep.memory.hauling && creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
-                creep.memory.hauling = false;
+            if (creep.heap.hauling && creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+                creep.heap.hauling = false;
             }
-            if (!creep.memory.hauling && creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
-                creep.memory.hauling = true;
+            if (!creep.heap.hauling && creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+                creep.heap.hauling = true;
             }
 
             const state = creep.heap.state;
@@ -47,6 +47,7 @@ function run(room) {
 
                 if (!targetId) continue;
                 const target = Game.getObjectById(targetId);
+                if (!target) { creep.heap.targetId = null; creep.heap.state = null; continue; }
                 if (target) {
                     if (creep.pickup(target) === ERR_NOT_IN_RANGE) {
                         movement.moveTo(creep, target);
@@ -64,6 +65,7 @@ function run(room) {
 
                 if (!targetId) continue;
                 const target = Game.getObjectById(targetId);
+                if (!target) { creep.heap.targetId = null; creep.heap.state = null; continue; }
                 if (target) {
                     if (creep.transfer(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
                         movement.moveTo(creep, target);

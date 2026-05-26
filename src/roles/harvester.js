@@ -29,10 +29,7 @@ module.exports = {
                 if (!targetId) continue;
 
                 const target = Game.getObjectById(targetId);
-                if (!target) {
-                    creep.heap.targetId = null;
-                    continue;
-                }
+                if (!target) { creep.heap.targetId = null; creep.heap.state = null; continue; }
 
                 if (target.ticksToRegeneration !== undefined && sourceSleep.isSleeping(target)) {
                     continue;

@@ -31,7 +31,7 @@ module.exports = {
                 if (creep.fatigue > 0) continue; // Fatigue gating
 
                 // HVT Target selection (e.g. Storage, Spawn)
-                const targetId = creep.heap.targetId || creep.memory.targetId;
+                const targetId = creep.heap.targetId;
                 const target = Game.getObjectById(targetId);
 
                 if (target) {

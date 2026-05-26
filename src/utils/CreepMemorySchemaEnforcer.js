@@ -5,7 +5,7 @@
 
 const Logger = require('./logger');
 
-const ALLOWED_PROPERTIES = new Set(['role', 'colony', 'room', 'targetId', 'working']);
+const ALLOWED_PROPERTIES = new Set(['role', 'colony', 'room', 'targetRoom', 'homeRoom', 'remoteRoom', 'claimFlag']);
 
 class CreepMemorySchemaEnforcer {
     /**
@@ -20,7 +20,8 @@ class CreepMemorySchemaEnforcer {
 
         for (const key of Object.keys(creepMemory)) {
             if (!ALLOWED_PROPERTIES.has(key)) {
-                Logger.warn(`CreepMemorySchemaEnforcer: Creep '${creepName}' has non-compliant property '${key}' in memory.`);
+                Logger.warn(`CreepMemorySchemaEnforcer: Creep '${creepName}' has non-compliant property '${key}' in memory. Stripping.`);
+                delete creepMemory[key];
             }
         }
     }

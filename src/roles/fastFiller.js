@@ -30,7 +30,7 @@ function run(room) {
             if (!state || !targetId) continue;
 
             const target = Game.getObjectById(targetId);
-            if (!target) continue;
+            if (!target) { creep.heap.targetId = null; creep.heap.state = null; continue; }
 
             if (state === 'filling') {
                 if (target.amount !== undefined) {

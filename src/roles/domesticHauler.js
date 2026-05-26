@@ -61,6 +61,7 @@ module.exports = {
                 if (!state || !targetId) continue;
 
                 const target = Game.getObjectById(creep.heap.targetId);
+                if (!target && creep.heap.targetId !== 'controller') { creep.heap.targetId = null; creep.heap.state = null; continue; }
 
                 if (creep.heap.state === 'pickup' || creep.heap.state === 'withdraw') {
                     if (target) {

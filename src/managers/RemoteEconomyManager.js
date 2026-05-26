@@ -130,24 +130,24 @@ const RemoteEconomyManager = {
                 // Ensure homeRoom and targetRoom are consistent
                 if (!creep.memory.homeRoom) creep.memory.homeRoom = room.name;
 
-                if (!creep.memory.targetSourceId && creep.room.name === creep.memory.targetRoom) {
+                if (!creep.heap.targetSourceId && creep.room.name === creep.memory.targetRoom) {
                     const roomSources = global.State.sourcesByRoom.get(creep.room.name) || [];
                     const assignedSources = colonyRemoteHarvesters.map(c => c.memory.targetSourceId).filter(id => id);
 
                     for (const src of roomSources) {
                         if (!assignedSources.includes(src.id)) {
-                            creep.memory.targetSourceId = src.id;
+                            creep.heap.targetSourceId = src.id;
                             break;
                         }
                     }
                 }
 
                 // Container lifecycle awareness for harvesters
-                if (creep.memory.containerId && Game.rooms[creep.memory.targetRoom]) {
+                if (creep.heap.containerId && Game.rooms[creep.memory.targetRoom]) {
                     // Room is visible, check if container exists
-                    const container = Game.getObjectById(creep.memory.containerId);
+                    const container = Game.getObjectById(creep.heap.containerId);
                     if (!container) {
-                        creep.memory.containerId = null; // Container destroyed or invalid
+                        creep.heap.containerId = null; // Container destroyed or invalid
                     }
                 }
             }
@@ -159,11 +159,11 @@ const RemoteEconomyManager = {
                 if (!creep.memory.homeRoom) creep.memory.homeRoom = room.name;
 
                 // Container lifecycle awareness for haulers
-                if (creep.memory.containerId && Game.rooms[creep.memory.remoteRoom]) {
+                if (creep.heap.containerId && Game.rooms[creep.memory.remoteRoom]) {
                     // Room is visible, check if container exists
-                    const container = Game.getObjectById(creep.memory.containerId);
+                    const container = Game.getObjectById(creep.heap.containerId);
                     if (!container) {
-                        creep.memory.containerId = null; // Container destroyed or invalid
+                        creep.heap.containerId = null; // Container destroyed or invalid
                     }
                 }
 

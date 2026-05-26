@@ -6,33 +6,46 @@ class VirtualLedger {
     }
 
     static clear() {
-        TrafficResourceLedger.clear();
+        // Disabled to prevent wiping multi-tick data.
+        // TrafficResourceLedger.clear();
     }
 
-    static registerIntent(targetId, resourceType, amount) {
-        // VirtualLedger used to register positive amounts for what was claimed/intended to be withdrawn.
-        // TrafficResourceLedger tracks the sub-tick inventory, so a withdrawal intent should be a negative delta.
-        TrafficResourceLedger.registerTransfer(targetId, resourceType, -amount);
+    static registerIntent(targetId, resourceType, amount, ttl = 15) {
+        TrafficResourceLedger.registerTransfer(targetId, resourceType, -amount, ttl);
     }
 
     static getClaimedAmount(targetId, resourceType) {
-        // VirtualLedger used to return a positive amount for claims.
-        // Since we registered it as negative in TrafficResourceLedger, we return the absolute value of negative deltas
-        // (representing how much has been claimed/removed) or 0 if it's positive (meaning stuff was added).
         if (!this.ledger.has(targetId)) return 0;
-        const delta = this.ledger.get(targetId).get(resourceType) || 0;
+
+        // Force garbage collection and get current delta
+        const remaining = TrafficResourceLedger.queryAvailable(targetId, resourceType);
+
+        const targetLedger = this.ledger.get(targetId);
+        const claims = targetLedger.get(resourceType) || [];
+
+        let delta = 0;
+        for (let i = 0; i < claims.length; i++) {
+            delta += claims[i].amount;
+        }
+
         return delta < 0 ? Math.abs(delta) : 0;
     }
 
-    static claim(target, resourceType, amount) {
-        // queryAvailable returns the true available amount considering all deltas (including what was already claimed)
+    static claim(creep, target, resourceType, amount) {
         const remaining = TrafficResourceLedger.queryAvailable(target.id, resourceType);
 
+        // Calculate dynamic TTL: Distance + buffer for shoving/fatigue
+        let distance = 10;
+        if (creep && creep.pos && target.pos && creep.pos.roomName === target.pos.roomName) {
+            distance = creep.pos.getRangeTo(target);
+        }
+        const ttl = distance + 10;
+
         if (remaining >= amount) {
-            this.registerIntent(target.id, resourceType, amount);
+            this.registerIntent(target.id, resourceType, amount, ttl);
             return amount;
         } else if (remaining > 0) {
-            this.registerIntent(target.id, resourceType, remaining);
+            this.registerIntent(target.id, resourceType, remaining, ttl);
             return remaining;
         }
         return -1;
