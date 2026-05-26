@@ -43,41 +43,24 @@ module.exports = {
                     continue;
                 }
 
-                // In target room, prioritize attacking enemy upgraders or the controller itself
-                const targetController = room.controller;
-                if (!targetController) {
-                    // If no controller found, nothing to snipe
+                const targetId = creep.heap.targetId;
+                const state = creep.heap.state;
+
+                if (!targetId) {
+                    // Go to center if no targets found
+                    movement.moveTo(creep, new RoomPosition(25, 25, targetRoomName));
                     continue;
                 }
 
-                // Don't attack our own controller
-                if (targetController.my) {
+                const target = Game.getObjectById(targetId);
+                if (!target) {
+                    creep.heap.targetId = null;
+                    creep.heap.state = null;
+                    movement.moveTo(creep, new RoomPosition(25, 25, targetRoomName));
                     continue;
                 }
 
-                let target = null;
-                const hostiles = global.State.hostilesByRoom ? global.State.hostilesByRoom.get(room.name) || [] : [];
-
-                // Find hostiles near the controller (upgraders)
-                for (const hostile of hostiles) {
-                    if (hostile.pos.getRangeTo(targetController) <= 3) {
-                        // Check if it's likely an upgrader (has WORK or CARRY parts)
-                        let isUpgrader = false;
-                        if (hostile.body) {
-                            isUpgrader = hostile.body.some(p => p.type === WORK || p.type === CARRY);
-                        } else {
-                            // If no body info is available, assume it's an upgrader if near controller
-                            isUpgrader = true;
-                        }
-
-                        if (isUpgrader) {
-                            target = hostile;
-                            break;
-                        }
-                    }
-                }
-
-                if (target) {
+                if (state === 'attack') {
                     if (creep.pos.isNearTo(target)) {
                         creep.attack(target);
                         // Move with target if it flees
@@ -85,12 +68,11 @@ module.exports = {
                     } else {
                         movement.moveTo(creep, target);
                     }
-                } else {
-                    // No upgraders found, attack controller to block upgrades/trigger downgrade
-                    if (creep.pos.isNearTo(targetController)) {
-                        creep.attackController(targetController);
+                } else if (state === 'attackController') {
+                    if (creep.pos.isNearTo(target)) {
+                        creep.attackController(target);
                     } else {
-                        movement.moveTo(creep, targetController);
+                        movement.moveTo(creep, target);
                     }
                 }
             } catch (e) {

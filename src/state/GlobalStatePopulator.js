@@ -153,9 +153,101 @@ class GlobalStatePopulator {
             }
         }
 
+        // Calculate global terminal intents
+        this.calculateTerminalIntents(state);
+
         // Delegate to stateScanner to finish event-driven scanning and additional state population
         if (stateScanner && typeof stateScanner.scan === 'function') {
             stateScanner.scan();
+        }
+    }
+
+    /**
+     * Calculates global terminal intents for energy and minerals across all owned rooms.
+     * @param {Object} state - The global state instance.
+     */
+    calculateTerminalIntents(state) {
+        if (!state.terminalIntents) {
+            state.terminalIntents = new Map();
+        } else {
+            state.terminalIntents.clear();
+        }
+
+        if (!Game.rooms) return;
+
+        const TARGET_ENERGY_BUFFER = 50000;
+        const TARGET_MINERAL_AMOUNT = 5000;
+
+        const roomsWithTerminals = [];
+        for (const roomName in Game.rooms) {
+            const room = Game.rooms[roomName];
+            if (room.controller && room.controller.my && room.terminal && room.terminal.my) {
+                roomsWithTerminals.push(room);
+            }
+        }
+
+        for (const room of roomsWithTerminals) {
+            if (room.terminal.cooldown > 0) continue;
+
+            const terminal = room.terminal;
+
+            // Manage Energy
+            if (terminal.store[RESOURCE_ENERGY] > TARGET_ENERGY_BUFFER + 10000) {
+                for (const otherRoom of roomsWithTerminals) {
+                    if (otherRoom.name === room.name) continue;
+
+                    if (otherRoom.terminal.store[RESOURCE_ENERGY] < TARGET_ENERGY_BUFFER) {
+                        const amountNeeded = TARGET_ENERGY_BUFFER - otherRoom.terminal.store[RESOURCE_ENERGY];
+                        const amountToSend = Math.min(amountNeeded, terminal.store[RESOURCE_ENERGY] - TARGET_ENERGY_BUFFER);
+
+                        if (amountToSend > 0) {
+                            const cost = Game.market.calcTransactionCost(amountToSend, room.name, otherRoom.name);
+                            if (terminal.store[RESOURCE_ENERGY] >= amountToSend + cost) {
+                                state.terminalIntents.set(room.name, {
+                                    resourceType: RESOURCE_ENERGY,
+                                    amount: amountToSend,
+                                    targetRoom: otherRoom.name
+                                });
+                                break; // Only one transfer per room per tick
+                            }
+                        }
+                    }
+                }
+            }
+
+            // If we already have an intent for this room, skip minerals
+            if (state.terminalIntents.has(room.name)) continue;
+
+            // Manage Minerals
+            for (const resourceType in terminal.store) {
+                if (resourceType === RESOURCE_ENERGY) continue;
+
+                const amount = terminal.store[resourceType];
+                if (amount > TARGET_MINERAL_AMOUNT + 1000) {
+                    for (const otherRoom of roomsWithTerminals) {
+                        if (otherRoom.name === room.name) continue;
+
+                        const otherAmount = otherRoom.terminal.store[resourceType] || 0;
+                        if (otherAmount < TARGET_MINERAL_AMOUNT) {
+                            const amountNeeded = TARGET_MINERAL_AMOUNT - otherAmount;
+                            const amountToSend = Math.min(amountNeeded, amount - TARGET_MINERAL_AMOUNT);
+
+                            if (amountToSend > 0) {
+                                const cost = Game.market.calcTransactionCost(amountToSend, room.name, otherRoom.name);
+                                if (terminal.store[RESOURCE_ENERGY] >= cost) {
+                                    state.terminalIntents.set(room.name, {
+                                        resourceType: resourceType,
+                                        amount: amountToSend,
+                                        targetRoom: otherRoom.name
+                                    });
+                                    break; // Only one transfer per room per tick
+                                }
+                            }
+                        }
+                    }
+                    if (state.terminalIntents.has(room.name)) break;
+                }
+            }
         }
     }
 

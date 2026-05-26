@@ -104,6 +104,30 @@ module.exports = {
                 }
             }
 
+            // Dumb Terminal Execution for Towers
+            if (global.State.structuresByRoom) {
+                const structuresMap = global.State.structuresByRoom.get(room.name);
+                if (structuresMap) {
+                    const towers = structuresMap.get(STRUCTURE_TOWER) || [];
+                    for (const towerObj of towers) {
+                        const tower = Array.isArray(towerObj) ? towerObj[1] : towerObj;
+                        const intent = global.State.towerIntents ? global.State.towerIntents.get(tower.id) : null;
+                        if (!intent) continue;
+
+                        const target = Game.getObjectById(intent.targetId);
+                        if (!target) continue; // Target validation
+
+                        if (intent.action === 'attack') {
+                            tower.attack(target);
+                        } else if (intent.action === 'repair') {
+                            tower.repair(target);
+                        } else if (intent.action === 'heal') {
+                            tower.heal(target);
+                        }
+                    }
+                }
+            }
+
             // Execute defender roles
             rampartMelee.run(room);
 

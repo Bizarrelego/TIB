@@ -30,8 +30,17 @@ module.exports = {
             try {
                 if (creep.fatigue > 0) continue; // Fatigue gating
 
-                // HVT Target selection (e.g. Storage, Spawn)
+                const targetRoomName = creep.memory.targetRoom || creep.heap.targetRoom;
+
+                if (targetRoomName && creep.room.name !== targetRoomName) {
+                    movement.moveTo(creep, new RoomPosition(25, 25, targetRoomName));
+                    continue;
+                }
+
+                // HVT Target selection assigned by Manager (e.g. Storage, Spawn)
                 const targetId = creep.heap.targetId;
+                if (!targetId) continue;
+
                 const target = Game.getObjectById(targetId);
 
                 if (target) {
@@ -71,7 +80,7 @@ module.exports = {
                         }
                     }
                 } else {
-                    // Find new HVT or standby
+                    creep.heap.targetId = null;
                 }
 
             } catch (e) {

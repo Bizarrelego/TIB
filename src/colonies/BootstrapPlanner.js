@@ -176,6 +176,56 @@ class BootstrapPlanner {
     }
 
     /**
+     * Bootstraps the pioneer creeps dispatched to a target room.
+     * Calculates harvest and build targets and assigns them directly to the pioneer's heap.
+     * @param {string} roomName
+     * @param {Creep[]} pioneers
+     */
+    static runPioneerAssignments(roomName, pioneers) {
+        if (!pioneers || pioneers.length === 0) return;
+
+        const room = Game.rooms[roomName];
+        if (!room) return; // Wait for vision
+
+        const sources = global.State.sourcesByRoom.get(roomName) || [];
+        const sites = global.State.sitesByRoom.get(roomName) || [];
+        const structures = global.State.structuresByRoom.get(roomName) || new Map();
+
+        let targetSite = sites.length > 0 ? sites[0] : null;
+        if (!targetSite && room.controller && room.controller.level < 2) {
+            targetSite = room.controller;
+        }
+
+        for (const creep of pioneers) {
+            if (!creep.heap) creep.heap = {};
+
+            // State management
+            if (creep.heap.state === 'harvesting' && creep.store.getFreeCapacity() === 0) {
+                creep.heap.state = 'building';
+                creep.heap.targetId = null;
+            } else if (creep.heap.state !== 'harvesting' && creep.store[RESOURCE_ENERGY] === 0) {
+                creep.heap.state = 'harvesting';
+                creep.heap.targetId = null;
+            } else if (!creep.heap.state) {
+                creep.heap.state = 'harvesting';
+            }
+
+            if (creep.heap.state === 'harvesting') {
+                if (!creep.heap.targetId && sources.length > 0) {
+                    // Simple assignment to first source, could be optimized to closest
+                    creep.heap.targetId = sources[0].id;
+                }
+            } else {
+                if (targetSite) {
+                    creep.heap.targetId = targetSite.id;
+                } else {
+                    creep.heap.targetId = null;
+                }
+            }
+        }
+    }
+
+    /**
      * Provides suggestions for initial creep roles and counts to spawnManager
      * during early RCL progression.
      *
