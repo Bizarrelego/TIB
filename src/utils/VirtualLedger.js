@@ -18,7 +18,6 @@ class VirtualLedger {
         if (!this.ledger.has(targetId)) return 0;
 
         // Force garbage collection and get current delta
-        const remaining = TrafficResourceLedger.queryAvailable(targetId, resourceType);
 
         const targetLedger = this.ledger.get(targetId);
         const claims = targetLedger.get(resourceType) || [];
