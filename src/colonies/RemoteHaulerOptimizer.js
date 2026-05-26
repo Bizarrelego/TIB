@@ -13,10 +13,10 @@ class RemoteHaulerOptimizer {
      * Calculates the optimal hauler body based on decay, distance, and energy generation.
      * @param {string} roomName The home room name.
      * @param {string} sourceId The ID of the remote source.
-     * @param {string} storageId The ID of the storage structure in the home room.
+     * @param {string} _storageId The ID of the storage structure in the home room (unused directly, preserved for interface).
      * @returns {string[]} The recommended creep body array.
      */
-    static calculateOptimalHaulerBody(roomName, sourceId, storageId) {
+    static calculateOptimalHaulerBody(roomName, sourceId, _storageId) {
         let sourceRoomName = null;
 
         if (global.State && global.State.sourcesByRoom) {

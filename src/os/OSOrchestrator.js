@@ -15,8 +15,6 @@ const AusterityTrigger = require('./AusterityTrigger');
 const Logger = require('../utils/logger');
 const OSInitializer = require('./OSInitializer');
 const IntentManager = require('./IntentManager');
-const cpuThrottler = require('./cpuThrottler');
-const { wrapManager } = require('../utils/ManagerErrorBoundary');
 
 class OSOrchestrator {
     static init() {

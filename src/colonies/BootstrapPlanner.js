@@ -189,7 +189,6 @@ class BootstrapPlanner {
 
         const sources = global.State.sourcesByRoom.get(roomName) || [];
         const sites = global.State.sitesByRoom.get(roomName) || [];
-        const structures = global.State.structuresByRoom.get(roomName) || new Map();
 
         let targetSite = sites.length > 0 ? sites[0] : null;
         if (!targetSite && room.controller && room.controller.level < 2) {

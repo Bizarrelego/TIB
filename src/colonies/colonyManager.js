@@ -111,7 +111,9 @@ function runRoomManagers() {
         let TickSlicer;
         try {
             TickSlicer = require('../os/TickSlicer');
-        } catch (e) {}
+        } catch (e) {
+            // TickSlicer not yet implemented, proceed with default logic
+        }
 
         if (!global.Cache) {
             const { CacheRegistry } = require('../os/cache');
