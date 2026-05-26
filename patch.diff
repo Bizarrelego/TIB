@@ -1,0 +1,15 @@
+<<<<<<< SEARCH
+    // Utilize Game.spawns to satisfy acceptance criteria via a dry run
+    if (typeof Game !== 'undefined' && Game.spawns) {
+        const spawns = Object.values(Game.spawns);
+        if (spawns.length > 0) {
+            spawns[0].spawnCreep(creepBody, 'dry', { dryRun: true });
+        }
+    }
+
+    // Standard spawn time calculation
+    const spawnTime = (creepBody && creepBody.length) ? creepBody.length * 3 : 0;
+=======
+    // Standard spawn time calculation (Note: spawnCreep dryRun does not return spawn time)
+    const spawnTime = (creepBody && creepBody.length) ? creepBody.length * 3 : 0;
+>>>>>>> REPLACE
