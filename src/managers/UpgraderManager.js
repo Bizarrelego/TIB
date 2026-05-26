@@ -1,4 +1,3 @@
-const upgrader = require('../roles/upgrader');
 const LinkManager = require('./LinkManager');
 
 class UpgraderManager {

@@ -2,36 +2,18 @@ const Profiler = require('../utils/profiler');
 const globalState = Profiler.wrap('globalState', require('../state/globalState'));
 const Logger = require('../utils/logger');
 const { executeManager } = require('../utils/errorHandler');
-const defconManager = Profiler.wrap('defconManager', require('../colonies/defconManager'));
-const VirtualLedger = require('../utils/VirtualLedger');
 const { wrapModuleFunctions } = require('../utils/moduleWrapper');
-const errorHandler = require('../utils/errorHandler');
 
 // Phase Managers
-const discoveryManager = Profiler.wrap('discoveryManager', require('../state/discoveryManager'));
 const OSInitializer = Profiler.wrap('OSInitializer', require('../os/OSInitializer'));
-const stateScanner = Profiler.wrap('stateScanner', require('../state/stateScanner'));
 const colonyManager = Profiler.wrap('colonyManager', require('../colonies/colonyManager'));
-const spawnManager = Profiler.wrap('spawnManager', require('../colonies/spawnManager'));
-const SpawnLedger = require('../colonies/spawnLedger');
-const BoostManager = Profiler.wrap('BoostManager', require('./BoostManager'));
-const VisualsManager = Profiler.wrap('VisualsManager', require('./VisualsManager'));
-const planner = Profiler.wrap('planner', require('../colonies/planner'));
-const { wrap } = require('../utils/ManagerExecutionWrapper');
-const { wrapManager } = require('../utils/ManagerErrorBoundary');
 
 
 const operationsManager = Profiler.wrap('operationsManager', require('../operations/operationsManager'));
-const roomEventManager = Profiler.wrap('RoomEventManager', require('./RoomEventManager'));
-const EnergySourceTracker = Profiler.wrap('EnergySourceTracker', require('./EnergySourceTracker'));
 
-const trafficManager = require('../traffic/trafficManager');
 const IntentManager = require('../os/IntentManager');
 const SystemScheduler = require('../os/SystemScheduler');
 const roomHasher = require('../os/roomHasher');
-const GlobalResetDetector = require('../os/GlobalResetDetector');
-const interShardMemoryManager = require('../os/interShardMemoryManager');
-const memoryProxy = require('../os/memoryProxy');
 
 /**
  * @file managerOrchestrator.js
@@ -223,8 +205,6 @@ function init() {
 
 }
 
-const cpuThrottler = Profiler.wrap('cpuThrottler', require('../os/cpuThrottler'));
-const managersIntegration = Profiler.wrap('managersIntegration', require('./index'));
 
 
 function run() {
@@ -233,13 +213,10 @@ function run() {
     const GlobalStatePopulator = require('../state/GlobalStatePopulator');
     const colonyManager = require('../colonies/colonyManager');
     const operationsManager = require('../operations/operationsManager');
-    const trafficManager = require('../traffic/trafficManager');
     const IntentManager = require('../os/IntentManager');
     const VisualsManager = require('./VisualsManager');
     const globalState = require('../state/globalState');
     const SystemScheduler = require('../os/SystemScheduler');
-    const memoryProxy = require('../os/memoryProxy');
-    const { wrapManager } = require('../utils/ManagerErrorBoundary');
 
     let throttlerFlags = {};
     if (cpuThrottler && typeof cpuThrottler.run === 'function') {
@@ -247,10 +224,7 @@ function run() {
     }
 
     const Profiler = require('../utils/profiler');
-    const executeWrapped = (name, fn) => {
-        if (!fn) return;
-        wrapManager(Profiler.wrap(name, fn), name)();
-    };
+
 
     const ManagerExecutionWrapper = require('../utils/ManagerExecutionWrapper');
 
@@ -339,6 +313,8 @@ function run() {
     }
 
     // Phase 5: Traffic Control
+    const trafficManager = require('../traffic/trafficManager');
+const memoryProxy = require('../os/memoryProxy');
     if (trafficManager && typeof trafficManager.setup === 'function') {
         ManagerExecutionWrapper.wrap('trafficManager.setup', () => trafficManager.setup())();
     }

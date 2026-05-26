@@ -3,7 +3,6 @@
  * @description Paths to remotes, eliminates hostiles via heatmaps, avoids core defenders.
  */
 
-const CombatManager = require('../managers/CombatManager');
 const movement = require('../utils/movement');
 
 module.exports = {

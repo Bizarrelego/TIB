@@ -252,14 +252,10 @@ const RemoteEconomyManager = {
                         }
                     }
                 }
-                            creep.memory.containerId = bestContainer.id;
-                        }
-                    }
-                }
+
             }
         }
     }
 };
-
 
 module.exports = RemoteEconomyManager;
