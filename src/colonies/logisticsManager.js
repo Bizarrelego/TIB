@@ -381,7 +381,224 @@ const LogisticsManager = {
             }
         }
 
+
+        // HAULER & DOMESTIC HAULER ASSIGNMENT LOGIC
+        // domesticHaulers already declared above
+        const structures = global.State.structuresByRoom.get(room.name);
+        // fastFillers already declared above
+        const ignoreCore = fastFillers.length > 0;
+
+        // Domestic Haulers (Source: Drops/Containers/Storage -> Sink: Spawns/Ext/Towers/Storage)
+        for (let i = 0; i < domesticHaulers.length; i++) {
+            const creep = domesticHaulers[i];
+            if (!creep.heap) creep.heap = {};
+            if (creep.heap.retired) continue;
+
+            // State Transitions
+            if (creep.heap.state !== 'pickup' && creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+                creep.heap.state = 'pickup';
+                creep.heap.targetId = null;
+            } else if (creep.heap.state !== 'transfer' && creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+                creep.heap.state = 'transfer';
+                creep.heap.targetId = null;
+            } else if (!creep.heap.state) {
+                creep.heap.state = 'pickup';
+            }
+
+            // Target Validation (Partial drops/pickups or missing targets)
+            if (creep.heap.targetId) {
+                const targetObj = Game.getObjectById(creep.heap.targetId);
+                if (!targetObj && creep.heap.targetId !== 'controller') {
+                    creep.heap.targetId = null;
+                } else if (targetObj) {
+                    if (creep.heap.state === 'pickup' && ((targetObj.amount !== undefined && targetObj.amount === 0) || (targetObj.store && targetObj.store.getUsedCapacity(RESOURCE_ENERGY) === 0))) {
+                        creep.heap.targetId = null;
+                    } else if (creep.heap.state === 'transfer' && targetObj.store && targetObj.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+                        creep.heap.targetId = null;
+                    }
+                }
+            }
+
+            if (!creep.heap.targetId) {
+                if (creep.heap.state === 'transfer') {
+                    let target = null;
+                    if (structures) {
+                        const spawnsMap = structures.get(STRUCTURE_SPAWN);
+                        if (spawnsMap && !target) {
+                            for (const spawn of spawnsMap.values()) {
+                                if (spawn.store.getFreeCapacity(RESOURCE_ENERGY) > 0) { target = spawn; break; }
+                            }
+                        }
+                        const extensionsMap = structures.get(STRUCTURE_EXTENSION);
+                        if (extensionsMap && !target) {
+                            for (const ext of extensionsMap.values()) {
+                                if (ext.store.getFreeCapacity(RESOURCE_ENERGY) > 0) { target = ext; break; }
+                            }
+                        }
+                        const towersMap = structures.get(STRUCTURE_TOWER);
+                        if (towersMap && !target) {
+                            for (const tower of towersMap.values()) {
+                                if (tower.store.getFreeCapacity(RESOURCE_ENERGY) > 0) { target = tower; break; }
+                            }
+                        }
+                        const storageMap = structures.get(STRUCTURE_STORAGE);
+                        if (storageMap && !target) {
+                            for (const storage of storageMap.values()) {
+                                if (storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0) { target = storage; break; }
+                            }
+                        }
+                    }
+                    if (!target && !creep.heap.ignoreController && room.controller) {
+                        target = room.controller;
+                    }
+                    if (target) {
+                        creep.heap.targetId = target.id === room.controller?.id ? 'controller' : target.id;
+                    }
+                } else if (creep.heap.state === 'pickup') {
+                    let target = null;
+                    const dropped = global.State.droppedByRoom.get(room.name);
+                    if (dropped && dropped.length > 0) {
+                        let minDistance = Infinity;
+                        for (let j = 0; j < dropped.length; j++) {
+                            const drop = dropped[j];
+                            if (drop.resourceType === RESOURCE_ENERGY && drop.amount >= 50) {
+                                const dist = creep.pos.getRangeTo(drop);
+                                if (dist < minDistance) { minDistance = dist; target = drop; }
+                            }
+                        }
+                    }
+                    if (!target && structures) {
+                        const containersMap = structures.get(STRUCTURE_CONTAINER);
+                        if (containersMap && !target) {
+                            let maxEnergy = 0;
+                            for (const container of containersMap.values()) {
+                                const energy = container.store.getUsedCapacity(RESOURCE_ENERGY);
+                                if (energy > maxEnergy) { maxEnergy = energy; target = container; }
+                            }
+                        }
+                        const storageMap = structures.get(STRUCTURE_STORAGE);
+                        if (storageMap && !target) {
+                            for (const storage of storageMap.values()) {
+                                if (storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) { target = storage; break; }
+                            }
+                        }
+                        const linksMap = structures.get(STRUCTURE_LINK);
+                        if (linksMap && !target) {
+                            for (const link of linksMap.values()) {
+                                if (link.store.getUsedCapacity(RESOURCE_ENERGY) > 0) { target = link; break; }
+                            }
+                        }
+                    }
+
+                    if (target) {
+                        creep.heap.targetId = target.id;
+                        creep.heap.state = target.amount !== undefined ? 'pickup' : 'withdraw'; // Properly format the state for the dumb role
+                    }
+                }
+            }
+        }
+
+        // General Haulers (Source: Drops/Containers -> Sink: Storage/Spawns/Towers/Controller)
+        for (let i = 0; i < haulers.length; i++) {
+            const creep = haulers[i];
+            if (!creep.heap) creep.heap = {};
+
+            // State Transitions
+            if (creep.heap.state !== 'pickup' && creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+                creep.heap.state = 'pickup';
+                creep.heap.targetId = null;
+            } else if (creep.heap.state !== 'transfer' && creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+                creep.heap.state = 'transfer';
+                creep.heap.targetId = null;
+            } else if (!creep.heap.state) {
+                creep.heap.state = 'pickup';
+            }
+
+            // Target Validation (Partial drops/pickups or missing targets)
+            if (creep.heap.targetId) {
+                const targetObj = Game.getObjectById(creep.heap.targetId);
+                if (!targetObj && creep.heap.targetId !== 'controller') {
+                    creep.heap.targetId = null;
+                } else if (targetObj) {
+                    if (creep.heap.state === 'pickup' && ((targetObj.amount !== undefined && targetObj.amount === 0) || (targetObj.store && targetObj.store.getUsedCapacity(RESOURCE_ENERGY) === 0))) {
+                        creep.heap.targetId = null;
+                    } else if (creep.heap.state === 'transfer' && targetObj.store && targetObj.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+                        creep.heap.targetId = null;
+                    }
+                }
+            }
+
+            if (!creep.heap.targetId) {
+                if (creep.heap.state === 'pickup') {
+                    let target = null;
+                    const dropped = global.State.droppedByRoom.get(room.name);
+                    if (dropped && dropped.length > 0) {
+                        let minDistance = Infinity;
+                        for (let j = 0; j < dropped.length; j++) {
+                            const drop = dropped[j];
+                            if (drop.resourceType === RESOURCE_ENERGY && drop.amount >= 50) {
+                                const dist = creep.pos.getRangeTo(drop);
+                                if (dist < minDistance) { minDistance = dist; target = drop; }
+                            }
+                        }
+                    }
+                    if (!target && room.storage && room.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                        target = room.storage;
+                    } else if (!target && structures) {
+                        const containersMap = structures.get(STRUCTURE_CONTAINER);
+                        if (containersMap && !target) {
+                            let maxEnergy = 0;
+                            for (const container of containersMap.values()) {
+                                const energy = container.store.getUsedCapacity(RESOURCE_ENERGY);
+                                if (energy > maxEnergy) { maxEnergy = energy; target = container; }
+                            }
+                        }
+                    }
+                    if (target) {
+                        creep.heap.targetId = target.id;
+                        creep.heap.state = target.amount !== undefined ? 'pickup' : 'withdraw'; // Safely route for dumb role
+                    }
+                } else if (creep.heap.state === 'transfer') {
+                    let target = null;
+                    if (ignoreCore) {
+                        if (room.storage && room.storage.isActive() && room.storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                            target = room.storage;
+                        } else if (structures) {
+                            const spawnsMap = structures.get(STRUCTURE_SPAWN);
+                            if (spawnsMap && !target) {
+                                for (const spawn of spawnsMap.values()) {
+                                    if (spawn.store.getFreeCapacity(RESOURCE_ENERGY) > 0) { target = spawn; break; }
+                                }
+                            }
+                            const extensionsMap = structures.get(STRUCTURE_EXTENSION);
+                            if (extensionsMap && !target) {
+                                for (const ext of extensionsMap.values()) {
+                                    if (ext.store.getFreeCapacity(RESOURCE_ENERGY) > 0) { target = ext; break; }
+                                }
+                            }
+                        }
+                        if (!target && !creep.heap.ignoreController && room.controller) {
+                            const upgraders = roomCreeps.get('upgrader') || [];
+                            if (upgraders.length > 0 && !room.storage) {
+                                target = room.controller;
+                            }
+                        }
+                    }
+
+                    if (!target && room.storage && room.storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                        target = room.storage;
+                    }
+
+                    if (target) {
+                        creep.heap.targetId = target.id === room.controller?.id ? 'controller' : target.id;
+                    }
+                }
+            }
+        }
+
         // HUB MANAGER ASSIGNMENT LOGIC
+
+
         if (hubManagers.length > 0 && storage) {
             const hubCache = getHubCache(storage, terminal, links, room);
             if (!hubCache) return;

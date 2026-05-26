@@ -19,7 +19,6 @@ module.exports = {
 
         const workers = roomCreeps.get('worker');
         if (!workers || workers.length === 0) return;
-        const VirtualLedger = require('../utils/VirtualLedger');
 
         for (let i = 0; i < workers.length; i++) {
             const creep = workers[i];
@@ -72,10 +71,9 @@ module.exports = {
                     }
                     if (creep.pos.isNearTo(target)) {
                         let status;
-                        const claimed = VirtualLedger.getClaimedAmount(target.id, RESOURCE_ENERGY);
-                        const amountToWithdraw = target.amount !== undefined
-                            ? Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), Math.max(0, target.amount - claimed))
-                            : Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), Math.max(0, TrafficManager.getVirtualState(target, RESOURCE_ENERGY).used - claimed));
+                        const amountToWithdraw = creep.heap.amount !== undefined ?
+                            Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), creep.heap.amount) :
+                            creep.store.getFreeCapacity(RESOURCE_ENERGY);
 
                         if (amountToWithdraw <= 0) {
                             creep.heap.targetId = null;
@@ -91,8 +89,6 @@ module.exports = {
                         if (status === ERR_NOT_ENOUGH_RESOURCES) {
                             creep.heap.targetId = null;
                             creep.heap.state = null;
-                        } else {
-                            VirtualLedger.registerIntent(target.id, RESOURCE_ENERGY, amountToWithdraw);
                         }
                     } else if (!isFatigued) {
                         movement.moveTo(creep, target);
@@ -105,10 +101,9 @@ module.exports = {
                     }
                     if (creep.pos.isNearTo(target)) {
                         let status;
-                        const claimed = VirtualLedger.getClaimedAmount(target.id, RESOURCE_ENERGY);
-                        const amountToWithdraw = target.store !== undefined
-                            ? Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), Math.max(0, TrafficManager.getVirtualState(target, RESOURCE_ENERGY).used - claimed))
-                            : Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), Math.max(0, target.amount - claimed));
+                        const amountToWithdraw = creep.heap.amount !== undefined ?
+                            Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), creep.heap.amount) :
+                            creep.store.getFreeCapacity(RESOURCE_ENERGY);
 
                         if (amountToWithdraw <= 0) {
                             creep.heap.targetId = null;
@@ -124,20 +119,18 @@ module.exports = {
                         if (status === ERR_NOT_ENOUGH_RESOURCES) {
                             creep.heap.targetId = null;
                             creep.heap.state = null;
-                        } else {
-                            VirtualLedger.registerIntent(target.id, RESOURCE_ENERGY, amountToWithdraw);
                         }
                     } else if (!isFatigued) {
                         movement.moveTo(creep, target);
                     }
-                } else if (state === 'refill') { // Fixes the string bug
+                } else if (state === 'fill' || state === 'refill') { // Fixes the string bug
                     if (creep.pos.isNearTo(target)) {
-                        const claimed = VirtualLedger.getClaimedAmount(target.id, RESOURCE_ENERGY);
-                        const amountToFill = Math.min(creep.store.getUsedCapacity(RESOURCE_ENERGY), Math.max(0, TrafficManager.getVirtualState(target, RESOURCE_ENERGY).free - claimed));
+                        const amountToFill = creep.heap.amount !== undefined ?
+                            Math.min(creep.store.getUsedCapacity(RESOURCE_ENERGY), creep.heap.amount) :
+                            creep.store.getUsedCapacity(RESOURCE_ENERGY);
 
                         if (amountToFill > 0) {
                             TrafficManager.registerTransfer(creep, target, RESOURCE_ENERGY, amountToFill);
-                            VirtualLedger.registerIntent(target.id, RESOURCE_ENERGY, amountToFill);
                         } else {
                             creep.heap.targetId = null;
                             creep.heap.state = null;

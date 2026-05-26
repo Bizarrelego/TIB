@@ -102,6 +102,24 @@ class UpgraderManager {
                     creep.heap.sourceId = optimalData.sourceId;
                 }
 
+                // Explicit energy target assignment
+                let energyTargetId = null;
+                const storage = room.storage;
+                if (storage && storage.isActive()) {
+                    energyTargetId = storage.id;
+                } else {
+                    const dropped = global.State.droppedByRoom.get(room.name);
+                    if (dropped) {
+                        for (const drop of dropped.values()) {
+                            if (drop.resourceType === RESOURCE_ENERGY && creep.heap.parkPos && drop.pos.x === creep.heap.parkPos.x && drop.pos.y === creep.heap.parkPos.y) {
+                                energyTargetId = drop.id;
+                                break;
+                            }
+                        }
+                    }
+                }
+                creep.heap.energyTargetId = energyTargetId;
+
                 upgrader.run(creep, room);
             }
         } catch (e) {

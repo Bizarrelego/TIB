@@ -95,6 +95,17 @@ module.exports = {
                 for (let j = 0; j < tasks.length; j++) {
                     const task = tasks[j];
                     if (task && task.target) {
+                        if (task.type === 'fill' || task.type === 'repair' || task.type === 'build' || task.type === 'upgrade') {
+                            const VirtualLedger = require('../utils/VirtualLedger');
+                            // Refill tasks should pull amount from the free space, and we'll use creep.heap.amount
+                            // We aren't strictly claiming positive space on target, but the ledger is about reserving space
+                            // For simplicity to meet the strict bounds, if task.free is defined (like for spawns/extensions), set amount
+                            if (task.type === 'fill' && task.free !== undefined) {
+                                const claimAmount = Math.min(creep.store.getUsedCapacity(RESOURCE_ENERGY), task.free);
+                                VirtualLedger.registerIntent(task.target.id, RESOURCE_ENERGY, claimAmount);
+                                creep.heap.amount = claimAmount;
+                            }
+                        }
                         creep.heap.state = task.type;
                         creep.heap.targetId = task.target.id;
                         // For non-repeatable tasks, we could splice it out here.
@@ -111,6 +122,7 @@ module.exports = {
                             const maxWanted = creep.store.getFreeCapacity(RESOURCE_ENERGY);
                             const claimed = VirtualLedger.claim(task.target, RESOURCE_ENERGY, maxWanted);
                             if (claimed < 0) continue;
+                            creep.heap.amount = claimed;
                         }
                         if (task.type === 'harvest') {
                             const assignedCount = sourceAssignments.get(task.target.id) || 0;

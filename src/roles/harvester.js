@@ -38,53 +38,19 @@ module.exports = {
                     continue;
                 }
 
-                if (!creep.heap.atOptimalSpot) {
-                    let isAtOptimalSpot = false;
-                    let optimalSpot = null;
-
-                    if (global.State && global.State.miningSpotsByRoom) {
-                        const roomSpots = global.State.miningSpotsByRoom.get(room.name);
-                        if (roomSpots && roomSpots instanceof Map) {
-                            optimalSpot = roomSpots.get(targetId);
-                        }
-                    }
-
-                    if (!optimalSpot) {
-                        const memoryRooms = Memory.rooms || {};
-                        const roomMemory = memoryRooms[room.name] || {};
-                        if (roomMemory.miningSpots && Array.isArray(roomMemory.miningSpots)) {
-                            const spotsMap = new Map(roomMemory.miningSpots);
-                            optimalSpot = spotsMap.get(targetId);
-
-                            if (global.State) {
-                                if (!global.State.miningSpotsByRoom) {
-                                    global.State.miningSpotsByRoom = new Map();
-                                }
-                                global.State.miningSpotsByRoom.set(room.name, spotsMap);
-                            }
-                        }
-                    }
-
-                    if (optimalSpot) {
-                        if (creep.pos.x === optimalSpot.x && creep.pos.y === optimalSpot.y) {
-                            isAtOptimalSpot = true;
-                        } else {
-                            movement.moveTo(creep, new RoomPosition(optimalSpot.x, optimalSpot.y, room.name));
-                            continue;
-                        }
-                    } else {
-                        if (!creep.pos.isNearTo(target)) {
-                            movement.moveTo(creep, target);
-                            continue;
-                        } else {
-                            isAtOptimalSpot = true;
-                        }
-                    }
-
-                    if (isAtOptimalSpot) {
+                if (!creep.heap.atOptimalSpot && creep.heap.targetPos) {
+                    if (creep.pos.x === creep.heap.targetPos.x && creep.pos.y === creep.heap.targetPos.y && creep.pos.roomName === creep.heap.targetPos.roomName) {
                         creep.heap.atOptimalSpot = true;
                     } else {
+                        movement.moveTo(creep, new RoomPosition(creep.heap.targetPos.x, creep.heap.targetPos.y, creep.heap.targetPos.roomName));
                         continue;
+                    }
+                } else if (!creep.heap.atOptimalSpot && !creep.heap.targetPos) {
+                    if (!creep.pos.isNearTo(target)) {
+                        movement.moveTo(creep, target);
+                        continue;
+                    } else {
+                        creep.heap.atOptimalSpot = true;
                     }
                 }
 
