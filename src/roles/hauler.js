@@ -31,7 +31,6 @@ module.exports = {
         if (!haulers) return;
 
         const fastFillers = roomCreeps.get('fastFiller') || [];
-        const ignoreCore = fastFillers.length > 0;
 
         for (const creep of haulers) {
             try {
