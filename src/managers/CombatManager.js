@@ -168,6 +168,55 @@ class CombatManager {
      * @param {Creep[]} hostiles
      * @returns {Creep|null}
      */
+
+    /**
+     * Executes CombatManager logic per tick to assign top-down targets to combat roles.
+     * @param {Room} room
+     */
+    static run(room) {
+        if (!global.State) return;
+
+        const roomCreeps = global.State.creepsByRoom.get(room.name);
+        if (!roomCreeps) return;
+
+        const hostiles = global.State.hostilesByRoom.get(room.name) || [];
+
+        // drainerHunters
+        const drainerHunters = roomCreeps.get('drainerHunter') || [];
+        for (let i = 0; i < drainerHunters.length; i++) {
+            const creep = drainerHunters[i];
+            const target = this.getBestTarget(creep, hostiles);
+            if (target) {
+                creep.heap.targetId = target.id;
+            } else {
+                creep.heap.targetId = null;
+            }
+        }
+
+        // remoteDefenders
+        const remoteDefenders = roomCreeps.get('remoteDefender') || [];
+        for (let i = 0; i < remoteDefenders.length; i++) {
+            const creep = remoteDefenders[i];
+            const targetRoomName = creep.memory.targetRoom;
+
+            if (creep.room.name === targetRoomName) {
+                const targetRoomHostiles = global.State.hostilesByRoom.get(targetRoomName) || [];
+                if (this.kite(creep, targetRoomHostiles)) {
+                    creep.heap.state = 'kite';
+                    const target = this.getBestTarget(creep, targetRoomHostiles);
+                    creep.heap.targetId = target ? target.id : null;
+                } else {
+                    creep.heap.state = 'attack';
+                    const target = this.getBestTarget(creep, targetRoomHostiles);
+                    creep.heap.targetId = target ? target.id : null;
+                }
+            } else {
+                creep.heap.state = 'attack';
+                creep.heap.targetId = null;
+            }
+        }
+    }
+
     static getBestTarget(creep, hostiles) {
         if (!hostiles || hostiles.length === 0) return null;
 

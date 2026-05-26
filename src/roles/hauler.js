@@ -35,14 +35,10 @@ module.exports = {
             try {
                 if (creep.fatigue > 0) continue;
 
-                if (creep.store.getUsedCapacity() === 0) {
-                    creep.heap.state = 'pickup';
-                } else if (creep.store.getFreeCapacity() === 0) {
-                    creep.heap.state = 'transfer';
-                }
+                const state = creep.heap.state;
+                const targetId = creep.heap.targetId;
 
-
-                if (!creep.heap.state || !creep.heap.targetId) continue;
+                if (!state || !targetId) continue;
 
                 const target = Game.getObjectById(creep.heap.targetId);
 

@@ -11,34 +11,27 @@ function run(room) {
         const creep = hubManagers[i];
 
         try {
-            // Stationary execution only - NO movement logic allowed.
             if (TrafficManager && TrafficManager.checkPipeline && TrafficManager.checkPipeline(creep.id)) continue;
 
-            const storage = room.storage;
-            if (!storage) continue;
+            const state = creep.heap.state;
+            const targetId = creep.heap.targetId;
 
-            const linkCache = global.State.linkCache ? global.State.linkCache.get(room.name) : null;
-            if (!linkCache || !linkCache.hubLinkId) continue;
+            if (!state || !targetId) continue;
 
-            const hubLink = Game.getObjectById(linkCache.hubLinkId);
-            if (!hubLink) continue;
+            const target = Game.getObjectById(targetId);
+            if (!target) continue;
 
-            // 0-CPU Stationary Transfer Logic
-            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
-                if (hubLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                    if (TrafficManager && TrafficManager.registerWithdraw) {
-                        TrafficManager.registerWithdraw(creep, hubLink, RESOURCE_ENERGY);
-                    } else {
-                        creep.withdraw(hubLink, RESOURCE_ENERGY);
-                    }
+            if (state === 'empty_link' || state === 'empty_storage' || state === 'empty_terminal') {
+                if (TrafficManager && TrafficManager.registerWithdraw) {
+                    TrafficManager.registerWithdraw(creep, target, RESOURCE_ENERGY);
+                } else {
+                    creep.withdraw(target, RESOURCE_ENERGY);
                 }
-            } else {
-                if (storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                    if (TrafficManager && TrafficManager.registerTransfer) {
-                        TrafficManager.registerTransfer(creep, storage, RESOURCE_ENERGY);
-                    } else {
-                        creep.transfer(storage, RESOURCE_ENERGY);
-                    }
+            } else if (state === 'fill_link' || state === 'fill_storage' || state === 'fill_terminal') {
+                if (TrafficManager && TrafficManager.registerTransfer) {
+                    TrafficManager.registerTransfer(creep, target, RESOURCE_ENERGY);
+                } else {
+                    creep.transfer(target, RESOURCE_ENERGY);
                 }
             }
         } catch (e) {

@@ -36,22 +36,25 @@ module.exports = {
                     continue;
                 }
 
-                const hostiles = global.State.hostilesByRoom.get(targetRoomName) || [];
+                const state = creep.heap.state;
+                const targetId = creep.heap.targetId;
 
-                // Kite if taking damage or fighting a dangerous target
-                if (CombatManager.kite(creep, hostiles)) {
-                    // Attack while kiting if possible
-                    const bestTarget = CombatManager.getBestTarget(creep, hostiles);
-                    if (bestTarget && creep.pos.getRangeTo(bestTarget) <= 1) {
-                        creep.attack(bestTarget);
+                if (state === 'kite') {
+                    if (targetId) {
+                        const kiteTarget = Game.getObjectById(targetId);
+                        if (kiteTarget && creep.pos.isNearTo(kiteTarget)) {
+                            creep.attack(kiteTarget);
+                        }
                     }
-                    continue;
+                    continue; // Kiting movement already handled or should be handled by manager, or fallback
                 }
 
-                const bestTarget = CombatManager.getBestTarget(creep, hostiles);
-                if (bestTarget) {
-                    if (creep.attack(bestTarget) === ERR_NOT_IN_RANGE) {
-                        movement.moveTo(creep, bestTarget);
+                if (targetId) {
+                    const target = Game.getObjectById(targetId);
+                    if (target) {
+                        if (creep.attack(target) === ERR_NOT_IN_RANGE) {
+                            movement.moveTo(creep, target);
+                        }
                     }
                 } else {
                     // Go to center if no targets found

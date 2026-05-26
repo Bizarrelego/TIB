@@ -1,6 +1,7 @@
 const { wrap } = require('../utils/ManagerExecutionWrapper');
 const { wrapManager } = require('../utils/ManagerErrorBoundary');
 const workerManager = require('../managers/workerManager');
+const SourceManager = require('../managers/SourceManager');
 
 const SpawnLedger = require('./spawnLedger');
 const defense = require('./defense');
@@ -88,6 +89,15 @@ module.exports = { run: function colonyManager() {
                 executeWrapped('labs.run', () => labs.run(room));
                 executeWrapped('market.run', () => market.run(room));
                 executeWrapped('haulerSizing.run', () => haulerSizing.run && haulerSizing.run(room));
+                executeWrapped('SourceManager.run', () => {
+                    const sources = SourceManager.getAvailableSources(room.name);
+                    const harvesters = global.State.creepsByRoom.get(room.name)?.get('harvester') || [];
+                    for (let i = 0; i < harvesters.length; i++) {
+                        if (sources.length > 0 && !harvesters[i].heap.targetId) {
+                            SourceManager.assignHarvester(sources[0].id, harvesters[i].id);
+                        }
+                    }
+                });
                 executeWrapped('workerManager.run', () => workerManager.run(room));
                 executeWrapped('UpgraderManager.run', () => UpgraderManager.run && UpgraderManager.run(room));
                 executeWrapped('RemoteEconomyManager.run', () => RemoteEconomyManager.run && RemoteEconomyManager.run(room));
@@ -127,5 +137,5 @@ module.exports = { run: function colonyManager() {
     }
 
     // Phase 5: Role Execution
-    executeWrapped('RoleManager.runAll', () => RoleManager.runAll());
+    // Removed RoleManager.runAll() from here to execute it globally after managers.
 } };

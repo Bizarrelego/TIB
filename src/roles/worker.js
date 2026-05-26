@@ -23,16 +23,7 @@ module.exports = {
         for (let i = 0; i < workers.length; i++) {
             const creep = workers[i];
             try {
-                if (creep.heap.isHarvesting && creep.store.getFreeCapacity() === 0) {
-                    creep.heap.isHarvesting = false;
-                    creep.heap.activeTask = null;
-                    creep.heap.isStatic = false; // Un-anchor from the source
-                }
-                if (!creep.heap.isHarvesting && creep.store.getUsedCapacity() === 0) {
-                    creep.heap.isHarvesting = true;
-                    creep.heap.activeTask = null;
-                    creep.heap.isStatic = false; // Un-anchor from the controller/hub
-                }
+                // State resets are now handled directly by the manager
 
                 if (TrafficManager.checkPipeline(creep.id)) continue;
                 const isFatigued = fatigueGating.isFatigued(creep);

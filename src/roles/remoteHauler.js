@@ -32,120 +32,38 @@ function run(room) {
                 creep.memory.hauling = true;
             }
 
-            if (!creep.memory.hauling) {
-                // We are not hauling, need to go to remote room to pick up energy
+            const state = creep.heap.state;
+            const targetId = creep.heap.targetId;
+
+            if (state === 'pickup') {
                 if (creep.room.name !== remoteRoomName) {
-                    const targetPos = new RoomPosition(25, 25, remoteRoomName);
-                    movement.moveTo(creep, targetPos);
+                    movement.moveTo(creep, new RoomPosition(25, 25, remoteRoomName));
                     continue;
                 }
-
-                // In remote room, move off exit
                 if (creep.pos.x === 0 || creep.pos.x === 49 || creep.pos.y === 0 || creep.pos.y === 49) {
-                    const centerPos = new RoomPosition(25, 25, remoteRoomName);
-                    movement.moveTo(creep, centerPos);
+                    movement.moveTo(creep, new RoomPosition(25, 25, remoteRoomName));
                     continue;
                 }
 
-                // Find energy to pick up
-                // Strict containerless scavenging: target dropped energy efficiently by proximity/amount
-                let target = null;
-                let bestScore = -Infinity;
-
-                const droppedArray = global.State.droppedByRoom.get(creep.room.name);
-                if (droppedArray) {
-                    for (const dropped of droppedArray.values()) {
-                        if (dropped.resourceType === RESOURCE_ENERGY && dropped.amount > 0) {
-                            // Score based on amount and distance to sweep efficiently
-                            const distance = creep.pos.getRangeTo(dropped);
-                            const score = dropped.amount - (distance * 10);
-                            if (!target || score > bestScore) {
-                                target = dropped;
-                                bestScore = score;
-                            }
-                        }
-                    }
-                }
-
+                if (!targetId) continue;
+                const target = Game.getObjectById(targetId);
                 if (target) {
-                    const result = creep.pickup(target);
-
-                    if (result === ERR_NOT_IN_RANGE) {
+                    if (creep.pickup(target) === ERR_NOT_IN_RANGE) {
                         movement.moveTo(creep, target);
-                    } else if (result === OK) {
-                        // Check if this action will fill the creep
-                        const amountTransferred = Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), target.amount);
-                        if (creep.store.getFreeCapacity(RESOURCE_ENERGY) - amountTransferred <= 0) {
-                            creep.memory.hauling = true;
-                        }
                     }
                 }
-            } else {
-                // We are hauling (have energy), need to drop it off at home
+            } else if (state === 'transfer') {
                 if (creep.room.name !== homeRoomName) {
-                    const targetPos = new RoomPosition(25, 25, homeRoomName);
-                    movement.moveTo(creep, targetPos);
+                    movement.moveTo(creep, new RoomPosition(25, 25, homeRoomName));
                     continue;
                 }
-
-                // In home room, move off exit
                 if (creep.pos.x === 0 || creep.pos.x === 49 || creep.pos.y === 0 || creep.pos.y === 49) {
-                    const centerPos = new RoomPosition(25, 25, homeRoomName);
-                    movement.moveTo(creep, centerPos);
+                    movement.moveTo(creep, new RoomPosition(25, 25, homeRoomName));
                     continue;
                 }
 
-                const structuresMap = global.State.structuresByRoom.get(homeRoomName);
-                if (!structuresMap) continue;
-
-                const restrictStorageOutflow = Game.rooms[homeRoomName] && Game.rooms[homeRoomName].memory.restrictStorageOutflow;
-
-                let target = null;
-
-                // Priority 1: Storage
-                if (!restrictStorageOutflow) {
-                    const storages = structuresMap.get(STRUCTURE_STORAGE) || [];
-                    if (storages.length > 0 && storages[0].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                        target = storages[0];
-                    }
-                }
-
-                // Priority 2: Terminal
-                if (!target && !restrictStorageOutflow) {
-                    const terminals = structuresMap.get(STRUCTURE_TERMINAL) || [];
-                    if (terminals.length > 0 && terminals[0].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                        target = terminals[0];
-                    }
-                }
-
-                // Priority 3: Spawn / Extension
-                if (!target) {
-                    const spawns = global.State.spawnsByRoom.get(homeRoomName) || [];
-                    for (let i = 0; i < spawns.length; i++) {
-                        if (spawns[i].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                            target = spawns[i];
-                            break;
-                        }
-                    }
-                }
-                if (!target) {
-                    const extensions = structuresMap.get(STRUCTURE_EXTENSION) || [];
-                    for (let i = 0; i < extensions.length; i++) {
-                        if (extensions[i].store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                            target = extensions[i];
-                            break;
-                        }
-                    }
-                }
-
-                // If no specific target, default to storage if it exists
-                if (!target) {
-                    const storages = structuresMap.get(STRUCTURE_STORAGE) || [];
-                    if (storages.length > 0) {
-                        target = storages[0];
-                    }
-                }
-
+                if (!targetId) continue;
+                const target = Game.getObjectById(targetId);
                 if (target) {
                     if (creep.transfer(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
                         movement.moveTo(creep, target);
@@ -153,7 +71,7 @@ function run(room) {
                 }
             }
 
-        } catch (e) {
+                } catch (e) {
             console.log(`[remoteHauler Error] Room ${room.name}, Creep ${creep.name}: ${e.stack}`);
         }
     }

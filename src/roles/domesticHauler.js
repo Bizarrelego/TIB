@@ -55,26 +55,10 @@ module.exports = {
                     continue;
                 }
 
-                let task = creep.heap.state || creep.heap.task;
+                const state = creep.heap.state;
+                const targetId = creep.heap.targetId;
 
-                // If the logisticsManager assigned a state, use it as task priority
-                if (creep.heap.state) {
-                    task = creep.heap.state;
-                } else {
-                    // Fallback to legacy assignment
-                    if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
-                        task = 'pickup';
-                        creep.heap.task = task;
-                    } else if (creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
-                        task = 'transfer';
-                        creep.heap.task = task;
-                    } else if (!task) {
-                        task = 'pickup'; // Default
-                        creep.heap.task = task;
-                    }
-                }
-
-                if (!creep.heap.state || !creep.heap.targetId) continue;
+                if (!state || !targetId) continue;
 
                 const target = Game.getObjectById(creep.heap.targetId);
 

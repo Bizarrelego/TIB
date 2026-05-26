@@ -20,7 +20,7 @@ const planner = Profiler.wrap('planner', require('../colonies/planner'));
 const { wrap } = require('../utils/ManagerExecutionWrapper');
 const { wrapManager } = require('../utils/ManagerErrorBoundary');
 
-const RoleManager = Profiler.wrap('RoleManager', require('../colonies/RoleManager'));
+
 const operationsManager = Profiler.wrap('operationsManager', require('../operations/operationsManager'));
 const roomEventManager = Profiler.wrap('RoomEventManager', require('./RoomEventManager'));
 const EnergySourceTracker = Profiler.wrap('EnergySourceTracker', require('./EnergySourceTracker'));
@@ -327,6 +327,11 @@ function run() {
     }
 
     // Phase 4: Operations
+    const RoleManager = require('../colonies/RoleManager');
+    if (RoleManager && typeof RoleManager.runAll === 'function') {
+        ManagerExecutionWrapper.wrap('RoleManager.runAll', () => RoleManager.runAll())();
+    }
+
     if (!throttlerFlags.skipOperations) {
         if (operationsManager && typeof operationsManager.run === 'function') {
             ManagerExecutionWrapper.wrap('operationsManager.run', () => operationsManager.run())();
