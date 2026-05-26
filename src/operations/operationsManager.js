@@ -10,12 +10,16 @@ const HarassmentManager = require('./HarassmentManager');
 const powerBankManager = require('./powerBankManager');
 const PowerSpawnManager = require('../managers/PowerSpawnManager');
 const QuadSquadManager = require('../managers/QuadSquadManager');
+const RoleManager = require('../colonies/RoleManager');
 
 /**
  * The main entry point for the Operations module, acting as a high-level orchestrator.
  * @returns {void}
  */
 const exportedModule = Profiler.wrap('operationsManager', function operationsManager() {
+    if (RoleManager && typeof RoleManager.runAll === 'function') {
+        RoleManager.runAll();
+    }
     intelManager();
         scoutManager();
         expansionManager();
