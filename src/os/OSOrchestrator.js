@@ -65,6 +65,30 @@ class OSOrchestrator {
         })();
     }
 
+    static runPhase3(throttlerFlags = {}) {
+        const { wrap } = require('../utils/ManagerExecutionWrapper');
+        const { wrapManager } = require('../utils/ManagerErrorBoundary');
+        const colonyManager = require('../colonies/colonyManager');
+
+        if (!throttlerFlags.skipColonies) {
+            if (colonyManager && typeof colonyManager.run === 'function') {
+                wrap('Phase3_Colonies', wrapManager(() => colonyManager.run(), 'Phase3_Colonies'))();
+            }
+        }
+    }
+
+    static runPhase4(throttlerFlags = {}) {
+        const { wrap } = require('../utils/ManagerExecutionWrapper');
+        const { wrapManager } = require('../utils/ManagerErrorBoundary');
+        const operationsManager = require('../operations/operationsManager');
+
+        if (!throttlerFlags.skipOperations) {
+            if (operationsManager && typeof operationsManager.run === 'function') {
+                wrap('Phase4_Operations', wrapManager(() => operationsManager.run(), 'Phase4_Operations'))();
+            }
+        }
+    }
+
     static runPhase2(throttlerFlags = {}) {
         const { wrap } = require('../utils/ManagerExecutionWrapper');
         const GlobalStatePopulator = require('../state/GlobalStatePopulator');

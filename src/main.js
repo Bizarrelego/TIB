@@ -4,6 +4,7 @@ const managersIntegration = Profiler.wrap('managersIntegration', require('./mana
 const globalState = Profiler.wrap('globalState', require('./state/globalState'));
 const resetRecovery = Profiler.wrap('resetRecovery', require('./os/resetRecovery'));
 
+const OSOrchestrator = require('./os/OSOrchestrator');
 const ExecutionPipeline = require('./os/ExecutionPipeline');
 const cpuThrottler = require('./os/cpuThrottler');
 
@@ -31,6 +32,9 @@ module.exports.loop = wrapManager(Profiler.wrap('main.loop', function () {
             managersIntegration.init(globalState);
         }
     });
+
+    // Initialize OS Orchestrator components
+    executeManager('OSOrchestrator.init', () => OSOrchestrator.init());
 
     // Run the centralized 6-phase pipeline
     ExecutionPipeline.run();
