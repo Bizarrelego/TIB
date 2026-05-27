@@ -258,6 +258,34 @@ class BodyCalc {
         return this.buildArray({ [CARRY]: carry, [MOVE]: move });
     }
 
+    /**
+     * Calculates the optimal body for a mineral miner.
+     * Plugs away at mineral with max WORK parts and sufficient MOVE.
+     * @param {number} energyCapacity Available spawn energy
+     * @returns {string[]} Optimal body array
+     */
+    static calculateMineralMinerBody(energyCapacity) {
+        let work = 0;
+        let move = 0;
+        let cost = 0;
+
+        // Capped to a reasonable limit, e.g. 10-15 WORK parts, since minerals have an extraction cooldown
+        const maxWork = 15;
+
+        while (work < maxWork && cost + BODYPART_COST[WORK] + BODYPART_COST[MOVE] <= energyCapacity && work + move < 50) {
+            work++;
+            move++; // Unroaded ratio
+            cost += BODYPART_COST[WORK] + BODYPART_COST[MOVE];
+        }
+
+        // At least something
+        if (work === 0 && energyCapacity >= 150) {
+            work = 1; move = 1;
+        }
+
+        return this.buildArray({ [WORK]: work, [MOVE]: move });
+    }
+
     static getBuildPower(roomName) {
         let buildPower = 0;
         const roomCreeps = global.State.creepsByRoom.get(roomName);

@@ -33,6 +33,7 @@ const logistics = require('./logistics');
 const market = require('./market');
 const planner = require('./planner');
 const rampartPlanner = require('./rampartPlanner');
+const MineralManager = require('../managers/MineralManager');
 
 /**
  * Executes core colony management loop.
@@ -100,11 +101,17 @@ function runRoomManagers() {
 
         const registeredManagers = Object.keys(require('../managers/index').managers);
         for (const name of registeredManagers) {
-            if (['PreSpawnManager', 'SpawnQueueManager', 'RoomEventManager', 'AllianceIntelManager', 'CombatManager', 'EnergyRequestManager', 'VisualsManager', 'NukeEvacuationManager', 'RampartDefenseManager', 'TowerManager', 'UpgraderManager', 'RemoteEconomyManager', 'TerminalManager', 'QuadSquadManager'].includes(name)) {
+            if (['PreSpawnManager', 'SpawnQueueManager', 'RoomEventManager', 'AllianceIntelManager', 'CombatManager', 'EnergyRequestManager', 'VisualsManager', 'NukeEvacuationManager', 'RampartDefenseManager', 'TowerManager', 'UpgraderManager', 'RemoteEconomyManager', 'TerminalManager', 'QuadSquadManager', 'MineralManager'].includes(name)) {
                 continue;
             }
             if (!managersConfig.find(c => c.name === name)) {
                 managersConfig.push({ name, slice: 1 });
+            }
+        }
+
+        if (room.controller && room.controller.level >= 6) {
+            if (!managersConfig.find(c => c.name === 'MineralManager')) {
+                managersConfig.push({ name: 'MineralManager', slice: 5 });
             }
         }
 
@@ -222,6 +229,11 @@ module.exports = { run: function colonyManager() {
                 executeWrapped('labs.run', () => labs.run(room));
                 executeWrapped('market.run', () => market.run(room));
                 executeWrapped('haulerSizing.run', () => haulerSizing.run && haulerSizing.run(room));
+                executeWrapped('MineralManager.run', () => {
+                    if (room.controller && room.controller.level >= 6 && typeof MineralManager !== 'undefined' && MineralManager.run) {
+                        MineralManager.run(room);
+                    }
+                });
                 executeWrapped('SourceManager.run', () => {
                     if (typeof SourceManager.run === 'function') {
                         SourceManager.run(room);
@@ -252,6 +264,13 @@ module.exports = { run: function colonyManager() {
                 executeWrapped('MiningPlanner.planMiningSpots', () => {
                     if (Memory.rooms && Memory.rooms[room.name] && !Memory.rooms[room.name].miningSpots) {
                         MiningPlanner.planMiningSpots(room.name);
+                    }
+                });
+
+                executeWrapped('MiningPlanner.planMineralSpots', () => {
+                    if (room.controller && room.controller.level >= 6 && Memory.rooms && Memory.rooms[room.name] && !Memory.rooms[room.name].mineralSpots) {
+                        MineralManager.init(room.name);
+                        Memory.rooms[room.name].mineralSpots = true; // Mark as initialized
                     }
                 });
 

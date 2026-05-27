@@ -1,6 +1,6 @@
 /**
  * @typedef {Object} CreepMemory
- * @property {string} role - The role of the creep (e.g., 'harvester', 'upgrader').
+ * @property {string} role - The role of the creep (e.g., 'harvester', 'upgrader', 'mineralMiner').
  * @property {string} [room] - The primary room the creep belongs to.
  * @property {string} [targetId] - ID of the current target structure/creep/source.
  * @property {boolean} [working] - State flag indicating if the creep is working/full.
@@ -12,6 +12,7 @@
  * @property {Map<string, Structure>} structures - Map of structure IDs to Structure objects.
  * @property {Map<string, Creep>} creeps - Map of creep IDs to Creep objects.
  * @property {Map<string, Source>} sources - Map of source IDs to Source objects.
+ * @property {Map<string, Mineral>} minerals - Map of mineral IDs to Mineral objects.
  */
 
 /**
