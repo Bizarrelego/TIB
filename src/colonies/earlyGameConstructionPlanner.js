@@ -28,14 +28,13 @@ function getRCL2ExtensionPositions(spawnPos, roomName) {
     return positions;
 }
 
-const SourceManager = require('../managers/SourceManager');
 const SystemScheduler = require('../os/SystemScheduler');
 
 /**
  * Automatically places container construction sites at optimal mining spots when RCL 2 is reached.
  * @param {Room} room
  */
-function planSourceContainers(room) {
+function planSourceContainers(_room) {
     // REJECTED BY TIB MATRIX. Containers are not allowed at RCL 2.
 }
 
@@ -45,7 +44,7 @@ function planSourceContainers(room) {
  * Automatically places a container construction site near the controller.
  * @param {Room} room
  */
-function planControllerContainer(room) {
+function planControllerContainer(_room) {
     // REJECTED BY TIB MATRIX. Containers are not allowed at RCL 2.
 }
 

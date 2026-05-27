@@ -144,7 +144,6 @@ const SourceManager = {
                 creep.heap.targetPos = { x: optimalSpot.x, y: optimalSpot.y, roomName: rName };
             }
         }
-        }
     }
 };
 

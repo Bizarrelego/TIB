@@ -1,6 +1,5 @@
 const TrafficManager = require('../traffic/trafficManager');
 const { isFatigued } = require('../utils/fatigueGating');
-const { isSleeping } = require('../utils/sourceSleep');
 
 module.exports = {
     run(room) {
