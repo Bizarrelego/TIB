@@ -143,6 +143,33 @@ const SourceManager = {
                 const rName = sourceObj ? sourceObj.room.name : creep.pos.roomName;
                 creep.heap.targetPos = { x: optimalSpot.x, y: optimalSpot.y, roomName: rName };
             }
+
+            // Check if there is a container nearby
+            let hasContainer = false;
+            if (optimalSpot) {
+                const sourceObj = Game.getObjectById(sourceId);
+                if (sourceObj && sourceObj.room) {
+                    const roomName = sourceObj.room.name;
+                    if (global.State && global.State.structuresByRoom) {
+                        const structures = global.State.structuresByRoom.get(roomName);
+                        if (structures && structures.has(STRUCTURE_CONTAINER)) {
+                            const containers = structures.get(STRUCTURE_CONTAINER);
+                            for (const c of containers.values()) {
+                                if (c.pos.x === optimalSpot.x && c.pos.y === optimalSpot.y) {
+                                    hasContainer = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!hasContainer) {
+                creep.heap.state = 'harvest_and_drop';
+            } else {
+                creep.heap.state = 'harvest';
+            }
         }
     }
 };

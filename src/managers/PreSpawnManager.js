@@ -30,10 +30,35 @@ class PreSpawnManager {
      * @param {number} spawnTime The time it takes to spawn the creep
      * @param {number} pathLength The distance from spawn to work location
      */
+
     static registerPreSpawn(roomName, role, body, name, opts, cost, creepToReplaceId, spawnTime, pathLength) {
         PreSpawnManager.initLedger();
 
+        // Check if physical containers are missing
+        let hasContainers = false;
+        if (global.State && global.State.structuresByRoom) {
+            const structures = global.State.structuresByRoom.get(roomName);
+            if (structures && structures.has(STRUCTURE_CONTAINER) && structures.get(STRUCTURE_CONTAINER).size > 0) {
+                hasContainers = true;
+            }
+        }
+
+        // Intercept specialized creeps if no containers
+        if (!hasContainers && (role === 'hauler' || role === 'upgrader')) {
+            role = 'worker';
+            // Adjust body for worker if needed (basic worker body instead of specialized)
+            // Just request a generic worker. The PreSpawnManager doesn't perfectly know available energy,
+            // but we can request a basic body or just use the same cost if it's already generated.
+            // Ideally, we'd fallback to a worker body formula, but [WORK, CARRY, MOVE, MOVE] is a safe fallback.
+            body = [WORK, CARRY, MOVE, MOVE];
+            cost = 250;
+            if (opts && opts.memory) {
+                opts.memory.role = 'worker';
+            }
+        }
+
         if (role === 'remoteHauler' && opts && opts.memory && opts.memory.targetSourceId) {
+
             let storageId = opts.memory.storageId;
             if (!storageId && global.State && global.State.structuresByRoom) {
                 const structures = global.State.structuresByRoom.get(roomName);

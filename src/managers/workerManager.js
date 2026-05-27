@@ -130,28 +130,33 @@ module.exports = {
                         }
                     }
                 }
+
             } else if (creep.heap.state === 'work') {
                 if (room.controller && room.controller.level < 3) {
                     const buildSites = sites;
 
                     let targetFill = null;
-                    if (structures) {
-                        const spawnsMap = structures.get(STRUCTURE_SPAWN);
-                        if (spawnsMap) {
-                            for (const spawn of spawnsMap.values()) {
-                                if (spawn.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                                    targetFill = spawn;
-                                    break;
+
+                    // Top-Down Extension Logistics override: if energy deficit, fill spawn/extension
+                    if (room.energyAvailable < room.energyCapacityAvailable) {
+                        if (structures) {
+                            const spawnsMap = structures.get(STRUCTURE_SPAWN);
+                            if (spawnsMap) {
+                                for (const spawn of spawnsMap.values()) {
+                                    if (spawn.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                                        targetFill = spawn;
+                                        break;
+                                    }
                                 }
                             }
-                        }
-                        if (!targetFill) {
-                            const extensionsMap = structures.get(STRUCTURE_EXTENSION);
-                            if (extensionsMap) {
-                                for (const ext of extensionsMap.values()) {
-                                    if (ext.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                                        targetFill = ext;
-                                        break;
+                            if (!targetFill) {
+                                const extensionsMap = structures.get(STRUCTURE_EXTENSION);
+                                if (extensionsMap) {
+                                    for (const ext of extensionsMap.values()) {
+                                        if (ext.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                                            targetFill = ext;
+                                            break;
+                                        }
                                     }
                                 }
                             }

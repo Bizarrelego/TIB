@@ -53,28 +53,34 @@ module.exports = {
 
                 // Zero-Pathing Drop Mining
                 if (creep.store.getUsedCapacity() > 0) {
-                    let hasLink = false;
-                    const structuresByRoom = global.State.structuresByRoom ? global.State.structuresByRoom.get(room.name) : null;
-                    if (structuresByRoom) {
-                        const links = structuresByRoom.get(STRUCTURE_LINK);
-                        if (links) {
-                            for (const link of links.values()) {
-                                if (Math.max(Math.abs(link.pos.x - creep.pos.x), Math.abs(link.pos.y - creep.pos.y)) <= 1) {
-                                    if (TrafficManager.registerTransfer) {
-                                        TrafficManager.registerTransfer(creep, link, RESOURCE_ENERGY);
-                                    } else {
-                                        creep.transfer(link, RESOURCE_ENERGY);
+                    if (creep.heap.state === 'harvest_and_drop') {
+                        // Containerless drop mining: drop directly on ground unconditionally when full
+                        if (creep.store.getFreeCapacity() === 0) {
+                            creep.drop(RESOURCE_ENERGY);
+                        }
+                    } else {
+                        let hasLink = false;
+                        const structuresByRoom = global.State.structuresByRoom ? global.State.structuresByRoom.get(room.name) : null;
+                        if (structuresByRoom) {
+                            const links = structuresByRoom.get(STRUCTURE_LINK);
+                            if (links) {
+                                for (const link of links.values()) {
+                                    if (Math.max(Math.abs(link.pos.x - creep.pos.x), Math.abs(link.pos.y - creep.pos.y)) <= 1) {
+                                        if (TrafficManager.registerTransfer) {
+                                            TrafficManager.registerTransfer(creep, link, RESOURCE_ENERGY);
+                                        } else {
+                                            creep.transfer(link, RESOURCE_ENERGY);
+                                        }
+                                        hasLink = true;
+                                        break;
                                     }
-                                    hasLink = true;
-                                    break;
                                 }
                             }
                         }
-                    }
 
-                    if (!hasLink) {
-                        // Containerless drop mining: drop directly on ground unconditionally
-                        creep.drop(RESOURCE_ENERGY);
+                        if (!hasLink && creep.store.getFreeCapacity() === 0) {
+                            creep.drop(RESOURCE_ENERGY);
+                        }
                     }
                 }
 
