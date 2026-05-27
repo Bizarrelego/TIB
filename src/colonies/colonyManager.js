@@ -238,11 +238,11 @@ module.exports = { run: function colonyManager() {
                     if (typeof SourceManager.run === 'function') {
                         SourceManager.run(room);
                     } else {
-                        const sources = SourceManager.getAvailableSources(room.name);
                         const harvesters = global.State.creepsByRoom.get(room.name)?.get('harvester') || [];
                         for (let i = 0; i < harvesters.length; i++) {
-                            if (sources.length > 0 && !harvesters[i].heap.targetId) {
-                                SourceManager.assignHarvester(sources[0].id, harvesters[i].id);
+                            const availableSources = SourceManager.getAvailableSources(room.name);
+                            if (availableSources.length > 0 && !harvesters[i].heap.targetId) {
+                                SourceManager.assignHarvester(availableSources[0].id, harvesters[i].id);
                             }
                         }
                     }
