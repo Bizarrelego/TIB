@@ -47,7 +47,6 @@ class HaulerSizing {
      * @param {number} requiredCarry Required number of CARRY parts.
      * @returns {string[]} Optimal body array.
      */
-
     static calculateBody(energyCapacity, requiredCarry) {
         let carry = 0;
         let move = 0;
@@ -75,68 +74,6 @@ class HaulerSizing {
         // Return constructed array
         return BodyCalc.buildArray({ [CARRY]: carry, [MOVE]: move });
     }
-
-    /**
-     * Executes hauler sizing logic per room, mainly to handle early game native RCL 1-2 integration.
-     * @param {Room} room
-     */
-    static run(room) {
-        if (!room.controller || room.controller.level >= 3) return;
-
-        // Check if any containers exist
-        let hasContainers = false;
-        if (global.State && global.State.structuresByRoom) {
-            const structures = global.State.structuresByRoom.get(room.name);
-            if (structures && structures.has(STRUCTURE_CONTAINER) && structures.get(STRUCTURE_CONTAINER).size > 0) {
-                hasContainers = true;
-            }
-        }
-
-        if (!hasContainers && global.State) {
-            const SourceManager = require('../managers/SourceManager');
-            const CachedPathing = require('../utils/CachedPathing');
-            const roomDropped = global.State.droppedByRoom ? (global.State.droppedByRoom.get(room.name) || []) : [];
-            const sources = global.State.sourcesByRoom ? (global.State.sourcesByRoom.get(room.name) || []) : [];
-
-            let totalDomesticCarryRequired = 0;
-
-            const spawnObj = global.State.structuresByRoom && global.State.structuresByRoom.get(room.name) && global.State.structuresByRoom.get(room.name).get(STRUCTURE_SPAWN);
-            const firstSpawn = spawnObj && spawnObj.size > 0 ? spawnObj.values().next().value : null;
-
-            for (const source of sources) {
-                const optimalSpot = SourceManager.getOptimalMiningSpot(source.id);
-                if (optimalSpot) {
-                    // Check dropped energy at this spot
-                    let spotEnergy = 0;
-                    for (const dropped of roomDropped) {
-                        if (dropped.pos.x === optimalSpot.x && dropped.pos.y === optimalSpot.y && dropped.resourceType === RESOURCE_ENERGY) {
-                            spotEnergy += dropped.amount;
-                        }
-                    }
-
-                    if (spotEnergy > 0) {
-                        let pathLength = 10; // Default
-                        if (firstSpawn) {
-                            const endPos = new RoomPosition(optimalSpot.x, optimalSpot.y, room.name);
-                            pathLength = CachedPathing.getPathLength(firstSpawn.pos, endPos) || 10;
-                        }
-
-                        const energyPerTick = source.energyCapacity / ENERGY_REGEN_TIME; // e.g. 1500/300 = 5, or 3000/300 = 10
-                        totalDomesticCarryRequired += HaulerSizing.getRequiredCarryParts(pathLength, spotEnergy, energyPerTick);
-                    }
-                }
-            }
-
-            // Write to room ledger or state to quantify infrastructure vacuum
-            if (totalDomesticCarryRequired > 0) {
-                if (!global.State.roomLedgers) global.State.roomLedgers = new Map();
-                if (!global.State.roomLedgers.has(room.name)) global.State.roomLedgers.set(room.name, new Map());
-                const ledger = global.State.roomLedgers.get(room.name);
-                ledger.set('infrastructureVacuum', totalDomesticCarryRequired);
-            }
-        }
-    }
-
 }
 
 module.exports = HaulerSizing;
