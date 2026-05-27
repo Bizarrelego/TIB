@@ -6,6 +6,7 @@
 const ROLE_PRIORITIES = require('../constants/rolePriorities');
 const eventBus = require('../os/eventBus');
 const CreepRoleBalancer = require('../colonies/CreepRoleBalancer');
+const SpawnLedgerUtility = require('../colonies/SpawnLedgerUtility');
 
 /**
  * @class SpawnQueueManager
@@ -33,20 +34,7 @@ class SpawnQueueManager {
 
         // "Sub-Tick Spawn Ledger: Virtual ledger for room energy capacity."
         // We track against the room's current energy capacity so managers don't over-queue total spawn potential for the tick.
-        const capacity = room.energyCapacityAvailable;
-
-        let totalQueuedCost = 0;
-        if (SpawnQueueManager.globalQueue.has(roomName)) {
-            const buckets = SpawnQueueManager.globalQueue.get(roomName);
-            for (const bucket of buckets) {
-                if (!bucket) continue;
-                for (const req of bucket) {
-                    totalQueuedCost += req.cost;
-                }
-            }
-        }
-
-        const virtualAvailable = Math.max(0, capacity - totalQueuedCost);
+        const virtualAvailable = SpawnLedgerUtility.getAvailableSpawnEnergy(roomName);
 
         if (virtualAvailable < cost) {
             return; // Not enough virtual capacity left to queue this creep
@@ -71,6 +59,7 @@ class SpawnQueueManager {
 
         if (!isDuplicate) {
             bucket.push({ role, body, name, opts, cost });
+            SpawnLedgerUtility.reserveEnergy(roomName, cost);
         }
     }
 
@@ -181,7 +170,7 @@ class SpawnQueueManager {
         const buckets = SpawnQueueManager.globalQueue.get(roomName);
         if (!buckets) return;
 
-        let availableSpawns = spawns.filter(s => !spawnLedger.isSpawnBusy(s));
+        let availableSpawns = spawns.filter(s => !SpawnLedgerUtility.isSpawnBusy(spawnLedger, s));
         if (availableSpawns.length === 0) return;
 
         for (let p = 119; p >= 0; p--) {
@@ -194,25 +183,28 @@ class SpawnQueueManager {
                 // Purge requests that exceed the room's absolute maximum capacity (e.g. extension destroyed)
                 if (request.cost > spawn.room.energyCapacityAvailable) {
                     bucket.splice(i, 1);
+                    SpawnLedgerUtility.releaseEnergy(roomName, request.cost);
                     continue;
                 }
 
-                if (!spawnLedger.canSpawn(request.cost)) {
+                if (!SpawnLedgerUtility.canAffordSpawn(spawnLedger, request.cost)) {
                     // STALL the queue to prevent lower-priority creeps from stealing energy
                     // and causing an infinite spawn lock for expensive high-priority creeps.
                     return;
                 }
 
-                const result = spawnLedger.requestSpawn(spawn, request.body, request.name, request.opts, request.cost);
+                const result = SpawnLedgerUtility.executeSpawn(spawnLedger, spawn, request.body, request.name, request.opts, request.cost);
 
                 if (result === OK) {
                     bucket.splice(i, 1);
+                    SpawnLedgerUtility.releaseEnergy(roomName, request.cost);
                     availableSpawns.shift();
                 } else if (result === ERR_NOT_ENOUGH_ENERGY || result === ERR_BUSY) {
                     return; // Stall if actual engine rejects due to energy or busy state
                 } else {
                     // Purge invalid requests (e.g. ERR_INVALID_ARGS, ERR_NAME_EXISTS) to prevent permanent blocking
                     bucket.splice(i, 1);
+                    SpawnLedgerUtility.releaseEnergy(roomName, request.cost);
                 }
             }
             if (availableSpawns.length === 0) break;
