@@ -130,34 +130,18 @@ module.exports = {
                     }
                 }
 
-            } else if (creep.heap.state === 'work') {
+                        } else if (creep.heap.state === 'work') {
                 if (room.controller && room.controller.level < 3) {
                     const buildSites = sites;
 
                     let targetFill = null;
 
-                    // Top-Down Extension Logistics override: if energy deficit, fill spawn/extension
+                    // Top-Down Extension Logistics override: if energy deficit, find the pre-computed fill task
                     if (room.energyAvailable < room.energyCapacityAvailable) {
-                        if (structures) {
-                            const spawnsMap = structures.get(STRUCTURE_SPAWN);
-                            if (spawnsMap) {
-                                for (const spawn of spawnsMap.values()) {
-                                    if (spawn.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                                        targetFill = spawn;
-                                        break;
-                                    }
-                                }
-                            }
-                            if (!targetFill) {
-                                const extensionsMap = structures.get(STRUCTURE_EXTENSION);
-                                if (extensionsMap) {
-                                    for (const ext of extensionsMap.values()) {
-                                        if (ext.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                                            targetFill = ext;
-                                            break;
-                                        }
-                                    }
-                                }
+                        for (let j = 0; j < tasks.length; j++) {
+                            if (tasks[j].type === 'fill') {
+                                targetFill = tasks[j].target;
+                                break;
                             }
                         }
                     }
