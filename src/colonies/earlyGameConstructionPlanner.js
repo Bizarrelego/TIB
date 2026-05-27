@@ -41,16 +41,65 @@ function planSourceContainers(room) {
         for (const source of sources) {
             const optimalSpot = SourceManager.getOptimalMiningSpot(source.id);
             if (optimalSpot) {
-                const pos = new RoomPosition(optimalSpot.x, optimalSpot.y, room.name);
-                const hasContainerSite = pos.lookFor(LOOK_CONSTRUCTION_SITES).find(s => s.structureType === STRUCTURE_CONTAINER);
-                const hasContainer = pos.lookFor(LOOK_STRUCTURES).find(s => s.structureType === STRUCTURE_CONTAINER);
+                let hasContainer = false;
+                let hasContainerSite = false;
+
+                if (global.State && global.State.structuresByRoom) {
+                    const structures = global.State.structuresByRoom.get(room.name);
+                    if (structures && structures.has(STRUCTURE_CONTAINER)) {
+                        const containers = structures.get(STRUCTURE_CONTAINER);
+                        for (const container of containers.values()) {
+                            if (container.pos.x === optimalSpot.x && container.pos.y === optimalSpot.y) {
+                                hasContainer = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (global.State && global.State.sitesByRoom) {
+                    const sitesMap = global.State.sitesByRoom.get(room.name);
+                    const sites = sitesMap ? (sitesMap instanceof Map ? Array.from(sitesMap.values()) : sitesMap) : [];
+                    for (const site of sites) {
+                        if (site.structureType === STRUCTURE_CONTAINER && site.pos.x === optimalSpot.x && site.pos.y === optimalSpot.y) {
+                            hasContainerSite = true;
+                            break;
+                        }
+                    }
+                }
 
                 if (!hasContainerSite && !hasContainer) {
+                    const pos = new RoomPosition(optimalSpot.x, optimalSpot.y, room.name);
                     pos.createConstructionSite(STRUCTURE_CONTAINER);
                 }
             }
         }
     }
+}
+
+function hasSiteOrStructureAt(roomName, x, y) {
+    if (global.State && global.State.structuresByRoom) {
+        const structures = global.State.structuresByRoom.get(roomName);
+        if (structures) {
+            for (const typeMap of structures.values()) {
+                for (const structure of typeMap.values()) {
+                    if (structure.pos.x === x && structure.pos.y === y) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    if (global.State && global.State.sitesByRoom) {
+        const sitesMap = global.State.sitesByRoom.get(roomName);
+        const sites = sitesMap ? (sitesMap instanceof Map ? Array.from(sitesMap.values()) : sitesMap) : [];
+        for (const site of sites) {
+            if (site.pos.x === x && site.pos.y === y) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 /**
@@ -73,13 +122,10 @@ function planControllerContainer(room) {
                 const y = cPos.y + dy;
 
                 if (x >= 2 && x <= 47 && y >= 2 && y <= 47) {
-                    const pos = new RoomPosition(x, y, room.name);
                     const terrain = Game.map.getRoomTerrain(room.name).get(x, y);
                     if (terrain !== TERRAIN_MASK_WALL) {
-                        const sites = pos.lookFor(LOOK_CONSTRUCTION_SITES);
-                        const structures = pos.lookFor(LOOK_STRUCTURES);
-
-                        if (sites.length === 0 && structures.length === 0) {
+                        if (!hasSiteOrStructureAt(room.name, x, y)) {
+                            const pos = new RoomPosition(x, y, room.name);
                             pos.createConstructionSite(STRUCTURE_CONTAINER);
                             placed = true;
                         }
