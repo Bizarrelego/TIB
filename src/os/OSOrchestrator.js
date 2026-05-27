@@ -73,6 +73,7 @@ class OSOrchestrator {
         const discoveryManager = require('../state/discoveryManager');
         const roomEventManager = require('../managers/RoomEventManager');
         const EnergySourceTracker = require('../managers/EnergySourceTracker');
+        const AllianceIntelManager = require('../managers/AllianceIntelManager');
 
         if (!throttlerFlags.skipState) {
             if (GlobalStatePopulator && typeof GlobalStatePopulator.populate === 'function') {
@@ -99,6 +100,10 @@ class OSOrchestrator {
 
             if (EnergySourceTracker && typeof EnergySourceTracker.run === 'function') {
                 wrap('EnergySourceTracker.run', () => EnergySourceTracker.run())();
+            }
+
+            if (AllianceIntelManager && typeof AllianceIntelManager.run === 'function') {
+                wrap('AllianceIntelManager.run', () => AllianceIntelManager.run())();
             }
         }
     }

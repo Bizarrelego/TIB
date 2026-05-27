@@ -34,6 +34,14 @@ const market = require('./market');
 const planner = require('./planner');
 const rampartPlanner = require('./rampartPlanner');
 const MineralManager = require('../managers/MineralManager');
+const LinkManager = require('../managers/LinkManager');
+const CreepAssignmentManager = require('../managers/CreepAssignmentManager');
+const BoostManager = require('../managers/BoostManager');
+const ConstructionManager = require('../managers/ConstructionManager');
+const StorageManager = require('../managers/StorageManager');
+const LabManager = require('../managers/LabManager');
+const MarketManager = require('../managers/MarketManager');
+
 
 /**
  * Executes core colony management loop.
@@ -51,133 +59,7 @@ const Logger = require('../utils/logger');
 const globalState = require('../state/globalState');
 const { wrapModuleFunctions } = require('../utils/moduleWrapper');
 
-function runRoomManagers() {
-    if (!global.State || !global.State.rooms) return;
 
-    for (const roomName of global.State.rooms.keys()) {
-        const room = Game.rooms[roomName];
-
-        if (!room || !room.controller || !room.controller.my) continue;
-
-        const roomCreeps = global.State.creepsByRoom.get(room.name);
-        if (roomCreeps) {
-            const haulers = roomCreeps.get('hauler') || [];
-            const domHaulers = roomCreeps.get('domesticHauler') || [];
-            const harvesters = roomCreeps.get('harvester') || [];
-
-            if (room.energyAvailable < 300 && haulers.length === 0 && domHaulers.length === 0 && harvesters.length > 0) {
-                const overridden = [];
-                for (let i = harvesters.length - 1; i >= 0; i--) {
-                    const h = harvesters[i];
-                    if (h.store.getUsedCapacity() > 0) {
-                        h.heap.state = 'transfer';
-                    } else {
-                        h.heap.state = 'pickup';
-                    }
-                    overridden.push(h);
-                    harvesters.splice(i, 1);
-                }
-                roomCreeps.set('domesticHauler', domHaulers.concat(overridden));
-            }
-        }
-
-        const managersConfig = [
-            { name: 'ConstructionManager', slice: 1 },
-            { name: 'LinkManager', slice: 1 },
-            { name: 'StorageManager', slice: 1 },
-            { name: 'LogisticsManager', slice: 1 },
-            { name: 'LabManager', slice: 5 },
-            { name: 'MarketManager', slice: 10 }
-        ];
-
-        if (room.controller.level < 6) {
-            const prune = ['LabManager'];
-            for (let i = managersConfig.length - 1; i >= 0; i--) {
-                if (prune.includes(managersConfig[i].name)) {
-                    managersConfig.splice(i, 1);
-                }
-            }
-        }
-
-        const registeredManagers = Object.keys(require('../managers/index').managers);
-        for (const name of registeredManagers) {
-            if (['PreSpawnManager', 'SpawnQueueManager', 'RoomEventManager', 'AllianceIntelManager', 'CombatManager', 'EnergyRequestManager', 'VisualsManager', 'NukeEvacuationManager', 'RampartDefenseManager', 'TowerManager', 'UpgraderManager', 'RemoteEconomyManager', 'TerminalManager', 'QuadSquadManager', 'MineralManager'].includes(name)) {
-                continue;
-            }
-            if (!managersConfig.find(c => c.name === name)) {
-                managersConfig.push({ name, slice: 1 });
-            }
-        }
-
-        if (room.controller && room.controller.level >= 6) {
-            if (!managersConfig.find(c => c.name === 'MineralManager')) {
-                managersConfig.push({ name: 'MineralManager', slice: 5 });
-            }
-        }
-
-        let TickSlicer;
-        try {
-            TickSlicer = require('../os/TickSlicer');
-        } catch (e) {
-            // TickSlicer not yet implemented, proceed with default logic
-        }
-
-        if (!global.Cache) {
-            const { CacheRegistry } = require('../os/cache');
-            CacheRegistry.init();
-        }
-        if (!global.Cache.has('processes')) global.Cache.set('processes', new Map());
-
-        for (const config of managersConfig) {
-            let processId = `${room.name}_${config.name}`;
-            let processObj = global.Cache.get('processes').get(processId);
-
-            if (TickSlicer && typeof TickSlicer.shouldRun === 'function') {
-                if (!TickSlicer.shouldRun(config.name, room.name)) continue;
-            } else {
-                if (processObj && processObj.wakeTick && Game.time < processObj.wakeTick) {
-                    continue;
-                }
-
-                if ((!processObj || !processObj.wakeTick) && Game.time % config.slice !== 0) continue;
-            }
-
-            let manager = globalState.getManager(config.name);
-            if (manager && typeof manager.run === 'function') {
-                if (!processObj) {
-                    processObj = { id: processId };
-                    global.Cache.get('processes').set(processId, processObj);
-                }
-                if (!manager.__errorWrapped) {
-                    manager = wrapModuleFunctions(manager, (funcName, originalFunc, ...args) => {
-                        return executeManager(`${config.name}.${funcName}`, originalFunc, ...args);
-                    });
-                    manager.__errorWrapped = true;
-                }
-
-                if (!manager.__profilerWrapped) {
-                    manager = Profiler.wrap(config.name, manager);
-                    manager.__profilerWrapped = true;
-                }
-
-                Logger.debug(`Running manager ${config.name} in room ${room.name}`);
-                const profilerEnabled = global.PROFILER_ENABLED || (typeof Memory !== 'undefined' && Memory.PROFILER_ENABLED);
-                const cpuAvailable = typeof Game !== 'undefined' && Game.cpu && typeof Game.cpu.getUsed === 'function';
-                let startCpu;
-                if (profilerEnabled) {
-                    startCpu = cpuAvailable ? Game.cpu.getUsed() : Date.now();
-                }
-
-                manager.run(room, processObj);
-
-                if (profilerEnabled) {
-                    const endCpu = cpuAvailable ? Game.cpu.getUsed() : Date.now();
-                    Profiler.record(config.name, endCpu - startCpu);
-                }
-            }
-        }
-    }
-}
 
 module.exports = { run: function colonyManager() {
     if (!global.State || !global.State.rooms) return;
@@ -215,6 +97,9 @@ module.exports = { run: function colonyManager() {
                 executeWrapped('BaseLayoutOptimizer.run', () => BaseLayoutOptimizer.run && BaseLayoutOptimizer.run(room));
 
                 // Phase 3: Execution, Market & Logistics
+                executeWrapped('LinkManager.run', () => LinkManager.run && LinkManager.run(room));
+                executeWrapped('ConstructionManager.run', () => ConstructionManager.run && ConstructionManager.run(room));
+                executeWrapped('StorageManager.run', () => StorageManager.run && StorageManager.run(room));
                 executeWrapped('MarketArbitrageAnalyzer.run', () => MarketArbitrageAnalyzer.run && MarketArbitrageAnalyzer.run(room));
                 executeWrapped('MarketOrderAnalyzer.run', () => MarketOrderAnalyzer.run && MarketOrderAnalyzer.run(room));
                 executeWrapped('MarketOrderExecutor.run', () => MarketOrderExecutor.run && MarketOrderExecutor.run(room));
@@ -227,13 +112,18 @@ module.exports = { run: function colonyManager() {
                 executeWrapped('logistics.run', () => logistics.run(room));
                 executeWrapped('LogisticsManager.run', () => LogisticsManager.run(room));
                 executeWrapped('labs.run', () => labs.run(room));
+                if (Game.time % 5 === 0) executeWrapped('LabManager.run', () => LabManager.run && LabManager.run(room));
+                executeWrapped('BoostManager.run', () => BoostManager.run && BoostManager.run(room));
                 executeWrapped('market.run', () => market.run(room));
+                if (Game.time % 10 === 0) executeWrapped('MarketManager.run', () => MarketManager.run && MarketManager.run(room));
                 executeWrapped('haulerSizing.run', () => haulerSizing.run && haulerSizing.run(room));
-                executeWrapped('MineralManager.run', () => {
-                    if (room.controller && room.controller.level >= 6 && typeof MineralManager !== 'undefined' && MineralManager.run) {
-                        MineralManager.run(room);
-                    }
-                });
+                if (Game.time % 5 === 0) {
+                    executeWrapped('MineralManager.run', () => {
+                        if (room.controller && room.controller.level >= 6 && typeof MineralManager !== 'undefined' && MineralManager.run) {
+                            MineralManager.run(room);
+                        }
+                    });
+                }
                 executeWrapped('SourceManager.run', () => {
                     if (typeof SourceManager.run === 'function') {
                         SourceManager.run(room);
@@ -248,11 +138,11 @@ module.exports = { run: function colonyManager() {
                     }
                 });
                 executeWrapped('workerManager.run', () => workerManager.run(room));
+
                 executeWrapped('UpgraderManager.run', () => UpgraderManager.run && UpgraderManager.run(room));
 
-                // LinkManager is handled centrally via managerOrchestrator but leaving un-wrapped here
-
                 executeWrapped('RemoteEconomyManager.run', () => RemoteEconomyManager.run && RemoteEconomyManager.run(room));
+                executeWrapped('CreepAssignmentManager.run', () => CreepAssignmentManager.run && CreepAssignmentManager.run(room));
 
                 // Phase 4: Roles & Spawning
                 executeWrapped('CreepRoleBalancer.run', () => CreepRoleBalancer.run && CreepRoleBalancer.run(room));
@@ -295,5 +185,5 @@ module.exports = { run: function colonyManager() {
         }
     }
 
-    executeWrapped('runRoomManagers', () => runRoomManagers());
+
 } };
