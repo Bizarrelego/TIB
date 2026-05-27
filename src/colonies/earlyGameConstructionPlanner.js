@@ -39,30 +39,7 @@ function planSourceContainers(room) {
     // REJECTED BY TIB MATRIX. Containers are not allowed at RCL 2.
 }
 
-function hasSiteOrStructureAt(roomName, x, y) {
-    if (global.State && global.State.structuresByRoom) {
-        const structures = global.State.structuresByRoom.get(roomName);
-        if (structures) {
-            for (const typeMap of structures.values()) {
-                for (const structure of typeMap.values()) {
-                    if (structure.pos.x === x && structure.pos.y === y) {
-                        return true;
-                    }
-                }
-            }
-        }
-    }
-    if (global.State && global.State.sitesByRoom) {
-        const sitesMap = global.State.sitesByRoom.get(roomName);
-        const sites = sitesMap ? (sitesMap instanceof Map ? Array.from(sitesMap.values()) : sitesMap) : [];
-        for (const site of sites) {
-            if (site.pos.x === x && site.pos.y === y) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
+
 
 /**
  * Automatically places a container construction site near the controller.
