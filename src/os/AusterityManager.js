@@ -6,22 +6,29 @@
 
 const Logger = require('../utils/logger');
 
-let isAusterityActive = false;
+const { LEVELS } = require('./AusterityDecisionEngine');
+
+let currentLevel = LEVELS.NONE;
 
 /**
- * Activates austerity mode and logs the activation.
+ * Activates austerity mode with the given level and logs the activation.
+ * @param {import('./AusterityDecisionEngine').AusterityLevel} level - The level of austerity to activate.
  */
-function activate() {
-    isAusterityActive = true;
-    Logger.info('[AusterityManager] 🚨 CPU Austerity Mode ACTIVATED - Reducing tick rates and throttling operations.');
+function activate(level) {
+    if (currentLevel !== level) {
+        currentLevel = level;
+        Logger.info(`[AusterityManager] 🚨 CPU Austerity Mode ACTIVATED (${level}) - Reducing tick rates and throttling operations.`);
+    }
 }
 
 /**
  * Deactivates austerity mode and logs the deactivation.
  */
 function deactivate() {
-    isAusterityActive = false;
-    Logger.info('[AusterityManager] ✅ CPU Austerity Mode DEACTIVATED - Resuming normal operations.');
+    if (currentLevel !== LEVELS.NONE) {
+        currentLevel = LEVELS.NONE;
+        Logger.info('[AusterityManager] ✅ CPU Austerity Mode DEACTIVATED - Resuming normal operations.');
+    }
 }
 
 /**
@@ -37,27 +44,36 @@ function run() {
         Logger.error(`[AusterityManager] Error evaluating austerity trigger: ${e.stack}`);
     }
 
-    return isAusterityActive;
+    return isActive();
 }
 
 /**
  * Returns the current state of austerity mode.
- * @returns {boolean}
+ * @returns {boolean} True if any level of austerity is active.
  */
 function isActive() {
-    return isAusterityActive;
+    return currentLevel !== LEVELS.NONE;
+}
+
+/**
+ * Returns the current austerity level.
+ * @returns {import('./AusterityDecisionEngine').AusterityLevel} The active austerity level.
+ */
+function getLevel() {
+    return currentLevel;
 }
 
 /**
  * Resets the internal state (useful for testing or global resets).
  */
 function reset() {
-    isAusterityActive = false;
+    currentLevel = LEVELS.NONE;
 }
 
 module.exports = {
     run,
     isActive,
+    getLevel,
     reset,
     activate,
     deactivate
