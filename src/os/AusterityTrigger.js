@@ -6,32 +6,32 @@
 
 const cpuBucketForecaster = require('./cpuBucketForecaster');
 const AusterityManager = require('./AusterityManager');
+const AusterityDecisionEngine = require('./AusterityDecisionEngine');
 
-const AUSTERITY_THRESHOLD = 500;
-const DRAIN_RATE_THRESHOLD = -20; // Losing more than 20 bucket per tick on average
 const FORECAST_TICKS = 10;
 
 /**
+ * Evaluates the CPU bucket forecast and determines the required austerity level.
+ * @returns {import('./AusterityDecisionEngine').AusterityLevel} The determined austerity level.
+ */
+function getRequiredAusterityLevel() {
+    if (cpuBucketForecaster.getHistoryLength() < 5) return AusterityDecisionEngine.LEVELS.NONE;
+
+    const currentBucket = cpuBucketForecaster.getCurrentBucket();
+    const drainRate = cpuBucketForecaster.getDrainRate();
+    const forecasted10Ticks = cpuBucketForecaster.getForecastedBucket(FORECAST_TICKS);
+
+    return AusterityDecisionEngine.shouldActivateAusterity(currentBucket, forecasted10Ticks, drainRate);
+}
+
+/**
  * Evaluates the CPU bucket forecast and determines if austerity should be triggered.
+ * Maintained for backward compatibility.
  * @returns {boolean} True if austerity should be triggered.
  */
 function shouldTriggerAusterity() {
-    if (cpuBucketForecaster.getHistoryLength() < 5) return false; // Need enough data
-
-    const currentBucket = cpuBucketForecaster.getCurrentBucket();
-    if (currentBucket < AUSTERITY_THRESHOLD) return true; // Already below threshold
-
-    const drainRate = cpuBucketForecaster.getDrainRate();
-
-    // If we're draining fast and will hit threshold soon (e.g. 10 ticks)
-    if (drainRate < DRAIN_RATE_THRESHOLD) {
-        const forecasted10Ticks = cpuBucketForecaster.getForecastedBucket(FORECAST_TICKS);
-        if (forecasted10Ticks < AUSTERITY_THRESHOLD) {
-            return true;
-        }
-    }
-
-    return false;
+    const level = getRequiredAusterityLevel();
+    return level !== AusterityDecisionEngine.LEVELS.NONE;
 }
 
 /**
@@ -39,11 +39,12 @@ function shouldTriggerAusterity() {
  * @returns {boolean} True if austerity mode is active.
  */
 function evaluateAndTriggerAusterity() {
-    const shouldTrigger = shouldTriggerAusterity();
+    const level = getRequiredAusterityLevel();
 
-    if (shouldTrigger && !AusterityManager.isActive()) {
-        AusterityManager.activate();
-    } else if (!shouldTrigger && AusterityManager.isActive()) {
+    if (level !== AusterityDecisionEngine.LEVELS.NONE) {
+        // Will only log activation if the level changes (handled internally by AusterityManager)
+        AusterityManager.activate(level);
+    } else {
         AusterityManager.deactivate();
     }
 
