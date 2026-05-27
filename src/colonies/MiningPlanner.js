@@ -130,6 +130,111 @@ const MiningPlanner = {
         global.State.miningSpotsByRoom.set(roomName, miningSpots);
 
         // Cached exclusively in global.State to adhere to zero native memory serialization rules.
+    },
+
+    /**
+     * Calculates and caches the optimal mining spot for each mineral in the given room.
+     * Evaluates adjacent tiles for terrain and existing structures (containers/extractors).
+     * Calculates exact path length to home storage.
+     * @param {string} roomName - The name of the room to plan mineral spots for.
+     * @param {string} [homeRoomName] - The name of the home room.
+     */
+    planMineralSpots(roomName, homeRoomName) {
+        const minerals = global.State.mineralsByRoom ? global.State.mineralsByRoom.get(roomName) : null;
+        if (!minerals || minerals.length === 0) return;
+
+        const terrain = Game.map.getRoomTerrain(roomName);
+        const structures = global.State.structuresByRoom ? global.State.structuresByRoom.get(roomName) : null;
+
+        let storagePos = null;
+        if (homeRoomName && global.State.structuresByRoom) {
+            const homeStructures = global.State.structuresByRoom.get(homeRoomName);
+            if (homeStructures) {
+                const storages = homeStructures.get(STRUCTURE_STORAGE);
+                if (storages && storages.length > 0) {
+                    storagePos = storages[0].pos;
+                } else {
+                    const spawns = global.State.spawnsByRoom ? global.State.spawnsByRoom.get(homeRoomName) : null;
+                    if (spawns && spawns.length > 0) {
+                        storagePos = spawns[0].pos;
+                    }
+                }
+            }
+        } else if (!homeRoomName && structures) {
+            const storages = structures.get(STRUCTURE_STORAGE);
+            if (storages && storages.length > 0) {
+                storagePos = storages[0].pos;
+            } else {
+                const spawns = global.State.spawnsByRoom ? global.State.spawnsByRoom.get(roomName) : null;
+                if (spawns && spawns.length > 0) {
+                    storagePos = spawns[0].pos;
+                }
+            }
+        }
+
+        const mineralSpots = new Map();
+
+        for (const mineral of minerals) {
+            let bestSpot = null;
+            let bestScore = -Infinity;
+
+            for (let dx = -1; dx <= 1; dx++) {
+                for (let dy = -1; dy <= 1; dy++) {
+                    if (dx === 0 && dy === 0) continue;
+
+                    const x = mineral.pos.x + dx;
+                    const y = mineral.pos.y + dy;
+
+                    if (x < 1 || x > 48 || y < 1 || y > 48) continue;
+                    if (terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
+
+                    let score = 0;
+
+                    if (structures) {
+                        const containers = structures.get(STRUCTURE_CONTAINER);
+                        if (containers) {
+                            for (const container of containers.values()) {
+                                if (container.pos.x === x && container.pos.y === y) {
+                                    score += 50;
+                                }
+                            }
+                        }
+
+                        const storages = structures.get(STRUCTURE_STORAGE);
+                        if (storages) {
+                            for (const storage of storages.values()) {
+                                if (Math.abs(storage.pos.x - x) <= 1 && Math.abs(storage.pos.y - y) <= 1) {
+                                    score += 30;
+                                }
+                            }
+                        }
+                    }
+
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestSpot = { x, y };
+                    }
+                }
+            }
+
+            if (bestSpot) {
+                if (storagePos) {
+                    const ret = PathFinder.search(
+                        new RoomPosition(bestSpot.x, bestSpot.y, roomName),
+                        { pos: storagePos, range: 1 },
+                        { plainCost: 2, swampCost: 10 }
+                    );
+                    if (!ret.incomplete) {
+                        bestSpot.pathLength = ret.path.length;
+                    }
+                }
+                mineralSpots.set(mineral.id, bestSpot);
+            }
+        }
+
+        if (!global.State) global.State = new Map();
+        if (!global.State.mineralSpotsByRoom) global.State.mineralSpotsByRoom = new Map();
+        global.State.mineralSpotsByRoom.set(roomName, mineralSpots);
     }
 };
 
