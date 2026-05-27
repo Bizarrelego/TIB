@@ -4,10 +4,7 @@ const managersIntegration = Profiler.wrap('managersIntegration', require('./mana
 const globalState = Profiler.wrap('globalState', require('./state/globalState'));
 const resetRecovery = Profiler.wrap('resetRecovery', require('./os/resetRecovery'));
 
-const OSOrchestrator = require('./os/OSOrchestrator');
-const colonyManager = require('./colonies/colonyManager');
-const operationsManager = require('./operations/operationsManager');
-const trafficManager = require('./traffic/trafficManager');
+const ExecutionPipeline = require('./os/ExecutionPipeline');
 const cpuThrottler = require('./os/cpuThrottler');
 
 const { wrapManager } = require('./utils/ManagerErrorBoundary');
@@ -35,25 +32,8 @@ module.exports.loop = wrapManager(Profiler.wrap('main.loop', function () {
         }
     });
 
-    let throttlerFlags = {};
-    if (cpuThrottler && typeof cpuThrottler.run === 'function') {
-        throttlerFlags = cpuThrottler.run() || {};
-    }
-
     // Run the centralized 6-phase pipeline
-    OSOrchestrator.runPhase1();
-    OSOrchestrator.runPhase2(throttlerFlags);
-
-    if (!throttlerFlags.skipColonies) {
-        colonyManager.run();
-    }
-
-    if (!throttlerFlags.skipOperations) {
-        operationsManager.run();
-    }
-
-    trafficManager.run();
-    OSOrchestrator.runPhase6();
+    ExecutionPipeline.run();
 
     // Profiler output
     executeManager('Profiler.report', () => Profiler.report());
