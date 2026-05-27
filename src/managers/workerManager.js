@@ -134,15 +134,32 @@ module.exports = {
                 if (room.controller && room.controller.level < 3) {
                     const buildSites = sites;
 
-                    let spawn = null;
+                    let targetFill = null;
                     if (structures) {
                         const spawnsMap = structures.get(STRUCTURE_SPAWN);
-                        if (spawnsMap && spawnsMap.size > 0) {
-                            spawn = Array.from(spawnsMap.values())[0];
+                        if (spawnsMap) {
+                            for (const spawn of spawnsMap.values()) {
+                                if (spawn.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                                    targetFill = spawn;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!targetFill) {
+                            const extensionsMap = structures.get(STRUCTURE_EXTENSION);
+                            if (extensionsMap) {
+                                for (const ext of extensionsMap.values()) {
+                                    if (ext.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                                        targetFill = ext;
+                                        break;
+                                    }
+                                }
+                            }
                         }
                     }
-                    if (spawn && spawn.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                        creep.heap.targetId = spawn.id;
+
+                    if (targetFill) {
+                        creep.heap.targetId = targetFill.id;
                         creep.heap.subState = 'fill';
                     } else if (buildSites.length > 0) {
                         creep.heap.targetId = buildSites[0].id;

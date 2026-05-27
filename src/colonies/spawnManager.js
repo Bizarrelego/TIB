@@ -104,9 +104,6 @@ module.exports = {
                 if (spawnLedger.canSpawn(cost)) {
                     SpawnQueueManager.requestSpawn(room.name, 'worker', body, 'worker_' + Game.time, { memory: { role: 'worker', colony: room.name } }, cost);
                 }
-                const queue = new SpawnQueueManager();
-                queue.process(spawns, spawnLedger);
-                return;
             }
 
             // Spawn harvesters first
