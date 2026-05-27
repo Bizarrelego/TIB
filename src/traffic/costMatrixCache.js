@@ -9,12 +9,19 @@ const CostMatrixCache = {
     get: (roomName) => {
         if (!global.State) global.State = new Map();
         if (!global.State.costMatrices) global.State.costMatrices = new Map();
+        if (!global.State.costMatrixObjects) global.State.costMatrixObjects = new Map();
 
         const needsUpdate = CostMatrixUpdateTrigger.shouldUpdateCostMatrix(roomName);
 
         if (!needsUpdate) {
+            if (global.State.costMatrixObjects.has(roomName)) {
+                return global.State.costMatrixObjects.get(roomName);
+            }
+
             if (global.State.costMatrices.has(roomName)) {
-                return PathFinder.CostMatrix.deserialize(global.State.costMatrices.get(roomName));
+                const mat = PathFinder.CostMatrix.deserialize(global.State.costMatrices.get(roomName));
+                global.State.costMatrixObjects.set(roomName, mat);
+                return mat;
             }
 
             // Attempt to deserialize from RawMemory to mitigate global reset CPU spikes
@@ -24,7 +31,9 @@ const CostMatrixCache = {
                     const parsed = JSON.parse(rawData);
                     if (parsed[roomName]) {
                         global.State.costMatrices.set(roomName, parsed[roomName]);
-                        return PathFinder.CostMatrix.deserialize(parsed[roomName]);
+                        const mat = PathFinder.CostMatrix.deserialize(parsed[roomName]);
+                        global.State.costMatrixObjects.set(roomName, mat);
+                        return mat;
                     }
                 } catch (e) {
                     console.log(`[CostMatrixCache] Failed to parse raw memory: ${e.message}`);
@@ -36,7 +45,9 @@ const CostMatrixCache = {
                 if (matrices.has(roomName)) {
                     const serialized = matrices.get(roomName);
                     global.State.costMatrices.set(roomName, serialized);
-                    return PathFinder.CostMatrix.deserialize(serialized);
+                    const mat = PathFinder.CostMatrix.deserialize(serialized);
+                    global.State.costMatrixObjects.set(roomName, mat);
+                    return mat;
                 }
             }
         }
@@ -46,10 +57,12 @@ const CostMatrixCache = {
     set: (roomName, costMatrix) => {
         if (!global.State) global.State = new Map();
         if (!global.State.costMatrices) global.State.costMatrices = new Map();
+        if (!global.State.costMatrixObjects) global.State.costMatrixObjects = new Map();
         if (!global.State.roomHashes) global.State.roomHashes = new Map();
 
         const serialized = costMatrix.serialize();
         global.State.costMatrices.set(roomName, serialized);
+        global.State.costMatrixObjects.set(roomName, costMatrix);
 
         const hash = RoomHasher.generate(roomName);
         global.State.roomHashes.set(roomName, hash);
@@ -60,6 +73,11 @@ const CostMatrixCache = {
             }
             const matrices = global.Cache.get('costMatrices');
             matrices.set(roomName, serialized);
+
+            if (!global.Cache.has('costMatrixObjects')) {
+                global.Cache.set('costMatrixObjects', new Map());
+            }
+            global.Cache.get('costMatrixObjects').set(roomName, costMatrix);
 
             if (!global.Cache.has('roomHashes')) {
                 global.Cache.set('roomHashes', new Map());
