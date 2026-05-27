@@ -36,45 +36,7 @@ const SystemScheduler = require('../os/SystemScheduler');
  * @param {Room} room
  */
 function planSourceContainers(room) {
-    if (room.controller && room.controller.level >= 2) {
-        const sources = global.State && global.State.sourcesByRoom ? global.State.sourcesByRoom.get(room.name) || [] : [];
-        for (const source of sources) {
-            const optimalSpot = SourceManager.getOptimalMiningSpot(source.id);
-            if (optimalSpot) {
-                let hasContainer = false;
-                let hasContainerSite = false;
-
-                if (global.State && global.State.structuresByRoom) {
-                    const structures = global.State.structuresByRoom.get(room.name);
-                    if (structures && structures.has(STRUCTURE_CONTAINER)) {
-                        const containers = structures.get(STRUCTURE_CONTAINER);
-                        for (const container of containers.values()) {
-                            if (container.pos.x === optimalSpot.x && container.pos.y === optimalSpot.y) {
-                                hasContainer = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                if (global.State && global.State.sitesByRoom) {
-                    const sitesMap = global.State.sitesByRoom.get(room.name);
-                    const sites = sitesMap ? (sitesMap instanceof Map ? Array.from(sitesMap.values()) : sitesMap) : [];
-                    for (const site of sites) {
-                        if (site.structureType === STRUCTURE_CONTAINER && site.pos.x === optimalSpot.x && site.pos.y === optimalSpot.y) {
-                            hasContainerSite = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (!hasContainerSite && !hasContainer) {
-                    const pos = new RoomPosition(optimalSpot.x, optimalSpot.y, room.name);
-                    pos.createConstructionSite(STRUCTURE_CONTAINER);
-                }
-            }
-        }
-    }
+    // REJECTED BY TIB MATRIX. Containers are not allowed at RCL 2.
 }
 
 function hasSiteOrStructureAt(roomName, x, y) {
@@ -107,33 +69,7 @@ function hasSiteOrStructureAt(roomName, x, y) {
  * @param {Room} room
  */
 function planControllerContainer(room) {
-    if (room.controller && room.controller.level >= 2) {
-        // Find a spot within 3 tiles of the controller
-        const cPos = room.controller.pos;
-        let placed = false;
-
-        // Simple search around controller
-        for (let dx = -3; dx <= 3 && !placed; dx++) {
-            for (let dy = -3; dy <= 3 && !placed; dy++) {
-                // Keep it at least 2 tiles away but within 3 to leave room
-                if (Math.abs(dx) < 2 && Math.abs(dy) < 2) continue;
-
-                const x = cPos.x + dx;
-                const y = cPos.y + dy;
-
-                if (x >= 2 && x <= 47 && y >= 2 && y <= 47) {
-                    const terrain = Game.map.getRoomTerrain(room.name).get(x, y);
-                    if (terrain !== TERRAIN_MASK_WALL) {
-                        if (!hasSiteOrStructureAt(room.name, x, y)) {
-                            const pos = new RoomPosition(x, y, room.name);
-                            pos.createConstructionSite(STRUCTURE_CONTAINER);
-                            placed = true;
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // REJECTED BY TIB MATRIX. Containers are not allowed at RCL 2.
 }
 
 /**

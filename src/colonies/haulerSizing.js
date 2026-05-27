@@ -130,9 +130,9 @@ class HaulerSizing {
             // Write to room ledger or state to quantify infrastructure vacuum
             if (totalDomesticCarryRequired > 0) {
                 if (!global.State.roomLedgers) global.State.roomLedgers = new Map();
-                if (!global.State.roomLedgers.has(room.name)) global.State.roomLedgers.set(room.name, {});
+                if (!global.State.roomLedgers.has(room.name)) global.State.roomLedgers.set(room.name, new Map());
                 const ledger = global.State.roomLedgers.get(room.name);
-                ledger.infrastructureVacuum = totalDomesticCarryRequired;
+                ledger.set('infrastructureVacuum', totalDomesticCarryRequired);
             }
         }
     }
