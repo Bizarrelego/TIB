@@ -73,8 +73,8 @@ function maximizeIntents(creep, potentialIntents) {
 
     // Sort intents by priority descending
     const sortedIntents = [...potentialIntents].sort((a, b) => {
-        const priorityA = INTENT_PRIORITIES[a.action] || 0;
-        const priorityB = INTENT_PRIORITIES[b.action] || 0;
+        const priorityA = INTENT_PRIORITIES.get(a.action) || 0;
+        const priorityB = INTENT_PRIORITIES.get(b.action) || 0;
         return priorityB - priorityA;
     });
 
