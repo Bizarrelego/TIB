@@ -7,8 +7,6 @@
  */
 
 const OSOrchestrator = require('./OSOrchestrator');
-const colonyManager = require('../colonies/colonyManager');
-const operationsManager = require('../operations/operationsManager');
 const trafficManager = require('../traffic/trafficManager');
 const cpuThrottler = require('./cpuThrottler');
 const SystemScheduler = require('./SystemScheduler');
@@ -39,18 +37,10 @@ const ExecutionPipeline = {
         wrap('Phase2_GlobalState', () => OSOrchestrator.runPhase2(throttlerFlags))();
 
         // Phase 3: Colonies
-        if (!throttlerFlags.skipColonies) {
-            if (colonyManager && typeof colonyManager.run === 'function') {
-                wrap('Phase3_Colonies', () => colonyManager.run())();
-            }
-        }
+        OSOrchestrator.runPhase3(throttlerFlags);
 
         // Phase 4: Operations
-        if (!throttlerFlags.skipOperations) {
-            if (operationsManager && typeof operationsManager.run === 'function') {
-                wrap('Phase4_Operations', () => operationsManager.run())();
-            }
-        }
+        OSOrchestrator.runPhase4(throttlerFlags);
 
         // Phase 5: Traffic Control
         if (trafficManager && typeof trafficManager.run === 'function') {
