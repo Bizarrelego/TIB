@@ -1,5 +1,6 @@
 function run(room) {
     try {
+        if (room.memory && room.memory.emergencyFortify) return;
         if (!room.controller || room.controller.level < 4) return;
 
         const structuresMap = global.State.structuresByRoom.get(room.name);

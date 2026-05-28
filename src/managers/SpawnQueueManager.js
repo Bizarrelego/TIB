@@ -27,6 +27,13 @@ class SpawnQueueManager {
      * @param {number} cost
      */
     static requestSpawn(roomName, role, body, name, opts, cost) {
+        // Reject non-essential economic spawns if high defcon policy is active
+        if (Memory.rooms[roomName] && Memory.rooms[roomName].prioritizeDefenseSpawns) {
+            if (role === 'upgrader' || role === 'builder') {
+                return;
+            }
+        }
+
         // Gatekeep using the reservation system.
         // Prevent adding to the queue if virtual available energy is less than the cost.
         const room = Game.rooms[roomName];
