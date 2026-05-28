@@ -3,6 +3,8 @@
  * @description Orchestrates the rehydration of global state components after a VM reset.
  */
 
+const GlobalStateSchemaValidator = require('../state/GlobalStateSchema');
+
 class GlobalStateRehydrator {
     /**
      * Iterates through Game objects to rebuild O(1) dictionaries in global.State
@@ -103,6 +105,8 @@ class GlobalStateRehydrator {
         if (typeof global.State.rehydrate === 'function') {
             global.State.rehydrate();
         }
+
+        GlobalStateSchemaValidator.validateState(global.State);
     }
 }
 
