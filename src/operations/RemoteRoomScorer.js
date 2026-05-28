@@ -16,6 +16,8 @@
  * @typedef {Object} RoomScoreResult
  * @property {number} totalScore - The overall calculated score.
  * @property {RoomScoreBreakdown} breakdown - Detailed scoring breakdown.
+ * @property {number} energyYield - The estimated energy yield of the room based on sources.
+ * @property {boolean} isDangerous - Indicates if the room is deemed dangerous due to threats.
  */
 
 /**
@@ -126,6 +128,13 @@ function scoreRoom(roomName, colonyRoomName = null) {
         result.breakdown.pathingScore +
         result.breakdown.threatScore +
         result.breakdown.controllerScore;
+
+    result.energyYield = sources * 1500; // Base 1500 per source, can be 3000 if reserved
+    if (intel.reservation && intel.reservation === (global.State.username || 'jules')) {
+        result.energyYield = sources * 3000;
+    }
+
+    result.isDangerous = threatPenalty > 50;
 
     return result;
 }
