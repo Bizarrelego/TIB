@@ -7,6 +7,7 @@ class UpgraderManager {
      * @returns {number}
      */
     static getDesiredCount(room) {
+        if (room.memory && room.memory.haltUpgrades) return 0;
         if (!room.controller || room.controller.level < 5) return 0;
 
         // Base logic: 1 upgrader if links are present.
@@ -81,6 +82,7 @@ class UpgraderManager {
      * @param {Room} room
      */
     static run(room) {
+        if (room.memory && room.memory.haltUpgrades) return;
         if (!room.controller || !room.controller.my) return;
 
         try {
