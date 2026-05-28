@@ -1,7 +1,26 @@
+const { managers } = require('../managers/index');
+const {
+    workerManager,
+    SourceManager,
+    TowerManager,
+    RampartDefenseManager,
+    NukeEvacuationManager,
+    UpgraderManager,
+    RemoteEconomyManager,
+    TerminalManager,
+    PreSpawnManager,
+    EnergyRequestManager,
+    MineralManager,
+    LinkManager,
+    CreepAssignmentManager,
+    BoostManager,
+    ConstructionManager,
+    StorageManager,
+    LabManager,
+    MarketManager
+} = managers;
 const { wrap } = require('../utils/ManagerExecutionWrapper');
 const { wrapManager } = require('../utils/ManagerErrorBoundary');
-const workerManager = require('../managers/workerManager');
-const SourceManager = require('../managers/SourceManager');
 
 const SpawnLedger = require('./spawnLedger');
 const defense = require('./defense');
@@ -13,14 +32,7 @@ const LogisticsManager = require('./logisticsManager');
 const defconManager = require('./defconManager');
 const BaseLayoutOptimizer = require('./BaseLayoutOptimizer');
 const CreepRoleBalancer = require('./CreepRoleBalancer');
-const TowerManager = require('../managers/TowerManager');
-const RampartDefenseManager = require('../managers/RampartDefenseManager');
-const NukeEvacuationManager = require('../managers/NukeEvacuationManager');
-const UpgraderManager = require('../managers/UpgraderManager');
-const RemoteEconomyManager = require('../managers/RemoteEconomyManager');
-const TerminalManager = require('../managers/TerminalManager');
-const PreSpawnManager = require('../managers/PreSpawnManager');
-const EnergyRequestManager = require('../managers/EnergyRequestManager');
+
 const MarketArbitrageAnalyzer = require('./MarketArbitrageAnalyzer');
 const MarketOrderAnalyzer = require('./MarketOrderAnalyzer');
 const MarketOrderExecutor = require('./MarketOrderExecutor');
@@ -33,15 +45,6 @@ const logistics = require('./logistics');
 const market = require('./market');
 const planner = require('./planner');
 const rampartPlanner = require('./rampartPlanner');
-const MineralManager = require('../managers/MineralManager');
-const LinkManager = require('../managers/LinkManager');
-const CreepAssignmentManager = require('../managers/CreepAssignmentManager');
-const BoostManager = require('../managers/BoostManager');
-const ConstructionManager = require('../managers/ConstructionManager');
-const StorageManager = require('../managers/StorageManager');
-const LabManager = require('../managers/LabManager');
-const MarketManager = require('../managers/MarketManager');
-
 
 /**
  * Executes core colony management loop.
@@ -58,8 +61,6 @@ const Profiler = require('../utils/profiler');
 const Logger = require('../utils/logger');
 const globalState = require('../state/globalState');
 const { wrapModuleFunctions } = require('../utils/moduleWrapper');
-
-
 
 module.exports = { run: function colonyManager() {
     if (!global.State || !global.State.rooms) return;
@@ -184,6 +185,5 @@ module.exports = { run: function colonyManager() {
             }
         }
     }
-
 
 } };
