@@ -97,8 +97,25 @@ function gatherIntel(roomName) {
         const towersMap = roomStructuresMap ? roomStructuresMap.get(STRUCTURE_TOWER) : null;
         intel.towerCount = towersMap ? (towersMap instanceof Map ? towersMap.size : towersMap.length) : 0;
 
+        const spawnsMap = roomStructuresMap ? roomStructuresMap.get(STRUCTURE_SPAWN) : null;
+        intel.spawnCount = spawnsMap ? (spawnsMap instanceof Map ? spawnsMap.size : spawnsMap.length) : 0;
+
+        const storageMap = roomStructuresMap ? roomStructuresMap.get(STRUCTURE_STORAGE) : null;
+        intel.hasStorage = storageMap ? (storageMap instanceof Map ? storageMap.size > 0 : storageMap.length > 0) : false;
+
+        const terminalMap = roomStructuresMap ? roomStructuresMap.get(STRUCTURE_TERMINAL) : null;
+        intel.hasTerminal = terminalMap ? (terminalMap instanceof Map ? terminalMap.size > 0 : terminalMap.length > 0) : false;
+
+        const labsMap = roomStructuresMap ? roomStructuresMap.get(STRUCTURE_LAB) : null;
+        intel.labCount = labsMap ? (labsMap instanceof Map ? labsMap.size : labsMap.length) : 0;
+
+        const nukerMap = roomStructuresMap ? roomStructuresMap.get(STRUCTURE_NUKER) : null;
+        intel.hasNuker = nukerMap ? (nukerMap instanceof Map ? nukerMap.size > 0 : nukerMap.length > 0) : false;
+
         const controller = global.State.controllersByRoom.get(roomName);
         if (controller) {
+            intel.level = controller.level || 0;
+
             if (controller.owner) {
                 intel.owner = controller.owner.username;
                 intel.hostile = !controller.my;
