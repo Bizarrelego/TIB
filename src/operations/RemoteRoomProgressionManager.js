@@ -27,7 +27,7 @@ function run() {
 
         // Ensure state tracking map exists
         if (!room.memory.remoteRoomProgression) {
-            room.memory.remoteRoomProgression = {};
+            room.memory.remoteRoomProgression = new Map();
         }
 
         const remoteRooms = getAssignedRemoteRooms(room.name);
@@ -65,7 +65,7 @@ function getAssignedRemoteRooms(colonyName) {
  * @param {string} remoteRoomName
  */
 function manageProgression(colonyRoom, remoteRoomName) {
-    const stateRecord = colonyRoom.memory.remoteRoomProgression[remoteRoomName] || { state: PROGRESSION_STATES.UNCLAIMED };
+    const stateRecord = colonyRoom.memory.remoteRoomProgression.get(remoteRoomName) || { state: PROGRESSION_STATES.UNCLAIMED };
     const scoreData = scoreRoom(remoteRoomName, colonyRoom.name);
 
     if (scoreData.isDangerous) {
@@ -124,7 +124,7 @@ function manageProgression(colonyRoom, remoteRoomName) {
             break;
     }
 
-    colonyRoom.memory.remoteRoomProgression[remoteRoomName] = stateRecord;
+    colonyRoom.memory.remoteRoomProgression.set(remoteRoomName, stateRecord);
 }
 
 /**
