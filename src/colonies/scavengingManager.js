@@ -21,8 +21,12 @@ module.exports = {
 
         if (scavengers.length === 0) return;
 
-        // Helper to find highest priority ruin/tombstone in a room
+        const bestTargetCache = new Map();
+        const DroppedResourceManager = require('../managers/DroppedResourceManager');
+
         const getBestScavengeTarget = (roomName) => {
+            if (bestTargetCache.has(roomName)) return bestTargetCache.get(roomName);
+
             let bestTarget = null;
             let maxEnergy = 0;
             
@@ -47,10 +51,17 @@ module.exports = {
                     }
                 }
             }
+
+            const drops = DroppedResourceManager.getPrioritizedDroppedResources(roomName);
+            if (drops.length > 0 && drops[0].amount > maxEnergy) {
+                bestTarget = drops[0].target;
+            }
+
+            bestTargetCache.set(roomName, bestTarget);
             return bestTarget;
         };
 
-        // Assign scavengers to active ruins/tombstones
+        // Assign scavengers to active ruins/tombstones/drops
         for (const creep of scavengers) {
             if (creep.fatigue > 0 || TrafficManager.checkPipeline(creep.id)) continue;
             
@@ -59,7 +70,7 @@ module.exports = {
 
             const target = getBestScavengeTarget(creep.room.name);
             if (target) {
-                creep.heap.state = 'withdraw';
+                creep.heap.state = target.amount !== undefined ? 'pickup' : 'withdraw';
                 creep.heap.targetId = target.id;
             }
         }
