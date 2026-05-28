@@ -192,24 +192,13 @@ class EnergyRequestManager {
             }
         }
 
-        // Dropped Energy (Priority 90 if > 100)
-        let dropped = [];
-        if (global.State.droppedEnergyByRoom && global.State.droppedEnergyByRoom.has(roomName)) {
-            dropped = global.State.droppedEnergyByRoom.get(roomName) || [];
-        } else if (global.State.droppedByRoom && global.State.droppedByRoom.has(roomName)) {
-            dropped = global.State.droppedByRoom.get(roomName) || [];
-        }
-        if (dropped instanceof Map) dropped = Array.from(dropped.values());
-
-        for (let i = 0; i < dropped.length; i++) {
-            const resource = dropped[i];
-            if ((resource.resourceType === undefined || resource.resourceType === RESOURCE_ENERGY) && resource.amount > 100) {
-                const bucket = buckets[90] = buckets[90] || [];
-                bucket.push({ target: resource, amount: resource.amount });
-            } else if ((resource.resourceType === undefined || resource.resourceType === RESOURCE_ENERGY) && resource.amount > 50) {
-                const bucket = buckets[80] = buckets[80] || [];
-                bucket.push({ target: resource, amount: resource.amount });
-            }
+        // Dropped Energy via DroppedResourceManager
+        const DroppedResourceManager = require('./DroppedResourceManager');
+        const prioritizedDrops = DroppedResourceManager.getPrioritizedDroppedResources(roomName);
+        for (let i = 0; i < prioritizedDrops.length; i++) {
+            const drop = prioritizedDrops[i];
+            const bucket = buckets[drop.priority] = buckets[drop.priority] || [];
+            bucket.push(drop);
         }
 
         // Tombstones and Ruins (Priority 85)
