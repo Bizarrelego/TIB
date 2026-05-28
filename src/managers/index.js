@@ -24,7 +24,11 @@ const AllianceIntelManager = require('./AllianceIntelManager');
 const SourceManager = require('./SourceManager');
 const MineralManager = require('./MineralManager');
 const CreepOperationalDataManager = require('./CreepOperationalDataManager');
+const EnergySourceTracker = require('./EnergySourceTracker');
+const SegmentManager = require('./SegmentManager');
 const { wrap } = require('../utils/ManagerExecutionWrapper');
+const { wrapManager } = require('../utils/ManagerErrorBoundary');
+const Profiler = require('../utils/profiler');
 
 const managers = {
     CombatManager,
@@ -52,7 +56,9 @@ const managers = {
     AllianceIntelManager,
     SourceManager,
     MineralManager,
-    CreepOperationalDataManager
+    CreepOperationalDataManager,
+    EnergySourceTracker,
+    SegmentManager
 };
 
 module.exports = {
@@ -62,10 +68,19 @@ module.exports = {
             // Ensure each manager's run function is wrapped with error boundaries and profiler
             if (manager && typeof manager.run === 'function' && !manager.__wrapped) {
                 const originalRun = manager.run;
-                manager.run = wrap(name, (...args) => originalRun.apply(manager, args));
+                // Double wrap: error boundary first, then profiler wrapper
+                manager.run = Profiler.wrap(name, wrapManager((...args) => originalRun.apply(manager, args), name));
                 manager.__wrapped = true;
             }
-            globalState.registerManager(name, manager);
+            if (globalState && typeof globalState.registerManager === 'function') {
+                globalState.registerManager(name, manager);
+            }
+        }
+    },
+    run: function(managerName, ...args) {
+        // Method to execute per-tick logic for a specific manager
+        if (managers[managerName] && typeof managers[managerName].run === 'function') {
+            return managers[managerName].run(...args);
         }
     }
 };

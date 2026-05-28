@@ -1,3 +1,5 @@
+const { managers } = require('../managers/index');
+const { PowerSpawnManager, QuadSquadManager } = managers;
 const Profiler = require('../utils/profiler');
 const { wrapModuleFunctions } = require('../utils/moduleWrapper');
 const { executeManager } = require('../utils/errorHandler');
@@ -8,8 +10,7 @@ const scoutManager = require('./scoutManager');
 const skOperationsManager = require('./skOperations');
 const HarassmentManager = require('./HarassmentManager');
 const powerBankManager = require('./powerBankManager');
-const PowerSpawnManager = require('../managers/PowerSpawnManager');
-const QuadSquadManager = require('../managers/QuadSquadManager');
+
 const RoleManager = require('../colonies/RoleManager');
 
 /**
