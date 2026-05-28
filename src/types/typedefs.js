@@ -36,3 +36,10 @@
  * @property {number} time - The Game.time when the matrix was generated.
  * @property {string} hash - The hash of the room state used to generate this matrix.
  */
+
+/**
+ * @typedef {Object} ObserverScanTarget
+ * @property {string} roomName - The name of the room to scan.
+ * @property {number} priority - The priority of the scan (higher is more important).
+ * @property {number} timestamp - The time when the scan target was added.
+ */
