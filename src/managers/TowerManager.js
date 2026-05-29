@@ -12,7 +12,15 @@ function run(room, defenseRepairTarget) {
         const structuresMap = global.State.structuresByRoom.get(room.name);
         if (!structuresMap) return;
 
-        const towers = Array.from(structuresMap.get(STRUCTURE_TOWER) || []).map(t => (Array.isArray(t) ? t[1] : t));
+        const towersMap = structuresMap.get(STRUCTURE_TOWER);
+        if (!towersMap || (towersMap instanceof Map && towersMap.size === 0) || (Array.isArray(towersMap) && towersMap.length === 0)) return;
+
+        const towers = [];
+        const towersIter = towersMap instanceof Map ? towersMap.values() : towersMap;
+        for (const t of towersIter) {
+            towers.push(Array.isArray(t) ? t[1] : t);
+        }
+
         if (towers.length === 0) return;
 
         let primaryTarget = null;

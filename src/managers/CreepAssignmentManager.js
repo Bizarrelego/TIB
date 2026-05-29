@@ -41,36 +41,41 @@ module.exports = {
         const structures = global.State.structuresByRoom.get(room.name);
         if (structures) {
             const spawnsMap = structures.get(STRUCTURE_SPAWN);
-            const spawns = spawnsMap ? Array.from(spawnsMap.values()) : [];
-            for (let i = 0; i < spawns.length; i++) {
-                const free = TrafficManager.getVirtualState(spawns[i], RESOURCE_ENERGY).free;
-                if (free > 0) {
-                    tasks.push({ target: spawns[i], type: 'fill', priority: 100, free });
+            if (spawnsMap) {
+                for (const spawn of spawnsMap.values()) {
+                    const free = TrafficManager.getVirtualState(spawn, RESOURCE_ENERGY).free;
+                    if (free > 0) {
+                        tasks.push({ target: spawn, type: 'fill', priority: 100, free });
+                    }
                 }
             }
 
             const extensionsMap = structures.get(STRUCTURE_EXTENSION);
-            const extensions = extensionsMap ? Array.from(extensionsMap.values()) : [];
-            for (let i = 0; i < extensions.length; i++) {
-                const free = TrafficManager.getVirtualState(extensions[i], RESOURCE_ENERGY).free;
-                if (free > 0) {
-                    tasks.push({ target: extensions[i], type: 'fill', priority: 90, free });
+            if (extensionsMap) {
+                for (const extension of extensionsMap.values()) {
+                    const free = TrafficManager.getVirtualState(extension, RESOURCE_ENERGY).free;
+                    if (free > 0) {
+                        tasks.push({ target: extension, type: 'fill', priority: 90, free });
+                    }
                 }
             }
 
             const rampartsMap = structures.get(STRUCTURE_RAMPART);
-            const ramparts = rampartsMap ? Array.from(rampartsMap.values()) : [];
-            for (let i = 0; i < ramparts.length; i++) {
-                if (ramparts[i].hits < 5000) {
-                    tasks.push({ target: ramparts[i], type: 'repair', priority: 70 });
+            if (rampartsMap) {
+                for (const rampart of rampartsMap.values()) {
+                    if (rampart.hits < 5000) {
+                        tasks.push({ target: rampart, type: 'repair', priority: 70 });
+                    }
                 }
             }
         }
 
         const sitesMap = global.State.sitesByRoom.get(room.name);
-        const sites = sitesMap ? (sitesMap instanceof Map ? Array.from(sitesMap.values()) : sitesMap) : [];
-        for (let i = 0; i < sites.length; i++) {
-            tasks.push({ target: sites[i], type: 'build', priority: 80 });
+        if (sitesMap) {
+            const sitesIter = sitesMap instanceof Map ? sitesMap.values() : sitesMap;
+            for (const site of sitesIter) {
+                tasks.push({ target: site, type: 'build', priority: 80 });
+            }
         }
 
         if (room.controller && room.controller.my) {

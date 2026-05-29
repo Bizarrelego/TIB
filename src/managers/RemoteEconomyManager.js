@@ -127,10 +127,15 @@ module.exports = {
 
                 if (!creep.memory.targetSourceId && creep.room.name === creep.memory.targetRoom) {
                     const roomSources = global.State.sourcesByRoom.get(creep.room.name) || [];
-                    const assignedSources = colonyRemoteHarvesters.map(c => c.memory.targetSourceId).filter(id => id);
+                    const assignedSources = new Set();
+                    for (let i = 0; i < colonyRemoteHarvesters.length; i++) {
+                        if (colonyRemoteHarvesters[i].memory.targetSourceId) {
+                            assignedSources.add(colonyRemoteHarvesters[i].memory.targetSourceId);
+                        }
+                    }
 
                     for (const src of roomSources) {
-                        if (!assignedSources.includes(src.id)) {
+                        if (!assignedSources.has(src.id)) {
                             creep.memory.targetSourceId = src.id;
                             break;
                         }
