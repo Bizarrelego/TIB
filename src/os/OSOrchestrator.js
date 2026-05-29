@@ -112,7 +112,10 @@ class OSOrchestrator {
                 wrap('globalState.update', () => globalState.update())();
             }
 
-            wrap('OSOrchestrator.updateRoomHashes', () => OSOrchestrator.updateRoomHashes())();
+            const GlobalStateCacheManager = require('./GlobalStateCacheManager');
+            if (GlobalStateCacheManager && typeof GlobalStateCacheManager.run === 'function') {
+                wrap('GlobalStateCacheManager.run', () => GlobalStateCacheManager.run())();
+            }
 
             if (discoveryManager && typeof discoveryManager === 'function') {
                 wrap('discoveryManager', () => discoveryManager())();
@@ -174,36 +177,6 @@ class OSOrchestrator {
         }
     }
 
-    static updateRoomHashes() {
-        if (!global.State || !global.State.rooms) return;
-
-        if (!global.Cache) {
-            global.Cache = new Map();
-        }
-        if (!global.Cache.has('roomHashes')) {
-            global.Cache.set('roomHashes', new Map());
-        }
-        if (!global.Cache.has('costMatrices')) {
-            global.Cache.set('costMatrices', new Map());
-        }
-
-        const roomHashes = global.Cache.get('roomHashes');
-        const costMatrices = global.Cache.get('costMatrices');
-
-        for (const roomName of global.State.rooms.keys()) {
-            if (roomHasher && typeof roomHasher.generate === 'function') {
-                const currentHash = roomHasher.generate(roomName);
-                const previousHash = roomHashes.get(roomName);
-
-                if (currentHash !== previousHash) {
-                    // Hash changed, invalidate the cached cost matrix for this room
-                    roomHashes.set(roomName, currentHash);
-                    costMatrices.delete(roomName);
-                    Logger.debug(`[OSOrchestrator] Room hash changed for ${roomName}. Invalidated CostMatrix.`);
-                }
-            }
-        }
-    }
 }
 
 module.exports = OSOrchestrator;
