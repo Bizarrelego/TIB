@@ -47,10 +47,12 @@ class RemoteIntelManager {
         if (!data || !data.roomName) return;
         this._ensureIntelMap();
 
-        let remoteData = global.State.remoteIntel.get(data.roomName) || {};
-        remoteData.lastHostileActivity = Game.time;
+        let remoteData = global.State.remoteIntel.get(data.roomName);
+        if (!remoteData) remoteData = new Map();
+
+        remoteData.set('lastHostileActivity', Game.time);
         // Hostile presence may temporarily invalidate a room as a remote candidate
-        remoteData.hasActiveThreat = true;
+        remoteData.set('hasActiveThreat', true);
 
         global.State.remoteIntel.set(data.roomName, remoteData);
     }
@@ -63,8 +65,10 @@ class RemoteIntelManager {
         if (!data || !data.roomName) return;
         this._ensureIntelMap();
 
-        let remoteData = global.State.remoteIntel.get(data.roomName) || {};
-        remoteData.lastConstructionActivity = Game.time;
+        let remoteData = global.State.remoteIntel.get(data.roomName);
+        if (!remoteData) remoteData = new Map();
+
+        remoteData.set('lastConstructionActivity', Game.time);
 
         global.State.remoteIntel.set(data.roomName, remoteData);
     }
@@ -77,8 +81,10 @@ class RemoteIntelManager {
         if (!data || !data.roomName) return;
         this._ensureIntelMap();
 
-        let remoteData = global.State.remoteIntel.get(data.roomName) || {};
-        remoteData.lastDecayActivity = Game.time;
+        let remoteData = global.State.remoteIntel.get(data.roomName);
+        if (!remoteData) remoteData = new Map();
+
+        remoteData.set('lastDecayActivity', Game.time);
 
         // We could theoretically mark infrastructure as needing repair here,
         // but for intel purposes we mostly just want to know when it happens
@@ -112,23 +118,24 @@ class RemoteIntelManager {
             basicIntel = global.State.intel.get(roomName);
         }
 
-        let remoteData = global.State.remoteIntel.get(roomName) || {};
+        let remoteData = global.State.remoteIntel.get(roomName);
+        if (!remoteData) remoteData = new Map();
 
-        remoteData.lastUpdate = Game.time;
+        remoteData.set('lastUpdate', Game.time);
 
         // Sync critical data for quick O(1) access
         if (basicIntel) {
-            remoteData.hostile = basicIntel.hostile || false;
-            remoteData.owner = basicIntel.owner || null;
-            remoteData.reservation = basicIntel.reservation || null;
-            remoteData.sources = basicIntel.sources || 0;
-            remoteData.mineral = basicIntel.mineral || null;
-            remoteData.type = basicIntel.type || 'unknown';
-            remoteData.level = basicIntel.level || 0;
-            remoteData.towerCount = basicIntel.towerCount || 0;
-            remoteData.spawnCount = basicIntel.spawnCount || 0;
-            remoteData.remoteCandidate = basicIntel.remoteCandidate || false;
-            remoteData.expansionScore = basicIntel.expansionScore || 0;
+            remoteData.set('hostile', basicIntel.hostile || false);
+            remoteData.set('owner', basicIntel.owner || null);
+            remoteData.set('reservation', basicIntel.reservation || null);
+            remoteData.set('sources', basicIntel.sources || 0);
+            remoteData.set('mineral', basicIntel.mineral || null);
+            remoteData.set('type', basicIntel.type || 'unknown');
+            remoteData.set('level', basicIntel.level || 0);
+            remoteData.set('towerCount', basicIntel.towerCount || 0);
+            remoteData.set('spawnCount', basicIntel.spawnCount || 0);
+            remoteData.set('remoteCandidate', basicIntel.remoteCandidate || false);
+            remoteData.set('expansionScore', basicIntel.expansionScore || 0);
         }
 
         global.State.remoteIntel.set(roomName, remoteData);
@@ -137,7 +144,7 @@ class RemoteIntelManager {
     /**
      * Retrieves stored intel for a specific room.
      * @param {string} roomName - The room name.
-     * @returns {Object|null} The intel object, or null if not found.
+     * @returns {Map<string, any>|null} The intel object, or null if not found.
      */
     getIntel(roomName) {
         if (!global.State || !global.State.remoteIntel) return null;
@@ -153,7 +160,7 @@ class RemoteIntelManager {
 
         const candidates = [];
         for (const [roomName, data] of global.State.remoteIntel.entries()) {
-            if (data.remoteCandidate) {
+            if (data.get('remoteCandidate')) {
                 candidates.push(roomName);
             }
         }
@@ -169,8 +176,9 @@ class RemoteIntelManager {
 
         const targets = [];
         for (const [roomName, data] of global.State.remoteIntel.entries()) {
-            if (data.expansionScore && data.expansionScore > 0) {
-                targets.push({ roomName, score: data.expansionScore });
+            const expansionScore = data.get('expansionScore');
+            if (expansionScore && expansionScore > 0) {
+                targets.push({ roomName, score: expansionScore });
             }
         }
 
