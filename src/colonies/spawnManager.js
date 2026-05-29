@@ -1,4 +1,4 @@
-const BodyCalc = require('../utils/bodyCalc');
+const CreepBodyBuilder = require('./CreepBodyBuilder');
 const SpawnQueueManager = require('../managers/SpawnQueueManager');
 const Profiler = require('../utils/profiler');
 const CreepRoleBalancer = require('./CreepRoleBalancer');
@@ -99,8 +99,8 @@ module.exports = {
             if (workerCount < targetWorkers) {
                 const energyAvailable = spawnLedger.getAvailableEnergy();
                 const calcCapacity = (workerCount === 0 && energyAvailable < capacity && energyAvailable >= 200) ? energyAvailable : capacity;
-                const body = BodyCalc.calculateWorker(calcCapacity);
-                const cost = BodyCalc.getCost(body);
+                const body = CreepBodyBuilder.build('worker', calcCapacity, room.controller.level);
+                const cost = CreepBodyBuilder.getCost(body);
                 if (spawnLedger.canSpawn(cost)) {
                     SpawnQueueManager.requestSpawn(room.name, 'worker', body, 'worker_' + Game.time, { memory: { role: 'worker', colony: room.name } }, cost);
                 }
@@ -110,8 +110,8 @@ module.exports = {
             if (harvesterCount < targetHarvesters) {
                 const energyAvailable = spawnLedger.getAvailableEnergy();
                 const calcCapacity = (haulerCount === 0 && energyAvailable < capacity && energyAvailable >= 200) ? energyAvailable : capacity;
-                const body = BodyCalc.calculateEarlyGameHarvester(calcCapacity);
-                const cost = BodyCalc.getCost(body);
+                const body = CreepBodyBuilder.build('harvester', calcCapacity, room.controller.level);
+                const cost = CreepBodyBuilder.getCost(body);
                 SpawnQueueManager.requestSpawn(room.name, 'harvester', body, 'harvester_' + Game.time, { memory: { role: 'harvester', colony: room.name } }, cost);
             }
 
@@ -120,8 +120,8 @@ module.exports = {
             if (haulerCount < targetHaulers && (!room.controller || room.controller.level < 5 || !spawnLedger.isLinkNetworkPresent(room))) {
                 const energyAvailable = spawnLedger.getAvailableEnergy();
                 const calcCapacity = (haulerCount === 0 && energyAvailable < capacity && energyAvailable >= 200) ? energyAvailable : capacity;
-                const body = BodyCalc.calculateDomesticHauler(calcCapacity);
-                const cost = BodyCalc.getCost(body);
+                const body = CreepBodyBuilder.build('domesticHauler', calcCapacity, room.controller.level);
+                const cost = CreepBodyBuilder.getCost(body);
                 SpawnQueueManager.requestSpawn(room.name, 'domesticHauler', body, 'domesticHauler_' + Game.time, { memory: { role: 'domesticHauler', colony: room.name } }, cost);
             }
 
@@ -136,10 +136,12 @@ module.exports = {
             }
 
             if (totalScouts < 1) {
-                if (spawnLedger.canSpawn(50)) {
-                    SpawnQueueManager.requestSpawn(room.name, 'scout', [MOVE], 'scout_' + Game.time, {
+                const body = CreepBodyBuilder.build('scout', capacity, room.controller.level);
+                const cost = CreepBodyBuilder.getCost(body);
+                if (spawnLedger.canSpawn(cost)) {
+                    SpawnQueueManager.requestSpawn(room.name, 'scout', body, 'scout_' + Game.time, {
                     memory: { role: 'scout', colony: room.name }
-                }, 50);
+                }, cost);
                 }
             }
         }
@@ -155,8 +157,8 @@ module.exports = {
         const desiredUpgraders = desiredCounts.get('upgrader') || 0;
 
         if (upgraderCount < desiredUpgraders) {
-            const body = BodyCalc.calculateUpgrader(capacity);
-            const cost = BodyCalc.getCost(body);
+            const body = CreepBodyBuilder.build('upgrader', capacity, room.controller.level);
+            const cost = CreepBodyBuilder.getCost(body);
             if (spawnLedger.canSpawn(cost)) {
                 SpawnQueueManager.requestSpawn(room.name, 'upgrader', body, 'upgrader_' + Game.time, {
                     memory: { role: 'upgrader', colony: room.name }
@@ -175,8 +177,8 @@ module.exports = {
 
                 const targetHubManagers = desiredCounts.get('hubManager') || 0;
                 if (hubManagerCount < targetHubManagers) {
-                    const body = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE];
-                    const cost = (16 * BODYPART_COST[CARRY]) + BODYPART_COST[MOVE];
+                    const body = CreepBodyBuilder.build('hubManager', capacity, room.controller.level);
+                    const cost = CreepBodyBuilder.getCost(body);
                     if (spawnLedger.canSpawn(cost)) {
                         SpawnQueueManager.requestSpawn(room.name, 'hubManager', body, 'hubManager_' + Game.time, {
                             memory: { role: 'hubManager', colony: room.name }
@@ -195,13 +197,8 @@ module.exports = {
         const desiredFastFillers = desiredCounts.get('fastFiller') || 0;
 
         if (fastFillerCount < desiredFastFillers) {
-            let body = [];
-            let cost = 0;
-            const pairCost = BODYPART_COST[CARRY] + BODYPART_COST[MOVE];
-            while (cost + pairCost <= capacity && body.length < 50) {
-                body.push(CARRY, MOVE);
-                cost += pairCost;
-            }
+            const body = CreepBodyBuilder.build('fastFiller', capacity, room.controller.level);
+            const cost = CreepBodyBuilder.getCost(body);
 
             if (body.length > 0 && spawnLedger.canSpawn(cost)) {
                 SpawnQueueManager.requestSpawn(room.name, 'fastFiller', body, 'fastFiller_' + Game.time, {
@@ -227,9 +224,11 @@ module.exports = {
                         const activeReserver = colonyReservers.find(c => c.memory.targetRoom === targetRoomName);
 
                         if (!activeReserver && intel.reservation !== 'jules') {
-                            const body = [CLAIM, MOVE];
-                            const cost = capacity >= 1300 ? 1300 : 650;
-                            if (capacity >= cost && spawnLedger.canSpawn(cost)) {
+                            const body = CreepBodyBuilder.build('reserver', capacity, room.controller.level);
+                            const cost = CreepBodyBuilder.getCost(body);
+                            // Keep the max capacity requirement of >= 650 or >= 1300 as originally modeled
+                            const requiredCapacity = capacity >= 1300 ? 1300 : 650;
+                            if (capacity >= requiredCapacity && spawnLedger.canSpawn(cost)) {
                                 SpawnQueueManager.requestSpawn(room.name, 'reserver', body, 'reserver_' + Game.time, {
                                     memory: { role: 'reserver', colony: room.name, targetRoom: targetRoomName }
                                 }, cost);
@@ -242,8 +241,8 @@ module.exports = {
 
                             if (roomRemoteHarvesters.length < sourcesCount) {
                                 const sourceCapacity = (intel.reservation === 'jules' || activeReserver) ? 3000 : 1500;
-                                const body = BodyCalc.calculateRemoteMiner(capacity, sourceCapacity);
-                                const cost = BodyCalc.getCost(body);
+                                const body = CreepBodyBuilder.build('remoteHarvester', capacity, room.controller.level, { sourceCapacity });
+                                const cost = CreepBodyBuilder.getCost(body);
                                 if (capacity >= cost && spawnLedger.canSpawn(cost)) {
                                     SpawnQueueManager.requestSpawn(room.name, 'remoteHarvester', body, 'remoteHarvester_' + Game.time, {
                                         memory: { role: 'remoteHarvester', colony: room.name, targetRoom: targetRoomName, targetSourceId: null }
