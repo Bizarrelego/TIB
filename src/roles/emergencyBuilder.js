@@ -21,14 +21,33 @@ module.exports = {
                 if (creep.fatigue > 0) continue; // Fatigue gating
 
                 if (creep.store.getFreeCapacity() > 0) {
-                    const source = creep.pos.findClosestByPath(FIND_SOURCES) || creep.pos.findClosestByRange(FIND_SOURCES);
+                    const sources = global.State.sourcesByRoom.get(room.name) || [];
+                    let source = null;
+                    let minRange = Infinity;
+                    for (const s of sources) {
+                        const range = creep.pos.getRangeTo(s);
+                        if (range < minRange) {
+                            minRange = range;
+                            source = s;
+                        }
+                    }
                     if (source) {
                         if (creep.harvest(source) === ERR_NOT_IN_RANGE) {
                             creep.moveTo(source);
                         }
                     }
                 } else {
-                    const spawn = creep.pos.findClosestByPath(FIND_MY_SPAWNS) || creep.pos.findClosestByRange(FIND_MY_SPAWNS);
+                    const structuresMap = global.State.structuresByRoom.get(room.name) || new Map();
+                    const spawnsMap = structuresMap.get(STRUCTURE_SPAWN) || new Map();
+                    let spawn = null;
+                    let minRange = Infinity;
+                    for (const sp of spawnsMap.values()) {
+                        const range = creep.pos.getRangeTo(sp);
+                        if (range < minRange) {
+                            minRange = range;
+                            spawn = sp;
+                        }
+                    }
                     if (spawn) {
                         if (creep.transfer(spawn, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
                             creep.moveTo(spawn);
