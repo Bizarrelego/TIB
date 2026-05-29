@@ -46,15 +46,16 @@ class IntentManager {
             case 'repair':
             case 'upgradeController':
             case 'harvest':
-            case 'transfer':
-            case 'withdraw':
-            case 'pickup':
-            case 'drop':
             case 'claimController':
             case 'reserveController':
             case 'attackController':
             case 'generateSafeMode':
                 return PIPELINES.UTILITY;
+            case 'transfer':
+            case 'withdraw':
+            case 'pickup':
+            case 'drop':
+                return PIPELINES.LOGISTICS;
             default:
                 return null;
         }
