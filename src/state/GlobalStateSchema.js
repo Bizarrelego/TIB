@@ -35,6 +35,8 @@ const Logger = require('../utils/logger');
  * @property {Map<string, ConstructionSite>} constructionSites
  * @property {Map<string, Map<string, ConstructionSite>>} constructionSitesByType
  * @property {Map<string, StructureSpawn>} spawns
+ * @property {Map<string, Map<string, RoomPosition>>} stationaryPositions
+ * @property {Map<string, number>} roomHashes
  */
 
 class GlobalStateSchemaValidator {
@@ -56,7 +58,7 @@ class GlobalStateSchemaValidator {
             'sitesByRoom', 'mineralsByRoom', 'rooms', 'creeps', 'structures',
             'sourceAssignments', 'miningSpotsByRoom', 'creepsById', 'structuresByType',
             'flags', 'flagsByRoom', 'resources', 'constructionSites',
-            'constructionSitesByType', 'spawns'
+            'constructionSitesByType', 'spawns', 'stationaryPositions', 'roomHashes'
         ];
 
         let isValid = true;

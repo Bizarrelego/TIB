@@ -41,6 +41,10 @@ class GlobalStateManager {
         this.sourceAssignments = new Map();
         /** @type {Map<string, any>} */
         this.miningSpotsByRoom = new Map();
+        /** @type {Map<string, Map<string, RoomPosition>>} */
+        this.stationaryPositions = new Map();
+        /** @type {Map<string, number>} */
+        this.roomHashes = new Map();
 
         // New properties for optimized global state populator
         /** @type {Map<string, Creep>} */
@@ -179,6 +183,8 @@ class GlobalStateManager {
         this.constructionSitesByType.clear();
         this.spawns.clear();
         if (this.structureStates) this.structureStates.clear();
+        this.stationaryPositions.clear();
+        this.roomHashes.clear();
 
         this.isRehydrated = false;
     }
