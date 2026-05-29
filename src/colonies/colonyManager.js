@@ -45,6 +45,7 @@ const logistics = require('./logistics');
 const market = require('./market');
 const planner = require('./planner');
 const rampartPlanner = require('./rampartPlanner');
+const PowerResourceManager = require('./PowerResourceManager');
 
 /**
  * Executes core colony management loop.
@@ -105,6 +106,7 @@ module.exports = { run: function colonyManager() {
                 executeWrapped('MarketOrderAnalyzer.run', () => MarketOrderAnalyzer.run && MarketOrderAnalyzer.run(room));
                 executeWrapped('MarketOrderExecutor.run', () => MarketOrderExecutor.run && MarketOrderExecutor.run(room));
                 executeWrapped('TerminalManager.run', () => TerminalManager.run && TerminalManager.run(room));
+                executeWrapped('PowerResourceManager.run', () => PowerResourceManager.run && PowerResourceManager.run(room));
                 executeWrapped('defense.run', () => defense.run(room));
                 executeWrapped('TowerManager.run', () => TowerManager.run && TowerManager.run(room));
                 executeWrapped('RampartDefenseManager.run', () => RampartDefenseManager.run && RampartDefenseManager.run(room));
