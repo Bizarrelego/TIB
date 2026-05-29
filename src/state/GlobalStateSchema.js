@@ -39,48 +39,42 @@ const Logger = require('../utils/logger');
  * @property {Map<string, number>} roomHashes
  */
 
-class GlobalStateSchemaValidator {
-    /**
-     * Validates if the given state conforms to the expected global state structure.
-     * @param {Object} state - The state object to validate.
-     * @returns {boolean} True if valid, false otherwise.
-     */
-    static validateState(state) {
-        if (!state) {
-            Logger.error('[GlobalStateSchema] State is null or undefined.');
-            return false;
-        }
+const SCHEMA = {
+    heapCache: 'Map',
+    managers: 'Map',
+    creepsByRole: 'Map',
+    creepsByRoom: 'Map',
+    structuresByRoom: 'Map',
+    hostilesByRoom: 'Map',
+    logisticsByRoom: 'Map',
+    creepLookup: 'Map',
+    sourcesByRoom: 'Map',
+    spawnsByRoom: 'Map',
+    controllersByRoom: 'Map',
+    sitesByRoom: 'Map',
+    mineralsByRoom: 'Map',
+    rooms: 'Map',
+    creeps: 'Map',
+    structures: 'Map',
+    sourceAssignments: 'Map',
+    miningSpotsByRoom: 'Map',
+    creepsById: 'Map',
+    structuresByType: 'Map',
+    flags: 'Map',
+    flagsByRoom: 'Map',
+    resources: 'Map',
+    constructionSites: 'Map',
+    constructionSitesByType: 'Map',
+    spawns: 'Map',
+    stationaryPositions: 'Map',
+    roomHashes: 'Map',
+    isRehydrated: 'boolean',
+    aggressionState: 'string'
+};
 
-        const requiredMaps = [
-            'heapCache', 'managers', 'creepsByRole', 'creepsByRoom',
-            'structuresByRoom', 'hostilesByRoom', 'logisticsByRoom',
-            'creepLookup', 'sourcesByRoom', 'spawnsByRoom', 'controllersByRoom',
-            'sitesByRoom', 'mineralsByRoom', 'rooms', 'creeps', 'structures',
-            'sourceAssignments', 'miningSpotsByRoom', 'creepsById', 'structuresByType',
-            'flags', 'flagsByRoom', 'resources', 'constructionSites',
-            'constructionSitesByType', 'spawns', 'stationaryPositions', 'roomHashes'
-        ];
-
-        let isValid = true;
-
-        for (const key of requiredMaps) {
-            if (!(state[key] instanceof Map)) {
-                Logger.error(`[GlobalStateSchema] Invalid or missing property: ${key}. Expected Map.`);
-                isValid = false;
-            }
-        }
-
-        if (typeof state.isRehydrated !== 'boolean') {
-            Logger.error('[GlobalStateSchema] Invalid property: isRehydrated. Expected boolean.');
-            isValid = false;
-        }
-
-        if (typeof state.aggressionState !== 'string') {
-            Logger.error('[GlobalStateSchema] Invalid property: aggressionState. Expected string.');
-            isValid = false;
-        }
-
-        return isValid;
+class GlobalStateSchema {
+    static get SCHEMA() {
+        return SCHEMA;
     }
 
     /**
@@ -155,4 +149,4 @@ class GlobalStateSchemaValidator {
     }
 }
 
-module.exports = GlobalStateSchemaValidator;
+module.exports = GlobalStateSchema;

@@ -4,7 +4,7 @@ const globalState = require('../state/globalState');
 const Logger = require('../utils/logger');
 const IntentManager = require('./IntentManager');
 const eventBus = require('./eventBus');
-const GlobalStateSchemaValidator = require('../state/GlobalStateSchema');
+const GlobalStateSchemaValidator = require('../state/GlobalStateSchemaValidator');
 const DistanceTransformInterface = require('../algorithms/wasm/distanceTransformInterface');
 const MinCutInterface = require('../algorithms/wasm/minCutInterface');
 const objectPool = require('./objectPool');
@@ -48,7 +48,7 @@ class OSInitializer {
             global.State.intentManager = new IntentManager();
         }
 
-        GlobalStateSchemaValidator.validateState(global.State);
+        GlobalStateSchemaValidator.validateGlobalState(global.State);
 
         // Initialize WASM modules asynchronously (fire and forget)
         DistanceTransformInterface.init().catch(e => Logger.error(`[OSInitializer] Failed to init DistanceTransform WASM: ${e.stack || e}`));
