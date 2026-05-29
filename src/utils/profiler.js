@@ -19,6 +19,43 @@ class Profiler {
     static get metrics() { if (!this._metrics) this._metrics = new Map(); return this._metrics; }
 
     /**
+     * Global storage for active executions.
+     * @type {Map<string, number>}
+     */
+    static get activeExecutions() { if (!this._activeExecutions) this._activeExecutions = new Map(); return this._activeExecutions; }
+
+    /**
+     * Begins active tracking for a manager/phase.
+     * @param {string} name - The name of the manager/phase.
+     */
+    static beginActiveTracking(name) {
+        if (typeof Game !== 'undefined' && Game.cpu && typeof Game.cpu.getUsed === 'function') {
+            this.activeExecutions.set(name, Game.cpu.getUsed());
+        }
+    }
+
+    /**
+     * Ends active tracking for a manager/phase.
+     * @param {string} name - The name of the manager/phase.
+     */
+    static endActiveTracking(name) {
+        this.activeExecutions.delete(name);
+    }
+
+    /**
+     * Gets the CPU used by an active execution so far.
+     * @param {string} name - The name of the manager/phase.
+     * @returns {number} The CPU used so far, or 0 if not tracking.
+     */
+    static getActiveUsed(name) {
+        if (!this.activeExecutions.has(name)) return 0;
+        if (typeof Game !== 'undefined' && Game.cpu && typeof Game.cpu.getUsed === 'function') {
+            return Game.cpu.getUsed() - this.activeExecutions.get(name);
+        }
+        return 0;
+    }
+
+    /**
      * Wraps a function or class to measure execution time.
      * If the target is an ES6 class with static methods or an object, it iterates
      * through `Object.getOwnPropertyNames()` to wrap each method individually.
@@ -65,20 +102,28 @@ class Profiler {
      */
     static _wrapFunction(name, func) {
         return function (...args) {
+            Profiler.beginActiveTracking(name);
+
             const profilerEnabled = global.PROFILER_ENABLED || (typeof Memory !== 'undefined' && Memory.PROFILER_ENABLED);
-            if (!profilerEnabled) {
-                return func.apply(this, args);
+            let start = 0;
+            const cpuAvailable = typeof Game !== 'undefined' && Game.cpu && typeof Game.cpu.getUsed === 'function';
+
+            if (profilerEnabled) {
+                start = cpuAvailable ? Game.cpu.getUsed() : Date.now();
             }
 
-            const cpuAvailable = typeof Game !== 'undefined' && Game.cpu && typeof Game.cpu.getUsed === 'function';
-            const start = cpuAvailable ? Game.cpu.getUsed() : Date.now();
+            try {
+                const result = func.apply(this, args);
 
-            const result = func.apply(this, args);
+                if (profilerEnabled) {
+                    const end = cpuAvailable ? Game.cpu.getUsed() : Date.now();
+                    Profiler.record(name, end - start);
+                }
 
-            const end = cpuAvailable ? Game.cpu.getUsed() : Date.now();
-            Profiler.record(name, end - start);
-
-            return result;
+                return result;
+            } finally {
+                Profiler.endActiveTracking(name);
+            }
         };
     }
 

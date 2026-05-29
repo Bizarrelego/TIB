@@ -16,6 +16,8 @@ const Profiler = require('./profiler');
  */
 function wrap(managerName, managerFunction) {
     return function (...args) {
+        Profiler.beginActiveTracking(managerName);
+
         const profilerEnabled = global.PROFILER_ENABLED || (typeof Memory !== 'undefined' && Memory.PROFILER_ENABLED);
 
         const cpuAvailable = typeof Game !== 'undefined' && Game.cpu && typeof Game.cpu.getUsed === 'function';
@@ -27,11 +29,13 @@ function wrap(managerName, managerFunction) {
         } catch (e) {
             errorHandler.logError(e, managerName);
             result = undefined;
-        }
+        } finally {
+            if (profilerEnabled) {
+                const end = cpuAvailable ? Game.cpu.getUsed() : Date.now();
+                Profiler.record(managerName, end - start);
+            }
 
-        if (profilerEnabled) {
-            const end = cpuAvailable ? Game.cpu.getUsed() : Date.now();
-            Profiler.record(managerName, end - start);
+            Profiler.endActiveTracking(managerName);
         }
 
         return result;
