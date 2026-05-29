@@ -11,6 +11,7 @@ const skOperationsManager = require('./skOperations');
 const HarassmentManager = require('./HarassmentManager');
 const powerBankManager = require('./powerBankManager');
 const RemoteRoomProgressionManager = require('./RemoteRoomProgressionManager');
+const RemoteIntelManager = require('./RemoteIntelManager');
 
 const RoleManager = require('../colonies/RoleManager');
 
@@ -30,6 +31,7 @@ const exportedModule = Profiler.wrap('operationsManager', function operationsMan
         HarassmentManager();
         powerBankManager();
         RemoteRoomProgressionManager.run();
+        RemoteIntelManager.run();
 
         if (global.State && global.State.rooms) {
             for (const room of global.State.rooms.values()) {

@@ -45,6 +45,8 @@ class GlobalStateManager {
         this.stationaryPositions = new Map();
         /** @type {Map<string, number>} */
         this.roomHashes = new Map();
+        /** @type {Map<string, any>} */
+        this.remoteIntel = new Map();
 
         // New properties for optimized global state populator
         /** @type {Map<string, Creep>} */
@@ -185,6 +187,7 @@ class GlobalStateManager {
         if (this.structureStates) this.structureStates.clear();
         this.stationaryPositions.clear();
         this.roomHashes.clear();
+        this.remoteIntel.clear();
 
         this.isRehydrated = false;
     }

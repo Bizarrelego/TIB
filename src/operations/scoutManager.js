@@ -2,6 +2,7 @@ const Profiler = require('../utils/profiler');
 const { wrapModuleFunctions } = require('../utils/moduleWrapper');
 const { executeManager } = require('../utils/errorHandler');
 const intelManager = require('./intel');
+const RemoteIntelManager = require('./RemoteIntelManager');
 /**
  * @file scoutManager.js
  * @description Manages scouting targets, intel gathering (sources, SK, highways, structures), and expansion scoring.
@@ -91,6 +92,7 @@ function runScouts() {
                 // If the scout is in a room, gather intel
                 if (scout.room) {
                     intelManager.gatherIntel(scout.room.name);
+                    RemoteIntelManager.processScoutReport(scout.room.name);
 
                     if (global.State.intel && global.State.intel.has(scout.room.name) && global.State.intel.get(scout.room.name).harassmentTarget) {
                         const SpawnQueueManager = require('../managers/SpawnQueueManager');
