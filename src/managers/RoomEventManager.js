@@ -1,5 +1,10 @@
 const eventBus = require('../os/eventBus');
 const Profiler = require('../utils/profiler');
+const {
+    EVENT_STRUCTURE_DAMAGED,
+    EVENT_ROOM_BUILD
+} = require('../constants/eventTypes');
+require('../os/StructureStateTracker'); // Initialize tracker subscriptions
 
 /**
  * Parses room event logs and publishes them to the event bus.
@@ -18,10 +23,19 @@ function roomEventManager() {
             switch (event.event) {
                 case EVENT_ATTACK:
                     eventBus.publish('HOSTILE_SPOTTED', eventPayload);
+                    if (event.data && event.data.targetId && event.data.damage) {
+                        eventBus.publish(EVENT_STRUCTURE_DAMAGED, {
+                            targetId: event.data.targetId,
+                            damage: event.data.damage
+                        });
+                    }
                     break;
                 case EVENT_BUILD:
                     eventBus.publish('CONSTRUCTION_STARTED', eventPayload);
                     eventBus.publish('INVALIDATE_COSTMATRIX', roomName);
+                    if (event.data && event.data.targetId) {
+                        eventBus.publish(EVENT_ROOM_BUILD, eventPayload);
+                    }
                     break;
                 case EVENT_OBJECT_DESTROYED:
                     eventBus.publish('STRUCTURE_DECAY', eventPayload);
