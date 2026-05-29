@@ -6,6 +6,7 @@
 const GlobalStateRehydrator = require('./GlobalStateRehydrator');
 const OSInitializer = require('./OSInitializer');
 const Logger = require('../utils/logger');
+const GlobalStateSchemaValidator = require('../state/GlobalStateSchemaValidator');
 
 class GlobalResetDetector {
     /**
@@ -18,6 +19,10 @@ class GlobalResetDetector {
             OSInitializer.init();
             require('./OSOrchestrator').init(); // Initialize OS Orchestrator scheduler tasks
             GlobalStateRehydrator.rehydrateGlobalState();
+
+            if (global.State) {
+                GlobalStateSchemaValidator.validateGlobalState(global.State);
+            }
         }
     }
 }

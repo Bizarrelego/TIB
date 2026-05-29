@@ -3,7 +3,7 @@
  * @description Orchestrates the rehydration of global state components after a VM reset.
  */
 
-const GlobalStateSchemaValidator = require('../state/GlobalStateSchema');
+const GlobalStateSchemaValidator = require('../state/GlobalStateSchemaValidator');
 
 class GlobalStateRehydrator {
     /**
@@ -106,7 +106,7 @@ class GlobalStateRehydrator {
             global.State.rehydrate();
         }
 
-        GlobalStateSchemaValidator.validateState(global.State);
+        GlobalStateSchemaValidator.validateGlobalState(global.State);
     }
 }
 
