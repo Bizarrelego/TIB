@@ -59,6 +59,8 @@ class GlobalStateManager {
         this.constructionSitesByType = new Map();
         /** @type {Map<string, StructureSpawn>} */
         this.spawns = new Map();
+        /** @type {Map<string, any>} */
+        this.structureStates = new Map();
     }
 
     registerManager(name, instance) {
@@ -67,6 +69,11 @@ class GlobalStateManager {
 
     getManager(name) {
         return this.managers.get(name);
+    }
+
+    getStructureState(targetId) {
+        const tracker = require('../os/StructureStateTracker');
+        return tracker.getState(targetId);
     }
 
     rehydrate() {
@@ -171,6 +178,7 @@ class GlobalStateManager {
         this.constructionSites.clear();
         this.constructionSitesByType.clear();
         this.spawns.clear();
+        if (this.structureStates) this.structureStates.clear();
 
         this.isRehydrated = false;
     }
