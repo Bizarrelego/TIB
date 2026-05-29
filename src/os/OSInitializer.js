@@ -41,6 +41,11 @@ class OSInitializer {
             interShardSync.init();
         }
 
+        const GlobalStateCacheManager = require('./GlobalStateCacheManager');
+        if (GlobalStateCacheManager && typeof GlobalStateCacheManager.init === 'function') {
+            GlobalStateCacheManager.init();
+        }
+
         if (!global.State) {
             global.State = new Map();
         }
