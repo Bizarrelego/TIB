@@ -14,38 +14,42 @@ module.exports = {
 
         const structures = global.State.structuresByRoom.get(room.name);
         const sitesMap = global.State.sitesByRoom.get(room.name);
-        const sites = sitesMap ? (sitesMap instanceof Map ? Array.from(sitesMap.values()) : sitesMap) : [];
-
         let tasks = [];
 
         if (structures) {
             const spawnsMap = structures.get(STRUCTURE_SPAWN);
-            const spawns = spawnsMap ? Array.from(spawnsMap.values()) : [];
-            for (let i = 0; i < spawns.length; i++) {
-                const free = TrafficManager.getVirtualState(spawns[i], RESOURCE_ENERGY).free;
-                if (free > 0) {
-                    tasks.push({ target: spawns[i], type: 'fill', priority: 100, free });
+            if (spawnsMap) {
+                for (const spawn of spawnsMap.values()) {
+                    const free = TrafficManager.getVirtualState(spawn, RESOURCE_ENERGY).free;
+                    if (free > 0) {
+                        tasks.push({ target: spawn, type: 'fill', priority: 100, free });
+                    }
                 }
             }
             const extensionsMap = structures.get(STRUCTURE_EXTENSION);
-            const extensions = extensionsMap ? Array.from(extensionsMap.values()) : [];
-            for (let i = 0; i < extensions.length; i++) {
-                const free = TrafficManager.getVirtualState(extensions[i], RESOURCE_ENERGY).free;
-                if (free > 0) {
-                    tasks.push({ target: extensions[i], type: 'fill', priority: 90, free });
+            if (extensionsMap) {
+                for (const extension of extensionsMap.values()) {
+                    const free = TrafficManager.getVirtualState(extension, RESOURCE_ENERGY).free;
+                    if (free > 0) {
+                        tasks.push({ target: extension, type: 'fill', priority: 90, free });
+                    }
                 }
             }
             const rampartsMap = structures.get(STRUCTURE_RAMPART);
-            const ramparts = rampartsMap ? Array.from(rampartsMap.values()) : [];
-            for (let i = 0; i < ramparts.length; i++) {
-                if (ramparts[i].hits < 5000) {
-                    tasks.push({ target: ramparts[i], type: 'repair', priority: 70 });
+            if (rampartsMap) {
+                for (const rampart of rampartsMap.values()) {
+                    if (rampart.hits < 5000) {
+                        tasks.push({ target: rampart, type: 'repair', priority: 70 });
+                    }
                 }
             }
         }
 
-        for (let i = 0; i < sites.length; i++) {
-            tasks.push({ target: sites[i], type: 'build', priority: 80 });
+        if (sitesMap) {
+            const sitesIter = sitesMap instanceof Map ? sitesMap.values() : sitesMap;
+            for (const site of sitesIter) {
+                tasks.push({ target: site, type: 'build', priority: 80 });
+            }
         }
         
         if (room.controller) {
@@ -56,7 +60,10 @@ module.exports = {
         
         const EnergyRequestManager = require('./EnergyRequestManager');
         const supplies = EnergyRequestManager.getEnergySupplies(room.name, 'worker') || [];
-        let supplyTasks = supplies.map(s => ({ target: Game.getObjectById(s.target.id), type: 'pickup', priority: s.priority, amount: s.amount }));
+        let supplyTasks = [];
+        for (let i = 0; i < supplies.length; i++) {
+            supplyTasks.push({ target: Game.getObjectById(supplies[i].target.id), type: 'pickup', priority: supplies[i].priority, amount: supplies[i].amount });
+        }
         for (let i = 0; i < sources.length; i++) {
             supplyTasks.push({ target: sources[i], type: 'harvest', priority: 50 });
         }
@@ -92,8 +99,16 @@ module.exports = {
                     // RCL 1-2 Logic: Find dropped energy or harvest directly
                     let targetDropped = null;
                     if (global.State.droppedByRoom) {
-                        const roomDropped = global.State.droppedByRoom.get(room.name) || [];
-                        targetDropped = roomDropped.find(r => r.resourceType === RESOURCE_ENERGY && r.amount > 50);
+                        const roomDropped = global.State.droppedByRoom.get(room.name);
+                        if (roomDropped) {
+                            const droppedIter = roomDropped instanceof Map ? roomDropped.values() : roomDropped;
+                            for (const r of droppedIter) {
+                                if (r.resourceType === RESOURCE_ENERGY && r.amount > 50) {
+                                    targetDropped = r;
+                                    break;
+                                }
+                            }
+                        }
                     }
                     if (targetDropped) {
                         creep.heap.targetId = targetDropped.id;
@@ -132,8 +147,6 @@ module.exports = {
                 }
             } else if (creep.heap.state === 'work') {
                 if (room.controller && room.controller.level < 3) {
-                    const buildSites = sites;
-
                     let targetFill = null;
                     if (structures) {
                         const spawnsMap = structures.get(STRUCTURE_SPAWN);
@@ -161,12 +174,18 @@ module.exports = {
                     if (targetFill) {
                         creep.heap.targetId = targetFill.id;
                         creep.heap.subState = 'fill';
-                    } else if (buildSites.length > 0) {
-                        creep.heap.targetId = buildSites[0].id;
-                        creep.heap.subState = 'build';
                     } else if (room.controller) {
-                        creep.heap.targetId = room.controller.id;
-                        creep.heap.subState = 'upgrade';
+                        let buildSite = null;
+                        if (sitesMap) {
+                           buildSite = sitesMap instanceof Map ? sitesMap.values().next().value : sitesMap[0];
+                        }
+                        if (buildSite) {
+                            creep.heap.targetId = buildSite.id;
+                            creep.heap.subState = 'build';
+                        } else {
+                            creep.heap.targetId = room.controller.id;
+                            creep.heap.subState = 'upgrade';
+                        }
                     }
                 } else {
                     // Find highest priority valid task
