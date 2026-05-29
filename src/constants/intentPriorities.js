@@ -9,6 +9,7 @@
  */
 const PIPELINES = {
     MOVEMENT: 'MOVEMENT',
+    MELEE: 'MELEE',
     RANGED: 'RANGED',
     UTILITY: 'UTILITY',
     LOGISTICS: 'LOGISTICS'

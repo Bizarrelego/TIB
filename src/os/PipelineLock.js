@@ -4,16 +4,7 @@
  * A creep can only execute one intent per pipeline (Movement, Melee, Ranged, Utility) per tick.
  */
 
-/**
- * Valid pipeline types for intent locking.
- * @enum {string}
- */
-const PIPELINES = {
-    MOVEMENT: 'MOVEMENT',
-    MELEE: 'MELEE',
-    RANGED: 'RANGED',
-    UTILITY: 'UTILITY'
-};
+const { PIPELINES } = require('../constants/intentPriorities');
 
 /**
  * PipelineLock class to manage intent locks for creeps.
