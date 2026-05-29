@@ -83,6 +83,8 @@ class BootstrapPlanner {
                     const px = pos.x;
                     const py = pos.y;
 
+                    if (terrain.get(px, py) === TERRAIN_MASK_WALL) continue;
+
                     let occupied = false;
                     const existingExtensions = structuresMap.get(STRUCTURE_EXTENSION) || new Map();
                     for (const struct of existingExtensions.values()) {
@@ -195,7 +197,8 @@ class BootstrapPlanner {
             targetSite = room.controller;
         }
 
-        for (const creep of pioneers) {
+        for (let i = 0; i < pioneers.length; i++) {
+            const creep = pioneers[i];
             if (!creep.heap) creep.heap = {};
 
             // State management
@@ -212,7 +215,7 @@ class BootstrapPlanner {
             if (creep.heap.state === 'harvesting') {
                 if (!creep.heap.targetId && sources.length > 0) {
                     // Simple assignment to first source, could be optimized to closest
-                    creep.heap.targetId = sources[0].id;
+                    creep.heap.targetId = sources[i % sources.length].id;
                 }
             } else {
                 if (targetSite) {

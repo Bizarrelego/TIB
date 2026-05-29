@@ -56,8 +56,8 @@ function manageEarlyProgression(room, _spawnLedger) {
             if (bestRoom) {
                 const SpawnQueueManager = require('../managers/SpawnQueueManager');
                 if (SpawnQueueManager.getQueuedCount(room.name, 'reserver', bestRoom) === 0) {
-                    const body = room.energyCapacityAvailable >= 1300 ? [CLAIM, CLAIM, MOVE, MOVE] : [CLAIM, MOVE];
-                    const cost = room.energyCapacityAvailable >= 1300 ? 1300 : 650;
+                    const body = [CLAIM, MOVE];
+                    const cost = 650;
                     SpawnQueueManager.requestSpawn(room.name, 'reserver', body, 'claimer_' + Game.time, { memory: { role: 'reserver', colony: room.name, targetRoom: bestRoom, claimFlag: true } }, cost);
                 }
             }
@@ -88,7 +88,6 @@ function run(_room) {
         manageEarlyProgression(_room, null);
     } else if (rcl === 2) {
         if (plannerState) BootstrapPlanner.planStructures(_room, plannerState);
-        earlyGameConstructionPlanner.getRCL2ExtensionPositions(_room);
         manageEarlyProgression(_room, null);
     } else if (rcl === 3) {
         RCL3RemoteOps.run(_room);
