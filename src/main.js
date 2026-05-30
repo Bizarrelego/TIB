@@ -21,8 +21,4 @@ module.exports.loop = function () {
     const roomState = global.State.rooms.get(firstRoomName);
     console.log(`Room ${firstRoomName} - Sources: ${roomState.sources.length}, Spawns: ${roomState.spawns.length}`);
   }
-
-  // Run SpawnManager
-  // Run TaskAssignmentManager
-  // Execute Creep Roles
 };
