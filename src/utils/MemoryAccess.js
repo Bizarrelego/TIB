@@ -1,4 +1,15 @@
 /**
+ * MemoryAccess.js
+ *
+ * WARNING: Per Heap Exclusivity constraints, this utility should ONLY be used
+ * for initialization, persistence of static strings (e.g., role, colony), or
+ * low-frequency state saving.
+ * DO NOT use these functions for operational data or high-frequency access
+ * inside creep tick loops. Use `creep.heap` or `global.State` instead to prevent
+ * CPU overhead from continuous Memory parsing.
+ */
+
+/**
  * Ensures the base Memory objects exist.
  */
 function ensureBaseMemory() {
