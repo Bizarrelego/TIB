@@ -31,7 +31,7 @@ function register(managerId, interval, callback) {
 
     if (typeof interval === 'function') {
         actualCallback = interval;
-        actualInterval = SystemConfig[managerId] ? SystemConfig[managerId].defaultFrequency : 1;
+        actualInterval = SystemConfig.has(managerId) ? SystemConfig.get(managerId).defaultFrequency : 1;
     } else {
         actualCallback = callback;
         actualInterval = interval;

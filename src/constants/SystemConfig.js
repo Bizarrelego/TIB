@@ -14,45 +14,45 @@
 
 /**
  * Centralized system configuration metadata.
- * @type {Object.<string, SystemConfigEntry>}
+ * @type {Map<string, SystemConfigEntry>}
  */
-const SystemConfig = {
-    garbageCollector: {
+const SystemConfig = new Map([
+    ['garbageCollector', {
         name: 'Garbage Collector',
         criticality: 'LOW',
         defaultFrequency: 100,
         cpuBudgetKey: 'DEFAULT'
-    },
-    SpawnManager: {
+    }],
+    ['SpawnManager', {
         name: 'Spawn Manager',
         criticality: 'CRITICAL',
         defaultFrequency: 1,
         cpuBudgetKey: 'Phase3_Colonies'
-    },
-    ConstructionManager: {
+    }],
+    ['ConstructionManager', {
         name: 'Construction Manager',
         criticality: 'NORMAL',
         defaultFrequency: 5,
         cpuBudgetKey: 'Phase3_Colonies'
-    },
-    MarketManager: {
+    }],
+    ['MarketManager', {
         name: 'Market Manager',
         criticality: 'NORMAL',
         defaultFrequency: 10,
         cpuBudgetKey: 'Phase4_Operations'
-    },
-    DefenseManager: {
+    }],
+    ['DefenseManager', {
         name: 'Defense Manager',
         criticality: 'CRITICAL',
         defaultFrequency: 1,
         cpuBudgetKey: 'Phase3_Colonies'
-    },
-    IntelManager: {
+    }],
+    ['IntelManager', {
         name: 'Intel Manager',
         criticality: 'LOW',
         defaultFrequency: 20,
         cpuBudgetKey: 'Phase4_Operations'
-    }
-};
+    }]
+]);
 
 module.exports = SystemConfig;
