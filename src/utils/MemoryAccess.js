@@ -3,43 +3,43 @@
  */
 function ensureBaseMemory() {
     if (!Memory.rooms) {
-        Memory.rooms = new Map();
+        Memory.rooms = {};
     }
     if (!Memory.creeps) {
-        Memory.creeps = new Map();
+        Memory.creeps = {};
     }
 }
 
 /**
  * Initializes and returns memory for a specific room.
  * @param {string} roomName
- * @returns {Map}
+ * @returns {Object}
  */
 function initializeRoomMemory(roomName) {
     ensureBaseMemory();
-    if (!Memory.rooms.has(roomName)) {
-        Memory.rooms.set(roomName, new Map());
+    if (!Memory.rooms[roomName]) {
+        Memory.rooms[roomName] = {};
     }
-    return Memory.rooms.get(roomName);
+    return Memory.rooms[roomName];
 }
 
 /**
  * Initializes and returns memory for a specific creep.
  * @param {string} creepName
- * @returns {Map}
+ * @returns {Object}
  */
 function initializeCreepMemory(creepName) {
     ensureBaseMemory();
-    if (!Memory.creeps.has(creepName)) {
-        Memory.creeps.set(creepName, new Map());
+    if (!Memory.creeps[creepName]) {
+        Memory.creeps[creepName] = {};
     }
-    return Memory.creeps.get(creepName);
+    return Memory.creeps[creepName];
 }
 
 /**
  * Gets memory for a specific room, initializing it if necessary.
  * @param {string} roomName
- * @returns {Map}
+ * @returns {Object}
  */
 function getRoomMemory(roomName) {
     return initializeRoomMemory(roomName);
@@ -48,7 +48,7 @@ function getRoomMemory(roomName) {
 /**
  * Gets memory for a specific creep, initializing it if necessary.
  * @param {string} creepName
- * @returns {Map}
+ * @returns {Object}
  */
 function getCreepMemory(creepName) {
     return initializeCreepMemory(creepName);
