@@ -1,57 +1,52 @@
-/**
- * Hauler creep role module.
- * Responsible for transporting energy from sources to spawns or upgraders.
- * Driven strictly by state and intents provided by TaskAssignmentManager.
- * @module roles/hauler
- */
-
-/**
- * Executes the hauler role logic for a given creep.
- *
- * @param {Creep} creep - The hauler creep to execute logic for.
- * @returns {void}
- */
-function run(creep) {
+module.exports = {
+  run(creep) {
     if (creep.spawning) return;
     if (creep.fatigue > 0) return;
 
-    if (!creep.heap) return;
+    if (!creep.heap || !creep.heap.targetId) {
+      if (!creep.heap) creep.heap = { state: 'idle', targetId: null, actionIntent: null };
+      creep.heap.state = 'idle';
+      return;
+    }
 
-    const targetId = creep.heap.targetId;
-    const actionIntent = creep.heap.actionIntent;
-
-    if (!targetId || !actionIntent) return;
-
-    const target = Game.getObjectById(targetId);
-
+    const target = Game.getObjectById(creep.heap.targetId);
     if (!target) {
-        creep.heap.state = 'idle';
-        return;
+      creep.heap.state = 'idle';
+      return;
     }
 
-    if (creep.pos.getRangeTo(target) > 1) {
+    if (creep.heap.actionIntent === 'haul_pickup') {
+      let result;
+      if (target instanceof Resource) {
+        result = creep.pickup(target);
+      } else {
+        result = creep.withdraw(target, RESOURCE_ENERGY);
+      }
+
+      if (result === ERR_NOT_IN_RANGE) {
         creep.moveTo(target);
-        return;
+      }
+
+      const isTargetEmpty = target instanceof Resource ? (target.amount === 0) : (target.store && target.store.getUsedCapacity(RESOURCE_ENERGY) === 0);
+      if (creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0 || isTargetEmpty) {
+        creep.heap.state = 'idle';
+      }
+    } else if (creep.heap.actionIntent === 'haul_deliver') {
+      let result;
+      if (target instanceof StructureController) {
+        result = creep.drop(RESOURCE_ENERGY);
+      } else {
+        result = creep.transfer(target, RESOURCE_ENERGY);
+      }
+
+      if (result === ERR_NOT_IN_RANGE) {
+        creep.moveTo(target);
+      }
+
+      const isTargetFull = target.store && target.store.getFreeCapacity(RESOURCE_ENERGY) === 0;
+      if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0 || isTargetFull) {
+        creep.heap.state = 'idle';
+      }
     }
-
-    switch (actionIntent) {
-        case 'pickup':
-            creep.pickup(target);
-            break;
-        case 'withdraw':
-            creep.withdraw(target, RESOURCE_ENERGY);
-            break;
-        case 'transfer':
-            creep.transfer(target, RESOURCE_ENERGY);
-            break;
-        default:
-            creep.heap.state = 'idle';
-            return;
-    }
-
-    creep.heap.state = 'idle';
-}
-
-module.exports = {
-    run
+  }
 };
