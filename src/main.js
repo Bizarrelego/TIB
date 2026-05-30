@@ -17,8 +17,8 @@ module.exports.loop = function () {
 
   // Log source and spawn counts for the first visible room
   const firstRoomName = Object.keys(Game.rooms)[0];
-  if (firstRoomName && global.State.rooms[firstRoomName]) {
-    const roomState = global.State.rooms[firstRoomName];
+  if (firstRoomName && global.State.rooms && global.State.rooms.has(firstRoomName)) {
+    const roomState = global.State.rooms.get(firstRoomName);
     console.log(`Room ${firstRoomName} - Sources: ${roomState.sources.length}, Spawns: ${roomState.spawns.length}`);
   }
 

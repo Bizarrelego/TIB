@@ -11,12 +11,12 @@
  */
 function run() {
   if (!global.State) {
-    global.State = { rooms: {} };
+    global.State = { rooms: new Map() };
   }
 
-  // Ensure rooms object exists within global.State
-  if (!global.State.rooms) {
-    global.State.rooms = {};
+  // Ensure rooms Map exists within global.State
+  if (!global.State.rooms || !(global.State.rooms instanceof Map)) {
+    global.State.rooms = new Map();
   }
 
   for (const roomName in Game.rooms) {
@@ -34,13 +34,13 @@ function run() {
       filter: (tombstone) => tombstone.store.getUsedCapacity(RESOURCE_ENERGY) > 0
     });
 
-    global.State.rooms[roomName] = {
+    global.State.rooms.set(roomName, {
       sources,
       spawns,
       droppedEnergy,
       ruins,
       tombstones
-    };
+    });
   }
 }
 
