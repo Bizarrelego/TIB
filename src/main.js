@@ -5,12 +5,16 @@
 const GlobalStateScanner = require('./state/GlobalStateScanner');
 
 module.exports.loop = function () {
+  require('./constants');
+
   // Clean up dead creep memory
   for (const name in Memory.creeps) {
     if (!Game.creeps[name]) {
       delete Memory.creeps[name];
     }
   }
+
+  global.tickCache = {};
 
   // Build global state
   GlobalStateScanner.run();
