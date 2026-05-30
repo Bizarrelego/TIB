@@ -34,12 +34,15 @@ function run() {
       filter: (tombstone) => tombstone.store.getUsedCapacity(RESOURCE_ENERGY) > 0
     });
 
+    const controller = room.controller;
+
     global.State.rooms.set(roomName, {
       sources,
       spawns,
       droppedEnergy,
       ruins,
-      tombstones
+      tombstones,
+      controller
     });
   }
 }
