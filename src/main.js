@@ -65,7 +65,7 @@ module.exports.loop = function () {
     const role = creep.memory.role;
 
     if (role === 'harvester') {
-      roleMiner.run(creep);
+      roleHarvester.run(creep);
     } else if (role === 'hauler') {
       roleHauler.run(creep);
     } else if (role === 'upgrader') {
