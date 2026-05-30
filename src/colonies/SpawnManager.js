@@ -16,48 +16,49 @@ function run(roomName) {
   if (spawn.spawning) return;
 
   // Count living creeps by their role for this colony
-  const counts = {
-    harvester: 0,
-    hauler: 0,
-    upgrader: 0
-  };
+  const counts = new Map([
+    ['harvester', 0],
+    ['hauler', 0],
+    ['upgrader', 0]
+  ]);
 
   for (const name in Game.creeps) {
     const creep = Game.creeps[name];
     if (creep.memory.colony === roomName) {
-      if (counts[creep.memory.role] !== undefined) {
-        counts[creep.memory.role]++;
+      const role = creep.memory.role;
+      if (counts.has(role)) {
+        counts.set(role, counts.get(role) + 1);
       }
     }
   }
 
   // Census limits
-  const census = {
-    harvester: 2,
-    hauler: 2,
-    upgrader: 2
-  };
+  const census = new Map([
+    ['harvester', 2],
+    ['hauler', 2],
+    ['upgrader', 2]
+  ]);
 
   // Hardcoded bodies
-  const bodies = {
-    harvester: [WORK, WORK, MOVE], // 250
-    hauler: [CARRY, CARRY, MOVE, MOVE], // 200
-    upgrader: [WORK, CARRY, MOVE, MOVE] // 250
-  };
+  const bodies = new Map([
+    ['harvester', [WORK, WORK, MOVE]], // 250
+    ['hauler', [CARRY, CARRY, MOVE, MOVE]], // 200
+    ['upgrader', [WORK, CARRY, MOVE, MOVE]] // 250
+  ]);
 
   // Check which role to spawn
   let roleToSpawn = null;
 
-  if (counts.harvester < census.harvester) {
+  if (counts.get('harvester') < census.get('harvester')) {
     roleToSpawn = 'harvester';
-  } else if (counts.hauler < census.hauler) {
+  } else if (counts.get('hauler') < census.get('hauler')) {
     roleToSpawn = 'hauler';
-  } else if (counts.upgrader < census.upgrader) {
+  } else if (counts.get('upgrader') < census.get('upgrader')) {
     roleToSpawn = 'upgrader';
   }
 
   if (roleToSpawn) {
-    const body = bodies[roleToSpawn];
+    const body = bodies.get(roleToSpawn);
     const newName = roleToSpawn + '_' + Game.time;
     spawn.spawnCreep(body, newName, {
       memory: { role: roleToSpawn, colony: roomName }
