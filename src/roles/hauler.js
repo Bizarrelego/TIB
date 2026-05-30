@@ -33,7 +33,16 @@ module.exports = {
       }
     } else if (creep.heap.actionIntent === 'haul_deliver') {
       let result;
-      if (target instanceof StructureController) {
+
+      // If the target is a creep (like an upgrader), we drop on its exact tile
+      if (target instanceof Creep) {
+        if (creep.pos.getRangeTo(target) > 0) {
+          creep.moveTo(target);
+        } else {
+          result = creep.drop(RESOURCE_ENERGY);
+        }
+      } else if (target instanceof StructureController) {
+        // Fallback to old behavior if somehow targeting controller directly without upgrader
         if (creep.pos.getRangeTo(target) > 3) {
           creep.moveTo(target);
         } else {
@@ -47,7 +56,11 @@ module.exports = {
         }
       }
 
-      const isTargetFull = target.store && target.store.getFreeCapacity(RESOURCE_ENERGY) === 0;
+      let isTargetFull = false;
+      if (target.store) {
+          isTargetFull = target.store.getFreeCapacity(RESOURCE_ENERGY) === 0;
+      }
+
       if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0 || isTargetFull) {
         creep.heap.state = 'idle';
       }

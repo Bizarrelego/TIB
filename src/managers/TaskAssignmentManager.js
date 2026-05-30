@@ -67,7 +67,19 @@ function run(roomName) {
           }
 
           if (!target) {
-            target = roomState.controller;
+            const upgraders = [];
+            for (const cName in Game.creeps) {
+              const c = Game.creeps[cName];
+              if (c.memory.colony === roomName && c.memory.role === 'upgrader') {
+                upgraders.push(c);
+              }
+            }
+            if (upgraders.length > 0) {
+              const index = getHash(name, upgraders.length);
+              target = upgraders[index];
+            } else {
+              target = roomState.controller;
+            }
           }
 
           if (target) {
