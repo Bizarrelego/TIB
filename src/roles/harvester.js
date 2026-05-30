@@ -15,8 +15,8 @@ module.exports = {
       return;
     }
 
-    if (creep.upgradeController(target) === ERR_NOT_IN_RANGE) {
-      creep.moveTo(target, { range: 3 });
+    if (creep.harvest(target) === ERR_NOT_IN_RANGE) {
+      creep.moveTo(target);
     }
   }
 };

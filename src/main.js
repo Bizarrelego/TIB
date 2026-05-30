@@ -6,7 +6,7 @@ const GlobalStateScanner = require('./state/GlobalStateScanner');
 const SpawnManager = require('./colonies/SpawnManager');
 const TaskAssignmentManager = require('./managers/TaskAssignmentManager');
 
-const roleMiner = require('./roles/miner');
+const roleMiner = require('./roles/harvester');
 const roleHauler = require('./roles/hauler');
 const roleUpgrader = require('./roles/upgrader');
 
@@ -34,6 +34,25 @@ module.exports.loop = function () {
 
     // Run TaskAssignmentManager
     TaskAssignmentManager.run(roomName);
+  }
+
+  // Execute Creep Roles
+  for (const name in Game.creeps) {
+    const creep = Game.creeps[name];
+    if (creep.spawning) continue;
+    if (creep.fatigue > 0) continue;
+
+    if (!creep.heap) {
+      creep.heap = { state: 'idle', targetId: null, actionIntent: null };
+    }
+
+    if (creep.memory.role === 'harvester') {
+      harvester.run(creep);
+    } else if (creep.memory.role === 'hauler') {
+      hauler.run(creep);
+    } else if (creep.memory.role === 'upgrader') {
+      upgrader.run(creep);
+    }
   }
 
   for (const roomName in Game.rooms) {
