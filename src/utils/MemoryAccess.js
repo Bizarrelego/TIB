@@ -3,10 +3,10 @@
  */
 function ensureBaseMemory() {
     if (!Memory.rooms) {
-        Memory.rooms = {};
+        Memory.rooms = new Map();
     }
     if (!Memory.creeps) {
-        Memory.creeps = {};
+        Memory.creeps = new Map();
     }
 }
 
@@ -17,10 +17,10 @@ function ensureBaseMemory() {
  */
 function initializeRoomMemory(roomName) {
     ensureBaseMemory();
-    if (!Memory.rooms[roomName]) {
-        Memory.rooms[roomName] = {};
+    if (!Memory.rooms.has(roomName)) {
+        Memory.rooms.set(roomName, {});
     }
-    return Memory.rooms[roomName];
+    return Memory.rooms.get(roomName);
 }
 
 /**
@@ -30,10 +30,10 @@ function initializeRoomMemory(roomName) {
  */
 function initializeCreepMemory(creepName) {
     ensureBaseMemory();
-    if (!Memory.creeps[creepName]) {
-        Memory.creeps[creepName] = {};
+    if (!Memory.creeps.has(creepName)) {
+        Memory.creeps.set(creepName, {});
     }
-    return Memory.creeps[creepName];
+    return Memory.creeps.get(creepName);
 }
 
 /**
