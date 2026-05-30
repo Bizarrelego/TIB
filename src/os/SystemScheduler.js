@@ -16,15 +16,32 @@
  */
 const tasks = new Map();
 
+const SystemConfig = require('../constants/SystemConfig');
+
 /**
  * Registers a manager or system to be executed at a specific interval.
  * @param {string} managerId - The unique identifier for the manager/system.
- * @param {number} interval - The tick interval at which the callback should run.
- * @param {function(): void} callback - The callback function to execute.
+ * @param {number|function(): void} interval - The tick interval at which the callback should run, or the callback function if interval is omitted.
+ * @param {function(): void} [callback] - The callback function to execute. Optional if passed as the second argument.
  * @returns {void}
  */
 function register(managerId, interval, callback) {
-    tasks.set(managerId, { interval, callback });
+    let actualInterval;
+    let actualCallback;
+
+    if (typeof interval === 'function') {
+        actualCallback = interval;
+        actualInterval = SystemConfig.has(managerId) ? SystemConfig.get(managerId).defaultFrequency : 1;
+    } else {
+        actualCallback = callback;
+        actualInterval = interval;
+    }
+
+    if (!actualCallback) {
+        throw new Error(`[SystemScheduler] Cannot register ${managerId} without a callback.`);
+    }
+
+    tasks.set(managerId, { interval: actualInterval, callback: actualCallback });
 }
 
 const cpuThrottler = require('./cpuThrottler');
