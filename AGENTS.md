@@ -21,8 +21,8 @@ The architecture must scale, but the current logic must remain primitive. Enforc
 
 ### 4. Active Phase: RCL 1-2 Bootstrapping
 You are building a brute-force, high-efficiency early game. 
-* **Logistics:** Implement strict Drop-Mining. Miners move to an optimal coordinate, lock their position, and execute `harvest()`. They do not path again. They let the engine drop excess energy.
-* **Hauling:** Haulers use hashed assignments to target specific miners, preventing swarming. They sweep dropped energy and route strictly to the Spawn or Upgrader drop-pile.
+* **Logistics:** Implement strict Drop-Mining. Harvesters move to an optimal coordinate, lock their position, and execute `harvest()`. They do not path again. They let the engine drop excess energy.
+* **Hauling:** Haulers use hashed assignments to target specific harvesters, preventing swarming. They sweep dropped energy and route strictly to the Spawn or Upgrader drop-pile.
 * **Upgrading:** Upgraders are stationary. Haulers drop energy on the upgrader's exact tile. Upgraders execute `pickup()` and `upgradeController()` on the same tick.
 * **Scavenging:** The `TaskAssignmentManager` must prioritize assigning `withdraw()` on `Ruin` and `Tombstone` objects over standard drop-piles.
 
