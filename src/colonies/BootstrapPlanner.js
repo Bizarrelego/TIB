@@ -226,49 +226,6 @@ class BootstrapPlanner {
             }
         }
     }
-
-    /**
-     * Provides suggestions for initial creep roles and counts to spawnManager
-     * during early RCL progression.
-     *
-     * @param {Room} room
-     * @returns {Object} Requirements for early game
-     */
-    static getCreepRequirements(room) {
-        if (!room || !room.controller) return { worker: 0, harvester: 0, domesticHauler: 0 };
-        const rcl = room.controller.level;
-
-        let reqs = {
-            worker: 1,
-            harvester: 0,
-            domesticHauler: 0,
-            upgrader: 0
-        };
-
-        if (rcl === 1) {
-            reqs.worker = 1;
-            reqs.harvester = 2;
-            reqs.domesticHauler = 2;
-            reqs.upgrader = 2;
-        } else if (rcl === 2) {
-            reqs.worker = 2;
-            reqs.harvester = 2; // Generally 1 per source
-            reqs.domesticHauler = 2;
-            reqs.upgrader = 4;
-        } else if (rcl === 3) {
-            reqs.worker = 4;
-            reqs.harvester = 2;
-            reqs.domesticHauler = 2;
-            reqs.upgrader = 3;
-        } else if (rcl >= 4) {
-            reqs.worker = 4;
-            reqs.harvester = 2;
-            reqs.domesticHauler = 2;
-            reqs.upgrader = 2;
-        }
-
-        return reqs;
-    }
 }
 
 module.exports = BootstrapPlanner;

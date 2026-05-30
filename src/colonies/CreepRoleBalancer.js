@@ -4,7 +4,6 @@
  */
 
 const ROLE_PRIORITIES = require('../constants/rolePriorities');
-const BootstrapPlanner = require('./BootstrapPlanner');
 const SpawnLedger = require('./spawnLedger');
 const UpgraderManager = require('../managers/UpgraderManager');
 const defconManager = require('./defconManager');
@@ -31,8 +30,7 @@ class CreepRoleBalancer {
 
         const rcl = room.controller ? room.controller.level : 0;
         const spawnLedger = new SpawnLedger(room);
-        const bootstrapReqs = BootstrapPlanner.getCreepRequirements(room);
-        const sites = global.State && global.State.get('sitesByRoom') ? global.State.get('sitesByRoom').get(roomName) : null;
+        const sites = global.State && global.State.sitesByRoom ? global.State.sitesByRoom.get(roomName) : null;
         const hasSites = sites && (sites instanceof Map ? sites.size > 0 : sites.length > 0);
 
         // Explicitly require the requested managers to conform to acceptance criteria
@@ -43,7 +41,7 @@ class CreepRoleBalancer {
         const currentDefcon = defconManager.getDefconLevel(roomName);
 
         // Worker count
-        let workerCount = bootstrapReqs.worker;
+        let workerCount = rcl >= 3 ? 4 : (rcl === 2 ? 2 : 1);
 
         // Dynamic construction logic based on ConstructionManager dependencies:
         // Increase workers slightly if there's active construction and we're at RCL 4+
@@ -53,18 +51,21 @@ class CreepRoleBalancer {
         counts.set('worker', workerCount);
 
         // Harvester count
-        let harvesterCount = rcl <= 4 ? bootstrapReqs.harvester : spawnLedger.calculateHarvesterTarget(room, workerCount);
+        let harvesterCount = 2;
+        if (global.State && global.State.sourcesByRoom && global.State.sourcesByRoom.has(roomName)) {
+            harvesterCount = global.State.sourcesByRoom.get(roomName).length;
+        }
         counts.set('harvester', harvesterCount);
 
         // Domestic Hauler count (retired at RCL 5 if Link network exists)
-        let domesticHaulerCount = rcl <= 4 ? bootstrapReqs.domesticHauler : 2;
+        let domesticHaulerCount = 2; // Baseline requirement up to RCL 5 retirement
         if (rcl >= 5 && spawnLedger.isLinkNetworkPresent(room)) {
             domesticHaulerCount = 0;
         }
         counts.set('domesticHauler', domesticHaulerCount);
 
         // Upgrader count
-        let desiredUpgraders = rcl <= 4 ? bootstrapReqs.upgrader : spawnLedger.calculateUpgraderTarget(room, harvesterCount);
+        let desiredUpgraders = rcl === 1 ? 2 : (rcl === 2 ? 4 : (rcl === 3 ? 3 : 2));
         if (rcl >= 5) {
             desiredUpgraders = UpgraderManager.getDesiredCount(room);
         }

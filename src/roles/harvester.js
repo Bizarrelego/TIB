@@ -35,6 +35,10 @@ module.exports = {
                     continue;
                 }
 
+                if (creep.heap.atOptimalSpot && !creep.pos.isNearTo(target)) {
+                    creep.heap.atOptimalSpot = false;
+                }
+
                 if (!creep.heap.atOptimalSpot && creep.heap.targetPos) {
                     if (creep.pos.x === creep.heap.targetPos.x && creep.pos.y === creep.heap.targetPos.y && creep.pos.roomName === creep.heap.targetPos.roomName) {
                         creep.heap.atOptimalSpot = true;

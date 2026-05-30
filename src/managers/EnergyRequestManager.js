@@ -147,7 +147,9 @@ class EnergyRequestManager {
         for (let i = 100; i >= 0; i--) {
             if (buckets[i]) {
                 for (let j = 0; j < buckets[i].length; j++) {
-                    flattened.push(buckets[i][j]);
+                    const item = buckets[i][j];
+                    if (item.priority === undefined) item.priority = i;
+                    flattened.push(item);
                 }
             }
         }
@@ -265,7 +267,9 @@ class EnergyRequestManager {
         for (let i = 100; i >= 0; i--) {
             if (buckets[i]) {
                 for (let j = 0; j < buckets[i].length; j++) {
-                    flattened.push(buckets[i][j]);
+                    const item = buckets[i][j];
+                    if (item.priority === undefined) item.priority = i;
+                    flattened.push(item);
                 }
             }
         }

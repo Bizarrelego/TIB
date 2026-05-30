@@ -62,7 +62,11 @@ module.exports = {
         const supplies = EnergyRequestManager.getEnergySupplies(room.name, 'worker') || [];
         let supplyTasks = [];
         for (let i = 0; i < supplies.length; i++) {
-            supplyTasks.push({ target: Game.getObjectById(supplies[i].target.id), type: 'pickup', priority: supplies[i].priority, amount: supplies[i].amount });
+            const targetObj = Game.getObjectById(supplies[i].target.id);
+            if (targetObj) {
+                const type = (targetObj instanceof Resource) ? 'pickup' : 'withdraw';
+                supplyTasks.push({ target: targetObj, type: type, priority: supplies[i].priority || 0, amount: supplies[i].amount });
+            }
         }
         for (let i = 0; i < sources.length; i++) {
             supplyTasks.push({ target: sources[i], type: 'harvest', priority: 50 });
@@ -86,7 +90,7 @@ module.exports = {
                 creep.heap.targetId = null;
                 creep.heap.activeTask = null;
                 creep.heap.amount = undefined;
-            } else if (creep.store.getFreeCapacity() === 0) {
+            } else if (creep.store.getFreeCapacity() === 0 || (creep.store.getUsedCapacity() > 0 && !creep.heap.targetId)) {
                 creep.heap.state = 'work';
                 creep.heap.subState = null;
                 creep.heap.targetId = null;
@@ -118,7 +122,7 @@ module.exports = {
                         creep.heap.targetId = targetDropped.id;
                         creep.heap.subState = 'pickup';
                     } else {
-                        const sourceIndex = parseInt(creep.id, 16) % sources.length;
+                        const sourceIndex = parseInt(creep.id.slice(-4), 16) % sources.length;
                         const source = sources.length > 0 ? sources[sourceIndex] : null;
                         creep.heap.targetId = source ? source.id : null;
                         creep.heap.subState = 'harvest';
@@ -151,68 +155,25 @@ module.exports = {
                     }
                 }
             } else if (creep.heap.state === 'work') {
-                if (room.controller && room.controller.level < 3) {
-                    let targetFill = null;
-                    if (structures) {
-                        const spawnsMap = structures.get(STRUCTURE_SPAWN);
-                        if (spawnsMap) {
-                            for (const spawn of spawnsMap.values()) {
-                                if (spawn.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                                    targetFill = spawn;
-                                    break;
-                                }
+                // Find highest priority valid task
+                for (let j = 0; j < tasks.length; j++) {
+                    const task = tasks[j];
+                    if (task && task.target) {
+                        if (task.type === 'fill' || task.type === 'repair' || task.type === 'build' || task.type === 'upgrade') {
+                            const VirtualLedger = require('../utils/VirtualLedger');
+                            // Refill tasks should pull amount from the free space, and we'll use creep.heap.amount
+                            // We aren't strictly claiming positive space on target, but the ledger is about reserving space
+                            // For simplicity to meet the strict bounds, if task.free is defined (like for spawns/extensions), set amount
+                            if (task.type === 'fill' && task.free !== undefined) {
+                                const claimAmount = Math.min(creep.store.getUsedCapacity(RESOURCE_ENERGY), task.free);
+                                VirtualLedger.registerIntent(task.target.id, RESOURCE_ENERGY, claimAmount);
+                                creep.heap.amount = claimAmount;
                             }
                         }
-                        if (!targetFill) {
-                            const extensionsMap = structures.get(STRUCTURE_EXTENSION);
-                            if (extensionsMap) {
-                                for (const ext of extensionsMap.values()) {
-                                    if (ext.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                                        targetFill = ext;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if (targetFill) {
-                        creep.heap.targetId = targetFill.id;
-                        creep.heap.subState = 'fill';
-                    } else if (room.controller) {
-                        let buildSite = null;
-                        if (sitesMap) {
-                           buildSite = sitesMap instanceof Map ? sitesMap.values().next().value : sitesMap[0];
-                        }
-                        if (buildSite) {
-                            creep.heap.targetId = buildSite.id;
-                            creep.heap.subState = 'build';
-                        } else {
-                            creep.heap.targetId = room.controller.id;
-                            creep.heap.subState = 'upgrade';
-                        }
-                    }
-                } else {
-                    // Find highest priority valid task
-                    for (let j = 0; j < tasks.length; j++) {
-                        const task = tasks[j];
-                        if (task && task.target) {
-                            if (task.type === 'fill' || task.type === 'repair' || task.type === 'build' || task.type === 'upgrade') {
-                                const VirtualLedger = require('../utils/VirtualLedger');
-                                // Refill tasks should pull amount from the free space, and we'll use creep.heap.amount
-                                // We aren't strictly claiming positive space on target, but the ledger is about reserving space
-                                // For simplicity to meet the strict bounds, if task.free is defined (like for spawns/extensions), set amount
-                                if (task.type === 'fill' && task.free !== undefined) {
-                                    const claimAmount = Math.min(creep.store.getUsedCapacity(RESOURCE_ENERGY), task.free);
-                                    VirtualLedger.registerIntent(task.target.id, RESOURCE_ENERGY, claimAmount);
-                                    creep.heap.amount = claimAmount;
-                                }
-                            }
-                            creep.heap.subState = task.type;
-                            creep.heap.targetId = task.target.id;
-                            // For non-repeatable tasks, we could splice it out here.
-                            break;
-                        }
+                        creep.heap.subState = task.type;
+                        creep.heap.targetId = task.target.id;
+                        // For non-repeatable tasks, we could splice it out here.
+                        break;
                     }
                 }
             }
