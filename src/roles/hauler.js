@@ -12,6 +12,7 @@
  * @returns {void}
  */
 function run(creep) {
+    if (creep.spawning) return;
     if (creep.fatigue > 0) return;
 
     if (!creep.heap) return;
@@ -28,28 +29,27 @@ function run(creep) {
         return;
     }
 
-    let actionResult;
+    if (creep.pos.getRangeTo(target) > 1) {
+        creep.moveTo(target);
+        return;
+    }
 
     switch (actionIntent) {
         case 'pickup':
-            actionResult = creep.pickup(target);
+            creep.pickup(target);
             break;
         case 'withdraw':
-            actionResult = creep.withdraw(target, RESOURCE_ENERGY);
+            creep.withdraw(target, RESOURCE_ENERGY);
             break;
         case 'transfer':
-            actionResult = creep.transfer(target, RESOURCE_ENERGY);
+            creep.transfer(target, RESOURCE_ENERGY);
             break;
         default:
             creep.heap.state = 'idle';
             return;
     }
 
-    if (actionResult === ERR_NOT_IN_RANGE) {
-        creep.moveTo(target);
-    } else {
-        creep.heap.state = 'idle';
-    }
+    creep.heap.state = 'idle';
 }
 
 module.exports = {
