@@ -5,7 +5,7 @@
  */
 
 // Roles
-const ROLE_MINER = 'miner';
+const ROLE_HARVESTER = 'harvester';
 const ROLE_HAULER = 'hauler';
 const ROLE_UPGRADER = 'upgrader';
 
@@ -18,7 +18,7 @@ const STATE_PICKUP = 'pickup';
 const STATE_WITHDRAW = 'withdraw';
 
 module.exports = {
-  ROLE_MINER,
+  ROLE_HARVESTER,
   ROLE_HAULER,
   ROLE_UPGRADER,
   STATE_IDLE,
