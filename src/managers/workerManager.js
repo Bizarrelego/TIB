@@ -84,10 +84,14 @@ module.exports = {
                 creep.heap.state = 'get_energy';
                 creep.heap.subState = null;
                 creep.heap.targetId = null;
+                creep.heap.activeTask = null;
+                creep.heap.amount = undefined;
             } else if (creep.store.getFreeCapacity() === 0) {
                 creep.heap.state = 'work';
                 creep.heap.subState = null;
                 creep.heap.targetId = null;
+                creep.heap.activeTask = null;
+                creep.heap.amount = undefined;
             }
 
             // Only assign if idle or task is finished

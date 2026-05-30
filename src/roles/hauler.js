@@ -59,11 +59,16 @@ module.exports = {
                     }
                 } else if (creep.heap.state === 'transfer') {
                     if (target) {
-                        const amount = Math.min(creep.store.getUsedCapacity(RESOURCE_ENERGY), TrafficManager.getVirtualState(target, RESOURCE_ENERGY).free);
+                        const freeSpace = TrafficManager.getVirtualState(target, RESOURCE_ENERGY).free;
+                        const amount = Math.min(creep.store.getUsedCapacity(RESOURCE_ENERGY), freeSpace);
+                        
                         if (amount > 0 && TrafficManager.registerTransfer(creep, target, RESOURCE_ENERGY, amount) === OK) {
                             TrafficManager.lockPipeline(creep.name, creep.id, target.id, RESOURCE_ENERGY, amount, 'TRANSFER');
                         } else if (creep.pos.getRangeTo(target) > 1) {
                             movement.moveTo(creep, target);
+                        } else if (freeSpace === 0 && creep.pos.getRangeTo(target) <= 1) {
+                            creep.heap.targetId = null;
+                            creep.heap.state = null;
                         }
                     } else if (creep.heap.targetId === 'controller' && room.controller) {
                         const anchor = getUpgraderAnchor(room);

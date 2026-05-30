@@ -57,17 +57,8 @@ class SpawnQueueManager {
         const priority = CreepRoleBalancer.getRolePriority(role);
         const bucket = buckets[priority];
 
-        // Prevent duplicate requests in O(1) priority bucket
-        const reqTargetRoom = opts && opts.memory ? (opts.memory.targetRoom || opts.memory.remoteRoom) : undefined;
-        const isDuplicate = bucket.some(req =>
-            req.role === role &&
-            (req.opts && req.opts.memory ? (req.opts.memory.targetRoom || req.opts.memory.remoteRoom) : undefined) === reqTargetRoom
-        );
-
-        if (!isDuplicate) {
-            bucket.push({ role, body, name, opts, cost });
-            SpawnLedgerUtility.reserveEnergy(roomName, cost);
-        }
+        bucket.push({ role, body, name, opts, cost });
+        SpawnLedgerUtility.reserveEnergy(roomName, cost);
     }
 
     /**

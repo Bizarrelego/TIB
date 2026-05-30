@@ -1,7 +1,6 @@
 const PreSpawnManager = require('./PreSpawnManager');
 const CombatManager = require('./CombatManager');
 const ConstructionManager = require('./ConstructionManager');
-const CreepAssignmentManager = require('./CreepAssignmentManager');
 const EnergyRequestManager = require('./EnergyRequestManager');
 const LabManager = require('./LabManager');
 const LinkManager = require('./LinkManager');
@@ -33,7 +32,6 @@ const Profiler = require('../utils/profiler');
 const managers = {
     CombatManager,
     ConstructionManager,
-    CreepAssignmentManager,
     EnergyRequestManager,
     LabManager,
     LinkManager,
