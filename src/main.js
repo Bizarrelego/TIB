@@ -3,6 +3,9 @@
  */
 
 const GlobalStateScanner = require('./state/GlobalStateScanner');
+const SpawnManager = require('./managers/SpawnManager');
+const TaskAssignmentManager = require('./managers/TaskAssignmentManager');
+const RoleManager = require('./managers/RoleManager');
 
 module.exports.loop = function () {
   require('./constants');
@@ -27,6 +30,11 @@ module.exports.loop = function () {
   }
 
   // Run SpawnManager
+  SpawnManager.run();
+
   // Run TaskAssignmentManager
+  TaskAssignmentManager.run();
+
   // Execute Creep Roles
+  RoleManager.run();
 };
