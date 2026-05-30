@@ -103,55 +103,28 @@ module.exports = {
 
             // 2. Assign Targets Based on State
             if (creep.heap.state === 'get_energy') {
-                if (room.controller && room.controller.level < 3) {
-                    // RCL 1-2 Logic: Find dropped energy or harvest directly
-                    let targetDropped = null;
-                    if (global.State.droppedByRoom) {
-                        const roomDropped = global.State.droppedByRoom.get(room.name);
-                        if (roomDropped) {
-                            const droppedIter = roomDropped instanceof Map ? roomDropped.values() : roomDropped;
-                            for (const r of droppedIter) {
-                                if (r.resourceType === RESOURCE_ENERGY && r.amount > 50) {
-                                    targetDropped = r;
-                                    break;
-                                }
-                            }
+                // Find highest priority valid supply task
+                for (let j = 0; j < supplyTasks.length; j++) {
+                    const task = supplyTasks[j];
+                    if (task && task.target) {
+                        if (task.type === 'pickup' || task.type === 'withdraw') {
+                            const VirtualLedger = require('../utils/VirtualLedger');
+                            const maxWanted = creep.store.getFreeCapacity(RESOURCE_ENERGY);
+                            const claimed = VirtualLedger.claim(creep, task.target, RESOURCE_ENERGY, maxWanted);
+                            if (claimed < 0) continue;
+                            creep.heap.amount = claimed;
                         }
-                    }
-                    if (targetDropped) {
-                        creep.heap.targetId = targetDropped.id;
-                        creep.heap.subState = 'pickup';
-                    } else {
-                        const sourceIndex = parseInt(creep.id.slice(-4), 16) % sources.length;
-                        const source = sources.length > 0 ? sources[sourceIndex] : null;
-                        creep.heap.targetId = source ? source.id : null;
-                        creep.heap.subState = 'harvest';
-                    }
-                } else {
-                    // RCL 3+ Logic: Use VirtualLedger and Storage
-                    // Find highest priority valid supply task
-                    for (let j = 0; j < supplyTasks.length; j++) {
-                        const task = supplyTasks[j];
-                        if (task && task.target) {
-                            if (task.type === 'pickup' || task.type === 'withdraw') {
-                                const VirtualLedger = require('../utils/VirtualLedger');
-                                const maxWanted = creep.store.getFreeCapacity(RESOURCE_ENERGY);
-                                const claimed = VirtualLedger.claim(creep, task.target, RESOURCE_ENERGY, maxWanted);
-                                if (claimed < 0) continue;
-                                creep.heap.amount = claimed;
-                            }
-                            if (task.type === 'harvest') {
-                                const assignedCount = sourceAssignments.get(task.target.id) || 0;
-                                if (assignedCount >= 3) continue;
-                                sourceAssignments.set(task.target.id, assignedCount + 1);
-                            }
-                            creep.heap.subState = task.type;
-                            creep.heap.targetId = task.target.id;
-                            if (task.type === 'harvest') {
-                                creep.heap.activeTask = 'harvest';
-                            }
-                            break;
+                        if (task.type === 'harvest') {
+                            const assignedCount = sourceAssignments.get(task.target.id) || 0;
+                            if (assignedCount >= 3) continue;
+                            sourceAssignments.set(task.target.id, assignedCount + 1);
                         }
+                        creep.heap.subState = task.type;
+                        creep.heap.targetId = task.target.id;
+                        if (task.type === 'harvest') {
+                            creep.heap.activeTask = 'harvest';
+                        }
+                        break;
                     }
                 }
             } else if (creep.heap.state === 'work') {

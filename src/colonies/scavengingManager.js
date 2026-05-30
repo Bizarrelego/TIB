@@ -12,12 +12,11 @@ module.exports = {
         const roomCreeps = global.State.creepsByRoom.get(room.name);
         if (!roomCreeps) return;
 
-        // Collect all workers and remote haulers from this colony
-        const workers = roomCreeps.get('worker') || [];
+        // Collect all haulers and remote haulers from this colony
         const haulers = roomCreeps.get('hauler') || [];
         const remoteHaulers = roomCreeps.get('remoteHauler') || [];
         
-        const scavengers = [...workers, ...haulers, ...remoteHaulers].filter(c => c.store.getFreeCapacity(RESOURCE_ENERGY) > 0);
+        const scavengers = [...haulers, ...remoteHaulers].filter(c => c.store.getFreeCapacity(RESOURCE_ENERGY) > 0);
 
         if (scavengers.length === 0) return;
 

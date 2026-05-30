@@ -80,8 +80,8 @@ class SpawnLedger {
     isLinkNetworkPresent(room) {
         const structuresMap = global.State.structuresByRoom.get(room.name);
         if (structuresMap) {
-            const links = structuresMap.get(STRUCTURE_LINK) || [];
-            return links.length >= 2;
+            const links = structuresMap.get(STRUCTURE_LINK);
+            return links ? links.size >= 2 : false;
         }
         return false;
     }
@@ -105,11 +105,15 @@ class SpawnLedger {
                 const anchor = plannerState.get('anchor');
                 if (anchor) {
                     const structures = global.State.structuresByRoom.get(room.name);
-                    const containers = structures ? structures.get(STRUCTURE_CONTAINER) || [] : [];
-                    for (const container of containers) {
-                        if (container.pos.x === anchor.x && container.pos.y === anchor.y && container.isActive()) {
-                            coreContainerExists = true;
-                            break;
+                    if (structures) {
+                        const containers = structures.get(STRUCTURE_CONTAINER);
+                        if (containers) {
+                            for (const container of containers.values()) {
+                                if (container.pos.x === anchor.x && container.pos.y === anchor.y && container.isActive()) {
+                                    coreContainerExists = true;
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
@@ -129,11 +133,12 @@ class SpawnLedger {
      */
     hasActiveSourceContainer(room) {
         const structures = global.State.structuresByRoom.get(room.name);
-        const containers = structures ? structures.get(STRUCTURE_CONTAINER) || [] : [];
-        if (containers.length === 0) return false;
+        if (!structures) return false;
+        const containers = structures.get(STRUCTURE_CONTAINER);
+        if (!containers || containers.size === 0) return false;
 
         const sources = global.State.sourcesByRoom.get(room.name) || [];
-        for (const container of containers) {
+        for (const container of containers.values()) {
             for (const source of sources) {
                 if (container.pos.isNearTo(source)) {
                     return true;
