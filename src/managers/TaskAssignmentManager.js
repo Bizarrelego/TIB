@@ -68,7 +68,7 @@ function run(roomName) {
           }
 
           if (!target) {
-            target = Game.rooms[roomName].controller;
+            target = roomState.controller;
           }
 
           if (target) {
@@ -78,7 +78,7 @@ function run(roomName) {
           }
         }
       } else if (role === 'upgrader') {
-        const controller = Game.rooms[roomName].controller;
+        const controller = roomState.controller;
         if (controller) {
           creep.heap.targetId = controller.id;
           creep.heap.actionIntent = 'upgrade';
