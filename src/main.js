@@ -6,7 +6,7 @@ const GlobalStateScanner = require('./state/GlobalStateScanner');
 const SpawnManager = require('./colonies/SpawnManager');
 const TaskAssignmentManager = require('./managers/TaskAssignmentManager');
 
-const roleMiner = require('./roles/harvester');
+const roleHarvester = require('./roles/harvester');
 const roleHauler = require('./roles/hauler');
 const roleUpgrader = require('./roles/upgrader');
 
