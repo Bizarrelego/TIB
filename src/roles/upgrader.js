@@ -15,11 +15,6 @@ module.exports = {
       return;
     }
 
-    const drops = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 1);
-    if (drops.length > 0) {
-      creep.pickup(drops[0]);
-    }
-
     if (creep.upgradeController(target) === ERR_NOT_IN_RANGE) {
       creep.moveTo(target, { range: 3 });
     }
