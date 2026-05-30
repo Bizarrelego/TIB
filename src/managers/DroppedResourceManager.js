@@ -56,6 +56,8 @@ class DroppedResourceManager {
                 }
             }
 
+            priority = Math.min(100, priority); // Clamp to max bucket array index
+
             prioritized.push({
                 target: resource,
                 priority: priority,

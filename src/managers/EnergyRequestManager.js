@@ -184,10 +184,9 @@ class EnergyRequestManager {
             }
 
             if (isSourceContainer && amount > 200) {
-                const bucket = buckets[100] = buckets[100] || [];
+                const bucket = buckets[80] = buckets[80] || [];
                 bucket.push({ target: container, amount: amount });
             } else {
-                // Priority 70: other containers
                 const priority = amount > 1500 ? 75 : 70;
                 const bucket = buckets[priority] = buckets[priority] || [];
                 bucket.push({ target: container, amount: amount });
@@ -203,7 +202,6 @@ class EnergyRequestManager {
             bucket.push(drop);
         }
 
-        // Tombstones and Ruins (Priority 85)
         let tombstones = (global.State.tombstonesByRoom && global.State.tombstonesByRoom.get(roomName)) || [];
         if (tombstones instanceof Map) tombstones = Array.from(tombstones.values());
         for (let i = 0; i < tombstones.length; i++) {
@@ -211,7 +209,7 @@ class EnergyRequestManager {
             if (tombstone.store) {
                 const amount = tombstone.store.getUsedCapacity(RESOURCE_ENERGY);
                 if (amount > 0) {
-                    const bucket = buckets[85] = buckets[85] || [];
+                    const bucket = buckets[95] = buckets[95] || [];
                     bucket.push({ target: tombstone, amount: amount });
                 }
             }
@@ -224,7 +222,7 @@ class EnergyRequestManager {
             if (ruin.store) {
                 const amount = ruin.store.getUsedCapacity(RESOURCE_ENERGY);
                 if (amount > 0) {
-                    const bucket = buckets[85] = buckets[85] || [];
+                    const bucket = buckets[95] = buckets[95] || [];
                     bucket.push({ target: ruin, amount: amount });
                 }
             }
@@ -237,7 +235,7 @@ class EnergyRequestManager {
              // Let's deprioritize links for general haulers to avoid conflicts with hubManager/upgrader link logic
             const link = links[i];
             const amount = link.store.getUsedCapacity(RESOURCE_ENERGY);
-            const bucket = buckets[30] = buckets[30] || [];
+            const bucket = buckets[40] = buckets[40] || [];
             bucket.push({ target: link, amount: amount });
         }
 
@@ -247,14 +245,14 @@ class EnergyRequestManager {
             const term = terminal[i];
             const energy = term.store.getUsedCapacity(RESOURCE_ENERGY);
             if (energy > 55000) {
-                const bucket = buckets[20] = buckets[20] || [];
+                const bucket = buckets[60] = buckets[60] || [];
                 bucket.push({ target: term, amount: energy - 50000 });
             }
         }
 
         // Storage (always available as a low priority source if nothing else is)
         const storage = resourceUtils.getStructuresWithUsedCapacity(roomName, [STRUCTURE_STORAGE]);
-        const storagePriority = hasStorage ? 100 : 10;
+        const storagePriority = hasStorage ? 70 : 10;
         for (let i = 0; i < storage.length; i++) {
             const store = storage[i];
             const amount = store.store.getUsedCapacity(RESOURCE_ENERGY);

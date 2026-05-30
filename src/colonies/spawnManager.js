@@ -98,7 +98,8 @@ module.exports = {
             const targetHaulers = desiredCounts.get('domesticHauler') || 0;
 
             // Spawns the initial bootstrap worker exclusively to start the colony economy
-            if (workerCount < targetWorkers) {
+            const queuedWorkers = SpawnQueueManager.getQueuedCount(room.name, 'worker');
+            if (workerCount + queuedWorkers < targetWorkers) {
                 const energyAvailable = spawnLedger.getAvailableEnergy();
                 const calcCapacity = (workerCount === 0 && energyAvailable < capacity && energyAvailable >= 200) ? energyAvailable : capacity;
                 const body = CreepBodyBuilder.build('worker', calcCapacity, room.controller.level);
@@ -109,7 +110,8 @@ module.exports = {
             }
 
             // Spawn harvesters first
-            if (harvesterCount < targetHarvesters) {
+            const queuedHarvesters = SpawnQueueManager.getQueuedCount(room.name, 'harvester');
+            if (harvesterCount + queuedHarvesters < targetHarvesters) {
                 const energyAvailable = spawnLedger.getAvailableEnergy();
                 const calcCapacity = (haulerCount === 0 && energyAvailable < capacity && energyAvailable >= 200) ? energyAvailable : capacity;
                 const body = CreepBodyBuilder.build('harvester', calcCapacity, room.controller.level);
@@ -119,7 +121,8 @@ module.exports = {
 
             // Spawn a domestic hauler to move energy from harvesters to spawn/extensions
             // Retire domestic haulers at RCL 5 if a Link network is established
-            if (haulerCount < targetHaulers && (!room.controller || room.controller.level < 5 || !spawnLedger.isLinkNetworkPresent(room))) {
+            const queuedHaulers = SpawnQueueManager.getQueuedCount(room.name, 'domesticHauler');
+            if (haulerCount + queuedHaulers < targetHaulers && (!room.controller || room.controller.level < 5 || !spawnLedger.isLinkNetworkPresent(room))) {
                 const energyAvailable = spawnLedger.getAvailableEnergy();
                 const calcCapacity = (haulerCount === 0 && energyAvailable < capacity && energyAvailable >= 200) ? energyAvailable : capacity;
                 const body = CreepBodyBuilder.build('domesticHauler', calcCapacity, room.controller.level);
@@ -157,7 +160,8 @@ module.exports = {
 
         const desiredUpgraders = desiredCounts.get('upgrader') || 0;
 
-        if (upgraderCount < desiredUpgraders) {
+        const queuedUpgraders = SpawnQueueManager.getQueuedCount(room.name, 'upgrader');
+        if (upgraderCount + queuedUpgraders < desiredUpgraders) {
             const body = CreepBodyBuilder.build('upgrader', capacity, room.controller.level);
             const cost = CreepBodyBuilder.getCost(body);
             if (spawnLedger.canSpawn(cost)) {
@@ -177,7 +181,8 @@ module.exports = {
                 }
 
                 const targetHubManagers = desiredCounts.get('hubManager') || 0;
-                if (hubManagerCount < targetHubManagers) {
+                const queuedHubManagers = SpawnQueueManager.getQueuedCount(room.name, 'hubManager');
+                if (hubManagerCount + queuedHubManagers < targetHubManagers) {
                     const body = CreepBodyBuilder.build('hubManager', capacity, room.controller.level);
                     const cost = CreepBodyBuilder.getCost(body);
                     if (spawnLedger.canSpawn(cost)) {
@@ -197,7 +202,8 @@ module.exports = {
         }
         const desiredFastFillers = desiredCounts.get('fastFiller') || 0;
 
-        if (fastFillerCount < desiredFastFillers) {
+        const queuedFastFillers = SpawnQueueManager.getQueuedCount(room.name, 'fastFiller');
+        if (fastFillerCount + queuedFastFillers < desiredFastFillers) {
             const body = CreepBodyBuilder.build('fastFiller', capacity, room.controller.level);
             const cost = CreepBodyBuilder.getCost(body);
 

@@ -12,7 +12,6 @@ const {
     EnergyRequestManager,
     MineralManager,
     LinkManager,
-    CreepAssignmentManager,
     BoostManager,
     ConstructionManager,
     StorageManager,
@@ -145,7 +144,6 @@ module.exports = { run: function colonyManager() {
                 executeWrapped('UpgraderManager.run', () => UpgraderManager.run && UpgraderManager.run(room));
 
                 executeWrapped('RemoteEconomyManager.run', () => RemoteEconomyManager.run && RemoteEconomyManager.run(room));
-                executeWrapped('CreepAssignmentManager.run', () => CreepAssignmentManager.run && CreepAssignmentManager.run(room));
 
                 // Phase 4: Roles & Spawning
                 executeWrapped('CreepRoleBalancer.run', () => CreepRoleBalancer.run && CreepRoleBalancer.run(room));

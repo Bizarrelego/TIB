@@ -124,6 +124,12 @@ module.exports = {
                         if (task.type === 'harvest') {
                             creep.heap.activeTask = 'harvest';
                         }
+                        
+                        if (task.target instanceof Resource) {
+                            creep.pickup(task.target);
+                        } else if (task.target instanceof Ruin || task.target instanceof Tombstone || task.target instanceof StructureContainer) {
+                            creep.withdraw(task.target, RESOURCE_ENERGY);
+                        }
                         break;
                     }
                 }
