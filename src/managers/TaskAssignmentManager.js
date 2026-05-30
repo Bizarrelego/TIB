@@ -2,6 +2,7 @@
  * The Brain - TaskAssignmentManager
  * Assigns deterministic intents to idle creeps reading strictly from global.State.
  */
+const { getHash } = require('../utils/HashUtility');
 
 function run(roomName) {
   // Retrieve the room state
@@ -25,12 +26,7 @@ function run(roomName) {
         const sources = roomState.sources;
         if (sources && sources.length > 0) {
           // Use creep's name or some index to distribute them evenly
-          // A simple hash of the name
-          let hash = 0;
-          for (let i = 0; i < name.length; i++) {
-            hash += name.charCodeAt(i);
-          }
-          const index = hash % sources.length;
+          const index = getHash(name, sources.length);
 
           creep.heap.targetId = sources[index].id;
           creep.heap.actionIntent = 'harvest';
@@ -43,11 +39,14 @@ function run(roomName) {
           let target = null;
 
           if (roomState.ruins && roomState.ruins.length > 0) {
-            target = roomState.ruins[0];
+            const index = getHash(name, roomState.ruins.length);
+            target = roomState.ruins[index];
           } else if (roomState.tombstones && roomState.tombstones.length > 0) {
-            target = roomState.tombstones[0];
+            const index = getHash(name, roomState.tombstones.length);
+            target = roomState.tombstones[index];
           } else if (roomState.droppedEnergy && roomState.droppedEnergy.length > 0) {
-            target = roomState.droppedEnergy[0];
+            const index = getHash(name, roomState.droppedEnergy.length);
+            target = roomState.droppedEnergy[index];
           }
 
           if (target) {

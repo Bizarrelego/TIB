@@ -47,11 +47,11 @@ module.exports.loop = function () {
     }
 
     if (creep.memory.role === 'harvester') {
-      harvester.run(creep);
+      roleHarvester.run(creep);
     } else if (creep.memory.role === 'hauler') {
-      hauler.run(creep);
+      roleHauler.run(creep);
     } else if (creep.memory.role === 'upgrader') {
-      upgrader.run(creep);
+      roleUpgrader.run(creep);
     }
   }
 

@@ -17,14 +17,14 @@ module.exports = {
 
     if (creep.heap.actionIntent === 'haul_pickup') {
       let result;
-      if (target instanceof Resource) {
-        result = creep.pickup(target);
-      } else {
-        result = creep.withdraw(target, RESOURCE_ENERGY);
-      }
-
-      if (result === ERR_NOT_IN_RANGE) {
+      if (creep.pos.getRangeTo(target) > 1) {
         creep.moveTo(target);
+      } else {
+        if (target instanceof Resource) {
+          result = creep.pickup(target);
+        } else {
+          result = creep.withdraw(target, RESOURCE_ENERGY);
+        }
       }
 
       const isTargetEmpty = target instanceof Resource ? (target.amount === 0) : (target.store && target.store.getUsedCapacity(RESOURCE_ENERGY) === 0);
@@ -34,13 +34,17 @@ module.exports = {
     } else if (creep.heap.actionIntent === 'haul_deliver') {
       let result;
       if (target instanceof StructureController) {
-        result = creep.drop(RESOURCE_ENERGY);
+        if (creep.pos.getRangeTo(target) > 3) {
+          creep.moveTo(target);
+        } else {
+          result = creep.drop(RESOURCE_ENERGY);
+        }
       } else {
-        result = creep.transfer(target, RESOURCE_ENERGY);
-      }
-
-      if (result === ERR_NOT_IN_RANGE) {
-        creep.moveTo(target);
+        if (creep.pos.getRangeTo(target) > 1) {
+          creep.moveTo(target);
+        } else {
+          result = creep.transfer(target, RESOURCE_ENERGY);
+        }
       }
 
       const isTargetFull = target.store && target.store.getFreeCapacity(RESOURCE_ENERGY) === 0;
