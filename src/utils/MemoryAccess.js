@@ -13,12 +13,12 @@ function ensureBaseMemory() {
 /**
  * Initializes and returns memory for a specific room.
  * @param {string} roomName
- * @returns {Object}
+ * @returns {Map}
  */
 function initializeRoomMemory(roomName) {
     ensureBaseMemory();
     if (!Memory.rooms.has(roomName)) {
-        Memory.rooms.set(roomName, {});
+        Memory.rooms.set(roomName, new Map());
     }
     return Memory.rooms.get(roomName);
 }
@@ -26,12 +26,12 @@ function initializeRoomMemory(roomName) {
 /**
  * Initializes and returns memory for a specific creep.
  * @param {string} creepName
- * @returns {Object}
+ * @returns {Map}
  */
 function initializeCreepMemory(creepName) {
     ensureBaseMemory();
     if (!Memory.creeps.has(creepName)) {
-        Memory.creeps.set(creepName, {});
+        Memory.creeps.set(creepName, new Map());
     }
     return Memory.creeps.get(creepName);
 }
@@ -39,7 +39,7 @@ function initializeCreepMemory(creepName) {
 /**
  * Gets memory for a specific room, initializing it if necessary.
  * @param {string} roomName
- * @returns {Object}
+ * @returns {Map}
  */
 function getRoomMemory(roomName) {
     return initializeRoomMemory(roomName);
@@ -48,7 +48,7 @@ function getRoomMemory(roomName) {
 /**
  * Gets memory for a specific creep, initializing it if necessary.
  * @param {string} creepName
- * @returns {Object}
+ * @returns {Map}
  */
 function getCreepMemory(creepName) {
     return initializeCreepMemory(creepName);
