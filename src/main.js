@@ -14,7 +14,7 @@ module.exports.loop = function () {
     }
   }
 
-  global.tickCache = {};
+  global.tickCache = new Map();
 
   // Build global state
   GlobalStateScanner.run();
