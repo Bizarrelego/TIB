@@ -14,10 +14,10 @@
  */
 function ensureBaseMemory() {
     if (!Memory.rooms) {
-        Memory.rooms = new Object();
+        Memory.rooms = {};
     }
     if (!Memory.creeps) {
-        Memory.creeps = new Object();
+        Memory.creeps = {};
     }
 }
 
@@ -29,7 +29,7 @@ function ensureBaseMemory() {
 function initializeRoomMemory(roomName) {
     ensureBaseMemory();
     if (!Memory.rooms[roomName]) {
-        Memory.rooms[roomName] = new Object();
+        Memory.rooms[roomName] = {};
     }
     return Memory.rooms[roomName];
 }
@@ -42,7 +42,7 @@ function initializeRoomMemory(roomName) {
 function initializeCreepMemory(creepName) {
     ensureBaseMemory();
     if (!Memory.creeps[creepName]) {
-        Memory.creeps[creepName] = new Object();
+        Memory.creeps[creepName] = {};
     }
     return Memory.creeps[creepName];
 }
