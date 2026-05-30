@@ -118,7 +118,8 @@ module.exports = {
                         creep.heap.targetId = targetDropped.id;
                         creep.heap.subState = 'pickup';
                     } else {
-                        const source = sources.length > 0 ? sources[0] : null;
+                        const sourceIndex = parseInt(creep.id, 16) % sources.length;
+                        const source = sources.length > 0 ? sources[sourceIndex] : null;
                         creep.heap.targetId = source ? source.id : null;
                         creep.heap.subState = 'harvest';
                     }

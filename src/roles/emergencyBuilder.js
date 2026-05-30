@@ -20,7 +20,12 @@ module.exports = {
             try {
                 if (creep.fatigue > 0) continue; // Fatigue gating
 
-                if (creep.store.getFreeCapacity() > 0) {
+                if (!creep.heap) creep.heap = {};
+
+                if (creep.heap.working && creep.store[RESOURCE_ENERGY] === 0) creep.heap.working = false;
+                if (!creep.heap.working && creep.store.getFreeCapacity() === 0) creep.heap.working = true;
+
+                if (!creep.heap.working) {
                     const sources = global.State.sourcesByRoom.get(room.name) || [];
                     let source = null;
                     let minRange = Infinity;

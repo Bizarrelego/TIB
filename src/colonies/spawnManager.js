@@ -85,7 +85,9 @@ module.exports = {
                 // Bypass all ledger and queue logic. Force an immediate spawn.
                 if (spawns.length > 0 && room.energyAvailable >= 200) {
                     const spawn = spawns[0];
-                    spawn.spawnCreep([WORK, CARRY, MOVE], `bootstrap_${Game.time}`, { memory: { role: 'worker', colony: room.name }});
+                    if (!spawnLedger.isSpawnBusy(spawn)) {
+                        spawn.spawnCreep([WORK, CARRY, MOVE], `bootstrap_${Game.time}`, { memory: { role: 'worker', colony: room.name }});
+                    }
                     return; // Halt all other spawn logic for this room this tick
                 }
             }
@@ -136,12 +138,11 @@ module.exports = {
             }
 
             if (totalScouts < 1) {
-                const body = CreepBodyBuilder.build('scout', capacity, room.controller.level);
-                const cost = CreepBodyBuilder.getCost(body);
-                if (spawnLedger.canSpawn(cost)) {
-                    SpawnQueueManager.requestSpawn(room.name, 'scout', body, 'scout_' + Game.time, {
-                    memory: { role: 'scout', colony: room.name }
-                }, cost);
+                const queuedScouts = SpawnQueueManager.getQueuedCount(room.name, 'scout');
+                if (queuedScouts === 0 && spawnLedger.canSpawn(50)) {
+                    SpawnQueueManager.requestSpawn(room.name, 'scout', [MOVE], 'scout_' + Game.time, {
+                        memory: { role: 'scout', colony: room.name }
+                    }, 50);
                 }
             }
         }

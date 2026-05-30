@@ -71,11 +71,6 @@ module.exports = {
                             }
                         }
                     }
-
-                    if (!hasLink) {
-                        // Containerless drop mining: drop directly on ground unconditionally
-                        creep.drop(RESOURCE_ENERGY);
-                    }
                 }
 
                 TrafficManager.registerHarvest(creep, target);
