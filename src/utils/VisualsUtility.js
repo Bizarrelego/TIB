@@ -73,16 +73,16 @@ function drawText(text, pos, color, opts = {}) {
 }
 
 /**
- * Draws the path of a creep if it exists in memory.
+ * Draws the path of a creep if it exists in heap.
  *
  * @param {Creep} creep - The creep whose path to draw.
  * @param {Object} [opts={}] - Additional options for the polyline.
  */
 function drawCreepPath(creep, opts = {}) {
-    if (!creep || !creep.room || !creep.memory || !creep.memory.path) return;
+    if (!creep || !creep.room || !creep.heap || !creep.heap.path) return;
 
     try {
-        let path = creep.memory.path;
+        let path = creep.heap.path;
         let points = [];
 
         if (typeof path === 'string') {
