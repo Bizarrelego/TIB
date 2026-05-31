@@ -34,6 +34,8 @@ function run() {
       filter: (tombstone) => tombstone.store.getUsedCapacity(RESOURCE_ENERGY) > 0
     });
 
+    const constructionSites = room.find(FIND_MY_CONSTRUCTION_SITES);
+
     const controller = room.controller;
 
     global.State.rooms.set(roomName, {
@@ -42,6 +44,7 @@ function run() {
       droppedEnergy,
       ruins,
       tombstones,
+      constructionSites,
       controller
     });
   }

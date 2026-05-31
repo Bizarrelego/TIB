@@ -5,6 +5,7 @@
 const GlobalStateScanner = require('./state/GlobalStateScanner');
 const SpawnManager = require('./colonies/SpawnManager');
 const TaskAssignmentManager = require('./managers/TaskAssignmentManager');
+const BasePlanner = require('./colonies/BasePlanner');
 
 const roleHarvester = require('./roles/harvester');
 const roleHauler = require('./roles/hauler');
@@ -26,6 +27,9 @@ module.exports.loop = function () {
   GlobalStateScanner.run();
 
   for (const roomName in Game.rooms) {
+    // Run BasePlanner
+    BasePlanner.run(roomName);
+
     // Log source and spawn counts
     if (global.State.rooms && global.State.rooms.has(roomName)) {
       const roomState = global.State.rooms.get(roomName);

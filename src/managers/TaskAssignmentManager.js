@@ -89,11 +89,19 @@ function run(roomName) {
           }
         }
       } else if (role === 'upgrader') {
-        const controller = roomState.controller;
-        if (controller) {
-          creep.heap.targetId = controller.id;
-          creep.heap.actionIntent = 'upgrade';
+        const constructionSites = roomState.constructionSites;
+
+        if (constructionSites && constructionSites.length > 0) {
+          creep.heap.targetId = constructionSites[0].id;
+          creep.heap.actionIntent = 'build';
           creep.heap.state = 'working';
+        } else {
+          const controller = roomState.controller;
+          if (controller) {
+            creep.heap.targetId = controller.id;
+            creep.heap.actionIntent = 'upgrade';
+            creep.heap.state = 'working';
+          }
         }
       }
     }
