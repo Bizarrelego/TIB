@@ -5,6 +5,7 @@
 const GlobalStateScanner = require('./state/GlobalStateScanner');
 const TaskAssignmentManager = require('./managers/TaskAssignmentManager');
 const SpawnManager = require('./colonies/SpawnManager');
+const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
 
 const roleHarvester = require('./roles/harvester');
 const roleHauler = require('./roles/hauler');
@@ -16,11 +17,7 @@ module.exports.loop = function () {
   require('./constants');
 
   // Clean up dead creep memory
-  for (const name in Memory.creeps) {
-    if (!Game.creeps[name]) {
-      delete Memory.creeps[name];
-    }
-  }
+  MemoryCleanupManager.run();
 
   // Build global state
   GlobalStateScanner.run();
