@@ -89,6 +89,19 @@ function run(roomName) {
           }
         }
       } else if (role === 'upgrader') {
+        const droppedEnergy = roomState.droppedEnergy;
+        creep.heap.pickupId = null;
+
+        if (droppedEnergy && droppedEnergy.length > 0) {
+          for (let i = 0; i < droppedEnergy.length; i++) {
+            const drop = droppedEnergy[i];
+            if (creep.pos.getRangeTo(drop) <= 3) {
+              creep.heap.pickupId = drop.id;
+              break;
+            }
+          }
+        }
+
         const constructionSites = roomState.constructionSites;
 
         if (constructionSites && constructionSites.length > 0) {

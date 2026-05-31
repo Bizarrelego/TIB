@@ -17,17 +17,18 @@ module.exports = {
 
     const actionIntent = creep.heap.actionIntent;
 
-    if (actionIntent === 'upgrade') {
-      const drop = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 3)[0];
-      if (drop) creep.pickup(drop);
+    if (creep.heap.pickupId) {
+      const drop = Game.getObjectById(creep.heap.pickupId);
+      if (drop) {
+        creep.pickup(drop);
+      }
+    }
 
+    if (actionIntent === 'upgrade') {
       if (creep.upgradeController(target) === ERR_NOT_IN_RANGE) {
         creep.moveTo(target, { range: 3 });
       }
     } else if (actionIntent === 'build') {
-      const drop = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 3)[0];
-      if (drop) creep.pickup(drop);
-
       if (creep.build(target) === ERR_NOT_IN_RANGE) {
         creep.moveTo(target, { range: 3 });
       }
