@@ -8,13 +8,24 @@ module.exports = {
       return;
     }
 
+    if (creep.heap.sleepUntil && Game.time < creep.heap.sleepUntil) {
+      return;
+    }
+
     const target = Game.getObjectById(creep.heap.targetId);
     if (!target) {
       return;
     }
 
-    if (creep.harvest(target) === ERR_NOT_IN_RANGE) {
+    if (target.energy === 0) {
+      creep.heap.sleepUntil = Game.time + target.ticksToRegeneration;
+      return;
+    }
+
+    if (creep.pos.getRangeTo(target) > 1) {
       creep.moveTo(target);
+    } else {
+      creep.harvest(target);
     }
   }
 };
