@@ -11,7 +11,7 @@ const roleHauler = require('./roles/hauler');
 const roleUpgrader = require('./roles/upgrader');
 
 module.exports.loop = function () {
-  global.tickCache = {};
+  global.tickCache = new Map();
 
   require('./constants');
 
