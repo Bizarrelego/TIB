@@ -25,10 +25,9 @@ function run(roomName) {
       if (role === 'harvester') {
         const sources = roomState.sources;
         if (sources && sources.length > 0) {
-          // Use creep's name or some index to distribute them evenly
-          const index = getHash(name, sources.length);
-
-          creep.heap.targetId = sources[index].id;
+          // Use last character of name or ID string to deterministically lock source index
+          const index = parseInt(creep.name.slice(-1), 36) || 0;
+          creep.heap.targetId = sources[index % sources.length].id;
           creep.heap.actionIntent = 'harvest';
           creep.heap.state = 'working';
         }
