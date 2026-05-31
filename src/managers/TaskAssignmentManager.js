@@ -1,18 +1,23 @@
 /**
  * The Brain - TaskAssignmentManager
- * Assigns deterministic intents to idle creeps reading strictly from global.State.
+ * Assigns deterministic intents to idle creeps reading strictly from global.state.
  */
 const { getOptimalHarvesterTarget } = require('../utils/HarvesterUtility');
 const { getHaulerDeliveryTarget } = require('../utils/HaulerUtility');
 const { getScavengingTarget } = require('../utils/ScavengingUtility');
 
 function run(roomName) {
-  if (!global.State || !global.State.rooms || !global.State.rooms.has(roomName)) return;
+  // Use global.state exactly as instructed, fallback to global.State
+  const stateObj = global.state || global.State;
+  if (!stateObj) return;
 
-  const roomState = global.State.rooms.get(roomName);
+  if (!stateObj.rooms || !stateObj.rooms.has(roomName)) return;
+  const roomState = stateObj.rooms.get(roomName);
 
-  for (const name in Game.creeps) {
-    const creep = Game.creeps[name];
+  const creepsToIterate = stateObj.creeps || Game.creeps;
+
+  for (const name in creepsToIterate) {
+    const creep = creepsToIterate[name];
     if (creep.memory.colony !== roomName) continue;
 
     // Safely initialize creep.heap
@@ -20,7 +25,7 @@ function run(roomName) {
       creep.heap = { state: 'idle', targetId: null, actionIntent: null };
     }
 
-    if (creep.heap.state === 'seeking_target') {
+    if (creep.heap.state === 'idle') {
       const role = creep.memory.role;
 
       if (role === 'harvester') {
@@ -52,7 +57,7 @@ function run(roomName) {
         const controller = roomState.controller;
         if (controller) {
           creep.heap.targetId = controller.id;
-          creep.heap.actionIntent = 'upgrade';
+          creep.heap.actionIntent = 'upgradeController';
           creep.heap.state = 'assigned';
         }
       }

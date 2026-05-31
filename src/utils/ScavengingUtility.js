@@ -9,6 +9,7 @@ function getScavengingTarget(roomState, creepName) {
     const validTombstones = (roomState.tombstones || []).filter(t => t.store && t.store.getUsedCapacity(RESOURCE_ENERGY) > 0);
     const validDrops = (roomState.droppedEnergy || []).filter(d => d.amount > 0);
 
+    // Ensure we prioritize ruins and tombstones
     if (validRuins.length > 0) {
         const index = getHash(creepName, validRuins.length);
         return { target: validRuins[index], intent: 'withdraw' };

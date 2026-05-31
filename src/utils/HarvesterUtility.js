@@ -9,9 +9,12 @@ function getOptimalHarvesterTarget(roomName, sources) {
     const sourceCounts = new Map();
     sources.forEach(s => sourceCounts.set(s.id, 0));
 
+    const stateObj = global.state || global.State;
+    const creepsToIterate = stateObj && stateObj.creeps ? stateObj.creeps : Game.creeps;
+
     // Count currently living harvesters' target assignments
-    for (const cName in Game.creeps) {
-        const c = Game.creeps[cName];
+    for (const cName in creepsToIterate) {
+        const c = creepsToIterate[cName];
         if (c.memory.colony === roomName && c.memory.role === 'harvester' && c.heap && c.heap.targetId) {
             if (sourceCounts.has(c.heap.targetId)) {
                 sourceCounts.set(c.heap.targetId, sourceCounts.get(c.heap.targetId) + 1);

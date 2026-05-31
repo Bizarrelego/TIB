@@ -15,8 +15,11 @@ function getHaulerDeliveryTarget(roomName, roomState, creepName) {
 
     // Fallback to upgrader drop-piles
     const upgraders = [];
-    for (const cName in Game.creeps) {
-        const c = Game.creeps[cName];
+    const stateObj = global.state || global.State;
+    const creepsToIterate = stateObj && stateObj.creeps ? stateObj.creeps : Game.creeps;
+
+    for (const cName in creepsToIterate) {
+        const c = creepsToIterate[cName];
         if (c.memory.colony === roomName && c.memory.role === 'upgrader') {
             upgraders.push(c);
         }
