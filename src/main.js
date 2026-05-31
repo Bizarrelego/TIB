@@ -45,17 +45,22 @@ module.exports.loop = function () {
     if (creep.spawning) continue;
     if (creep.fatigue > 0) continue;
 
+    // Strict heap initialization check
     if (!creep.heap) {
-      creep.heap = { state: 'idle', targetId: null, actionIntent: null };
+        creep.heap = { state: 'idle', targetId: null, actionIntent: null };
     }
 
-    const role = creep.memory.role;
-    if (role === 'harvester') {
-      roleHarvester.run(creep);
-    } else if (role === 'hauler') {
-      roleHauler.run(creep);
-    } else if (role === 'upgrader') {
-      roleUpgrader.run(creep);
+    // Execute matching muscle layer
+    try {
+        if (creep.memory.role === 'harvester') {
+            require('./roles/harvester').run(creep);
+        } else if (creep.memory.role === 'hauler') {
+            require('./roles/hauler').run(creep);
+        } else if (creep.memory.role === 'upgrader') {
+            require('./roles/upgrader').run(creep);
+        }
+    } catch (e) {
+        console.log(`Error executing creep ${name}: ${e.message}`);
     }
   }
 };

@@ -23,28 +23,37 @@ module.exports = {
         creep.moveTo(target);
       } else {
         creep.pickup(target);
-        creep.heap.state = 'idle';
+        if (creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0 || !Game.getObjectById(creep.heap.targetId)) {
+          creep.heap.state = 'idle';
+        }
       }
     } else if (intent === 'withdraw') {
       if (creep.pos.getRangeTo(target) > 1) {
         creep.moveTo(target);
       } else {
         creep.withdraw(target, RESOURCE_ENERGY);
-        creep.heap.state = 'idle';
+        if (creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0 || !Game.getObjectById(creep.heap.targetId)) {
+          creep.heap.state = 'idle';
+        }
       }
     } else if (intent === 'transfer') {
       if (creep.pos.getRangeTo(target) > 1) {
         creep.moveTo(target);
       } else {
-        creep.transfer(target, RESOURCE_ENERGY);
-        creep.heap.state = 'idle';
+        if (creep.transfer(target, RESOURCE_ENERGY) === ERR_FULL) {
+          creep.heap.state = 'idle';
+        } else if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+          creep.heap.state = 'idle';
+        }
       }
     } else if (intent === 'drop') {
       if (creep.pos.getRangeTo(target) > 0) {
         creep.moveTo(target);
       } else {
         creep.drop(RESOURCE_ENERGY);
-        creep.heap.state = 'idle';
+        if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+          creep.heap.state = 'idle';
+        }
       }
     } else {
       creep.heap.state = 'idle';

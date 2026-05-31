@@ -5,13 +5,11 @@ module.exports = {
 
     if (!creep.heap || !creep.heap.targetId) {
       if (!creep.heap) creep.heap = { state: 'idle', targetId: null, actionIntent: null };
-      creep.heap.state = 'idle';
       return;
     }
 
     const target = Game.getObjectById(creep.heap.targetId);
     if (!target) {
-      creep.heap.state = 'idle';
       return;
     }
 
