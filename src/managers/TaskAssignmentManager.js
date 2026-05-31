@@ -27,13 +27,14 @@ function run(roomName) {
         if (sources && sources.length > 0) {
           const sourceCounts = new Map();
           sources.forEach(s => sourceCounts.set(s.id, 0));
-          Object.values(Game.creeps).forEach(c => {
-              if (c.memory.role === 'harvester' && c.heap && c.heap.targetId) {
+          for (const cName in Game.creeps) {
+              const c = Game.creeps[cName];
+              if (c.memory.colony === roomName && c.memory.role === 'harvester' && c.heap && c.heap.targetId) {
                   if (sourceCounts.has(c.heap.targetId)) {
                       sourceCounts.set(c.heap.targetId, sourceCounts.get(c.heap.targetId) + 1);
                   }
               }
-          });
+          }
           const bestSource = sources.reduce((a, b) => sourceCounts.get(a.id) < sourceCounts.get(b.id) ? a : b);
           creep.heap.targetId = bestSource.id;
           creep.heap.actionIntent = 'harvest';
@@ -52,7 +53,8 @@ function run(roomName) {
             const index = getHash(name, roomState.tombstones.length);
             target = roomState.tombstones[index];
           } else if (roomState.droppedEnergy && roomState.droppedEnergy.length > 0) {
-            target = roomState.droppedEnergy[0];
+            const index = getHash(name, roomState.droppedEnergy.length);
+            target = roomState.droppedEnergy[index];
           }
 
           if (target) {
