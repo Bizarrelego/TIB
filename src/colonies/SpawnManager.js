@@ -52,7 +52,7 @@ function run(roomName) {
   }
 
   if (roleToSpawn) {
-    const body = bodies[roleToSpawn];
+    const body = bodies.get(roleToSpawn);
     const newName = roleToSpawn + '_' + Game.time;
     spawn.spawnCreep(body, newName, {
       memory: { role: roleToSpawn, colony: roomName }
