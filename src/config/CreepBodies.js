@@ -2,12 +2,12 @@
  * Hardcoded creep body configurations for different roles.
  */
 
-const HARVESTER_BODY = [WORK, WORK, MOVE];
-const HAULER_BODY = [CARRY, CARRY, MOVE, MOVE];
-const UPGRADER_BODY = [WORK, CARRY, MOVE, MOVE];
+const harvester = [WORK, WORK, MOVE];
+const hauler = [CARRY, CARRY, MOVE, MOVE];
+const upgrader = [WORK, CARRY, MOVE, MOVE];
 
 module.exports = {
-  HARVESTER_BODY,
-  HAULER_BODY,
-  UPGRADER_BODY
+  harvester,
+  hauler,
+  upgrader
 };
