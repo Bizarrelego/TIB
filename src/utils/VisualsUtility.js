@@ -72,9 +72,61 @@ function drawText(text, pos, color, opts = {}) {
     visual.text(text, pos.x, pos.y, { color: color, font: 0.5, ...opts });
 }
 
+/**
+ * Draws the path of a creep if it exists in heap.
+ *
+ * @param {Creep} creep - The creep whose path to draw.
+ * @param {Object} [opts={}] - Additional options for the polyline.
+ */
+function drawCreepPath(creep, opts = {}) {
+    if (!creep || !creep.room || !creep.heap || !creep.heap.path) return;
+
+    try {
+        let path = creep.heap.path;
+        let points = [];
+
+        if (typeof path === 'string') {
+            if (typeof Room !== 'undefined' && Room.deserializePath) {
+                const deserialized = Room.deserializePath(path);
+                points = deserialized.map(step => [step.x, step.y]);
+            }
+        } else if (Array.isArray(path)) {
+            points = path.map(step => [step.x, step.y]);
+        }
+
+        if (points.length > 0) {
+            const visual = new RoomVisual(creep.room.name);
+            visual.poly(points, { stroke: '#ffffff', strokeWidth: 0.15, opacity: 0.5, ...opts });
+        }
+    } catch (e) {
+        // Ignore errors if data is malformed
+    }
+}
+
+/**
+ * Draws a line from a creep to its current target.
+ *
+ * @param {Creep} creep - The creep.
+ * @param {Object} [opts={}] - Additional options for the line.
+ */
+function drawTargetIndicator(creep, opts = {}) {
+    if (!creep || !creep.heap || !creep.heap.targetId) return;
+
+    try {
+        const target = Game.getObjectById(creep.heap.targetId);
+        if (!target || !target.pos) return;
+
+        drawLine(creep.pos, target.pos, '#ff0000', opts);
+    } catch (e) {
+        // Ignore errors if data is malformed
+    }
+}
+
 module.exports = {
     drawCircle,
     drawPath,
     drawLine,
-    drawText
+    drawText,
+    drawCreepPath,
+    drawTargetIndicator
 };
