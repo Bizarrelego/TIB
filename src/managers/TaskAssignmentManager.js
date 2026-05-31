@@ -25,9 +25,18 @@ function run(roomName) {
       if (role === 'harvester') {
         const sources = roomState.sources;
         if (sources && sources.length > 0) {
-          // Use last character of name or ID string to deterministically lock source index
-          const index = parseInt(creep.name.slice(-1), 36) || 0;
-          creep.heap.targetId = sources[index % sources.length].id;
+          const sourceCounts = new Map();
+          sources.forEach(s => sourceCounts.set(s.id, 0));
+          for (const cName in Game.creeps) {
+              const c = Game.creeps[cName];
+              if (c.memory.colony === roomName && c.memory.role === 'harvester' && c.heap && c.heap.targetId) {
+                  if (sourceCounts.has(c.heap.targetId)) {
+                      sourceCounts.set(c.heap.targetId, sourceCounts.get(c.heap.targetId) + 1);
+                  }
+              }
+          }
+          const bestSource = sources.reduce((a, b) => sourceCounts.get(a.id) < sourceCounts.get(b.id) ? a : b);
+          creep.heap.targetId = bestSource.id;
           creep.heap.actionIntent = 'harvest';
           creep.heap.state = 'working';
         }
@@ -95,6 +104,11 @@ function run(roomName) {
           creep.heap.state = 'working';
         }
       }
+    }
+
+    // Runtime verification as requested
+    if (creep.heap && creep.heap.actionIntent) {
+        console.log(`[Task Check] ${creep.name} | Intent: ${creep.heap.actionIntent} | TargetID: ${creep.heap.targetId}`);
     }
   }
 }
