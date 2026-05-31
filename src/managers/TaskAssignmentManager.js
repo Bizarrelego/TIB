@@ -45,21 +45,25 @@ function run(roomName) {
           // Empty hauler - find something to pickup
           // Priority: Ruins > Tombstones > Dropped
           let target = null;
+          let intentStr = null;
 
           if (roomState.ruins && roomState.ruins.length > 0) {
             const index = getHash(name, roomState.ruins.length);
             target = roomState.ruins[index];
+            intentStr = 'withdraw';
           } else if (roomState.tombstones && roomState.tombstones.length > 0) {
             const index = getHash(name, roomState.tombstones.length);
             target = roomState.tombstones[index];
+            intentStr = 'withdraw';
           } else if (roomState.droppedEnergy && roomState.droppedEnergy.length > 0) {
             const index = getHash(name, roomState.droppedEnergy.length);
             target = roomState.droppedEnergy[index];
+            intentStr = 'pickup';
           }
 
           if (target) {
             creep.heap.targetId = target.id;
-            creep.heap.actionIntent = 'haul_pickup';
+            creep.heap.actionIntent = intentStr;
             creep.heap.state = 'working';
           }
         } else {
@@ -92,7 +96,7 @@ function run(roomName) {
 
           if (target) {
             creep.heap.targetId = target.id;
-            creep.heap.actionIntent = 'haul_deliver';
+            creep.heap.actionIntent = 'transfer';
             creep.heap.state = 'working';
           }
         }

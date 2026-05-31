@@ -20,7 +20,7 @@ module.exports = {
 
     const intent = creep.heap.actionIntent;
 
-    if (intent === 'pickup' || intent === 'haul_pickup') {
+    if (intent === 'pickup') {
       if (creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
         creep.heap.state = 'idle';
         return;
@@ -29,13 +29,7 @@ module.exports = {
       if (creep.pos.getRangeTo(target) > 1) {
         creep.moveTo(target);
       } else {
-        let result;
-        if (target.store !== undefined) {
-          result = creep.withdraw(target, RESOURCE_ENERGY);
-        } else {
-          result = creep.pickup(target);
-        }
-
+        const result = creep.pickup(target);
         if (result !== OK && result !== ERR_NOT_IN_RANGE) {
           creep.heap.state = 'idle';
         }
@@ -45,7 +39,26 @@ module.exports = {
         creep.heap.state = 'idle';
       }
 
-    } else if (intent === 'transfer' || intent === 'haul_deliver') {
+    } else if (intent === 'withdraw') {
+      if (creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+        creep.heap.state = 'idle';
+        return;
+      }
+
+      if (creep.pos.getRangeTo(target) > 1) {
+        creep.moveTo(target);
+      } else {
+        const result = creep.withdraw(target, RESOURCE_ENERGY);
+        if (result !== OK && result !== ERR_NOT_IN_RANGE) {
+          creep.heap.state = 'idle';
+        }
+      }
+
+      if (creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+        creep.heap.state = 'idle';
+      }
+
+    } else if (intent === 'transfer') {
       if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
         creep.heap.state = 'idle';
         return;
