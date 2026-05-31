@@ -32,6 +32,9 @@ module.exports.loop = function () {
       console.log(`Room ${roomName} - Sources: ${roomState.sources.length}, Spawns: ${roomState.spawns.length}`);
     }
 
+    // Run SpawnManager
+    SpawnManager.run(roomName);
+
     // Run TaskAssignmentManager
     TaskAssignmentManager.run(roomName);
   }
@@ -46,24 +49,7 @@ module.exports.loop = function () {
       creep.heap = { state: 'idle', targetId: null, actionIntent: null };
     }
 
-    if (creep.memory.role === 'harvester') {
-      roleHarvester.run(creep);
-    } else if (creep.memory.role === 'hauler') {
-      roleHauler.run(creep);
-    } else if (creep.memory.role === 'upgrader') {
-      roleUpgrader.run(creep);
-    }
-  }
-
-  for (const roomName in Game.rooms) {
-    // Run SpawnManager
-    SpawnManager.run(roomName);
-  }
-
-  for (const name in Game.creeps) {
-    const creep = Game.creeps[name];
     const role = creep.memory.role;
-
     if (role === 'harvester') {
       roleHarvester.run(creep);
     } else if (role === 'hauler') {
