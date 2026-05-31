@@ -3,14 +3,16 @@
  */
 
 const GlobalStateScanner = require('./state/GlobalStateScanner');
-const SpawnManager = require('./colonies/SpawnManager');
 const TaskAssignmentManager = require('./managers/TaskAssignmentManager');
+const SpawnManager = require('./colonies/SpawnManager');
 
 const roleHarvester = require('./roles/harvester');
 const roleHauler = require('./roles/hauler');
 const roleUpgrader = require('./roles/upgrader');
 
 module.exports.loop = function () {
+  global.tickCache = new Map();
+
   require('./constants');
 
   // Clean up dead creep memory
@@ -19,8 +21,6 @@ module.exports.loop = function () {
       delete Memory.creeps[name];
     }
   }
-
-  global.tickCache = new Map();
 
   // Build global state
   GlobalStateScanner.run();
@@ -32,11 +32,11 @@ module.exports.loop = function () {
       console.log(`Room ${roomName} - Sources: ${roomState.sources.length}, Spawns: ${roomState.spawns.length}`);
     }
 
-    // Run SpawnManager
-    SpawnManager.run(roomName);
-
     // Run TaskAssignmentManager
     TaskAssignmentManager.run(roomName);
+
+    // Run SpawnManager
+    SpawnManager.run(roomName);
   }
 
   // Execute Creep Roles
