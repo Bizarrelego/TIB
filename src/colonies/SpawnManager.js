@@ -38,12 +38,7 @@ function run(roomName) {
     upgrader: 2
   };
 
-  // Hardcoded bodies
-  const bodies = {
-    harvester: [WORK, WORK, MOVE], // 250
-    hauler: [CARRY, CARRY, MOVE, MOVE], // 200
-    upgrader: [WORK, CARRY, MOVE, MOVE] // 250
-  };
+  const bodies = require('../config/CreepBodies');
 
   // Check which role to spawn
   let roleToSpawn = null;
@@ -57,7 +52,7 @@ function run(roomName) {
   }
 
   if (roleToSpawn) {
-    const body = bodies[roleToSpawn];
+    const body = bodies.get(roleToSpawn);
     const newName = roleToSpawn + '_' + Game.time;
     spawn.spawnCreep(body, newName, {
       memory: { role: roleToSpawn, colony: roomName }
