@@ -4,6 +4,9 @@
  */
 
 function run(roomName) {
+  // Tick-slicing optimization: only run spawn logic every 10 ticks
+  if (Game.time % 10 !== 0) return;
+
   // Retrieve the room state
   if (!global.State || !global.State.rooms || !global.State.rooms.has(roomName)) return;
 
