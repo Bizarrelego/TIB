@@ -3,34 +3,39 @@ module.exports = {
     if (creep.spawning) return;
     if (creep.fatigue > 0) return;
 
-    if (!creep.heap || !creep.heap.targetId || !creep.heap.actionIntent) {
-      if (creep.heap) creep.heap.state = 'idle';
+    if (!creep.heap || !creep.heap.get('targetId') || !creep.heap.get('actionIntent')) {
+      if (creep.heap) creep.heap.set('state', 'idle');
       return;
     }
 
-    const target = Game.getObjectById(creep.heap.targetId);
+    const target = Game.getObjectById(creep.heap.get('targetId'));
     if (!target) {
-      creep.heap.state = 'idle';
+      creep.heap.set('state', 'idle');
       return;
     }
 
-    const intent = creep.heap.actionIntent;
+    // Process optional same-tick pickup task alongside main task
+    const pickupTargetId = creep.heap.get('pickupTargetId');
+    if (pickupTargetId) {
+      const drop = Game.getObjectById(pickupTargetId);
+      if (drop) {
+        creep.pickup(drop);
+      }
+    }
+
+    const intent = creep.heap.get('actionIntent');
     let result = OK;
 
-    if (intent === 'pickup') {
-      result = creep.pickup(target);
-    } else if (intent === 'upgradeController') {
+    if (intent === 'upgradeController') {
       result = creep.upgradeController(target);
-    } else {
-      creep.heap.state = 'idle';
-      return;
+    } else if (intent === 'pickup' && !pickupTargetId) {
+      result = creep.pickup(target);
     }
 
-    // Set idle if action completes or fails
     if (result !== OK) {
-      creep.heap.state = 'idle';
+      creep.heap.set('state', 'idle');
     } else {
-       creep.heap.state = 'idle';
+      creep.heap.set('state', 'idle');
     }
   }
 };
