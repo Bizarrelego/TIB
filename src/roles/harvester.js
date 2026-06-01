@@ -21,13 +21,23 @@ module.exports = {
 
     if (target.energy === 0) {
       creep.heap.sleepUntil = Game.time + target.ticksToRegeneration;
+      creep.heap.state = 'idle';
       return;
     }
 
-    if (creep.pos.getRangeTo(target) > 1) {
+    if (creep.heap.targetPos) {
+      if (creep.pos.roomName !== creep.heap.targetPos.roomName || creep.pos.x !== creep.heap.targetPos.x || creep.pos.y !== creep.heap.targetPos.y) {
+        creep.moveTo(new RoomPosition(creep.heap.targetPos.x, creep.heap.targetPos.y, creep.heap.targetPos.roomName));
+        return;
+      }
+    } else if (creep.pos.getRangeTo(target) > 1) {
       creep.moveTo(target);
-    } else {
-      creep.harvest(target);
+      return;
+    }
+
+    const result = creep.harvest(target);
+    if (result === ERR_NOT_ENOUGH_RESOURCES) {
+      creep.heap.state = 'idle';
     }
   }
 };
