@@ -3,24 +3,24 @@ module.exports = {
     if (creep.spawning) return;
     if (creep.fatigue > 0) return;
 
-    if (!creep.heap || !creep.heap.get('targetId')) {
-      if (!creep.heap) {
-         creep.heap = new Map([['state', 'idle'], ['targetId', null], ['actionIntent', null]]);
+    if (!creep.heap || !creep.heap.targetId) {
+      if (!creep.heap || typeof creep.heap !== 'object' || creep.heap instanceof Map) {
+         creep.heap = { state: 'idle', targetId: null, actionIntent: null };
       }
       return;
     }
 
-    if (creep.heap.has('sleepUntil') && Game.time < creep.heap.get('sleepUntil')) {
+    if (creep.heap.sleepUntil && Game.time < creep.heap.sleepUntil) {
       return;
     }
 
-    const target = Game.getObjectById(creep.heap.get('targetId'));
+    const target = Game.getObjectById(creep.heap.targetId);
     if (!target) {
       return;
     }
 
     if (target.energy === 0) {
-      creep.heap.set('sleepUntil', Game.time + target.ticksToRegeneration);
+      creep.heap.sleepUntil = Game.time + target.ticksToRegeneration;
       return;
     }
 

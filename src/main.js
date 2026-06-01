@@ -37,20 +37,9 @@ module.exports.loop = function () {
         // Fatigue check in roles, but skip spawning entirely here
         if (creep.spawning) continue;
 
-        // Ensure heap is safe mapping dict
-        if (!creep.heap) {
-            creep.heap = new Map([
-                ['state', 'idle'],
-                ['targetId', null],
-                ['actionIntent', null]
-            ]);
-        } else if (!(creep.heap instanceof Map)) {
-            const old = creep.heap;
-            creep.heap = new Map([
-                ['state', old.state || 'idle'],
-                ['targetId', old.targetId || null],
-                ['actionIntent', old.actionIntent || null]
-            ]);
+        // Revert to standard object per latest strict PR requirement
+        if (!creep.heap || creep.heap instanceof Map || typeof creep.heap !== 'object') {
+            creep.heap = { state: 'idle', targetId: null, actionIntent: null };
         }
 
         const role = creep.memory.role;

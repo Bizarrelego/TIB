@@ -22,25 +22,14 @@ function drawPath(roomName, path) {
 function debugCreep(creep) {
     if (!creep || !creep.room || !creep.heap) return;
 
-    let path = null;
-    if (creep.heap instanceof Map) {
-        path = creep.heap.get('path');
-    } else {
-        path = creep.heap.path;
-    }
-
+    let path = creep.heap.path;
     if (path) {
         drawPath(creep.room.name, path);
     }
 
-    let targetId = null;
-    if (creep.heap instanceof Map) {
-         targetId = creep.heap.get('targetId');
-    } else {
-         targetId = creep.heap.targetId;
-    }
-
+    let targetId = creep.heap.targetId;
     if (!targetId) return;
+
     const target = Game.getObjectById(targetId);
     if (!target) return;
 
