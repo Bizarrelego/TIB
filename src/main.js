@@ -1,5 +1,5 @@
 const TaskAssignmentManager = require('./managers/TaskAssignmentManager');
-const SpawnManager = require('./managers/SpawnManager');
+const SpawnManager = require('./colonies/SpawnManager');
 const GlobalStateScanner = require('./state/GlobalStateScanner');
 const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
 
@@ -19,23 +19,21 @@ module.exports.loop = function () {
 
     const stateObj = global.State || global.state;
 
-    // 4. Brain and Heart logic for each room
+    // 4. Heart and Brain logic for each room
     if (stateObj && stateObj.rooms) {
         for (const [roomName, roomState] of stateObj.rooms.entries()) {
-            // Task Assignment (The Brain)
-            TaskAssignmentManager.run(roomName);
-
             // Spawning (The Heart)
             SpawnManager.run(roomName);
+
+            // Task Assignment (The Brain)
+            TaskAssignmentManager.run(roomName);
         }
     }
 
     // 5. Execute Muscle (Creep Roles)
-    for (const name in Game.creeps) {
-        const creep = Game.creeps[name];
-
-        // Fatigue check in roles, but skip spawning entirely here
-        if (creep.spawning) continue;
+    Object.values(Game.creeps).forEach(creep => {
+        if (creep.spawning) return;
+        if (creep.fatigue > 0) return;
 
         // Revert to standard object per latest strict PR requirement
         if (!creep.heap || creep.heap instanceof Map || typeof creep.heap !== 'object') {
@@ -50,5 +48,5 @@ module.exports.loop = function () {
         } else if (role === 'upgrader') {
             upgraderRole.run(creep);
         }
-    }
+    });
 };
