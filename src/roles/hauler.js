@@ -3,7 +3,9 @@ module.exports = {
     if (creep.spawning) return;
     if (creep.fatigue > 0) return;
 
-    if (!creep.heap) creep.heap = { state: 'idle', targetId: null, actionIntent: null };
+    if (!creep.heap || creep.heap instanceof Map || typeof creep.heap !== 'object') {
+        creep.heap = { state: 'idle', targetId: null, actionIntent: null };
+    }
 
     if (!creep.heap.targetId) {
       creep.heap.state = 'idle';

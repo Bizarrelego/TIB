@@ -3,9 +3,8 @@ module.exports = {
     if (creep.spawning) return;
     if (creep.fatigue > 0) return;
 
-    if (!creep.heap || !creep.heap.targetId) {
-      if (!creep.heap) creep.heap = { state: 'idle', targetId: null, actionIntent: null };
-      creep.heap.state = 'idle';
+    if (!creep.heap || !creep.heap.targetId || !creep.heap.actionIntent) {
+      if (creep.heap) creep.heap.state = 'idle';
       return;
     }
 
@@ -15,10 +14,14 @@ module.exports = {
       return;
     }
 
-    if (creep.pos.getRangeTo(target) > 3) {
-      creep.moveTo(target, { range: 3 });
-    } else {
+    const intent = creep.heap.actionIntent;
+
+    if (intent === 'upgradeController') {
       creep.upgradeController(target);
+    } else if (intent === 'pickup') {
+      creep.pickup(target);
     }
+
+    creep.heap.state = 'idle';
   }
 };

@@ -5,6 +5,7 @@
 const { getOptimalHarvesterTarget } = require('../utils/HarvesterUtility');
 const { getHaulerDeliveryTarget } = require('../utils/HaulerUtility');
 const { getScavengingTarget } = require('../utils/ScavengingUtility');
+const { getUpgraderTask } = require('../tasks/UpgraderTaskProvider');
 
 function run(roomName) {
   // Use global.state exactly as instructed, fallback to global.State
@@ -20,8 +21,7 @@ function run(roomName) {
     const creep = creepsToIterate[name];
     if (creep.memory.colony !== roomName) continue;
 
-    // Safely initialize creep.heap
-    if (!creep.heap) {
+    if (!creep.heap || creep.heap instanceof Map || typeof creep.heap !== 'object') {
       creep.heap = { state: 'idle', targetId: null, actionIntent: null };
     }
 
@@ -54,10 +54,13 @@ function run(roomName) {
           }
         }
       } else if (role === 'upgrader') {
-        const controller = roomState.controller;
-        if (controller) {
-          creep.heap.targetId = controller.id;
-          creep.heap.actionIntent = 'upgradeController';
+        const task = getUpgraderTask(creep, stateObj);
+        if (task) {
+          creep.heap.targetId = task.targetId;
+          creep.heap.actionIntent = task.actionIntent;
+          if (task.pickupTargetId) {
+             creep.heap.pickupTargetId = task.pickupTargetId;
+          }
           creep.heap.state = 'assigned';
         }
       }
