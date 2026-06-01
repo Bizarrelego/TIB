@@ -31,11 +31,9 @@ module.exports.loop = function () {
     }
 
     // 5. Execute Muscle (Creep Roles)
-    for (const name in Game.creeps) {
-        const creep = Game.creeps[name];
-
-        if (creep.spawning) continue;
-        if (creep.fatigue > 0) continue;
+    Object.values(Game.creeps).forEach(creep => {
+        if (creep.spawning) return;
+        if (creep.fatigue > 0) return;
 
         // Revert to standard object per latest strict PR requirement
         if (!creep.heap || creep.heap instanceof Map || typeof creep.heap !== 'object') {
@@ -50,5 +48,5 @@ module.exports.loop = function () {
         } else if (role === 'upgrader') {
             upgraderRole.run(creep);
         }
-    }
+    });
 };
