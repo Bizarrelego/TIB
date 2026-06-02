@@ -20,14 +20,17 @@ class RoleExecutor {
                 continue;
             }
 
-            if (taskId === TaskAssignmentManager.TASKS.SCOUT) {
-                RoleExecutor.executeScoutTask(creep);
+            if (taskId === TaskAssignmentManager.TASKS.SCOUT || taskId === TaskAssignmentManager.TASKS.MOVE_ROOM) {
+                RoleExecutor.executeCrossRoomTask(creep);
                 continue;
             }
 
             const target = Game.getObjectById(targetId);
             if (!target) {
-                creep.memory.targetId = null;
+                // Ignore clearing if moving to a room and target isn't visible yet
+                if (creep.room.name === creep.memory.targetRoom) {
+                    creep.memory.targetId = null;
+                }
                 continue;
             }
 
@@ -80,7 +83,7 @@ class RoleExecutor {
         }
     }
 
-    static executeScoutTask(creep) {
+    static executeCrossRoomTask(creep) {
         const targetRoom = creep.memory.targetRoom;
         if (!targetRoom) {
             creep.memory.taskId = TaskAssignmentManager.TASKS.IDLE;
@@ -89,6 +92,9 @@ class RoleExecutor {
 
         if (creep.room.name !== targetRoom) {
             creep.moveTo(new RoomPosition(25, 25, targetRoom), { visualizePathStyle: { stroke: '#00ff00' } });
+        } else {
+             // Reached target room, TaskAssignmentManager will assign local target next tick.
+             creep.memory.taskId = TaskAssignmentManager.TASKS.IDLE;
         }
     }
 }
