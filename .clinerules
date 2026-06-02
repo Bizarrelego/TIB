@@ -1,0 +1,16 @@
+# SCREEPS DEVELOPMENT RULES
+You are writing JavaScript for the game Screeps. Code must be heavily optimized for CPU usage and follow a strict top-down architecture.
+
+## ARCHITECTURE (TIGGA STYLE)
+- **Top-Down Control:** Creeps do not make decisions. Global managers dictate Room logic. Room managers assign tasks to Creeps. Creeps only execute their assigned task state.
+- **CPU Optimization:** Never put pathfinding (`moveTo`) inside a `for` loop. Cache paths in memory. Use `canExecute()` checks to prevent action conflicts in the same tick.
+- **Memory Management:** Keep `Memory` footprint small to reduce parsing time. Only store essential IDs and compressed state data.
+
+## AGGRESSION & COMBAT
+- **Swarm Guarding & Quarantining:** When attacking, logic should support quarantining an enemy room by placing persistent guards on all neighboring exits to starve them during safe mode.
+- **Combat Micro:** Combat creeps must use kiting logic (move away from melee while firing ranged). 
+- **Expansion:** Code must support automated room claiming and pre-emptive spawning when a target room is identified.
+
+## SYNTAX CONSTRAINTS
+- Use ES6 module syntax or standard CommonJS (`module.exports`) consistently.
+- Do not hallucinate Screeps API functions. If unsure of a Game object property, ask the user to provide the documentation.
