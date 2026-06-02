@@ -7,7 +7,7 @@ class CreepActionUtility {
             roleModule.run(creep);
         } catch (e) {
             // Role module not found or failed, fall back to legacy task execution
-            const taskId = creep.memory.taskId;
+            const taskId = creep.heap && creep.heap.taskId ? creep.heap.taskId : creep.memory.taskId;
             if (!taskId || taskId === TaskAssignmentManager.TASKS.IDLE) {
                 return;
             }
@@ -17,11 +17,13 @@ class CreepActionUtility {
                 return;
             }
 
-            const targetId = creep.memory.targetId;
+            const targetId = creep.heap && creep.heap.targetId ? creep.heap.targetId : creep.memory.targetId;
             const target = Game.getObjectById(targetId);
 
             if (!target) {
-                if (creep.room.name === creep.memory.targetRoom) {
+                const targetRoom = creep.heap && creep.heap.targetRoom ? creep.heap.targetRoom : creep.memory.targetRoom;
+                if (creep.room.name === targetRoom) {
+                    if (creep.heap) creep.heap.targetId = null;
                     creep.memory.targetId = null;
                 }
                 return;
@@ -72,13 +74,15 @@ class CreepActionUtility {
             result === ERR_FULL ||
             result === ERR_INVALID_TARGET
         ) {
+            if (creep.heap) creep.heap.targetId = null;
             creep.memory.targetId = null;
         }
     }
 
     static executeCrossRoomTask(creep) {
-        const targetRoom = creep.memory.targetRoom;
+        const targetRoom = creep.heap && creep.heap.targetRoom ? creep.heap.targetRoom : creep.memory.targetRoom;
         if (!targetRoom) {
+            if (creep.heap) creep.heap.taskId = TaskAssignmentManager.TASKS.IDLE;
             creep.memory.taskId = TaskAssignmentManager.TASKS.IDLE;
             return;
         }
@@ -86,6 +90,7 @@ class CreepActionUtility {
         if (creep.room.name !== targetRoom) {
             creep.moveTo(new RoomPosition(25, 25, targetRoom), { range: 22, visualizePathStyle: { stroke: '#00ff00' } });
         } else {
+             if (creep.heap) creep.heap.taskId = TaskAssignmentManager.TASKS.IDLE;
              creep.memory.taskId = TaskAssignmentManager.TASKS.IDLE;
         }
     }
