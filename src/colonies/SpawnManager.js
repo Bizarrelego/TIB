@@ -1,19 +1,9 @@
 /**
  * Top-Down, V8-Optimized Spawn Manager
- * Aggressive RCL1 Bootstrapping
+ * Aggressive RCL1/RCL2 Bootstrapping
  */
 
-// V8 Optimization: Constant references avoid array allocation overhead during tick execution.
-const RCL1_BODIES = {
-    harvester: [WORK, WORK, CARRY, MOVE], // 300 energy
-    hauler: [CARRY, CARRY, CARRY, MOVE, MOVE, MOVE], // 300 energy
-    upgrader: [WORK, CARRY, CARRY, MOVE, MOVE], // 300 energy
-    scout: [MOVE] // 50 energy
-};
-
 // V8 Optimization: Monomorphic object shape.
-// By defining all properties a creep might ever use at spawn time,
-// V8 assigns them a single hidden class. DO NOT add properties later via creep.memory.newProp = X.
 const createMemoryTemplate = (role, roomName) => ({
     role: role,
     room: roomName,
@@ -30,69 +20,115 @@ class SpawnManager {
      * @param {Room|string} roomOrName
      */
     static run(roomOrName) {
-        // Fix: Normalize input so it handles both string names and Room objects.
+        // Normalize input so it handles both string names and Room objects from _.forEach
         const roomObj = typeof roomOrName === 'string' ? Game.rooms[roomOrName] : roomOrName;
         if (!roomObj) return;
 
         const roomState = global.State?.rooms?.get(roomObj.name);
         
-        // Retrieve spawns from heap cache map. Avoid roomObj.find to save CPU.
         const spawns = roomState?.spawns || roomObj.find(FIND_MY_SPAWNS);
         if (!spawns || spawns.length === 0) return;
 
         const spawn = spawns[0];
-        
-        // Early exit: Do not run logic if spawn is busy.
         if (spawn.spawning !== null) return;
 
         const energyAvailable = roomObj.energyAvailable;
+        const energyCapacity = roomObj.energyCapacityAvailable;
         
-        // Aggressive RCL1 cutoff: Do not calculate dynamically. Wait for exactly 300.
-        if (energyAvailable < 300) return;
+        // Wait for max capacity (300 at RCL1, 550 at RCL2) to spawn optimal creeps
+        if (energyAvailable < Math.min(energyCapacity, 550)) return;
 
-        // Heap-based role counting. 
-        // DO NOT use Game.creeps.filter() - it creates new arrays and triggers GC.
         const creepCounts = roomState?.creepCounts || SpawnManager.fallbackScanner(roomObj);
 
-        // Top-down aggressive priority logic. No stored queue in Memory.
-        // 1. Harvesters: Dedicated miners. 1 per source. Assume 2 sources.
+        // 1. Harvesters
         if ((creepCounts.harvester || 0) < 2) {
-            SpawnManager.executeSpawn(spawn, 'harvester', roomObj.name);
+            SpawnManager.executeSpawn(spawn, 'harvester', roomObj.name, energyCapacity);
             return;
         }
 
-        // 2. Haulers: Move dropped energy to spawn.
+        // 2. Haulers
         if ((creepCounts.hauler || 0) < 3) {
-            SpawnManager.executeSpawn(spawn, 'hauler', roomObj.name);
+            SpawnManager.executeSpawn(spawn, 'hauler', roomObj.name, energyCapacity);
             return;
         }
 
-        // 3. Upgraders: Burn energy into the controller.
+        // 3. Builders (Only if sites exist)
+        if (roomState && roomState.constructionSites && roomState.constructionSites.length > 0) {
+            if ((creepCounts.builder || 0) < 2) {
+                SpawnManager.executeSpawn(spawn, 'builder', roomObj.name, energyCapacity);
+                return;
+            }
+        }
+
+        // 4. Upgraders
         if ((creepCounts.upgrader || 0) < 4) {
-            SpawnManager.executeSpawn(spawn, 'upgrader', roomObj.name);
+            SpawnManager.executeSpawn(spawn, 'upgrader', roomObj.name, energyCapacity);
             return;
         }
 
-        // 4. Scouts: Expand vision network if IntelManager queues targets.
-        // Limit to 1 scout globally for now to prevent over-spawning.
+        // 5. Scouts
         if (global.State.scoutQueue && global.State.scoutQueue.length > 0) {
             const scoutCount = global.State?.creepCounts?.scout || SpawnManager.fallbackScanner(roomObj).scout || 0;
             if (scoutCount < 1) {
-                SpawnManager.executeSpawn(spawn, 'scout', roomObj.name);
+                SpawnManager.executeSpawn(spawn, 'scout', roomObj.name, energyCapacity);
                 return;
             }
         }
     }
 
     /**
-     * Fallback only. Your GlobalStateScanner MUST handle this counting.
-     * @param {Room} roomObj
+     * Handles the actual spawning execution and heap updates.
+     * @param {StructureSpawn} spawn
+     * @param {string} role
+     * @param {string} roomName
+     * @param {number} energyCapacity
      */
+    static executeSpawn(spawn, role, roomName, energyCapacity) {
+        const body = SpawnManager.getBody(role, energyCapacity);
+        const name = role + '_' + Game.time;
+        const memory = createMemoryTemplate(role, roomName);
+
+        const result = spawn.spawnCreep(body, name, { memory });
+
+        if (result === OK) {
+            const roomState = global.State?.rooms?.get(roomName);
+            if (roomState) {
+                if (!roomState.creepCounts) {
+                    roomState.creepCounts = { harvester: 0, hauler: 0, upgrader: 0, builder: 0, scout: 0 };
+                }
+                roomState.creepCounts[role] = (roomState.creepCounts[role] || 0) + 1;
+            }
+        }
+    }
+
+    /**
+     * Dynamically generates the largest body possible for the current RCL.
+     */
+    static getBody(role, energyCapacity) {
+        if (role === 'scout') return [MOVE];
+
+        if (energyCapacity >= 550) { // RCL 2
+            switch (role) {
+                case 'harvester': return [WORK, WORK, WORK, CARRY, MOVE, MOVE];
+                case 'hauler': return [CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE];
+                case 'builder':
+                case 'upgrader': return [WORK, WORK, CARRY, CARRY, MOVE, MOVE, MOVE];
+            }
+        }
+
+        // RCL 1 Default (300 Energy)
+        switch (role) {
+            case 'harvester': return [WORK, WORK, CARRY, MOVE];
+            case 'hauler': return [CARRY, CARRY, CARRY, MOVE, MOVE, MOVE];
+            case 'builder':
+            case 'upgrader': return [WORK, CARRY, CARRY, MOVE, MOVE];
+        }
+    }
+
     static fallbackScanner(roomObj) {
-        const counts = { harvester: 0, hauler: 0, upgrader: 0, scout: 0 };
+        const counts = { harvester: 0, hauler: 0, upgrader: 0, builder: 0, scout: 0 };
         const creeps = roomObj.find(FIND_MY_CREEPS);
         
-        // Tight loop, no higher-order functions.
         for (let i = 0; i < creeps.length; i++) {
             const role = creeps[i].memory.role;
             if (counts[role] !== undefined) {
