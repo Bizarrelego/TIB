@@ -1,7 +1,7 @@
 node_modules
 /dist
 /scripts
+/scripts
 scripts/deploy-local.js
 /server
 oc.js
-docs
