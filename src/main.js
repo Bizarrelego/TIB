@@ -13,6 +13,7 @@ const RoleExecutor = require('./managers/RoleExecutor');
 
 // Utilities
 const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
+const ProfilerUtility = require('./utilities/ProfilerUtility');
 
 module.exports.loop = function () {
     // 1. Memory Cleanup
@@ -49,4 +50,7 @@ module.exports.loop = function () {
 
     // 7. Intent Execution
     RoleExecutor.run();
+
+    // 8. Profiler Reporting
+    ProfilerUtility.report();
 };
