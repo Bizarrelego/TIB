@@ -205,9 +205,12 @@ class TaskAssignmentManager {
             const adj = exitRooms[i];
             const mem = Memory.rooms[adj];
             
-            // Requires intel. Avoid owned rooms. Scavenge if > 100 energy dropped.
+            // Ensure no hostiles exist before sending civilian creeps
             if (mem && mem.droppedEnergy > 100 && (!mem.controller.owner || mem.controller.owner === 'None')) {
-                return adj;
+                const isSafe = mem.hostiles.creeps === 0 && mem.hostiles.towers === 0 && !mem.hostiles.invaderCore;
+                if (isSafe) {
+                    return adj;
+                }
             }
         }
         return null;

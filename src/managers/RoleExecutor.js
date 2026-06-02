@@ -91,7 +91,9 @@ class RoleExecutor {
         }
 
         if (creep.room.name !== targetRoom) {
-            creep.moveTo(new RoomPosition(25, 25, targetRoom), { visualizePathStyle: { stroke: '#00ff00' } });
+            // Range 22 ensures the creep moves just past the room exit.
+            // Targeting exact 25, 25 will fail if the center tile is a wall.
+            creep.moveTo(new RoomPosition(25, 25, targetRoom), { range: 22, visualizePathStyle: { stroke: '#00ff00' } });
         } else {
              // Reached target room, TaskAssignmentManager will assign local target next tick.
              creep.memory.taskId = TaskAssignmentManager.TASKS.IDLE;
