@@ -68,8 +68,9 @@ class SpawnManager {
 
         // 5. Scouts
         if (global.State.scoutQueue && global.State.scoutQueue.length > 0) {
-            const scoutCount = global.State?.creepCounts?.scout || SpawnManager.fallbackScanner(roomObj).scout || 0;
-            if (scoutCount < 1) {
+            // FIX: Look at roomState, not global.State, to prevent infinite spawning when scouts leave the room.
+            const scoutCount = roomState?.creepCounts?.scout || SpawnManager.fallbackScanner(roomObj).scout || 0;
+            if (scoutCount < 1) { // 1 scout per colony is perfectly optimal for maintaining intel.
                 SpawnManager.executeSpawn(spawn, 'scout', roomObj.name, energyCapacity);
                 return;
             }

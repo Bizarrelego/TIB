@@ -13,7 +13,7 @@ const TASKS = {
     BUILD: 6,
     DROP: 7,
     SCOUT: 8,
-    MOVE_ROOM: 9 // New Task for Remote Routing
+    MOVE_ROOM: 9
 };
 
 const STATES = {
@@ -58,12 +58,14 @@ class TaskAssignmentManager {
         
         let state = creep.memory.state;
 
+        // Standard Capacity Transitions
         if (state === STATES.GATHER && free === 0) {
             state = STATES.WORK;
         } else if (state === STATES.WORK && used === 0) {
             state = STATES.GATHER;
         }
 
+        // Harvester Override: Ferry energy manually if no haulers exist.
         if (role === 'harvester') {
             const haulers = roomState.creepCounts?.hauler || 0;
             if (haulers > 0) {
@@ -71,12 +73,21 @@ class TaskAssignmentManager {
             }
         }
 
-        if (role === 'hauler' && state === STATES.GATHER && used > 0) {
+        // Gather Override: If partially full and local floor is clean, go work.
+        // This prevents upgraders/builders/haulers from stalling when they grab a small pile.
+        if ((role === 'hauler' || role === 'upgrader' || role === 'builder') && state === STATES.GATHER && used > 0) {
             const dropped = roomState.droppedEnergy?.length || 0;
             const ruins = roomState.ruins?.length || 0;
-            // Prevent dropping gather state if we are remote scavenging
+            
+            // Only force work if the home room is completely devoid of energy sources
             if (dropped === 0 && ruins === 0 && creep.room.name === creep.memory.room) {
-                state = STATES.WORK; 
+                // If the spawn has energy, upgraders/builders should still try to withdraw from it.
+                // Do not force WORK state if spawn has energy.
+                const spawnEnergy = (roomState.spawns && roomState.spawns.length > 0) ? roomState.spawns[0].store.getUsedCapacity(RESOURCE_ENERGY) : 0;
+                
+                if (spawnEnergy < 100 || role === 'hauler') {
+                    state = STATES.WORK; 
+                }
             }
         }
 
@@ -84,7 +95,6 @@ class TaskAssignmentManager {
             creep.memory.state = state;
             creep.memory.targetId = null;
             creep.memory.taskId = TASKS.IDLE;
-            // Reset target room to home room when state flips
             if (role !== 'scout') {
                  creep.memory.targetRoom = creep.memory.room;
             }
@@ -94,7 +104,6 @@ class TaskAssignmentManager {
     static validateCurrentTask(creep) {
         if (!creep.memory.targetId) return;
 
-        // Skip validation if the target is in another room and we aren't there yet
         const target = Game.getObjectById(creep.memory.targetId);
         if (!target && creep.room.name === creep.memory.targetRoom) {
             creep.memory.targetId = null;
@@ -148,7 +157,6 @@ class TaskAssignmentManager {
 
     static assignHauler(creep, roomState) {
         if (creep.memory.state === STATES.GATHER) {
-            // Priority 1: Check Local Drops
             const bestDrop = TaskAssignmentManager.getLargestDrop(roomState.droppedEnergy);
             if (bestDrop) {
                 creep.memory.targetId = bestDrop.id;
@@ -165,8 +173,6 @@ class TaskAssignmentManager {
                 return;
             }
 
-            // Priority 2: Remote Scavenging
-            // If home room is clean, check Intel for adjacent rooms with drops
             if (creep.room.name === creep.memory.room) {
                  const remoteTarget = TaskAssignmentManager.findRemoteScavengeTarget(creep.memory.room);
                  if (remoteTarget) {
@@ -176,7 +182,6 @@ class TaskAssignmentManager {
                  }
             }
         } else {
-            // Delivering: Must happen in home room.
             if (creep.room.name !== creep.memory.room) {
                  creep.memory.targetRoom = creep.memory.room;
                  creep.memory.taskId = TASKS.MOVE_ROOM;
@@ -192,10 +197,6 @@ class TaskAssignmentManager {
         }
     }
 
-    /**
-     * Checks Memory for adjacent rooms with energy and no hostiles.
-     * @param {string} homeRoom 
-     */
     static findRemoteScavengeTarget(homeRoom) {
         const exits = Game.map.describeExits(homeRoom);
         if (!exits) return null;
@@ -205,7 +206,6 @@ class TaskAssignmentManager {
             const adj = exitRooms[i];
             const mem = Memory.rooms[adj];
             
-            // Ensure no hostiles exist before sending civilian creeps
             if (mem && mem.droppedEnergy > 100 && (!mem.controller.owner || mem.controller.owner === 'None')) {
                 const isSafe = mem.hostiles.creeps === 0 && mem.hostiles.towers === 0 && !mem.hostiles.invaderCore;
                 if (isSafe) {

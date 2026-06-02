@@ -112,7 +112,8 @@ class RoleExecutor {
         } else {
             // Check if creep is stuck on the room transition border
             if (creep.pos.x === 0 || creep.pos.x === 49 || creep.pos.y === 0 || creep.pos.y === 49) {
-                creep.moveTo(new RoomPosition(25, 25, creep.room.name), { reusePath: 10 });
+                // IMPROVEMENT: ignoreCreeps bypasses traffic jams at exits, forcing the creep to step off the border.
+                creep.moveTo(new RoomPosition(25, 25, creep.room.name), { reusePath: 10, ignoreCreeps: true });
             } else {
                 // Safely inside the room. Clear task so TaskAssignmentManager can assign a new one.
                 creep.memory.taskId = TaskAssignmentManager.TASKS.IDLE;
