@@ -1,10 +1,9 @@
 /**
  * Module responsible for building the global state object by scanning rooms.
- * Optimized for RCL 1-8 via Single-Pass Binning and V8 Monomorphism.
+ * Optimized for RCL 1-8 via Single-Pass Binning, V8 Monomorphism, and Object Reuse.
  * @module GlobalStateScanner
  */
 
-// V8 Optimization: Statically define the exact shape of a room's state.
 const createRoomStateTemplate = () => ({
     controller: null,
     storage: null,
@@ -19,13 +18,13 @@ const createRoomStateTemplate = () => ({
     links: [],
     labs: [],
     containers: [],
+    sourceContainers: [], 
+    controllerContainers: [], 
     droppedEnergy: [],
     ruins: [],
     tombstones: [],
     constructionSites: [],
     hostiles: [],
-    // CRITICAL FIX: You MUST include all active roles here or the scanner will ignore them,
-    // causing SpawnManager to infinitely spawn them.
     creepCounts: {
         harvester: 0,
         hauler: 0,
@@ -39,18 +38,39 @@ const createRoomStateTemplate = () => ({
 });
 
 function run() {
-    if (!global.State) {
-        global.State = { rooms: new Map() };
-    }
-
-    if (!global.State.rooms || !(global.State.rooms instanceof Map)) {
-        global.State.rooms = new Map();
-    }
+    if (!global.State) global.State = { rooms: new Map() };
 
     for (const roomName in Game.rooms) {
         const room = Game.rooms[roomName];
-        const state = createRoomStateTemplate();
         
+        // V8 GC Optimization: Reuse state objects to avoid thrashing
+        let state = global.State.rooms.get(roomName);
+        if (!state) {
+            state = createRoomStateTemplate();
+            global.State.rooms.set(roomName, state);
+        }
+
+        // Reset arrays and counts
+        state.spawns = [];
+        state.extensions = [];
+        state.towers = [];
+        state.links = [];
+        state.labs = [];
+        state.containers = [];
+        state.sourceContainers = [];
+        state.controllerContainers = [];
+        state.droppedEnergy = [];
+        state.ruins = [];
+        state.tombstones = [];
+        state.storage = null;
+        state.terminal = null;
+        state.factory = null;
+        state.extractor = null;
+
+        for (const role in state.creepCounts) {
+            state.creepCounts[role] = 0;
+        }
+
         state.controller = room.controller;
         state.mineral = room.find(FIND_MINERALS)[0] || null;
         state.sources = room.find(FIND_SOURCES);
@@ -74,6 +94,16 @@ function run() {
             }
         }
 
+        // Centralize container categorization to prevent TaskAssignmentManager from using room.find()
+        for (let i = 0; i < state.containers.length; i++) {
+            const c = state.containers[i];
+            if (state.controller && c.pos.inRangeTo(state.controller, 3)) {
+                state.controllerContainers.push(c);
+            } else if (state.sources.some(s => s.pos.inRangeTo(c, 2))) {
+                state.sourceContainers.push(c);
+            }
+        }
+
         const drops = room.find(FIND_DROPPED_RESOURCES);
         for (let i = 0; i < drops.length; i++) {
             if (drops[i].resourceType === RESOURCE_ENERGY) {
@@ -94,8 +124,6 @@ function run() {
                 state.tombstones.push(tombstones[i]);
             }
         }
-
-        global.State.rooms.set(roomName, state);
     }
 
     const creepNames = Object.keys(Game.creeps);

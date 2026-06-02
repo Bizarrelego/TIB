@@ -1,110 +1,144 @@
-/**
- * Top-Down, V8-Optimized Spawn Manager
- * Hardcoded Census Framework for RCL 1-2 Bootstrapping
- */
-
-const createMemoryTemplate = (role, roomName) => ({
-    role: role,
-    room: roomName
-});
+// IMPROVEMENT: Replaces hardcoded limits with dynamic source/site calculations.
+// IMPROVEMENT: Introduces strict Emergency Recovery to prevent colony death spirals.
+// IMPROVEMENT: Optimizes body generation to balance WORK/MOVE fatigue ratios.
 
 class SpawnManager {
     static run(roomOrName) {
-        const roomObj = typeof roomOrName === 'string' ? Game.rooms[roomOrName] : roomOrName;
-        if (!roomObj) return;
+        const room = typeof roomOrName === 'string' ? Game.rooms[roomOrName] : roomOrName;
+        if (!room) return;
 
-        const roomState = global.State?.rooms?.get(roomObj.name);
-        
-        const spawns = roomState?.spawns || roomObj.find(FIND_MY_SPAWNS);
-        if (!spawns || spawns.length === 0) return;
-
-        const spawn = spawns[0];
-        if (spawn.spawning !== null) return;
-
-        const creepCounts = roomState?.creepCounts || SpawnManager.fallbackScanner(roomObj);
-        
-        // CENSUS CONSTANTS
-        const LIMIT_HARVESTERS = 4;
-        const LIMIT_HAULERS = 5;
-        const LIMIT_UPGRADERS = 3;
-        const LIMIT_BUILDERS = 5;
-
-        const isEmergency = (creepCounts.harvester || 0) === 0 || (creepCounts.hauler || 0) === 0;
-        const energyAvailable = roomObj.energyAvailable;
-        const energyCapacity = roomObj.energyCapacityAvailable;
-        
-        const spawnEnergy = isEmergency ? Math.max(300, energyAvailable) : energyCapacity;
-        
-        if (energyAvailable < spawnEnergy) return;
-
-        if ((creepCounts.harvester || 0) < LIMIT_HARVESTERS) {
-            SpawnManager.executeSpawn(spawn, 'harvester', roomObj.name, spawnEnergy);
-            return;
-        }
-
-        if ((creepCounts.hauler || 0) < LIMIT_HAULERS) {
-            SpawnManager.executeSpawn(spawn, 'hauler', roomObj.name, spawnEnergy);
-            return;
-        }
-
-        if ((creepCounts.upgrader || 0) < LIMIT_UPGRADERS) {
-            SpawnManager.executeSpawn(spawn, 'upgrader', roomObj.name, spawnEnergy);
-            return;
-        }
-
-        if (roomState && roomState.constructionSites && roomState.constructionSites.length > 0) {
-            if ((creepCounts.builder || 0) < LIMIT_BUILDERS) {
-                SpawnManager.executeSpawn(spawn, 'builder', roomObj.name, spawnEnergy);
-                return;
+        // O(1) filter for available spawns
+        const spawns = room.find(FIND_MY_SPAWNS);
+        let availableSpawn = null;
+        for (let i = 0; i < spawns.length; i++) {
+            if (!spawns[i].spawning) {
+                availableSpawn = spawns[i];
+                break;
             }
+        }
+        if (!availableSpawn) return;
+
+        // Use GlobalStateScanner cache if available, else O(N) fallback
+        let creeps = [];
+        if (global.Tick && global.Tick.creepsByRoom && global.Tick.creepsByRoom[room.name]) {
+            creeps = global.Tick.creepsByRoom[room.name];
+        } else {
+            creeps = room.find(FIND_MY_CREEPS);
+        }
+
+        const counts = this.getCensus(creeps);
+        const needs = this.calculateNeeds(room);
+
+        const energyAvailable = room.energyAvailable;
+        const energyCapacity = room.energyCapacityAvailable;
+
+        // 1. EMERGENCY RECOVERY: Bypass capacity checks to save a dying colony
+        if (counts.harvester === 0) {
+            if (energyAvailable >= 200) this.executeSpawn(availableSpawn, 'harvester', room.name, energyAvailable);
+            return;
+        }
+        if (counts.hauler === 0) {
+            if (energyAvailable >= 100) this.executeSpawn(availableSpawn, 'hauler', room.name, energyAvailable);
+            return;
+        }
+
+        // 2. STANDARD SPAWNING: Wait for full energy capacity to spawn maximum size creeps
+        if (energyAvailable < energyCapacity) return;
+
+        if (counts.harvester < needs.harvester) {
+            this.executeSpawn(availableSpawn, 'harvester', room.name, energyCapacity);
+            return;
+        }
+        if (counts.hauler < needs.hauler) {
+            this.executeSpawn(availableSpawn, 'hauler', room.name, energyCapacity);
+            return;
+        }
+        if (counts.upgrader < needs.upgrader) {
+            this.executeSpawn(availableSpawn, 'upgrader', room.name, energyCapacity);
+            return;
+        }
+        if (counts.builder < needs.builder) {
+            this.executeSpawn(availableSpawn, 'builder', room.name, energyCapacity);
+            return;
         }
     }
 
+    static getCensus(creeps) {
+        const counts = { harvester: 0, hauler: 0, upgrader: 0, builder: 0 };
+        for (let i = 0; i < creeps.length; i++) {
+            const role = creeps[i].memory.role;
+            if (counts[role] !== undefined) counts[role]++;
+        }
+        return counts;
+    }
+
+    static calculateNeeds(room) {
+        const sourceCount = room.find(FIND_SOURCES).length;
+        const sitesCount = room.find(FIND_MY_CONSTRUCTION_SITES).length;
+        const rcl = room.controller.level;
+
+        // Scale down worker counts as creep sizes increase with RCL
+        const harvesterMultiplier = rcl < 3 ? 2 : 1; 
+        const haulerMultiplier = rcl < 4 ? 2 : 1;
+
+        return {
+            harvester: sourceCount * harvesterMultiplier,
+            hauler: sourceCount * haulerMultiplier,
+            upgrader: rcl === 8 ? 1 : 2, // Hard cap at RCL 8 to save CPU/Energy
+            builder: sitesCount > 0 ? (sitesCount > 10 ? 3 : 2) : 0
+        };
+    }
+
     static executeSpawn(spawn, role, roomName, energy) {
-        const body = SpawnManager.getBody(role, energy);
+        const body = this.getBody(role, energy);
         if (body.length === 0) return; 
 
         const name = role + '_' + Game.time;
-        const memory = createMemoryTemplate(role, roomName);
-
-        const result = spawn.spawnCreep(body, name, { memory });
+        
+        // Inline memory allocation to avoid external function call overhead
+        const result = spawn.spawnCreep(body, name, { 
+            memory: { role: role, room: roomName } 
+        });
 
         if (result === OK) {
-            const roomState = global.State?.rooms?.get(roomName);
-            if (roomState) {
-                if (!roomState.creepCounts) {
-                    roomState.creepCounts = { harvester: 0, hauler: 0, upgrader: 0, builder: 0, scout: 0 };
-                }
-                roomState.creepCounts[role] = (roomState.creepCounts[role] || 0) + 1;
+            // Optimistically update V8 Heap tick cache to prevent duplicate spawning in the same tick
+            if (global.Tick && global.Tick.creepsByRoom && global.Tick.creepsByRoom[roomName]) {
+                global.Tick.creepsByRoom[roomName].push({ memory: { role: role } });
             }
         }
     }
 
     static getBody(role, energy) {
-        let body = [];
+        const body = [];
         let cost = 0;
 
         if (role === 'harvester') {
-            body = [WORK, CARRY, MOVE];
+            body.push(WORK, CARRY, MOVE);
             cost = 200;
             let workParts = 1;
             
+            // Max out at 5 WORK parts (source fully drained in 300 ticks)
             while (cost + 100 <= energy && workParts < 5) {
                 body.unshift(WORK);
                 cost += 100;
                 workParts++;
             }
-            if (cost + 50 <= energy) {
+            
+            // Calculate required MOVE parts to not be completely paralyzed
+            let moveNeeded = Math.ceil((workParts + 1) / 2) - 1; 
+            while (cost + 50 <= energy && moveNeeded > 0) {
                 body.push(MOVE);
                 cost += 50;
+                moveNeeded--;
             }
             return body;
         }
 
         if (role === 'hauler') {
-            body = [CARRY, MOVE];
+            body.push(CARRY, MOVE);
             cost = 100;
-            while (cost + 150 <= energy && body.length < 30) {
+            // 2 CARRY : 1 MOVE ratio is optimal for roads
+            while (cost + 150 <= energy && body.length < 48) {
                 body.unshift(CARRY, CARRY);
                 body.push(MOVE);
                 cost += 150;
@@ -113,9 +147,10 @@ class SpawnManager {
         }
 
         if (role === 'builder' || role === 'upgrader') {
-            body = [WORK, CARRY, MOVE];
+            body.push(WORK, CARRY, MOVE);
             cost = 200;
-            while (cost + 200 <= energy && body.length < 30) {
+            // 1 WORK : 1 CARRY : 1 MOVE ratio
+            while (cost + 200 <= energy && body.length < 48) {
                 body.unshift(WORK, CARRY);
                 body.push(MOVE);
                 cost += 200;
@@ -125,19 +160,5 @@ class SpawnManager {
 
         return [WORK, CARRY, MOVE];
     }
-
-    static fallbackScanner(roomObj) {
-        const counts = { harvester: 0, hauler: 0, upgrader: 0, builder: 0, scout: 0 };
-        const creeps = roomObj.find(FIND_MY_CREEPS);
-        
-        for (let i = 0; i < creeps.length; i++) {
-            const role = creeps[i].memory.role;
-            if (counts[role] !== undefined) {
-                counts[role]++;
-            }
-        }
-        return counts;
-    }
 }
-
 module.exports = SpawnManager;

@@ -1,139 +1,195 @@
-/**
- * Room Planner Manager
- * Handles automated construction site placement based on RCL progression.
- */
+// IMPROVEMENT: Replaces CPU-heavy lookAt loops with one-time CostMatrix Distance Transforms.
+// IMPROVEMENT: Caches the entire room blueprint to eliminate tick-by-tick planning CPU overhead.
+// IMPROVEMENT: Uses a bounding flood-fill to dynamically generate rampart chokepoints.
 
 class RoomPlanner {
     static run() {
+        if (!global.Cache) global.Cache = { blueprints: {} };
+        if (!global.Cache.blueprints) global.Cache.blueprints = {};
+
         const visibleRooms = Object.keys(Game.rooms);
         for (let i = 0; i < visibleRooms.length; i++) {
             const room = Game.rooms[visibleRooms[i]];
             if (room.controller && room.controller.my) {
-                RoomPlanner.planRoom(room);
+                this.manageRoom(room);
             }
         }
     }
 
-    static planRoom(room) {
-        const rcl = room.controller.level;
-        
-        // 1. Plan source containers regardless of RCL
-        RoomPlanner.planSourceContainers(room);
-
-        if (rcl < 2) return;
-
-        const spawns = room.find(FIND_MY_SPAWNS);
-        if (spawns.length === 0) return;
-        const anchor = spawns[0].pos;
-
-        // 2. Plan Extensions
-        const maxExtensions = CONTROLLER_STRUCTURES[STRUCTURE_EXTENSION][rcl];
-        RoomPlanner.planExtensions(room, anchor, maxExtensions);
-
-        // 3. Plan Towers
-        if (rcl >= 3) {
-            const maxTowers = CONTROLLER_STRUCTURES[STRUCTURE_TOWER][rcl];
-            RoomPlanner.planTowers(room, anchor, maxTowers);
+    static manageRoom(room) {
+        // 1. Generate Blueprint if it doesn't exist
+        if (!global.Cache.blueprints[room.name]) {
+            this.generateTerrainBlueprint(room);
         }
+
+        // 2. Throttle construction to save CPU and global site limits
+        if (Game.time % 13 !== 0) return; 
+        if (Object.keys(Game.constructionSites).length > 50) return;
+
+        // 3. Execute Blueprint based on current RCL
+        this.executeBlueprint(room);
     }
 
-    static planSourceContainers(room) {
-        const sources = room.find(FIND_SOURCES);
-        
-        for (let i = 0; i < sources.length; i++) {
-            const source = sources[i];
-            
-            const containers = source.pos.findInRange(FIND_STRUCTURES, 1, { filter: s => s.structureType === STRUCTURE_CONTAINER });
-            const sites = source.pos.findInRange(FIND_CONSTRUCTION_SITES, 1, { filter: s => s.structureType === STRUCTURE_CONTAINER });
-            
-            if (containers.length > 0 || sites.length > 0) continue;
+    static generateTerrainBlueprint(room) {
+        const terrain = Game.map.getRoomTerrain(room.name);
+        const dt = new PathFinder.CostMatrix();
 
-            // Find an open spot adjacent to the source
-            for (let dx = -1; dx <= 1; dx++) {
-                for (let dy = -1; dy <= 1; dy++) {
-                    if (dx === 0 && dy === 0) continue;
-                    
-                    const x = source.pos.x + dx;
-                    const y = source.pos.y + dy;
-                    
-                    const terrain = Game.map.getRoomTerrain(room.name).get(x, y);
-                    if (terrain === TERRAIN_MASK_WALL) continue;
-
-                    const result = room.createConstructionSite(x, y, STRUCTURE_CONTAINER);
-                    if (result === OK) break; // Only place one container per source
+        // Pass 1: Initialize DT
+        for (let x = 0; x < 50; x++) {
+            for (let y = 0; y < 50; y++) {
+                if (terrain.get(x, y) === TERRAIN_MASK_WALL) {
+                    dt.set(x, y, 0);
+                } else {
+                    // Edges count as walls for base planning to prevent border exposure
+                    if (x === 0 || y === 0 || x === 49 || y === 49) dt.set(x, y, 0);
+                    else dt.set(x, y, 255);
                 }
-                if (sites.length > 0) break;
             }
         }
-    }
 
-    static planExtensions(room, anchor, targetCount) {
-        const extensions = room.find(FIND_MY_STRUCTURES, { filter: { structureType: STRUCTURE_EXTENSION } });
-        const sites = room.find(FIND_MY_CONSTRUCTION_SITES, { filter: { structureType: STRUCTURE_EXTENSION } });
-        
-        let currentCount = extensions.length + sites.length;
-        if (currentCount >= targetCount) return;
+        // Pass 2: Top-Left to Bottom-Right
+        for (let x = 1; x < 49; x++) {
+            for (let y = 1; y < 49; y++) {
+                if (dt.get(x, y) > 0) {
+                    const min = Math.min(dt.get(x - 1, y), dt.get(x, y - 1), dt.get(x - 1, y - 1), dt.get(x + 1, y - 1));
+                    dt.set(x, y, min + 1);
+                }
+            }
+        }
 
-        let radius = 2;
-        while (currentCount < targetCount && radius < 10) {
-            for (let dx = -radius; dx <= radius; dx++) {
-                for (let dy = -radius; dy <= radius; dy++) {
-                    if (Math.abs(dx) + Math.abs(dy) === radius && (dx + dy) % 2 === 0) {
-                        const x = anchor.x + dx;
-                        const y = anchor.y + dy;
-                        
-                        if (x < 2 || x > 47 || y < 2 || y > 47) continue;
+        // Pass 3: Bottom-Right to Top-Left
+        let maxVal = 0;
+        let anchor = { x: 25, y: 25 };
 
-                        const terrain = Game.map.getRoomTerrain(room.name).get(x, y);
-                        if (terrain === TERRAIN_MASK_WALL) continue;
+        for (let x = 48; x >= 1; x--) {
+            for (let y = 48; y >= 1; y--) {
+                if (dt.get(x, y) > 0) {
+                    const min = Math.min(dt.get(x + 1, y), dt.get(x, y + 1), dt.get(x + 1, y + 1), dt.get(x - 1, y + 1));
+                    const val = Math.min(dt.get(x, y), min + 1);
+                    dt.set(x, y, val);
 
-                        const isBlocked = room.lookAt(x, y).some(l => 
-                            l.type === LOOK_STRUCTURES || l.type === LOOK_CONSTRUCTION_SITES
-                        );
-
-                        if (!isBlocked) {
-                            const result = room.createConstructionSite(x, y, STRUCTURE_EXTENSION);
-                            if (result === OK) {
-                                currentCount++;
-                                if (currentCount >= targetCount) return;
-                            }
-                        }
+                    if (val > maxVal) {
+                        maxVal = val;
+                        anchor = { x, y };
                     }
                 }
             }
-            radius++;
         }
+
+        // Generate Blueprint object based on the optimal anchor
+        const blueprint = this.applyStamp(anchor);
+        blueprint.ramparts = this.calculateChokepoints(terrain, anchor);
+        
+        global.Cache.blueprints[room.name] = blueprint;
     }
 
-    static planTowers(room, anchor, targetCount) {
-        const towers = room.find(FIND_MY_STRUCTURES, { filter: { structureType: STRUCTURE_TOWER } });
-        const sites = room.find(FIND_MY_CONSTRUCTION_SITES, { filter: { structureType: STRUCTURE_TOWER } });
+    static applyStamp(anchor) {
+        // High-efficiency bunker/cross stamp design. 
+        // dx/dy offsets from anchor.
+        const layout = {
+            [STRUCTURE_SPAWN]: [{dx: 0, dy: -1}],
+            [STRUCTURE_STORAGE]: [{dx: 0, dy: 1}],
+            [STRUCTURE_TOWER]: [{dx: -1, dy: 0}, {dx: 1, dy: 0}, {dx: 0, dy: -2}],
+            [STRUCTURE_EXTENSION]: [
+                {dx: -1, dy: -1}, {dx: 1, dy: -1}, {dx: -1, dy: 1}, {dx: 1, dy: 1},
+                {dx: -2, dy: -2}, {dx: 2, dy: -2}, {dx: -2, dy: 2}, {dx: 2, dy: 2},
+                {dx: -2, dy: -1}, {dx: 2, dy: -1}, {dx: -2, dy: 1}, {dx: 2, dy: 1},
+                {dx: -1, dy: -2}, {dx: 1, dy: -2}, {dx: -1, dy: 2}, {dx: 1, dy: 2}
+                // Add more as needed for RCL 8 (up to 60)
+            ]
+        };
+
+        const parsedBlueprint = {};
+        for (const [structureType, offsets] of Object.entries(layout)) {
+            parsedBlueprint[structureType] = offsets.map(pos => ({
+                x: anchor.x + pos.dx,
+                y: anchor.y + pos.dy
+            }));
+        }
+        return parsedBlueprint;
+    }
+
+    static calculateChokepoints(terrain, anchor) {
+        // Flood-fill outward to radius 6 to find perimeter walls
+        const radius = 6;
+        const ramparts = [];
+        const visited = new Uint8Array(2500); // Flat array 50x50 cache
+        const queue = [{x: anchor.x, y: anchor.y, dist: 0}];
         
-        let currentCount = towers.length + sites.length;
-        if (currentCount >= targetCount) return;
+        visited[anchor.x * 50 + anchor.y] = 1;
 
-        const offsets = [ {x: 0, y: -2}, {x: 2, y: 0}, {x: 0, y: 2}, {x: -2, y: 0} ];
+        while (queue.length > 0) {
+            const current = queue.shift();
 
-        for (let i = 0; i < offsets.length; i++) {
-            const x = anchor.x + offsets[i].x;
-            const y = anchor.y + offsets[i].y;
-            
-            const terrain = Game.map.getRoomTerrain(room.name).get(x, y);
-            if (terrain === TERRAIN_MASK_WALL) continue;
-
-            const isBlocked = room.lookAt(x, y).some(l => 
-                l.type === LOOK_STRUCTURES || l.type === LOOK_CONSTRUCTION_SITES
-            );
-
-            if (!isBlocked) {
-                const result = room.createConstructionSite(x, y, STRUCTURE_TOWER);
-                if (result === OK) {
-                    currentCount++;
-                    if (currentCount >= targetCount) return;
+            // If we hit the boundary distance, it's a perimeter tile. 
+            // If it's not a wall, it needs a rampart.
+            if (current.dist === radius) {
+                if (terrain.get(current.x, current.y) !== TERRAIN_MASK_WALL) {
+                    ramparts.push({x: current.x, y: current.y});
                 }
+                continue;
+            }
+
+            const neighbors = [
+                {x: current.x, y: current.y - 1}, {x: current.x + 1, y: current.y},
+                {x: current.x, y: current.y + 1}, {x: current.x - 1, y: current.y}
+            ];
+
+            for (let i = 0; i < neighbors.length; i++) {
+                const nx = neighbors[i].x;
+                const ny = neighbors[i].y;
+
+                if (nx <= 2 || nx >= 47 || ny <= 2 || ny >= 47) continue; // Keep away from exits
+                
+                const idx = nx * 50 + ny;
+                if (!visited[idx]) {
+                    visited[idx] = 1;
+                    if (terrain.get(nx, ny) !== TERRAIN_MASK_WALL) {
+                        queue.push({x: nx, y: ny, dist: current.dist + 1});
+                    }
+                }
+            }
+        }
+        return ramparts;
+    }
+
+    static executeBlueprint(room) {
+        const blueprint = global.Cache.blueprints[room.name];
+        const rcl = room.controller.level;
+
+        // Order of construction priority
+        const buildOrder = [STRUCTURE_SPAWN, STRUCTURE_TOWER, STRUCTURE_EXTENSION, STRUCTURE_ROAD];
+        
+        // Place structures
+        for (let i = 0; i < buildOrder.length; i++) {
+            const type = buildOrder[i];
+            const maxAllowed = CONTROLLER_STRUCTURES[type][rcl];
+            const plannedPositions = blueprint[type] || [];
+
+            let currentBuiltOrPlanned = room.find(FIND_MY_STRUCTURES, { filter: s => s.structureType === type }).length +
+                                        room.find(FIND_MY_CONSTRUCTION_SITES, { filter: s => s.structureType === type }).length;
+
+            for (let j = 0; j < plannedPositions.length; j++) {
+                if (currentBuiltOrPlanned >= maxAllowed) break;
+
+                const pos = plannedPositions[j];
+                const code = room.createConstructionSite(pos.x, pos.y, type);
+                
+                if (code === OK) {
+                    currentBuiltOrPlanned++;
+                    return; // Throttle to 1 site placed per tick
+                }
+            }
+        }
+
+        // Place Ramparts (RCL 4+)
+        if (rcl >= 4 && blueprint.ramparts) {
+            for (let i = 0; i < blueprint.ramparts.length; i++) {
+                const pos = blueprint.ramparts[i];
+                const code = room.createConstructionSite(pos.x, pos.y, STRUCTURE_RAMPART);
+                if (code === OK) return;
             }
         }
     }
 }
-
 module.exports = RoomPlanner;
