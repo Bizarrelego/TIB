@@ -42,8 +42,31 @@ function run() {
       droppedEnergy,
       ruins,
       tombstones,
-      controller
+      controller,
+      // V8 Optimization: Pre-allocate standard role counters to maintain monomorphism 
+      // in the V8 engine when updating these properties later.
+      creepCounts: { harvester: 0, hauler: 0, upgrader: 0 }
     });
+  }
+
+  // Global pass over Game.creeps to populate counts.
+  // Avoids room.find(FIND_MY_CREEPS) array allocation and native-to-JS bridge overhead.
+  const creepNames = Object.keys(Game.creeps);
+  for (let i = 0; i < creepNames.length; i++) {
+    const creep = Game.creeps[creepNames[i]];
+    // Rely on memory first for consistent intent, fallback to actual room if transitioning.
+    const roomName = creep.memory.room || creep.room.name;
+    const role = creep.memory.role;
+
+    const roomState = global.State.rooms.get(roomName);
+    if (roomState && role) {
+      if (roomState.creepCounts[role] !== undefined) {
+        roomState.creepCounts[role]++;
+      } else {
+        // Handle edge-case roles dynamically if they exist outside the standard 3
+        roomState.creepCounts[role] = 1;
+      }
+    }
   }
 }
 
