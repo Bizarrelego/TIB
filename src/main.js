@@ -3,9 +3,7 @@ const SpawnManager = require('./colonies/SpawnManager');
 const GlobalStateScanner = require('./state/GlobalStateScanner');
 const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
 
-const harvesterRole = require('./roles/harvester');
-const haulerRole = require('./roles/hauler');
-const upgraderRole = require('./roles/upgrader');
+const RoleExecutor = require('./managers/RoleExecutor');
 
 module.exports.loop = function () {
     // 1. Initialize transient tick cache
@@ -40,13 +38,6 @@ module.exports.loop = function () {
             creep.heap = { state: 'idle', targetId: null, actionIntent: null };
         }
 
-        const role = creep.memory.role;
-        if (role === 'harvester') {
-            harvesterRole.run(creep);
-        } else if (role === 'hauler') {
-            haulerRole.run(creep);
-        } else if (role === 'upgrader') {
-            upgraderRole.run(creep);
-        }
+        RoleExecutor.run(creep);
     });
 };
