@@ -38,7 +38,9 @@ class SpawnManager {
         
         const spawnEnergy = isEmergency ? Math.max(300, energyAvailable) : energyCapacity;
         
-        if (energyAvailable < spawnEnergy && energyAvailable < 300) return;
+        // IMPROVEMENT: Optimizes performance and prevents deadlock. 
+        // Force the spawn to wait until the exact calculated spawnEnergy is available.
+        if (energyAvailable < spawnEnergy) return;
 
         // 1. Harvesters (1 per source)
         if ((creepCounts.harvester || 0) < maxHarvesters) {

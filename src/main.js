@@ -1,45 +1,55 @@
-const TaskAssignmentManager = require('./managers/TaskAssignmentManager');
-const SpawnManager = require('./colonies/SpawnManager');
-const GlobalStateScanner = require('./state/GlobalStateScanner');
-const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
-const IntelManager = require('./managers/IntelManager');
+/**
+ * TIB - Top-Down V8-Optimized AI
+ * Main Execution Pipeline
+ */
 
+// Core Managers
+const GlobalStateScanner = require('./state/GlobalStateScanner');
+const IntelManager = require('./managers/IntelManager');
+const RoomPlanner = require('./managers/RoomPlanner');
+const SpawnManager = require('./colonies/SpawnManager');
+const TaskAssignmentManager = require('./managers/TaskAssignmentManager');
 const RoleExecutor = require('./managers/RoleExecutor');
 
-module.exports.loop = function () {
-    // 1. Initialize transient tick cache
-    global.tickCache = new Map();
+// Utilities
+const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
 
-    // 2. Scan state and populate global.State (GlobalStateScanner.run() must be at the very beginning)
+module.exports.loop = function () {
+    // 1. Memory Cleanup (Crucial to run first to prevent ghost creeps in assignments)
+    MemoryCleanupManager.run();
+
+    // 2. Global State Scanning (O(1) Heap generation)
     GlobalStateScanner.run();
 
-    IntelManager.run();
+    // -- CPU Throttle Check --
+    // If bucket is critically low, skip non-essential background tasks
+    const cpuNormal = Game.cpu.bucket > 500;
 
-    const stateObj = global.State || global.state;
+    if (cpuNormal) {
+        // 3. Intelligence Gathering
+        IntelManager.run();
 
-    // 3. Spawning (The Heart) - SpawnManager.run() is called after GlobalStateScanner
-    if (stateObj && stateObj.rooms) {
-        for (const [roomName, roomState] of stateObj.rooms.entries()) {
+        // 4. Room Planning (Rate limited to save CPU)
+        if (Game.time % 100 === 0) {
+            RoomPlanner.run();
+        }
+    }
+
+    // 5. Colony Spawning
+    const rooms = Object.keys(Game.rooms);
+    for (let i = 0; i < rooms.length; i++) {
+        const roomName = rooms[i];
+        const room = Game.rooms[roomName];
+        
+        // Only run spawn logic in rooms we own
+        if (room.controller && room.controller.my) {
             SpawnManager.run(roomName);
         }
     }
 
-    // 4. Task Assignment (The Brain) - TaskAssignmentManager.run() is called after SpawnManager
+    // 6. Task Assignment (Top-Down State Machine)
     TaskAssignmentManager.run();
 
-    // 5. Execute Muscle (Creep Roles) - RoleExecutor.run() is called after TaskAssignmentManager
-    Object.values(Game.creeps).forEach(creep => {
-        if (creep.spawning) return;
-        if (creep.fatigue > 0) return;
-
-        // Revert to standard object per latest strict PR requirement
-        if (!creep.heap || creep.heap instanceof Map || typeof creep.heap !== 'object') {
-            creep.heap = { state: 'idle', targetId: null, actionIntent: null };
-        }
-
-        RoleExecutor.run(creep);
-    });
-
-    // 6. Clear stale memory for dead creeps - MemoryCleanupManager.run() is called at the end of each tick
-    MemoryCleanupManager.run();
+    // 7. Intent Execution (C++ Bindings)
+    RoleExecutor.run();
 };

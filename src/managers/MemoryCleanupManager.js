@@ -1,19 +1,17 @@
 /**
- * Cleans up stale memory entries, specifically for dead creeps.
+ * Clears memory of dead creeps to prevent heap bloat.
  */
-module.exports = {
-  /**
-   * Iterates through Memory.creeps and deletes entries for creeps that no longer exist in Game.creeps.
-   * Throttled via tick-slicing.
-   */
-  run: function () {
-    // Tick-slicing optimization: only run memory cleanup every 100 ticks
-    if (Game.time % 100 !== 0) return;
+class MemoryCleanupManager {
+    static run() {
+        // Run every 10 ticks to save CPU
+        if (Game.time % 10 !== 0) return;
 
-    for (const name in Memory.creeps) {
-      if (!Game.creeps[name]) {
-        delete Memory.creeps[name];
-      }
+        for (const name in Memory.creeps) {
+            if (!Game.creeps[name]) {
+                delete Memory.creeps[name];
+            }
+        }
     }
-  }
-};
+}
+
+module.exports = MemoryCleanupManager;
