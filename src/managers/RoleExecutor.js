@@ -5,37 +5,32 @@
 const TaskAssignmentManager = require('./TaskAssignmentManager');
 
 class RoleExecutor {
-    static run() {
-        const creepNames = Object.keys(Game.creeps);
-        
-        for (let i = 0; i < creepNames.length; i++) {
-            const creep = Game.creeps[creepNames[i]];
-            
-            if (creep.spawning) continue;
+    static run(creep) {
+        if (!creep) return;
+        if (creep.spawning) return;
 
-            const taskId = creep.memory.taskId;
-            const targetId = creep.memory.targetId;
+        const taskId = creep.heap.taskId;
+        const targetId = creep.heap.targetId;
 
-            if (!taskId || taskId === TaskAssignmentManager.TASKS.IDLE) {
-                continue;
-            }
-
-            if (taskId === TaskAssignmentManager.TASKS.SCOUT || taskId === TaskAssignmentManager.TASKS.MOVE_ROOM) {
-                RoleExecutor.executeCrossRoomTask(creep);
-                continue;
-            }
-
-            const target = Game.getObjectById(targetId);
-            if (!target) {
-                // Ignore clearing if moving to a room and target isn't visible yet
-                if (creep.room.name === creep.memory.targetRoom) {
-                    creep.memory.targetId = null;
-                }
-                continue;
-            }
-
-            RoleExecutor.executeTask(creep, target, taskId);
+        if (!taskId || taskId === TaskAssignmentManager.TASKS.IDLE) {
+            return;
         }
+
+        if (taskId === TaskAssignmentManager.TASKS.SCOUT || taskId === TaskAssignmentManager.TASKS.MOVE_ROOM) {
+            RoleExecutor.executeCrossRoomTask(creep);
+            return;
+        }
+
+        const target = Game.getObjectById(targetId);
+        if (!target) {
+            // Ignore clearing if moving to a room and target isn't visible yet
+            if (creep.room.name === creep.heap.targetRoom) {
+                creep.heap.targetId = null;
+            }
+            return;
+        }
+
+        RoleExecutor.executeTask(creep, target, taskId);
     }
 
     static executeTask(creep, target, taskId) {
@@ -68,7 +63,7 @@ class RoleExecutor {
                 }
                 break;
             default:
-                creep.memory.targetId = null;
+                creep.heap.targetId = null;
                 return;
         }
 
@@ -84,14 +79,14 @@ class RoleExecutor {
             result === ERR_FULL || 
             result === ERR_INVALID_TARGET
         ) {
-            creep.memory.targetId = null;
+            creep.heap.targetId = null;
         }
     }
 
     static executeCrossRoomTask(creep) {
-        const targetRoom = creep.memory.targetRoom;
+        const targetRoom = creep.heap.targetRoom;
         if (!targetRoom) {
-            creep.memory.taskId = TaskAssignmentManager.TASKS.IDLE;
+            creep.heap.taskId = TaskAssignmentManager.TASKS.IDLE;
             return;
         }
 
@@ -106,8 +101,8 @@ class RoleExecutor {
 
             if (moveResult === ERR_NO_PATH) {
                 // Room is walled off or unreachable. Destroy the target to abort infinite pathfinding loops.
-                creep.memory.targetRoom = null;
-                creep.memory.taskId = TaskAssignmentManager.TASKS.IDLE;
+                creep.heap.targetRoom = null;
+                creep.heap.taskId = TaskAssignmentManager.TASKS.IDLE;
             }
         } else {
             // Check if creep is stuck on the room transition border
@@ -116,7 +111,7 @@ class RoleExecutor {
                 creep.moveTo(new RoomPosition(25, 25, creep.room.name), { reusePath: 10, ignoreCreeps: true });
             } else {
                 // Safely inside the room. Clear task so TaskAssignmentManager can assign a new one.
-                creep.memory.taskId = TaskAssignmentManager.TASKS.IDLE;
+                creep.heap.taskId = TaskAssignmentManager.TASKS.IDLE;
             }
         }
     }
