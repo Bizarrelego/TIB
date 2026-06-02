@@ -32,15 +32,5 @@ module.exports.loop = function () {
     }
 
     // 5. Execute Muscle (Creep Roles)
-    Object.values(Game.creeps).forEach(creep => {
-        if (creep.spawning) return;
-        if (creep.fatigue > 0) return;
-
-        // Revert to standard object per latest strict PR requirement
-        if (!creep.heap || creep.heap instanceof Map || typeof creep.heap !== 'object') {
-            creep.heap = { state: 'idle', targetId: null, actionIntent: null };
-        }
-
-        RoleExecutor.run(creep);
-    });
+    RoleExecutor.run();
 };
