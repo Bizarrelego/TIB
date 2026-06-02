@@ -15,21 +15,19 @@ const RoleExecutor = require('./managers/RoleExecutor');
 const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
 
 module.exports.loop = function () {
-    // 1. Memory Cleanup (Crucial to run first to prevent ghost creeps in assignments)
+    // 1. Memory Cleanup
     MemoryCleanupManager.run();
 
-    // 2. Global State Scanning (O(1) Heap generation)
+    // 2. Global State Scanning
     GlobalStateScanner.run();
 
-    // -- CPU Throttle Check --
-    // If bucket is critically low, skip non-essential background tasks
     const cpuNormal = Game.cpu.bucket > 500;
 
     if (cpuNormal) {
         // 3. Intelligence Gathering
         IntelManager.run();
 
-        // 4. Room Planning (Rate limited to save CPU)
+        // 4. Room Planning
         if (Game.time % 100 === 0) {
             RoomPlanner.run();
         }
@@ -41,15 +39,14 @@ module.exports.loop = function () {
         const roomName = rooms[i];
         const room = Game.rooms[roomName];
         
-        // Only run spawn logic in rooms we own
         if (room.controller && room.controller.my) {
             SpawnManager.run(roomName);
         }
     }
 
-    // 6. Task Assignment (Top-Down State Machine)
+    // 6. Task Assignment
     TaskAssignmentManager.run();
 
-    // 7. Intent Execution (C++ Bindings)
+    // 7. Intent Execution
     RoleExecutor.run();
 };

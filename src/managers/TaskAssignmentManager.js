@@ -58,14 +58,12 @@ class TaskAssignmentManager {
         
         let state = creep.memory.state;
 
-        // Standard Capacity Transitions
         if (state === STATES.GATHER && free === 0) {
             state = STATES.WORK;
         } else if (state === STATES.WORK && used === 0) {
             state = STATES.GATHER;
         }
 
-        // Harvester Override: Ferry energy manually if no haulers exist.
         if (role === 'harvester') {
             const haulers = roomState.creepCounts?.hauler || 0;
             if (haulers > 0) {
@@ -81,8 +79,7 @@ class TaskAssignmentManager {
             if (dropped === 0 && ruins === 0 && creep.room.name === creep.memory.room) {
                 const spawnEnergy = (roomState.spawns && roomState.spawns.length > 0) ? roomState.spawns[0].store.getUsedCapacity(RESOURCE_ENERGY) : 0;
                 
-                // FIX: Use <= 100 instead of < 100. If spawn has exactly 100 energy, 
-                // assignUpgrader rejects WITHDRAW. This forces WORK to avoid deadlocking idle creeps.
+                // Allow them to transition to WORK if they have energy and the spawn is low on energy
                 if (spawnEnergy <= 100 || role === 'hauler') {
                     state = STATES.WORK; 
                 }
@@ -132,7 +129,6 @@ class TaskAssignmentManager {
         }
 
         if (global.State.scoutQueue && global.State.scoutQueue.length > 0) {
-            // FIX: Ensure the scout selects a room from the queue that it isn't ALREADY standing in.
             const nextRoom = global.State.scoutQueue.find(r => r !== creep.room.name);
             if (nextRoom) {
                 creep.memory.targetRoom = nextRoom;
@@ -221,28 +217,67 @@ class TaskAssignmentManager {
         return null;
     }
 
+    static getEnergySource(creep, roomState) {
+        const bestDrop = TaskAssignmentManager.getLargestDrop(roomState.droppedEnergy);
+        if (bestDrop) {
+            creep.memory.targetId = bestDrop.id;
+            creep.memory.taskId = TASKS.PICKUP;
+            return true;
+        }
+
+        const ruins = roomState.ruins;
+        if (ruins && ruins.length > 0) {
+            creep.memory.targetId = ruins[0].id;
+            creep.memory.taskId = TASKS.PICKUP;
+            return true;
+        }
+
+        // Fallback: Withdraw from structures, prioritizing containers then spawns
+        const containers = roomState.containers?.filter(c => c.store.getUsedCapacity(RESOURCE_ENERGY) > 0) || [];
+        if (containers.length > 0) {
+            // Pick highest energy container
+            const bestContainer = containers.reduce((prev, current) => 
+                (prev.store.getUsedCapacity(RESOURCE_ENERGY) > current.store.getUsedCapacity(RESOURCE_ENERGY)) ? prev : current
+            );
+            creep.memory.targetId = bestContainer.id;
+            creep.memory.taskId = TASKS.WITHDRAW;
+            return true;
+        }
+
+        const spawns = roomState.spawns;
+        // Only withdraw from spawn if it has a comfortable buffer (e.g., > 100 energy)
+        if (spawns && spawns.length > 0 && spawns[0].store.getUsedCapacity(RESOURCE_ENERGY) > 100) {
+            creep.memory.targetId = spawns[0].id;
+            creep.memory.taskId = TASKS.WITHDRAW;
+            return true;
+        }
+
+        return false;
+    }
+
     static assignBuilder(creep, roomState) {
         if (creep.memory.state === STATES.GATHER) {
-            const bestDrop = TaskAssignmentManager.getLargestDrop(roomState.droppedEnergy);
-            if (bestDrop) {
-                creep.memory.targetId = bestDrop.id;
-                creep.memory.taskId = TASKS.PICKUP;
-                return;
-            }
-
-            const spawns = roomState.spawns;
-            if (spawns && spawns.length > 0 && spawns[0].store.getUsedCapacity(RESOURCE_ENERGY) > 100) {
-                creep.memory.targetId = spawns[0].id;
-                creep.memory.taskId = TASKS.WITHDRAW;
-            }
+            TaskAssignmentManager.getEnergySource(creep, roomState);
         } else {
             const sites = roomState.constructionSites;
             if (sites && sites.length > 0) {
-                creep.memory.targetId = sites[0].id;
+                // Priority: Containers, then Extensions, then everything else
+                const containers = sites.filter(s => s.structureType === STRUCTURE_CONTAINER);
+                if (containers.length > 0) {
+                    creep.memory.targetId = containers[0].id;
+                } else {
+                    const extensions = sites.filter(s => s.structureType === STRUCTURE_EXTENSION);
+                    if (extensions.length > 0) {
+                        creep.memory.targetId = extensions[0].id;
+                    } else {
+                        creep.memory.targetId = sites[0].id;
+                    }
+                }
                 creep.memory.taskId = TASKS.BUILD;
                 return;
             }
 
+            // Fallback to upgrade if no construction sites
             if (roomState.controller) {
                 creep.memory.targetId = roomState.controller.id;
                 creep.memory.taskId = TASKS.UPGRADE;
@@ -252,18 +287,7 @@ class TaskAssignmentManager {
 
     static assignUpgrader(creep, roomState) {
         if (creep.memory.state === STATES.GATHER) {
-            const bestDrop = TaskAssignmentManager.getLargestDrop(roomState.droppedEnergy);
-            if (bestDrop) {
-                creep.memory.targetId = bestDrop.id;
-                creep.memory.taskId = TASKS.PICKUP;
-                return;
-            }
-
-            const spawns = roomState.spawns;
-            if (spawns && spawns.length > 0 && spawns[0].store.getUsedCapacity(RESOURCE_ENERGY) > 100) {
-                creep.memory.targetId = spawns[0].id;
-                creep.memory.taskId = TASKS.WITHDRAW;
-            }
+            TaskAssignmentManager.getEnergySource(creep, roomState);
         } else {
             if (roomState.controller) {
                 creep.memory.targetId = roomState.controller.id;

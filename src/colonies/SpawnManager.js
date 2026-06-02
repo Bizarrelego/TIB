@@ -38,8 +38,6 @@ class SpawnManager {
         
         const spawnEnergy = isEmergency ? Math.max(300, energyAvailable) : energyCapacity;
         
-        // IMPROVEMENT: Optimizes performance and prevents deadlock. 
-        // Force the spawn to wait until the exact calculated spawnEnergy is available.
         if (energyAvailable < spawnEnergy) return;
 
         // 1. Harvesters (1 per source)
@@ -109,7 +107,7 @@ class SpawnManager {
 
         if (role === 'harvester') {
             body = [WORK, CARRY, MOVE];
-            cost = 150;
+            cost = 200; // CORRECTED BASE COST: 100(WORK) + 50(CARRY) + 50(MOVE) = 200
             let workParts = 1;
             
             // Maximize WORK parts up to 5 (optimal for a 3000 capacity source)

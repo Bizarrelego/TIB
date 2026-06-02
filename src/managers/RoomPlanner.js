@@ -1,7 +1,6 @@
 /**
  * Room Planner Manager
  * Handles automated construction site placement based on RCL progression.
- * Run this periodically (e.g., Game.time % 100 === 0) to avoid CPU waste.
  */
 
 class RoomPlanner {
@@ -17,19 +16,54 @@ class RoomPlanner {
 
     static planRoom(room) {
         const rcl = room.controller.level;
+        
+        // 1. Plan source containers regardless of RCL
+        RoomPlanner.planSourceContainers(room);
+
         if (rcl < 2) return;
 
         const spawns = room.find(FIND_MY_SPAWNS);
         if (spawns.length === 0) return;
         const anchor = spawns[0].pos;
 
-        // Dynamically grab max extensions allowed for this RCL
+        // 2. Plan Extensions
         const maxExtensions = CONTROLLER_STRUCTURES[STRUCTURE_EXTENSION][rcl];
         RoomPlanner.planExtensions(room, anchor, maxExtensions);
 
+        // 3. Plan Towers
         if (rcl >= 3) {
             const maxTowers = CONTROLLER_STRUCTURES[STRUCTURE_TOWER][rcl];
             RoomPlanner.planTowers(room, anchor, maxTowers);
+        }
+    }
+
+    static planSourceContainers(room) {
+        const sources = room.find(FIND_SOURCES);
+        
+        for (let i = 0; i < sources.length; i++) {
+            const source = sources[i];
+            
+            const containers = source.pos.findInRange(FIND_STRUCTURES, 1, { filter: s => s.structureType === STRUCTURE_CONTAINER });
+            const sites = source.pos.findInRange(FIND_CONSTRUCTION_SITES, 1, { filter: s => s.structureType === STRUCTURE_CONTAINER });
+            
+            if (containers.length > 0 || sites.length > 0) continue;
+
+            // Find an open spot adjacent to the source
+            for (let dx = -1; dx <= 1; dx++) {
+                for (let dy = -1; dy <= 1; dy++) {
+                    if (dx === 0 && dy === 0) continue;
+                    
+                    const x = source.pos.x + dx;
+                    const y = source.pos.y + dy;
+                    
+                    const terrain = Game.map.getRoomTerrain(room.name).get(x, y);
+                    if (terrain === TERRAIN_MASK_WALL) continue;
+
+                    const result = room.createConstructionSite(x, y, STRUCTURE_CONTAINER);
+                    if (result === OK) break; // Only place one container per source
+                }
+                if (sites.length > 0) break;
+            }
         }
     }
 
@@ -40,11 +74,10 @@ class RoomPlanner {
         let currentCount = extensions.length + sites.length;
         if (currentCount >= targetCount) return;
 
-        let radius = 2; // Start 2 tiles away from spawn
+        let radius = 2;
         while (currentCount < targetCount && radius < 10) {
             for (let dx = -radius; dx <= radius; dx++) {
                 for (let dy = -radius; dy <= radius; dy++) {
-                    // Checkerboard pattern (dx + dy must be even)
                     if (Math.abs(dx) + Math.abs(dy) === radius && (dx + dy) % 2 === 0) {
                         const x = anchor.x + dx;
                         const y = anchor.y + dy;
@@ -79,7 +112,6 @@ class RoomPlanner {
         let currentCount = towers.length + sites.length;
         if (currentCount >= targetCount) return;
 
-        // Priority offsets for towers (close to spawn)
         const offsets = [ {x: 0, y: -2}, {x: 2, y: 0}, {x: 0, y: 2}, {x: -2, y: 0} ];
 
         for (let i = 0; i < offsets.length; i++) {
