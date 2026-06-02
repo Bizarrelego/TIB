@@ -1,6 +1,6 @@
 /**
  * Top-Down, Heap-Driven Task Assignment Manager
- * Replaces all serialized Memory queues.
+ * Optimized for RCL2+ (Extensions, Builders, Overflow Pipelines)
  */
 
 // V8 Optimization: Integer constants for task routing.
@@ -10,7 +10,10 @@ const TASKS = {
     PICKUP: 2,
     TRANSFER: 3,
     UPGRADE: 4,
-    WITHDRAW: 5
+    WITHDRAW: 5,
+    BUILD: 6,
+    DROP: 7,
+    SCOUT: 8
 };
 
 // V8 Optimization: Integer constants for capacity state machine.
@@ -20,10 +23,6 @@ const STATES = {
 };
 
 class TaskAssignmentManager {
-    /**
-     * Iterates all creeps and assigns tasks based on O(1) heap state.
-     * Must run AFTER GlobalStateScanner and BEFORE RoleExecutor.
-     */
     static run() {
         const creepNames = Object.keys(Game.creeps);
         
@@ -33,21 +32,30 @@ class TaskAssignmentManager {
             
             if (!roomState) continue;
 
-            this.updateCreepState(creep, roomState);
-            this.validateCurrentTask(creep);
+            TaskAssignmentManager.updateCreepState(creep, roomState);
+            TaskAssignmentManager.validateCurrentTask(creep);
 
             if (!creep.memory.targetId) {
-                this.assignTask(creep, roomState);
+                TaskAssignmentManager.assignTask(creep, roomState);
             }
         }
     }
 
     /**
-     * Rigid state machine controlling Gather vs Deliver logic.
-     * Evaluates capacity and overrides before routing.
-     * @param {Creep} creep 
-     * @param {Object} roomState 
+     * Finds the largest dropped energy pile in O(N) time.
+     * Replaces Array.sort() to eliminate memory allocation and GC overhead.
      */
+    static getLargestDrop(drops) {
+        if (!drops || drops.length === 0) return null;
+        let maxDrop = drops[0];
+        for (let i = 1; i < drops.length; i++) {
+            if (drops[i].amount > maxDrop.amount) {
+                maxDrop = drops[i];
+            }
+        }
+        return maxDrop;
+    }
+
     static updateCreepState(creep, roomState) {
         const role = creep.memory.role;
         const used = creep.store.getUsedCapacity();
@@ -62,15 +70,15 @@ class TaskAssignmentManager {
             state = STATES.GATHER;
         }
 
-        // Harvester Override: If no haulers exist, ferry energy manually to avoid passive spawn waits.
+        // Harvester Override: Ferry energy manually if no haulers exist.
         if (role === 'harvester') {
             const haulers = roomState.creepCounts?.hauler || 0;
             if (haulers > 0) {
-                state = STATES.GATHER; // Lock to purely mining once haulers exist
+                state = STATES.GATHER; 
             }
         }
 
-        // Hauler Override: If partially full and nothing left to gather, go deliver.
+        // Hauler Override: Deliver if partially full and the floor is clean.
         if (role === 'hauler' && state === STATES.GATHER && used > 0) {
             const dropped = roomState.droppedEnergy?.length || 0;
             const ruins = roomState.ruins?.length || 0;
@@ -79,7 +87,6 @@ class TaskAssignmentManager {
             }
         }
 
-        // If state changed, DESTROY the current target to force reassignment.
         if (state !== creep.memory.state) {
             creep.memory.state = state;
             creep.memory.targetId = null;
@@ -87,36 +94,52 @@ class TaskAssignmentManager {
         }
     }
 
-    /**
-     * Validates if the current target still exists in the engine.
-     * @param {Creep} creep 
-     */
     static validateCurrentTask(creep) {
         if (!creep.memory.targetId) return;
 
-        // Fast internal C++ cache lookup
         const target = Game.getObjectById(creep.memory.targetId);
         
+        // Construction sites disappear when finished. Check validity.
         if (!target) {
             creep.memory.targetId = null;
             creep.memory.taskId = TASKS.IDLE;
         }
     }
 
-    /**
-     * Routes the creep to the correct target based on its rigid state.
-     * @param {Creep} creep 
-     * @param {Object} roomState 
-     */
     static assignTask(creep, roomState) {
         const role = creep.memory.role;
         
         if (role === 'harvester') {
-            this.assignHarvester(creep, roomState);
+            TaskAssignmentManager.assignHarvester(creep, roomState);
         } else if (role === 'hauler') {
-            this.assignHauler(creep, roomState);
+            TaskAssignmentManager.assignHauler(creep, roomState);
         } else if (role === 'upgrader') {
-            this.assignUpgrader(creep, roomState);
+            TaskAssignmentManager.assignUpgrader(creep, roomState);
+        } else if (role === 'builder') {
+            TaskAssignmentManager.assignBuilder(creep, roomState);
+        } else if (role === 'scout') {
+            TaskAssignmentManager.assignScout(creep);
+        }
+    }
+
+    static assignScout(creep) {
+        // Optimization: Do not re-assign if they already have a valid target room that isn't finished.
+        if (creep.memory.targetRoom && creep.memory.targetRoom !== creep.room.name) {
+            creep.memory.taskId = TASKS.SCOUT;
+            return;
+        }
+
+        // Target reached or no target. Pull from the IntelManager queue.
+        if (global.State.scoutQueue && global.State.scoutQueue.length > 0) {
+            // Take the first room in the queue and assign it.
+            // When the scout enters the room, IntelManager will see it next tick, update Memory, 
+            // and the room will drop out of the scoutQueue automatically.
+            creep.memory.targetRoom = global.State.scoutQueue[0];
+            creep.memory.taskId = TASKS.SCOUT;
+        } else {
+            // Nothing to scout.
+            creep.memory.targetRoom = null;
+            creep.memory.taskId = TASKS.IDLE;
         }
     }
 
@@ -125,76 +148,123 @@ class TaskAssignmentManager {
             const sources = roomState.sources;
             if (!sources || sources.length === 0) return;
 
-            // Static load balancing based on name length
             const sourceIndex = creep.name.length % sources.length;
             creep.memory.targetId = sources[sourceIndex].id;
             creep.memory.taskId = TASKS.HARVEST;
         } else {
-            // Delivering (Bootstrapping override)
-            const spawns = roomState.spawns;
-            if (spawns && spawns.length > 0) {
-                creep.memory.targetId = spawns[0].id;
-                creep.memory.taskId = TASKS.TRANSFER;
-            }
+            // Bootstrapping override: Fill Extensions -> Spawns
+            TaskAssignmentManager.routeToStorage(creep, roomState);
         }
     }
 
     static assignHauler(creep, roomState) {
         if (creep.memory.state === STATES.GATHER) {
-            // Priority 1: Pickup largest dropped energy piles.
-            const dropped = roomState.droppedEnergy;
-            if (dropped && dropped.length > 0) {
-                dropped.sort((a, b) => b.amount - a.amount);
-                creep.memory.targetId = dropped[0].id;
+            const bestDrop = TaskAssignmentManager.getLargestDrop(roomState.droppedEnergy);
+            if (bestDrop) {
+                creep.memory.targetId = bestDrop.id;
                 creep.memory.taskId = TASKS.PICKUP;
                 return;
             }
 
-            // Priority 2: Ruins
             const ruins = roomState.ruins;
             if (ruins && ruins.length > 0) {
                 creep.memory.targetId = ruins[0].id;
                 creep.memory.taskId = TASKS.PICKUP;
             }
         } else {
-            // Priority 1: Fill Spawn
-            const spawns = roomState.spawns;
-            if (spawns && spawns.length > 0) {
-                // Always target the spawn. If full, they will wait next to it.
-                // Do not assign Upgrading to haulers. They lack WORK parts.
-                creep.memory.targetId = spawns[0].id;
-                creep.memory.taskId = TASKS.TRANSFER;
+            // Priority 1: Extensions & Spawns
+            if (TaskAssignmentManager.routeToStorage(creep, roomState)) return;
+
+            // Priority 2: Overflow to Controller
+            if (roomState.controller) {
+                creep.memory.targetId = roomState.controller.id;
+                creep.memory.taskId = TASKS.DROP;
             }
         }
     }
 
-    static assignUpgrader(creep, roomState) {
+    static assignBuilder(creep, roomState) {
         if (creep.memory.state === STATES.GATHER) {
-            // Priority 1: Scavenge dynamically.
-            const dropped = roomState.droppedEnergy;
-            if (dropped && dropped.length > 0) {
-                creep.memory.targetId = dropped[0].id;
+            const bestDrop = TaskAssignmentManager.getLargestDrop(roomState.droppedEnergy);
+            if (bestDrop) {
+                creep.memory.targetId = bestDrop.id;
                 creep.memory.taskId = TASKS.PICKUP;
                 return;
             }
 
-            // Priority 2: Withdraw from spawn (Utilize the spawn as a container at RCL1)
             const spawns = roomState.spawns;
-            if (spawns && spawns.length > 0 && spawns[0].store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+            if (spawns && spawns.length > 0 && spawns[0].store.getUsedCapacity(RESOURCE_ENERGY) > 100) {
                 creep.memory.targetId = spawns[0].id;
                 creep.memory.taskId = TASKS.WITHDRAW;
             }
         } else {
-            // Work state
+            const sites = roomState.constructionSites;
+            if (sites && sites.length > 0) {
+                creep.memory.targetId = sites[0].id;
+                creep.memory.taskId = TASKS.BUILD;
+                return;
+            }
+
+            // Fallback to upgrading if no construction sites exist
             if (roomState.controller) {
                 creep.memory.targetId = roomState.controller.id;
                 creep.memory.taskId = TASKS.UPGRADE;
             }
         }
     }
+
+    static assignUpgrader(creep, roomState) {
+        if (creep.memory.state === STATES.GATHER) {
+            // Upgraders rely on haulers dropping energy at the controller.
+            const bestDrop = TaskAssignmentManager.getLargestDrop(roomState.droppedEnergy);
+            if (bestDrop) {
+                creep.memory.targetId = bestDrop.id;
+                creep.memory.taskId = TASKS.PICKUP;
+                return;
+            }
+
+            const spawns = roomState.spawns;
+            if (spawns && spawns.length > 0 && spawns[0].store.getUsedCapacity(RESOURCE_ENERGY) > 100) {
+                creep.memory.targetId = spawns[0].id;
+                creep.memory.taskId = TASKS.WITHDRAW;
+            }
+        } else {
+            if (roomState.controller) {
+                creep.memory.targetId = roomState.controller.id;
+                creep.memory.taskId = TASKS.UPGRADE;
+            }
+        }
+    }
+
+    /**
+     * Shared routing logic for filling Extensions then Spawns.
+     * Returns true if a target was found, false otherwise.
+     */
+    static routeToStorage(creep, roomState) {
+        if (roomState.extensions) {
+            for (let i = 0; i < roomState.extensions.length; i++) {
+                const ext = roomState.extensions[i];
+                if (ext.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                    creep.memory.targetId = ext.id;
+                    creep.memory.taskId = TASKS.TRANSFER;
+                    return true;
+                }
+            }
+        }
+
+        if (roomState.spawns && roomState.spawns.length > 0) {
+            const spawn = roomState.spawns[0];
+            if (spawn.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                creep.memory.targetId = spawn.id;
+                creep.memory.taskId = TASKS.TRANSFER;
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
 
-// Attach constants to the class for external access if needed by RoleExecutor
 TaskAssignmentManager.TASKS = TASKS;
 TaskAssignmentManager.STATES = STATES;
 

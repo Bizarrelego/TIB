@@ -7,7 +7,8 @@
 const RCL1_BODIES = {
     harvester: [WORK, WORK, CARRY, MOVE], // 300 energy
     hauler: [CARRY, CARRY, CARRY, MOVE, MOVE, MOVE], // 300 energy
-    upgrader: [WORK, CARRY, CARRY, MOVE, MOVE] // 300 energy
+    upgrader: [WORK, CARRY, CARRY, MOVE, MOVE], // 300 energy
+    scout: [MOVE] // 50 energy
 };
 
 // V8 Optimization: Monomorphic object shape.
@@ -18,6 +19,7 @@ const createMemoryTemplate = (role, roomName) => ({
     room: roomName,
     taskId: 0,
     targetId: null,
+    targetRoom: null, // REQUIRED FOR SCOUTING
     scavenging: 0,
     state: 0
 });
@@ -50,52 +52,34 @@ class SpawnManager {
 
         // Heap-based role counting. 
         // DO NOT use Game.creeps.filter() - it creates new arrays and triggers GC.
-        const creepCounts = roomState?.creepCounts || this.fallbackScanner(roomObj);
+        const creepCounts = roomState?.creepCounts || SpawnManager.fallbackScanner(roomObj);
 
         // Top-down aggressive priority logic. No stored queue in Memory.
         // 1. Harvesters: Dedicated miners. 1 per source. Assume 2 sources.
         if ((creepCounts.harvester || 0) < 2) {
-            this.executeSpawn(spawn, 'harvester', roomObj.name);
+            SpawnManager.executeSpawn(spawn, 'harvester', roomObj.name);
             return;
         }
 
         // 2. Haulers: Move dropped energy to spawn.
         if ((creepCounts.hauler || 0) < 3) {
-            this.executeSpawn(spawn, 'hauler', roomObj.name);
+            SpawnManager.executeSpawn(spawn, 'hauler', roomObj.name);
             return;
         }
 
         // 3. Upgraders: Burn energy into the controller.
         if ((creepCounts.upgrader || 0) < 4) {
-            this.executeSpawn(spawn, 'upgrader', roomObj.name);
+            SpawnManager.executeSpawn(spawn, 'upgrader', roomObj.name);
             return;
         }
-    }
 
-    /**
-     * Handles the actual spawning execution and heap updates.
-     * @param {StructureSpawn} spawn
-     * @param {string} role
-     * @param {string} roomName
-     */
-    static executeSpawn(spawn, role, roomName) {
-        const body = RCL1_BODIES[role];
-        
-        // Fast string concatenation. Avoids UUID generation overhead.
-        const name = role + '_' + Game.time;
-        const memory = createMemoryTemplate(role, roomName);
-
-        const result = spawn.spawnCreep(body, name, { memory });
-
-        if (result === OK) {
-            // Optimistically update heap state to prevent duplicate spawning 
-            // in the same tick if you expand to multiple spawns.
-            const roomState = global.State?.rooms?.get(roomName);
-            if (roomState) {
-                if (!roomState.creepCounts) {
-                    roomState.creepCounts = { harvester: 0, hauler: 0, upgrader: 0 };
-                }
-                roomState.creepCounts[role] = (roomState.creepCounts[role] || 0) + 1;
+        // 4. Scouts: Expand vision network if IntelManager queues targets.
+        // Limit to 1 scout globally for now to prevent over-spawning.
+        if (global.State.scoutQueue && global.State.scoutQueue.length > 0) {
+            const scoutCount = global.State?.creepCounts?.scout || SpawnManager.fallbackScanner(roomObj).scout || 0;
+            if (scoutCount < 1) {
+                SpawnManager.executeSpawn(spawn, 'scout', roomObj.name);
+                return;
             }
         }
     }
@@ -105,7 +89,7 @@ class SpawnManager {
      * @param {Room} roomObj
      */
     static fallbackScanner(roomObj) {
-        const counts = { harvester: 0, hauler: 0, upgrader: 0 };
+        const counts = { harvester: 0, hauler: 0, upgrader: 0, scout: 0 };
         const creeps = roomObj.find(FIND_MY_CREEPS);
         
         // Tight loop, no higher-order functions.

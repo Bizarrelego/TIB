@@ -19,7 +19,13 @@ class RoleExecutor {
             const targetId = creep.memory.targetId;
 
             // Skip creeps that have not been assigned a valid target or task
-            if (!targetId || !taskId || taskId === TaskAssignmentManager.TASKS.IDLE) {
+            if (!taskId || taskId === TaskAssignmentManager.TASKS.IDLE) {
+                continue;
+            }
+
+            // Scouts use targetRoom instead of targetId. Handle them separately.
+            if (taskId === TaskAssignmentManager.TASKS.SCOUT) {
+                this.executeScoutTask(creep);
                 continue;
             }
 
@@ -30,7 +36,7 @@ class RoleExecutor {
                 continue;
             }
 
-            this.executeTask(creep, target, taskId);
+            RoleExecutor.executeTask(creep, target, taskId);
         }
     }
 
@@ -60,6 +66,19 @@ class RoleExecutor {
             case TaskAssignmentManager.TASKS.WITHDRAW:
                 result = creep.withdraw(target, RESOURCE_ENERGY);
                 break;
+            case TaskAssignmentManager.TASKS.BUILD:
+                result = creep.build(target);
+            // Skip creeps that have not been assigned a valid target or task
+            if (!taskId || taskId === TaskAssignmentManager.TASKS.IDLE) {
+                continue;
+            }
+
+            // Scouts use targetRoom instead of targetId. Handle them separately.
+            if (taskId === TaskAssignmentManager.TASKS.SCOUT) {
+                RoleExecutor.executeScoutTask(creep);
+                continue;
+            }
+                break;
             default:
                 creep.memory.targetId = null;
                 return;
@@ -76,6 +95,25 @@ class RoleExecutor {
             // Target is invalid for this intent. Destroy the ID so TaskAssignmentManager 
             // routes the creep to a new target on the next tick.
             creep.memory.targetId = null;
+        }
+    }
+
+    /**
+     * Executes cross-room scouting movement.
+     * @param {Creep} creep 
+     */
+    static executeScoutTask(creep) {
+        const targetRoom = creep.memory.targetRoom;
+        if (!targetRoom) {
+            creep.memory.taskId = TaskAssignmentManager.TASKS.IDLE;
+            return;
+        }
+
+        // If not in the target room, pathfind to the center of it.
+        // Once they enter the room, IntelManager will serialize it on the next tick,
+        // and TaskAssignmentManager will give the scout a new room.
+        if (creep.room.name !== targetRoom) {
+            creep.moveTo(new RoomPosition(25, 25, targetRoom), { visualizePathStyle: { stroke: '#00ff00' } });
         }
     }
 }
