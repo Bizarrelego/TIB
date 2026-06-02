@@ -25,6 +25,7 @@ const createRoomStateTemplate = () => ({
     tombstones: [],
     constructionSites: [],
     hostiles: [],
+    structureIds: [],
     creepCounts: {
         harvester: 0,
         hauler: 0,
@@ -51,6 +52,7 @@ function run() {
         }
 
         // Reset arrays and counts
+        state.structureIds = [];
         state.spawns = [];
         state.extensions = [];
         state.towers = [];
@@ -80,6 +82,7 @@ function run() {
         const structures = room.find(FIND_STRUCTURES);
         for (let i = 0; i < structures.length; i++) {
             const s = structures[i];
+            state.structureIds.push(s.id);
             switch (s.structureType) {
                 case STRUCTURE_SPAWN: state.spawns.push(s); break;
                 case STRUCTURE_EXTENSION: state.extensions.push(s); break;
