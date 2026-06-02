@@ -74,18 +74,16 @@ class TaskAssignmentManager {
         }
 
         // Gather Override: If partially full and local floor is clean, go work.
-        // This prevents upgraders/builders/haulers from stalling when they grab a small pile.
         if ((role === 'hauler' || role === 'upgrader' || role === 'builder') && state === STATES.GATHER && used > 0) {
             const dropped = roomState.droppedEnergy?.length || 0;
             const ruins = roomState.ruins?.length || 0;
             
-            // Only force work if the home room is completely devoid of energy sources
             if (dropped === 0 && ruins === 0 && creep.room.name === creep.memory.room) {
-                // If the spawn has energy, upgraders/builders should still try to withdraw from it.
-                // Do not force WORK state if spawn has energy.
                 const spawnEnergy = (roomState.spawns && roomState.spawns.length > 0) ? roomState.spawns[0].store.getUsedCapacity(RESOURCE_ENERGY) : 0;
                 
-                if (spawnEnergy < 100 || role === 'hauler') {
+                // FIX: Use <= 100 instead of < 100. If spawn has exactly 100 energy, 
+                // assignUpgrader rejects WITHDRAW. This forces WORK to avoid deadlocking idle creeps.
+                if (spawnEnergy <= 100 || role === 'hauler') {
                     state = STATES.WORK; 
                 }
             }
@@ -134,8 +132,15 @@ class TaskAssignmentManager {
         }
 
         if (global.State.scoutQueue && global.State.scoutQueue.length > 0) {
-            creep.memory.targetRoom = global.State.scoutQueue[0];
-            creep.memory.taskId = TASKS.SCOUT;
+            // FIX: Ensure the scout selects a room from the queue that it isn't ALREADY standing in.
+            const nextRoom = global.State.scoutQueue.find(r => r !== creep.room.name);
+            if (nextRoom) {
+                creep.memory.targetRoom = nextRoom;
+                creep.memory.taskId = TASKS.SCOUT;
+            } else {
+                creep.memory.targetRoom = null;
+                creep.memory.taskId = TASKS.IDLE;
+            }
         } else {
             creep.memory.targetRoom = null;
             creep.memory.taskId = TASKS.IDLE;

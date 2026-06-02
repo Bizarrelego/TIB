@@ -5,8 +5,6 @@
  */
 
 // V8 Optimization: Statically define the exact shape of a room's state.
-// Never add properties to this object dynamically later. 
-// If a structure doesn't exist, it remains an empty array or null.
 const createRoomStateTemplate = () => ({
     controller: null,
     storage: null,
@@ -26,7 +24,8 @@ const createRoomStateTemplate = () => ({
     tombstones: [],
     constructionSites: [],
     hostiles: [],
-    // Pre-allocate all possible roles to prevent dynamic key creation
+    // CRITICAL FIX: You MUST include all active roles here or the scanner will ignore them,
+    // causing SpawnManager to infinitely spawn them.
     creepCounts: {
         harvester: 0,
         hauler: 0,
@@ -34,13 +33,11 @@ const createRoomStateTemplate = () => ({
         builder: 0,
         repairer: 0,
         defender: 0,
-        miner: 0
+        miner: 0,
+        scout: 0
     }
 });
 
-/**
- * Scans all visible rooms and populates the global state object.
- */
 function run() {
     if (!global.State) {
         global.State = { rooms: new Map() };
@@ -60,8 +57,6 @@ function run() {
         state.constructionSites = room.find(FIND_MY_CONSTRUCTION_SITES);
         state.hostiles = room.find(FIND_HOSTILE_CREEPS);
 
-        // Single-Pass Structure Binning
-        // Avoids multiple C++ bridge crossings by sorting in pure JS.
         const structures = room.find(FIND_STRUCTURES);
         for (let i = 0; i < structures.length; i++) {
             const s = structures[i];
@@ -79,8 +74,6 @@ function run() {
             }
         }
 
-        // Single-Pass Resource Binning (Energy Only)
-        // JS filtering is faster here than C++ callback closures.
         const drops = room.find(FIND_DROPPED_RESOURCES);
         for (let i = 0; i < drops.length; i++) {
             if (drops[i].resourceType === RESOURCE_ENERGY) {
@@ -105,8 +98,6 @@ function run() {
         global.State.rooms.set(roomName, state);
     }
 
-    // Global pass over Game.creeps to populate counts.
-    // Avoids room.find(FIND_MY_CREEPS) array allocation and native-to-JS bridge overhead.
     const creepNames = Object.keys(Game.creeps);
     for (let i = 0; i < creepNames.length; i++) {
         const creep = Game.creeps[creepNames[i]];
