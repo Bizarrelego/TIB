@@ -1,16 +1,11 @@
 /**
  * Top-Down, V8-Optimized Spawn Manager
- * Algorithmic Body Generation & Dynamic Scaling
+ * Hardcoded Census Framework for RCL 1-2 Bootstrapping
  */
 
 const createMemoryTemplate = (role, roomName) => ({
     role: role,
-    room: roomName,
-    taskId: 0,
-    targetId: null,
-    targetRoom: null,
-    scavenging: 0,
-    state: 0
+    room: roomName
 });
 
 class SpawnManager {
@@ -28,10 +23,12 @@ class SpawnManager {
 
         const creepCounts = roomState?.creepCounts || SpawnManager.fallbackScanner(roomObj);
         
-        // Dynamic limits based on room state
-        const maxHarvesters = roomState?.sources ? roomState.sources.length : 2;
-        
-        // Emergency check: If core economy is dead, spawn immediately with available energy.
+        // CENSUS CONSTANTS
+        const LIMIT_HARVESTERS = 4;
+        const LIMIT_HAULERS = 5;
+        const LIMIT_UPGRADERS = 3;
+        const LIMIT_BUILDERS = 5;
+
         const isEmergency = (creepCounts.harvester || 0) === 0 || (creepCounts.hauler || 0) === 0;
         const energyAvailable = roomObj.energyAvailable;
         const energyCapacity = roomObj.energyCapacityAvailable;
@@ -40,37 +37,24 @@ class SpawnManager {
         
         if (energyAvailable < spawnEnergy) return;
 
-        // 1. Harvesters (1 per source)
-        if ((creepCounts.harvester || 0) < maxHarvesters) {
+        if ((creepCounts.harvester || 0) < LIMIT_HARVESTERS) {
             SpawnManager.executeSpawn(spawn, 'harvester', roomObj.name, spawnEnergy);
             return;
         }
 
-        // 2. Haulers
-        if ((creepCounts.hauler || 0) < 3) {
+        if ((creepCounts.hauler || 0) < LIMIT_HAULERS) {
             SpawnManager.executeSpawn(spawn, 'hauler', roomObj.name, spawnEnergy);
             return;
         }
 
-        // 3. Builders (Only if sites exist)
-        if (roomState && roomState.constructionSites && roomState.constructionSites.length > 0) {
-            if ((creepCounts.builder || 0) < 2) {
-                SpawnManager.executeSpawn(spawn, 'builder', roomObj.name, spawnEnergy);
-                return;
-            }
-        }
-
-        // 4. Upgraders
-        if ((creepCounts.upgrader || 0) < 3) {
+        if ((creepCounts.upgrader || 0) < LIMIT_UPGRADERS) {
             SpawnManager.executeSpawn(spawn, 'upgrader', roomObj.name, spawnEnergy);
             return;
         }
 
-        // 5. Scouts
-        if (global.State.scoutQueue && global.State.scoutQueue.length > 0) {
-            const scoutCount = roomState?.creepCounts?.scout || SpawnManager.fallbackScanner(roomObj).scout || 0;
-            if (scoutCount < 1) {
-                SpawnManager.executeSpawn(spawn, 'scout', roomObj.name, 50);
+        if (roomState && roomState.constructionSites && roomState.constructionSites.length > 0) {
+            if ((creepCounts.builder || 0) < LIMIT_BUILDERS) {
+                SpawnManager.executeSpawn(spawn, 'builder', roomObj.name, spawnEnergy);
                 return;
             }
         }
@@ -78,7 +62,7 @@ class SpawnManager {
 
     static executeSpawn(spawn, role, roomName, energy) {
         const body = SpawnManager.getBody(role, energy);
-        if (body.length === 0) return; // Failsafe
+        if (body.length === 0) return; 
 
         const name = role + '_' + Game.time;
         const memory = createMemoryTemplate(role, roomName);
@@ -96,27 +80,20 @@ class SpawnManager {
         }
     }
 
-    /**
-     * Algorithmically generates the largest optimal body for the given energy.
-     */
     static getBody(role, energy) {
-        if (role === 'scout') return [MOVE];
-
         let body = [];
         let cost = 0;
 
         if (role === 'harvester') {
             body = [WORK, CARRY, MOVE];
-            cost = 200; // CORRECTED BASE COST: 100(WORK) + 50(CARRY) + 50(MOVE) = 200
+            cost = 200;
             let workParts = 1;
             
-            // Maximize WORK parts up to 5 (optimal for a 3000 capacity source)
             while (cost + 100 <= energy && workParts < 5) {
                 body.unshift(WORK);
                 cost += 100;
                 workParts++;
             }
-            // Add one extra MOVE if affordable to speed up transit to the source
             if (cost + 50 <= energy) {
                 body.push(MOVE);
                 cost += 50;
@@ -127,7 +104,6 @@ class SpawnManager {
         if (role === 'hauler') {
             body = [CARRY, MOVE];
             cost = 100;
-            // 2 CARRY per 1 MOVE is optimal for road/plains hauling
             while (cost + 150 <= energy && body.length < 30) {
                 body.unshift(CARRY, CARRY);
                 body.push(MOVE);
@@ -139,7 +115,6 @@ class SpawnManager {
         if (role === 'builder' || role === 'upgrader') {
             body = [WORK, CARRY, MOVE];
             cost = 200;
-            // Balanced parts
             while (cost + 200 <= energy && body.length < 30) {
                 body.unshift(WORK, CARRY);
                 body.push(MOVE);
