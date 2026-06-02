@@ -2,6 +2,7 @@ const TaskAssignmentManager = require('./managers/TaskAssignmentManager');
 const SpawnManager = require('./colonies/SpawnManager');
 const GlobalStateScanner = require('./state/GlobalStateScanner');
 const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
+const IntelManager = require('./managers/IntelManager');
 
 const RoleExecutor = require('./managers/RoleExecutor');
 
@@ -14,6 +15,8 @@ module.exports.loop = function () {
 
     // 3. Scan state and populate global.State
     GlobalStateScanner.run();
+
+    IntelManager.run();
 
     const stateObj = global.State || global.state;
 
