@@ -1,6 +1,6 @@
-// IMPROVEMENT: Replaces hardcoded limits with dynamic source/site calculations.
+// IMPROVEMENT: Replaces hardcoded limits with terrain-aware source calculations.
 // IMPROVEMENT: Introduces strict Emergency Recovery to prevent colony death spirals.
-// IMPROVEMENT: Optimizes body generation to balance WORK/MOVE fatigue ratios.
+// IMPROVEMENT: Caches terrain checks to Memory to eliminate tick-by-tick CPU drain.
 
 class SpawnManager {
     static run(roomOrName) {
@@ -72,19 +72,56 @@ class SpawnManager {
         return counts;
     }
 
+    static getAvailableSourceSpaces(room) {
+        if (Memory.rooms && Memory.rooms[room.name] && Memory.rooms[room.name].sourceSpaces) {
+            return Memory.rooms[room.name].sourceSpaces;
+        }
+
+        const sources = room.find(FIND_SOURCES);
+        const terrain = Game.map.getRoomTerrain(room.name);
+        let totalSpaces = 0;
+
+        for (let i = 0; i < sources.length; i++) {
+            const pos = sources[i].pos;
+            let spaces = 0;
+            
+            for (let dx = -1; dx <= 1; dx++) {
+                for (let dy = -1; dy <= 1; dy++) {
+                    if (dx === 0 && dy === 0) continue;
+                    if (terrain.get(pos.x + dx, pos.y + dy) !== TERRAIN_MASK_WALL) {
+                        spaces++;
+                    }
+                }
+            }
+            totalSpaces += spaces;
+        }
+
+        if (!Memory.rooms) Memory.rooms = {};
+        if (!Memory.rooms[room.name]) Memory.rooms[room.name] = {};
+        Memory.rooms[room.name].sourceSpaces = totalSpaces;
+
+        return totalSpaces;
+    }
+
     static calculateNeeds(room) {
         const sourceCount = room.find(FIND_SOURCES).length;
         const sitesCount = room.find(FIND_MY_CONSTRUCTION_SITES).length;
         const rcl = room.controller.level;
+        const openSpaces = this.getAvailableSourceSpaces(room);
 
-        // Scale down worker counts as creep sizes increase with RCL
-        const harvesterMultiplier = rcl < 3 ? 2 : 1; 
-        const haulerMultiplier = rcl < 4 ? 2 : 1;
+        // Early game: fill all spaces. Late game: 1 large creep per source.
+        // Cap strictly at available physical spaces so creeps don't idle.
+        let targetHarvesters = rcl < 3 ? openSpaces : sourceCount;
+        targetHarvesters = Math.min(targetHarvesters, openSpaces);
+
+        // Hauler logic scales with source count. 
+        // Note: 5 haulers per source (multiplier 5) is excessive if paths are short. Capped at 3 to prevent congestion.
+        const haulerMultiplier = rcl < 4 ? 3 : 1;
 
         return {
-            harvester: sourceCount * harvesterMultiplier,
+            harvester: targetHarvesters,
             hauler: sourceCount * haulerMultiplier,
-            upgrader: rcl === 8 ? 1 : 2, // Hard cap at RCL 8 to save CPU/Energy
+            upgrader: rcl === 8 ? 1 : 2, 
             builder: sitesCount > 0 ? (sitesCount > 10 ? 3 : 2) : 0
         };
     }
