@@ -5,37 +5,32 @@
 const TaskAssignmentManager = require('./TaskAssignmentManager');
 
 class RoleExecutor {
-    static run() {
-        const creepNames = Object.keys(Game.creeps);
-        
-        for (let i = 0; i < creepNames.length; i++) {
-            const creep = Game.creeps[creepNames[i]];
-            
-            if (creep.spawning) continue;
+    static run(creep) {
+        if (!creep) return;
+        if (creep.spawning) return;
 
-            const taskId = creep.memory.taskId;
-            const targetId = creep.memory.targetId;
+        const taskId = creep.memory.taskId;
+        const targetId = creep.memory.targetId;
 
-            if (!taskId || taskId === TaskAssignmentManager.TASKS.IDLE) {
-                continue;
-            }
-
-            if (taskId === TaskAssignmentManager.TASKS.SCOUT || taskId === TaskAssignmentManager.TASKS.MOVE_ROOM) {
-                RoleExecutor.executeCrossRoomTask(creep);
-                continue;
-            }
-
-            const target = Game.getObjectById(targetId);
-            if (!target) {
-                // Ignore clearing if moving to a room and target isn't visible yet
-                if (creep.room.name === creep.memory.targetRoom) {
-                    creep.memory.targetId = null;
-                }
-                continue;
-            }
-
-            RoleExecutor.executeTask(creep, target, taskId);
+        if (!taskId || taskId === TaskAssignmentManager.TASKS.IDLE) {
+            return;
         }
+
+        if (taskId === TaskAssignmentManager.TASKS.SCOUT || taskId === TaskAssignmentManager.TASKS.MOVE_ROOM) {
+            RoleExecutor.executeCrossRoomTask(creep);
+            return;
+        }
+
+        const target = Game.getObjectById(targetId);
+        if (!target) {
+            // Ignore clearing if moving to a room and target isn't visible yet
+            if (creep.room.name === creep.memory.targetRoom) {
+                creep.memory.targetId = null;
+            }
+            return;
+        }
+
+        RoleExecutor.executeTask(creep, target, taskId);
     }
 
     static executeTask(creep, target, taskId) {
