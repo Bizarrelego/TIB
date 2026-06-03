@@ -1,3 +1,5 @@
+const RepairTargetUtility = require('../utilities/RepairTargetUtility');
+
 /**
  * Top-Down, Heap-Driven Task Assignment Manager
  * Enforces strict Drop-Mining, Stationary Upgrading, and Distance-Weighted Hauling
@@ -254,6 +256,17 @@ class TaskAssignmentManager {
     }
 
     static assignBuilderWork(creep, roomState) {
+        const roomName = creep.memory.room || creep.room.name;
+        const repairTargets = RepairTargetUtility.getRepairTargets(roomName, 0.8);
+        if (repairTargets && repairTargets.length > 0) {
+            const closest = creep.pos.findClosestByRange(repairTargets);
+            if (closest) {
+                creep.heap.targetId = closest.id;
+                creep.heap.actionIntent = 'repair';
+                return;
+            }
+        }
+
         const sites = roomState.constructionSites;
         if (sites && sites.length > 0) {
             const closest = creep.pos.findClosestByRange(sites);
