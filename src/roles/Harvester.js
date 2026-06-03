@@ -20,7 +20,7 @@ const Harvester = {
             const result = creep.harvest(source);
 
             if (result === ERR_NOT_IN_RANGE) {
-                creep.moveTo(source, { visualizePathStyle: { stroke: '#ffaa00' } });
+                creep.heap.state = 'idle';
             } else if (result === ERR_NOT_ENOUGH_RESOURCES) {
                 creep.heap.sleepUntil = Game.time + source.ticksToRegeneration;
                 creep.heap.state = 'sleeping';
