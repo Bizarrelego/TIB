@@ -12,11 +12,9 @@
 function findSpawnsNeedingEnergy(room) {
     if (!room) return [];
 
-    let state;
+    let state = null;
     if (global.State && global.State.rooms && typeof global.State.rooms.get === 'function') {
         state = global.State.rooms.get(room.name);
-    } else if (global.state && global.state.rooms) {
-        state = global.state.rooms[room.name];
     }
 
     if (!state || !state.spawns) return [];
@@ -36,11 +34,9 @@ function findSpawnsNeedingEnergy(room) {
 function findExtensionsNeedingEnergy(room) {
     if (!room) return [];
 
-    let state;
+    let state = null;
     if (global.State && global.State.rooms && typeof global.State.rooms.get === 'function') {
         state = global.State.rooms.get(room.name);
-    } else if (global.state && global.state.rooms) {
-        state = global.state.rooms[room.name];
     }
 
     if (!state || !state.extensions) return [];
@@ -60,19 +56,18 @@ function findExtensionsNeedingEnergy(room) {
 function findControllerEnergyDropOff(room) {
     if (!room) return null;
 
-    let state;
+    let state = null;
     if (global.State && global.State.rooms && typeof global.State.rooms.get === 'function') {
         state = global.State.rooms.get(room.name);
-    } else if (global.state && global.state.rooms) {
-        state = global.state.rooms[room.name];
     }
 
-    // First, try to find an upgrader's position
-    const creepNames = Object.keys(Game.creeps);
-    for (let i = 0; i < creepNames.length; i++) {
-        const creep = Game.creeps[creepNames[i]];
-        if (creep.memory.role === 'upgrader' && creep.room.name === room.name) {
-            return creep.pos;
+    // First, try to find an upgrader's position using global state
+    if (state && state.creeps) {
+        for (let i = 0; i < state.creeps.length; i++) {
+            const creep = state.creeps[i];
+            if (creep.memory && creep.memory.role === 'upgrader' && creep.room.name === room.name) {
+                return creep.pos;
+            }
         }
     }
 
