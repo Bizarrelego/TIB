@@ -29,6 +29,7 @@ const createRoomStateTemplate = () => ({
     hostiles: [],
     structureIds: [],
     repairTargets: [],
+    creeps: [],
     creepCounts: {
         harvester: 0,
         hauler: 0,
@@ -57,6 +58,7 @@ function run() {
         // Reset arrays and counts
         state.structureIds = [];
         state.repairTargets = [];
+        state.creeps = [];
         state.spawns = [];
         state.extensions = [];
         state.towers = [];
@@ -143,8 +145,11 @@ function run() {
         const role = creep.memory.role;
 
         const roomState = global.State.rooms.get(roomName);
-        if (roomState && role && roomState.creepCounts[role] !== undefined) {
-            roomState.creepCounts[role]++;
+        if (roomState) {
+            roomState.creeps.push(creep);
+            if (role && roomState.creepCounts[role] !== undefined) {
+                roomState.creepCounts[role]++;
+            }
         }
     }
 }
