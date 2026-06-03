@@ -4,7 +4,7 @@
  */
 class RoleExecutor {
     static run() {
-        global.creepHeap = global.creepHeap || {};
+        if (!(global.creepHeap instanceof Map)) global.creepHeap = new Map();
         const creepNames = Object.keys(Game.creeps);
         
         for (let i = 0; i < creepNames.length; i++) {
@@ -12,7 +12,10 @@ class RoleExecutor {
             
             if (creep.spawning || creep.fatigue > 0) continue;
 
-            creep.heap = global.creepHeap[creep.name] = global.creepHeap[creep.name] || { state: 'idle', actionIntent: 'idle', targetId: null, sleepUntil: 0 };
+            if (!global.creepHeap.has(creep.name)) {
+                global.creepHeap.set(creep.name, { state: 'idle', actionIntent: 'idle', targetId: null, sleepUntil: 0 });
+            }
+            creep.heap = global.creepHeap.get(creep.name);
 
             if (Game.time < creep.heap.sleepUntil) continue;
 
