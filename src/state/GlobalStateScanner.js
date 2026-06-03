@@ -1,3 +1,5 @@
+const RepairTargetUtility = require('../utilities/RepairTargetUtility');
+
 /**
  * Module responsible for building the global state object by scanning rooms.
  * Optimized for RCL 1-8 via Single-Pass Binning, V8 Monomorphism, and Object Reuse.
@@ -26,6 +28,7 @@ const createRoomStateTemplate = () => ({
     constructionSites: [],
     hostiles: [],
     structureIds: [],
+    repairTargets: [],
     creepCounts: {
         harvester: 0,
         hauler: 0,
@@ -53,6 +56,7 @@ function run() {
 
         // Reset arrays and counts
         state.structureIds = [];
+        state.repairTargets = [];
         state.spawns = [];
         state.extensions = [];
         state.towers = [];
@@ -127,6 +131,9 @@ function run() {
                 state.tombstones.push(tombstones[i]);
             }
         }
+
+        // Must run after structures are scanned and added to state.structureIds
+        state.repairTargets = RepairTargetUtility.getRepairTargets(roomName, 0.8);
     }
 
     const creepNames = Object.keys(Game.creeps);
