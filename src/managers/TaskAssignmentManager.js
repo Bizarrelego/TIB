@@ -1,3 +1,5 @@
+const RepairTargetUtility = require('../utilities/RepairTargetUtility');
+
 /**
  * Top-Down, Heap-Driven Task Assignment Manager
  * Enforces strict Drop-Mining, Stationary Upgrading, and Distance-Weighted Hauling
@@ -254,12 +256,46 @@ class TaskAssignmentManager {
     }
 
     static assignBuilderWork(creep, roomState) {
+        const repairTargets = roomState.repairTargets;
+        if (repairTargets && repairTargets.length > 0) {
+            let closest = null;
+            let minRange = Infinity;
+
+            for (let i = 0; i < repairTargets.length; i++) {
+                const target = repairTargets[i];
+                const range = creep.pos.getRangeTo(target);
+                if (range < minRange) {
+                    minRange = range;
+                    closest = target;
+                }
+            }
+
+            if (closest) {
+                creep.heap.targetId = closest.id;
+                creep.heap.actionIntent = 'repair';
+                return;
+            }
+        }
+
         const sites = roomState.constructionSites;
         if (sites && sites.length > 0) {
-            const closest = creep.pos.findClosestByRange(sites);
-            creep.heap.targetId = closest.id;
-            creep.heap.actionIntent = 'build';
-            return;
+            let closestSite = null;
+            let minRangeSite = Infinity;
+
+            for (let i = 0; i < sites.length; i++) {
+                const site = sites[i];
+                const range = creep.pos.getRangeTo(site);
+                if (range < minRangeSite) {
+                    minRangeSite = range;
+                    closestSite = site;
+                }
+            }
+
+            if (closestSite) {
+                creep.heap.targetId = closestSite.id;
+                creep.heap.actionIntent = 'build';
+                return;
+            }
         }
 
         if (roomState.controller) {
