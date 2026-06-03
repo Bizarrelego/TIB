@@ -9,6 +9,9 @@ class MemoryCleanupManager {
         for (const name in Memory.creeps) {
             if (!Game.creeps[name]) {
                 delete Memory.creeps[name];
+                if (global.creepHeap instanceof Map) {
+                    global.creepHeap.delete(name);
+                }
             }
         }
     }

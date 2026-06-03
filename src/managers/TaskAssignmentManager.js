@@ -6,12 +6,12 @@ const RepairTargetUtility = require('../utilities/RepairTargetUtility');
  */
 class TaskAssignmentManager {
     static run() {
-        global.creepHeap = global.creepHeap || {};
+        if (!(global.creepHeap instanceof Map)) global.creepHeap = new Map();
         if (!global.Tick) global.Tick = {};
         
         // Separate claims for gathering (pulling energy) and delivering (pushing energy)
-        global.Tick.gatherClaims = {}; 
-        global.Tick.deliveryClaims = {}; 
+        global.Tick.gatherClaims = new Map();
+        global.Tick.deliveryClaims = new Map();
 
         const creepNames = Object.keys(Game.creeps);
         
@@ -24,7 +24,10 @@ class TaskAssignmentManager {
             const roomState = global.State?.rooms?.get(roomObj.name);
             if (!roomState) continue; // Abort if GlobalStateScanner has not processed the room
 
-            creep.heap = global.creepHeap[creep.name] = global.creepHeap[creep.name] || { state: 'idle', actionIntent: 'idle', targetId: null, secondaryTargetId: null };
+            if (!global.creepHeap.has(creep.name)) {
+                global.creepHeap.set(creep.name, { state: 'idle', actionIntent: 'idle', targetId: null, secondaryTargetId: null });
+            }
+            creep.heap = global.creepHeap.get(creep.name);
 
             if (creep.heap.actionIntent !== 'idle' && creep.heap.actionIntent !== null) {
                 TaskAssignmentManager.validateCurrentTask(creep, roomState);
@@ -48,9 +51,9 @@ class TaskAssignmentManager {
     static reregisterClaim(creep) {
         if (!creep.heap.targetId) return;
         if (creep.heap.state === 'gather') {
-            global.Tick.gatherClaims[creep.heap.targetId] = (global.Tick.gatherClaims[creep.heap.targetId] || 0) + creep.store.getFreeCapacity();
+            global.Tick.gatherClaims.set(creep.heap.targetId, (global.Tick.gatherClaims.get(creep.heap.targetId) || 0) + creep.store.getFreeCapacity());
         } else if (creep.heap.state === 'work' && (creep.heap.actionIntent === 'transfer' || creep.heap.actionIntent === 'build')) {
-            global.Tick.deliveryClaims[creep.heap.targetId] = (global.Tick.deliveryClaims[creep.heap.targetId] || 0) + creep.store.getUsedCapacity(RESOURCE_ENERGY);
+            global.Tick.deliveryClaims.set(creep.heap.targetId, (global.Tick.deliveryClaims.get(creep.heap.targetId) || 0) + creep.store.getUsedCapacity(RESOURCE_ENERGY));
         }
     }
 
@@ -138,7 +141,7 @@ class TaskAssignmentManager {
             let intent = '';
 
             const evaluateTarget = (target, amount, actionIntent) => {
-                const claimed = global.Tick.gatherClaims[target.id] || 0;
+                const claimed = global.Tick.gatherClaims.get(target.id) || 0;
                 const remaining = amount - claimed;
                 
                 if (remaining >= Math.min(50, creep.store.getFreeCapacity(RESOURCE_ENERGY))) {
@@ -175,7 +178,7 @@ class TaskAssignmentManager {
             }
 
             if (bestTarget) {
-                global.Tick.gatherClaims[bestTarget.id] = (global.Tick.gatherClaims[bestTarget.id] || 0) + creep.store.getFreeCapacity(RESOURCE_ENERGY);
+                global.Tick.gatherClaims.set(bestTarget.id, (global.Tick.gatherClaims.get(bestTarget.id) || 0) + creep.store.getFreeCapacity(RESOURCE_ENERGY));
                 creep.heap.targetId = bestTarget.id;
                 creep.heap.actionIntent = intent;
                 return;
@@ -198,11 +201,11 @@ class TaskAssignmentManager {
         if (roomState.controller) {
             if (roomState.controllerContainers && roomState.controllerContainers.length > 0) {
                 const target = roomState.controllerContainers[0];
-                const claimed = global.Tick.deliveryClaims[target.id] || 0;
+                const claimed = global.Tick.deliveryClaims.get(target.id) || 0;
                 const remainingSpace = target.store.getFreeCapacity(RESOURCE_ENERGY) - claimed;
                 
                 if (remainingSpace > 0) {
-                    global.Tick.deliveryClaims[target.id] = claimed + creep.store.getUsedCapacity(RESOURCE_ENERGY);
+                    global.Tick.deliveryClaims.set(target.id, claimed + creep.store.getUsedCapacity(RESOURCE_ENERGY));
                     creep.heap.targetId = target.id;
                     creep.heap.actionIntent = 'transfer';
                     return;
@@ -312,7 +315,7 @@ class TaskAssignmentManager {
             const freeCapacity = target.store.getFreeCapacity(RESOURCE_ENERGY);
             if (freeCapacity === 0) return;
 
-            const claimed = global.Tick.deliveryClaims[target.id] || 0;
+            const claimed = global.Tick.deliveryClaims.get(target.id) || 0;
             const remainingSpace = freeCapacity - claimed;
             if (remainingSpace <= 0) return;
 
@@ -333,7 +336,7 @@ class TaskAssignmentManager {
         }
 
         if (bestTarget) {
-            global.Tick.deliveryClaims[bestTarget.id] = (global.Tick.deliveryClaims[bestTarget.id] || 0) + creep.store.getUsedCapacity(RESOURCE_ENERGY);
+            global.Tick.deliveryClaims.set(bestTarget.id, (global.Tick.deliveryClaims.get(bestTarget.id) || 0) + creep.store.getUsedCapacity(RESOURCE_ENERGY));
             creep.heap.targetId = bestTarget.id;
             creep.heap.actionIntent = 'transfer';
             return true;
