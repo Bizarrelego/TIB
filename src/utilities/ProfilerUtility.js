@@ -4,6 +4,19 @@ const ProfilerUtility = {
     enabled: false,
     metrics: new Map(),
 
+    start: function() {
+        if (this.enabled) {
+            this.metrics.clear();
+        }
+    },
+
+    end: function() {
+        if (this.enabled) {
+            const totalCpu = Game.cpu.getUsed();
+            Logger.debug(`Total CPU used this tick: ${totalCpu.toFixed(3)}`);
+        }
+    },
+
     /**
      * Enables or disables the profiler.
      * @param {boolean} state
