@@ -11,7 +11,10 @@ const ProfilerUtility = {
     },
 
     end: function() {
-        // Any specific end-of-tick profiler logic
+        if (this.enabled) {
+            const totalCpu = Game.cpu.getUsed();
+            Logger.debug(`Total CPU used this tick: ${totalCpu.toFixed(3)}`);
+        }
     },
 
     /**

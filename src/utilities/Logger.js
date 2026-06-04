@@ -12,7 +12,7 @@ const Logger = {
         console.log(`[DEBUG] ${message}`);
     },
     run: function() {
-        // End-of-tick logging can be implemented here
+        this.debug(`Tick ${Game.time} executed successfully.`);
     }
 };
 
