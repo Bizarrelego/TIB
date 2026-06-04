@@ -10,6 +10,9 @@ const Logger = {
     },
     debug: function(message) {
         console.log(`[DEBUG] ${message}`);
+    },
+    run: function() {
+        this.debug(`Tick ${Game.time} executed successfully.`);
     }
 };
 

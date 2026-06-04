@@ -14,10 +14,11 @@ const RoleExecutor = require('./managers/RoleExecutor');
 // Utilities
 const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
 const ProfilerUtility = require('./utilities/ProfilerUtility');
+const Logger = require('./utilities/Logger');
 
 module.exports.loop = function () {
-    // 1. Memory Cleanup
-    MemoryCleanupManager.run();
+    // 1. Profiler Start
+    ProfilerUtility.start();
 
     // 2. Global State Scanning
     GlobalStateScanner.run();
@@ -35,15 +36,7 @@ module.exports.loop = function () {
     }
 
     // 5. Colony Spawning
-    const rooms = Object.keys(Game.rooms);
-    for (let i = 0; i < rooms.length; i++) {
-        const roomName = rooms[i];
-        const room = Game.rooms[roomName];
-        
-        if (room.controller && room.controller.my) {
-            SpawnManager.run(roomName);
-        }
-    }
+    SpawnManager.run();
 
     // 6. Task Assignment
     TaskAssignmentManager.run();
@@ -51,6 +44,15 @@ module.exports.loop = function () {
     // 7. Intent Execution
     RoleExecutor.run();
 
-    // 8. Profiler Reporting
+    // 8. Memory Cleanup
+    MemoryCleanupManager.run();
+
+    // 9. Profiler Reporting
     ProfilerUtility.report();
+
+    // 10. Logger
+    Logger.run();
+
+    // 11. Profiler End
+    ProfilerUtility.end();
 };
