@@ -1,4 +1,4 @@
-const RepairTargetUtility = require('../utilities/RepairTargetUtility');
+const TaskAssignmentManager = require('../managers/TaskAssignmentManager');
 
 class Hauler {
     static assignTask(creep, roomState) {
