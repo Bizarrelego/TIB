@@ -5,13 +5,13 @@ class SourcePositionCacheUtility {
      * @returns {RoomPosition|null} The cached position, or null if not found.
      */
     static getOptimalHarvestPosition(sourceId) {
-        if (!Memory.sourcePositions || !Memory.sourcePositions[sourceId]) {
+        if (!Memory.sourcePositions || !(Memory.sourcePositions instanceof Map) || !Memory.sourcePositions.has(sourceId)) {
             return null;
         }
 
-        const cachedPos = Memory.sourcePositions[sourceId];
+        const cachedPos = Memory.sourcePositions.get(sourceId);
         // Validate properties before creating RoomPosition to avoid engine errors
-        if (cachedPos.x !== undefined && cachedPos.y !== undefined && cachedPos.roomName) {
+        if (cachedPos && cachedPos.x !== undefined && cachedPos.y !== undefined && cachedPos.roomName) {
              return new RoomPosition(cachedPos.x, cachedPos.y, cachedPos.roomName);
         }
 
@@ -24,8 +24,8 @@ class SourcePositionCacheUtility {
      * @param {RoomPosition} pos The optimal position to cache.
      */
     static setOptimalHarvestPosition(sourceId, pos) {
-        if (!Memory.sourcePositions) {
-            Memory.sourcePositions = {};
+        if (!Memory.sourcePositions || !(Memory.sourcePositions instanceof Map)) {
+            Memory.sourcePositions = new Map();
         }
 
         if (!pos) {
@@ -33,11 +33,11 @@ class SourcePositionCacheUtility {
         }
 
         // Store plain object to save memory serialization overhead
-        Memory.sourcePositions[sourceId] = {
+        Memory.sourcePositions.set(sourceId, {
             x: pos.x,
             y: pos.y,
             roomName: pos.roomName
-        };
+        });
     }
 }
 
