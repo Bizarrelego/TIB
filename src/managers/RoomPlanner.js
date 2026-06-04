@@ -4,8 +4,8 @@
 
 class RoomPlanner {
     static run() {
-        if (!global.Cache) global.Cache = { blueprints: {} };
-        if (!global.Cache.blueprints) global.Cache.blueprints = {};
+        if (!global.Cache) global.Cache = { blueprints: new Map() };
+        if (!(global.Cache.blueprints instanceof Map)) global.Cache.blueprints = new Map();
 
         const visibleRooms = Object.keys(Game.rooms);
         for (let i = 0; i < visibleRooms.length; i++) {
@@ -18,7 +18,7 @@ class RoomPlanner {
 
     static manageRoom(room) {
         // 1. Generate Blueprint if it doesn't exist
-        if (!global.Cache.blueprints[room.name]) {
+        if (!global.Cache.blueprints.has(room.name)) {
             this.generateTerrainBlueprint(room);
         }
 
@@ -80,7 +80,7 @@ class RoomPlanner {
         const blueprint = this.applyStamp(anchor);
         blueprint.ramparts = this.calculateChokepoints(terrain, anchor);
         
-        global.Cache.blueprints[room.name] = blueprint;
+        global.Cache.blueprints.set(room.name, blueprint);
     }
 
     static applyStamp(anchor) {
@@ -154,7 +154,7 @@ class RoomPlanner {
     }
 
     static executeBlueprint(room) {
-        const blueprint = global.Cache.blueprints[room.name];
+        const blueprint = global.Cache.blueprints.get(room.name);
         const rcl = room.controller.level;
 
         // Order of construction priority
