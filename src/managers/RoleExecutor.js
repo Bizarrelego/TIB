@@ -4,18 +4,22 @@
  */
 class RoleExecutor {
     static run() {
-        if (!(global.creepHeap instanceof Map)) global.creepHeap = new Map();
-        const creepNames = Object.keys(Game.creeps);
+        if (!global.creepHeap) global.creepHeap = new Map();
         
-        for (let i = 0; i < creepNames.length; i++) {
-            const creep = Game.creeps[creepNames[i]];
+        // Check: Object.values is faster than Object.keys followed by property lookup.
+        const creeps = Object.values(Game.creeps);
+        
+        for (let i = 0; i < creeps.length; i++) {
+            const creep = creeps[i];
             
             if (creep.spawning || creep.fatigue > 0) continue;
 
-            if (!global.creepHeap.has(creep.name)) {
-                global.creepHeap.set(creep.name, { state: 'idle', actionIntent: 'idle', targetId: null, sleepUntil: 0 });
+            let heap = global.creepHeap.get(creep.name);
+            if (!heap) {
+                heap = { state: 'idle', actionIntent: 'idle', targetId: null, sleepUntil: 0 };
+                global.creepHeap.set(creep.name, heap);
             }
-            creep.heap = global.creepHeap.get(creep.name);
+            creep.heap = heap;
 
             if (Game.time < creep.heap.sleepUntil) continue;
 
@@ -59,12 +63,10 @@ class RoleExecutor {
                 result = creep.transfer(target, RESOURCE_ENERGY);
                 break;
             case 'upgrade':
-                // Force pathing check first to bypass the ERR_NOT_ENOUGH_RESOURCES API quirk
-                if (!creep.pos.inRangeTo(target, 3)) {
+                if (creep.pos.getRangeTo(target) > 3) {
                     result = ERR_NOT_IN_RANGE;
                 } else {
                     result = creep.upgradeController(target);
-                    // Same-tick pickup for stationary upgrading
                     if (creep.heap.secondaryTargetId && creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
                         const secondary = Game.getObjectById(creep.heap.secondaryTargetId);
                         if (secondary) creep.pickup(secondary);
@@ -78,12 +80,14 @@ class RoleExecutor {
                 result = creep.build(target);
                 break;
             case 'drop':
-                // Tightened from 3 to 2 to ensure drops are dense enough for stationary upgraders
-                if (!creep.pos.inRangeTo(target, 2)) {
+                if (creep.pos.getRangeTo(target) > 2) {
                     result = ERR_NOT_IN_RANGE;
                 } else {
                     result = creep.drop(RESOURCE_ENERGY);
                 }
+                break;
+            case 'repair':
+                result = creep.repair(target);
                 break;
             default:
                 creep.heap.state = 'idle';
@@ -96,13 +100,11 @@ class RoleExecutor {
         } else if (
             result === ERR_FULL || 
             result === ERR_INVALID_TARGET ||
-            // Upgraders must lock intent even when empty so they don't wander off the drop-pile
             (result === ERR_NOT_ENOUGH_RESOURCES && actionIntent !== 'upgrade')
         ) {
             creep.heap.state = 'idle';
             creep.heap.actionIntent = 'idle';
-        } else if (result === OK && actionIntent !== 'harvest' && actionIntent !== 'upgrade' && actionIntent !== 'build') {
-            // One-shot tasks clear intent on completion
+        } else if (result === OK && actionIntent !== 'harvest' && actionIntent !== 'upgrade' && actionIntent !== 'build' && actionIntent !== 'repair') {
             creep.heap.state = 'idle';
             creep.heap.actionIntent = 'idle';
         }
