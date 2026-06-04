@@ -13,7 +13,7 @@ const ProfilerUtility = {
     end: function() {
         if (this.enabled) {
             const totalCpu = Game.cpu.getUsed();
-            Logger.debug(`Total CPU used this tick: ${totalCpu.toFixed(3)}`);
+            console.log(`[DEBUG] Total CPU used this tick: ${totalCpu.toFixed(3)}`);
         }
     },
 

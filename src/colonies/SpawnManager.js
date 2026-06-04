@@ -1,5 +1,5 @@
 const CreepCensusUtility = require('../utilities/CreepCensusUtility');
-const CreepBodyUtility = require('../utilities/CreepBodyUtility');
+const CreepBodies = require('../config/CreepBodies');
 
 class SpawnManager {
     static run() {
@@ -40,7 +40,7 @@ class SpawnManager {
     }
 
     static executeSpawn(spawn, role, roomName) {
-        const body = CreepBodyUtility.getBody(role);
+        const body = CreepBodies.get(role);
         if (!body || body.length === 0) return;
 
         const name = role + '_' + Game.time;
