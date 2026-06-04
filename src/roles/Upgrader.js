@@ -1,4 +1,3 @@
-const RepairTargetUtility = require('../utilities/RepairTargetUtility');
 
 class Upgrader {
     static assignTask(creep, roomState) {
