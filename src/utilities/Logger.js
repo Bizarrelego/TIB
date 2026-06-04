@@ -10,6 +10,9 @@ const Logger = {
     },
     debug: function(message) {
         console.log(`[DEBUG] ${message}`);
+    },
+    run: function() {
+        // End-of-tick logging can be implemented here
     }
 };
 

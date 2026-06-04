@@ -4,6 +4,16 @@ const ProfilerUtility = {
     enabled: false,
     metrics: new Map(),
 
+    start: function() {
+        if (this.enabled) {
+            this.metrics.clear();
+        }
+    },
+
+    end: function() {
+        // Any specific end-of-tick profiler logic
+    },
+
     /**
      * Enables or disables the profiler.
      * @param {boolean} state
