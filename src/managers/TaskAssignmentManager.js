@@ -123,17 +123,43 @@ class TaskAssignmentManager {
 
     static assignHauler(creep, roomState) {
         if (creep.heap.get('state') === 'gather') {
+            // Check: Prioritize Ruin and Tombstone objects explicitly for Scavenging
+            let bestTarget = null;
+            let intent = '';
+
+            const evaluateScavenge = (target, amount, actionIntent) => {
+                if (bestTarget) return; // Only need the first valid one
+
+                const claimed = target.__gatherClaimed || 0;
+                const remaining = amount - claimed;
+
+                if (remaining >= Math.min(50, creep.store.getFreeCapacity(RESOURCE_ENERGY))) {
+                    bestTarget = target;
+                    intent = actionIntent;
+                }
+            };
+
+            roomState.tombstones?.forEach(t => evaluateScavenge(t, t.store.getUsedCapacity(RESOURCE_ENERGY), ActionConstants.get('ACTION_WITHDRAW')));
+            roomState.ruins?.forEach(r => evaluateScavenge(r, r.store.getUsedCapacity(RESOURCE_ENERGY), ActionConstants.get('ACTION_WITHDRAW')));
+
+            if (bestTarget) {
+                bestTarget.__gatherClaimed = (bestTarget.__gatherClaimed || 0) + creep.store.getFreeCapacity(RESOURCE_ENERGY);
+                creep.heap.set('targetId', bestTarget.id);
+                creep.heap.set('actionIntent', intent);
+                return;
+            }
+
+            // Fallback to hashed assignments if no scavenging targets are available
             const harvesters = roomState.creeps?.filter(c => c.my && c.memory.role === 'harvester') || [];
             if (harvesters.length > 0) {
                 // Hashed assignment: Assign this hauler to a specific harvester based on the hauler's name string length
                 const targetHarvester = harvesters[creep.name.length % harvesters.length];
-                
+
                 // Find dropped energy or container near this specific harvester
                 const drops = roomState.droppedEnergy?.filter(d => d.pos.getRangeTo(targetHarvester) <= 2) || [];
                 const containers = roomState.sourceContainers?.filter(c => c.pos.getRangeTo(targetHarvester) <= 2) || [];
 
                 let targetDrop = null;
-                let intent = '';
 
                 if (drops.length > 0) {
                     targetDrop = drops[0];
@@ -144,6 +170,7 @@ class TaskAssignmentManager {
                 }
 
                 if (targetDrop) {
+                    targetDrop.__gatherClaimed = (targetDrop.__gatherClaimed || 0) + creep.store.getFreeCapacity(RESOURCE_ENERGY);
                     creep.heap.set('targetId', targetDrop.id);
                     creep.heap.set('actionIntent', intent);
                     return;
