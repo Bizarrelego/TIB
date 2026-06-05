@@ -20,33 +20,33 @@ module.exports.loop = function () {
     // 1. Profiler Start
     ProfilerUtility.start();
 
-    // 2. Memory Cleanup
-    // Improvement: Clean dead memory first to prevent iteration over dead entities
-    MemoryCleanupManager.run();
-
-    // 3. Global State Scanning
+    // 2. Global State Scanning
     GlobalStateScanner.run();
 
     const cpuNormal = Game.cpu.bucket > 500;
 
     if (cpuNormal) {
-        // 4. Intelligence Gathering
+        // 3. Intelligence Gathering
         IntelManager.run();
 
-        // 5. Room Planning
+        // 4. Room Planning
         if (Game.time % 100 === 0) {
             RoomPlanner.run();
         }
     }
 
+    // 5. Task Assignment
+    TaskAssignmentManager.run();
+
     // 6. Colony Spawning
     SpawnManager.run();
 
-    // 7. Task Assignment
-    TaskAssignmentManager.run();
-
-    // 8. Intent Execution
+    // 7. Intent Execution
     RoleExecutor.run();
+
+    // 8. Memory Cleanup
+    // Improvement: Clean dead memory first to prevent iteration over dead entities
+    MemoryCleanupManager.run();
 
     // 9. Profiler Reporting
     ProfilerUtility.report();
