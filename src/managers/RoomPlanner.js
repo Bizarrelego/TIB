@@ -4,6 +4,9 @@
 
 class RoomPlanner {
     static run() {
+        if (Game.cpu.bucket <= 500) return;
+        if (Game.time % 100 !== 0) return;
+
         if (!global.Cache) global.Cache = { blueprints: new Map() };
         if (!(global.Cache.blueprints instanceof Map)) global.Cache.blueprints = new Map();
 
