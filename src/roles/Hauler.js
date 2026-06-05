@@ -6,15 +6,15 @@ const Hauler = {
 
         if (!creep.heap) return;
 
-        const targetId = creep.heap.targetId;
-        const actionIntent = creep.heap.actionIntent;
+        const targetId = creep.heap.get('targetId');
+        const actionIntent = creep.heap.get('actionIntent');
 
         if (!targetId || !actionIntent || actionIntent === ActionConstants.ACTION_IDLE) return;
 
         // Use native getObjectById since the utility doesn't exist
         const target = Game.getObjectById(targetId);
         if (!target) {
-            creep.heap.state = 'idle';
+            creep.heap.set('state', 'idle');
             return;
         }
 
@@ -35,7 +35,7 @@ const Hauler = {
         } else if (actionIntent === ActionConstants.ACTION_DROP) {
             result = creep.drop(RESOURCE_ENERGY);
         } else {
-            creep.heap.state = 'idle';
+            creep.heap.set('state', 'idle');
             return;
         }
 
@@ -45,7 +45,7 @@ const Hauler = {
             result === ERR_NOT_ENOUGH_RESOURCES ||
             result === ERR_FULL ||
             result === ERR_INVALID_TARGET) {
-            creep.heap.state = 'idle';
+            creep.heap.set('state', 'idle');
         }
     }
 };
