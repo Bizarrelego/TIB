@@ -39,7 +39,9 @@ class RoomResourceAvailabilityUtility {
     }
 
     /**
-     * Returns the ID of the closest available energy source to a given position.
+     * Returns the ID of the closest available energy source to a given position,
+     * prioritizing Ruins/Tombstones over standard dropped energy, then sources.
+     * Uses pure JS distance calculation to avoid native polling.
      * @param {RoomPosition} pos
      * @param {string} roomName
      * @returns {string|null}
@@ -50,44 +52,57 @@ class RoomResourceAvailabilityUtility {
         const state = global.State.rooms.get(roomName);
         if (!state) return null;
 
-        const candidates = [];
+        const findClosestInArray = (array, conditionFn) => {
+            if (!array || array.length === 0) return null;
+            let closest = null;
+            let minRange = Infinity;
 
-        if (state.droppedEnergy) {
-            for (let i = 0; i < state.droppedEnergy.length; i++) {
-                if (state.droppedEnergy[i].amount > 0) {
-                    candidates.push(state.droppedEnergy[i]);
+            for (let i = 0; i < array.length; i++) {
+                const element = array[i];
+                if (!conditionFn(element)) continue;
+
+                const range = pos.getRangeTo(element.pos);
+                if (range < minRange) {
+                    minRange = range;
+                    closest = element;
                 }
+            }
+            return closest;
+        };
+
+        // 1. Priority: Ruins & Tombstones
+        let closestScavenge = null;
+        let minScavengeRange = Infinity;
+
+        const closestRuin = findClosestInArray(state.ruins, r => r.store.getUsedCapacity(RESOURCE_ENERGY) > 0);
+        if (closestRuin) {
+            const range = pos.getRangeTo(closestRuin.pos);
+            if (range < minScavengeRange) {
+                minScavengeRange = range;
+                closestScavenge = closestRuin;
             }
         }
 
-        if (state.ruins) {
-            for (let i = 0; i < state.ruins.length; i++) {
-                if (state.ruins[i].store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                    candidates.push(state.ruins[i]);
-                }
+        const closestTombstone = findClosestInArray(state.tombstones, t => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0);
+        if (closestTombstone) {
+            const range = pos.getRangeTo(closestTombstone.pos);
+            if (range < minScavengeRange) {
+                minScavengeRange = range;
+                closestScavenge = closestTombstone;
             }
         }
 
-        if (state.tombstones) {
-            for (let i = 0; i < state.tombstones.length; i++) {
-                if (state.tombstones[i].store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                    candidates.push(state.tombstones[i]);
-                }
-            }
-        }
+        if (closestScavenge) return closestScavenge.id;
 
-        if (state.sources) {
-            for (let i = 0; i < state.sources.length; i++) {
-                if (state.sources[i].energy > 0) {
-                    candidates.push(state.sources[i]);
-                }
-            }
-        }
+        // 2. Priority: Dropped Energy
+        const closestDrop = findClosestInArray(state.droppedEnergy, d => d.amount > 0);
+        if (closestDrop) return closestDrop.id;
 
-        if (candidates.length === 0) return null;
+        // 3. Priority: Sources
+        const closestSource = findClosestInArray(state.sources, s => s.energy > 0);
+        if (closestSource) return closestSource.id;
 
-        const closest = pos.findClosestByRange(candidates);
-        return closest ? closest.id : null;
+        return null;
     }
 }
 
