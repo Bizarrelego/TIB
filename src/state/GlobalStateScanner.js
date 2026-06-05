@@ -27,6 +27,7 @@ const createRoomStateTemplate = () => ({
     tombstones: [],
     constructionSites: [],
     hostiles: [],
+    invaderCores: [],
     structureIds: [],
     repairTargets: [],
     creeps: [],
@@ -61,6 +62,7 @@ function run() {
         state.creeps = [];
         state.spawns = [];
         state.extensions = [];
+        state.invaderCores = [];
         state.towers = [];
         state.links = [];
         state.labs = [];
@@ -100,6 +102,7 @@ function run() {
                 case STRUCTURE_TERMINAL: state.terminal = s; break;
                 case STRUCTURE_FACTORY: state.factory = s; break;
                 case STRUCTURE_EXTRACTOR: state.extractor = s; break;
+                case STRUCTURE_INVADER_CORE: state.invaderCores.push(s); break;
             }
         }
 

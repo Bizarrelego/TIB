@@ -14,8 +14,13 @@ const createRoomMemoryTemplate = () => ({
 
 class IntelManager {
     static run() {
-        if (!Memory.rooms) Memory.rooms = {};
+        // Run every 10 ticks to save CPU
+        if (Game.time % 10 !== 0) return;
         
+        if (!Memory.rooms) {
+            Memory.rooms = {};
+        }
+
         const visibleRooms = Object.keys(Game.rooms);
         for (let i = 0; i < visibleRooms.length; i++) {
             IntelManager.scanAndSave(Game.rooms[visibleRooms[i]]);
@@ -25,63 +30,75 @@ class IntelManager {
     }
 
     static scanAndSave(room) {
-        if (!Memory.rooms[room.name]) {
-            Memory.rooms[room.name] = createRoomMemoryTemplate();
+        if (!Memory.rooms) {
+            Memory.rooms = {};
         }
 
-        const mem = Memory.rooms[room.name];
+        let mem = Memory.rooms[room.name];
+        if (!mem) {
+            mem = createRoomMemoryTemplate();
+            Memory.rooms[room.name] = mem;
+        }
+
         mem.scoutedAt = Game.time;
         
         // Ensure nested objects exist in case of schema updates on existing memory
         if (!mem.controller) mem.controller = { owner: null, level: 0, safeMode: 0, x: 0, y: 0 };
         if (!mem.hostiles) mem.hostiles = { creeps: 0, towers: 0, invaderCore: false };
+
+        const state = global.State.rooms.get(room.name);
+        if (!state) return;
         
         // 1. Detailed Source Intelligence
-        const sources = room.find(FIND_SOURCES);
-        mem.sources = [];
+        const sources = state.sources || [];
+        const memSources = [];
         for (let i = 0; i < sources.length; i++) {
-            mem.sources.push({
+            memSources.push({
                 id: sources[i].id,
                 x: sources[i].pos.x,
                 y: sources[i].pos.y
             });
         }
+        mem.sources = memSources;
         
         // 2. Controller Intelligence
+        const controllerObj = mem.controller;
         if (room.controller) {
-            mem.controller.owner = room.controller.owner ? room.controller.owner.username : null;
-            mem.controller.level = room.controller.level;
-            mem.controller.safeMode = room.controller.safeMode || 0;
-            mem.controller.x = room.controller.pos.x;
-            mem.controller.y = room.controller.pos.y;
+            controllerObj.owner = room.controller.owner ? room.controller.owner.username : null;
+            controllerObj.level = room.controller.level;
+            controllerObj.safeMode = room.controller.safeMode || 0;
+            controllerObj.x = room.controller.pos.x;
+            controllerObj.y = room.controller.pos.y;
         } else {
-            mem.controller.owner = null;
+            controllerObj.owner = null;
         }
 
         // 3. Mineral Intelligence
-        const minerals = room.find(FIND_MINERALS);
-        if (minerals.length > 0) {
+        const mineral = state.mineral;
+        if (mineral) {
             mem.mineral = {
-                id: minerals[0].id,
-                type: minerals[0].mineralType,
-                x: minerals[0].pos.x,
-                y: minerals[0].pos.y
+                id: mineral.id,
+                type: mineral.mineralType,
+                x: mineral.pos.x,
+                y: mineral.pos.y
             };
         } else {
             mem.mineral = null;
         }
 
         // 4. Hostile Threat Assessment
-        const hostileCreeps = room.find(FIND_HOSTILE_CREEPS);
-        const hostileTowers = room.find(FIND_HOSTILE_STRUCTURES, { filter: s => s.structureType === STRUCTURE_TOWER });
-        const invaderCores = room.find(FIND_HOSTILE_STRUCTURES, { filter: s => s.structureType === STRUCTURE_INVADER_CORE });
+        const hostileCreeps = state.hostiles || [];
+        const towers = state.towers || [];
+        const hostileTowers = towers.filter(s => !s.my && s.structureType === STRUCTURE_TOWER);
+        const invaderCores = state.invaderCores || [];
 
-        mem.hostiles.creeps = hostileCreeps.length;
-        mem.hostiles.towers = hostileTowers.length;
-        mem.hostiles.invaderCore = invaderCores.length > 0;
+        const hostilesObj = mem.hostiles;
+        hostilesObj.creeps = hostileCreeps.length;
+        hostilesObj.towers = hostileTowers.length;
+        hostilesObj.invaderCore = invaderCores.length > 0;
 
         // 5. Scavenging Data
-        const drops = room.find(FIND_DROPPED_RESOURCES, { filter: r => r.resourceType === RESOURCE_ENERGY });
+        const drops = state.droppedEnergy || [];
         let totalDrops = 0;
         for (let i = 0; i < drops.length; i++) {
             totalDrops += drops[i].amount;
@@ -90,6 +107,10 @@ class IntelManager {
     }
 
     static buildScoutQueue(visibleRooms) {
+        if (!Memory.rooms) {
+            Memory.rooms = {};
+        }
+
         const queue = [];
         for (let i = 0; i < visibleRooms.length; i++) {
             const exits = Game.map.describeExits(visibleRooms[i]);
@@ -98,8 +119,9 @@ class IntelManager {
             const exitRooms = Object.values(exits);
             for (let j = 0; j < exitRooms.length; j++) {
                 const adjRoom = exitRooms[j];
+                const mem = Memory.rooms[adjRoom];
                 // Reduced from 5000 to 3000. Hostile data goes stale fast.
-                if (!Memory.rooms[adjRoom] || (Game.time - Memory.rooms[adjRoom].scoutedAt > 3000)) {
+                if (!mem || (Game.time - mem.scoutedAt > 3000)) {
                     if (!queue.includes(adjRoom)) {
                         queue.push(adjRoom);
                     }
