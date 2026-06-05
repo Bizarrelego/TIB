@@ -1,3 +1,5 @@
+const ActionConstants = require('../constants/ActionConstants');
+
 const Hauler = {
     run: function (creep) {
         if (creep.fatigue > 0) return;
@@ -7,7 +9,7 @@ const Hauler = {
         const targetId = creep.heap.targetId;
         const actionIntent = creep.heap.actionIntent;
 
-        if (!targetId || !actionIntent || actionIntent === 'idle') return;
+        if (!targetId || !actionIntent || actionIntent === ActionConstants.ACTION_IDLE) return;
 
         // Use native getObjectById since the utility doesn't exist
         const target = Game.getObjectById(targetId);
@@ -17,7 +19,7 @@ const Hauler = {
         }
 
         let result;
-        if (actionIntent === 'withdraw' || actionIntent === 'INTENT_WITHDRAW') {
+        if (actionIntent === ActionConstants.ACTION_WITHDRAW) {
             // Handle Ruin/Tombstone prioritization by withdrawing what they have if it's not energy
             if (target.store && (target.structureType === undefined || target.structureType === STRUCTURE_RUIN || target instanceof Tombstone || target instanceof Ruin)) {
                 // Determine resource type to withdraw
@@ -26,11 +28,11 @@ const Hauler = {
             } else {
                 result = creep.withdraw(target, RESOURCE_ENERGY);
             }
-        } else if (actionIntent === 'pickup' || actionIntent === 'INTENT_PICKUP') {
+        } else if (actionIntent === ActionConstants.ACTION_PICKUP) {
             result = creep.pickup(target);
-        } else if (actionIntent === 'transfer' || actionIntent === 'INTENT_TRANSFER') {
+        } else if (actionIntent === ActionConstants.ACTION_TRANSFER) {
             result = creep.transfer(target, RESOURCE_ENERGY);
-        } else if (actionIntent === 'drop' || actionIntent === 'INTENT_DROP') {
+        } else if (actionIntent === ActionConstants.ACTION_DROP) {
             result = creep.drop(RESOURCE_ENERGY);
         } else {
             creep.heap.state = 'idle';

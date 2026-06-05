@@ -1,3 +1,5 @@
+const ActionConstants = require('../constants/ActionConstants');
+
 class CreepHeapUtility {
     /**
      * Gets the default heap structure for a creep.
@@ -7,7 +9,7 @@ class CreepHeapUtility {
         const heap = new Map();
         heap.set('state', 'idle');
         heap.set('targetId', null);
-        heap.set('actionIntent', null);
+        heap.set('actionIntent', ActionConstants.ACTION_IDLE);
         return heap;
     }
 
@@ -59,8 +61,8 @@ class CreepHeapUtility {
      * @returns {string|null}
      */
     static getCreepActionIntent(creep) {
-        if (!creep || !creep.heap) return null;
-        return creep.heap.get('actionIntent') || null;
+        if (!creep || !creep.heap) return ActionConstants.ACTION_IDLE;
+        return creep.heap.get('actionIntent') || ActionConstants.ACTION_IDLE;
     }
 
     /**
