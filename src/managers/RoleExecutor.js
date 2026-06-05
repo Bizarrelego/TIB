@@ -1,4 +1,5 @@
 const ActionConstants = require('../constants/ActionConstants');
+const CreepHeapUtility = require('../utilities/CreepHeapUtility');
 
 /**
  * Top-Down Role Executor
@@ -18,15 +19,16 @@ class RoleExecutor {
 
             let heap = global.creepHeap.get(creep.name);
             if (!heap) {
-                heap = { state: 'idle', actionIntent: ActionConstants.ACTION_IDLE, targetId: null, sleepUntil: 0 };
+                heap = CreepHeapUtility.getDefaultHeap();
+                heap.set('sleepUntil', 0);
                 global.creepHeap.set(creep.name, heap);
             }
             creep.heap = heap;
 
-            if (Game.time < creep.heap.sleepUntil) continue;
+            if (Game.time < creep.heap.get('sleepUntil')) continue;
 
-            const actionIntent = creep.heap.actionIntent;
-            const targetId = creep.heap.targetId;
+            const actionIntent = creep.heap.get('actionIntent');
+            const targetId = creep.heap.get('targetId');
 
             if (!actionIntent || actionIntent === ActionConstants.ACTION_IDLE) continue;
 
@@ -37,8 +39,8 @@ class RoleExecutor {
 
             const target = Game.getObjectById(targetId);
             if (!target) {
-                creep.heap.state = 'idle';
-                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+                creep.heap.set('state', 'idle');
+                creep.heap.set('actionIntent', ActionConstants.ACTION_IDLE);
                 continue;
             }
 
@@ -53,9 +55,9 @@ class RoleExecutor {
             case ActionConstants.ACTION_HARVEST:
                 result = creep.harvest(target);
                 if (result === ERR_NOT_ENOUGH_RESOURCES && target.ticksToRegeneration) {
-                    creep.heap.sleepUntil = Game.time + target.ticksToRegeneration;
-                    creep.heap.state = 'idle';
-                    creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+                    creep.heap.set('sleepUntil', Game.time + target.ticksToRegeneration);
+                    creep.heap.set('state', 'idle');
+                    creep.heap.set('actionIntent', ActionConstants.ACTION_IDLE);
                 }
                 break;
             case ActionConstants.ACTION_PICKUP:
@@ -69,8 +71,8 @@ class RoleExecutor {
                     result = ERR_NOT_IN_RANGE;
                 } else {
                     result = creep.upgradeController(target);
-                    if (creep.heap.secondaryTargetId && creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                        const secondary = Game.getObjectById(creep.heap.secondaryTargetId);
+                    if (creep.heap.get('secondaryTargetId') && creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                        const secondary = Game.getObjectById(creep.heap.get('secondaryTargetId'));
                         if (secondary) creep.pickup(secondary);
                     }
                 }
@@ -92,8 +94,8 @@ class RoleExecutor {
                 result = creep.repair(target);
                 break;
             default:
-                creep.heap.state = 'idle';
-                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+                creep.heap.set('state', 'idle');
+                creep.heap.set('actionIntent', ActionConstants.ACTION_IDLE);
                 return;
         }
 
@@ -104,18 +106,18 @@ class RoleExecutor {
             result === ERR_INVALID_TARGET ||
             (result === ERR_NOT_ENOUGH_RESOURCES && actionIntent !== ActionConstants.ACTION_UPGRADE)
         ) {
-            creep.heap.state = 'idle';
-            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            creep.heap.set('state', 'idle');
+            creep.heap.set('actionIntent', ActionConstants.ACTION_IDLE);
         } else if (result === OK && actionIntent !== ActionConstants.ACTION_HARVEST && actionIntent !== ActionConstants.ACTION_UPGRADE && actionIntent !== ActionConstants.ACTION_BUILD && actionIntent !== ActionConstants.ACTION_REPAIR) {
-            creep.heap.state = 'idle';
-            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            creep.heap.set('state', 'idle');
+            creep.heap.set('actionIntent', ActionConstants.ACTION_IDLE);
         }
     }
 
     static executeCrossRoomTask(creep) {
         const targetRoom = creep.memory.targetRoom;
         if (!targetRoom) {
-            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            creep.heap.set('actionIntent', ActionConstants.ACTION_IDLE);
             return;
         }
 
@@ -129,13 +131,13 @@ class RoleExecutor {
 
             if (moveResult === ERR_NO_PATH) {
                 creep.memory.targetRoom = null;
-                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+                creep.heap.set('actionIntent', ActionConstants.ACTION_IDLE);
             }
         } else {
             if (creep.pos.x === 0 || creep.pos.x === 49 || creep.pos.y === 0 || creep.pos.y === 49) {
                 creep.moveTo(new RoomPosition(25, 25, creep.room.name), { reusePath: 10, ignoreCreeps: true });
             } else {
-                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+                creep.heap.set('actionIntent', ActionConstants.ACTION_IDLE);
             }
         }
     }
