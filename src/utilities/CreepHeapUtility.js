@@ -9,7 +9,7 @@ class CreepHeapUtility {
         const heap = new Map();
         heap.set('state', 'idle');
         heap.set('targetId', null);
-        heap.set('actionIntent', ActionConstants.ACTION_IDLE);
+        heap.set('actionIntent', ActionConstants.get('ACTION_IDLE'));
         return heap;
     }
 
@@ -61,8 +61,8 @@ class CreepHeapUtility {
      * @returns {string|null}
      */
     static getCreepActionIntent(creep) {
-        if (!creep || !creep.heap) return ActionConstants.ACTION_IDLE;
-        return creep.heap.get('actionIntent') || ActionConstants.ACTION_IDLE;
+        if (!creep || !creep.heap) return ActionConstants.get('ACTION_IDLE');
+        return creep.heap.get('actionIntent') || ActionConstants.get('ACTION_IDLE');
     }
 
     /**
