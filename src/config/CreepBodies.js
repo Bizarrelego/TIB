@@ -1,7 +1,9 @@
-const CreepBodies = new Map([
-    ['harvester', [WORK, WORK, MOVE]],
-    ['hauler', [CARRY, CARRY, MOVE, MOVE]],
-    ['upgrader', [WORK, CARRY, MOVE]]
-]);
+const HARVESTER_BODY = [WORK, WORK, MOVE];
+const HAULER_BODY = [CARRY, CARRY, MOVE, MOVE];
+const UPGRADER_BODY = [WORK, CARRY, MOVE];
 
-module.exports = CreepBodies;
+module.exports = {
+    HARVESTER_BODY,
+    HAULER_BODY,
+    UPGRADER_BODY
+};

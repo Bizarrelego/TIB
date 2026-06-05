@@ -2,7 +2,8 @@ const CreepBodies = require('../config/CreepBodies');
 
 class CreepBodyUtility {
     static getBody(role) {
-        return CreepBodies.get(role);
+        const key = `${role.toUpperCase()}_BODY`;
+        return CreepBodies[key];
     }
 }
 module.exports = CreepBodyUtility;
