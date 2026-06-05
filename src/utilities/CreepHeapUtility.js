@@ -1,10 +1,14 @@
 class CreepHeapUtility {
     /**
      * Gets the default heap structure for a creep.
-     * @returns {Object}
+     * @returns {Map}
      */
     static getDefaultHeap() {
-        return { state: 'idle', targetId: null, actionIntent: null };
+        const heap = new Map();
+        heap.set('state', 'idle');
+        heap.set('targetId', null);
+        heap.set('actionIntent', null);
+        return heap;
     }
 
     /**
@@ -14,7 +18,7 @@ class CreepHeapUtility {
      */
     static getCreepState(creep) {
         if (!creep || !creep.heap) return 'idle';
-        return creep.heap.state || 'idle';
+        return creep.heap.get('state') || 'idle';
     }
 
     /**
@@ -25,7 +29,7 @@ class CreepHeapUtility {
     static setCreepState(creep, state) {
         if (!creep) return;
         if (!creep.heap) creep.heap = CreepHeapUtility.getDefaultHeap();
-        creep.heap.state = state;
+        creep.heap.set('state', state);
     }
 
     /**
@@ -35,7 +39,7 @@ class CreepHeapUtility {
      */
     static getCreepTargetId(creep) {
         if (!creep || !creep.heap) return null;
-        return creep.heap.targetId || null;
+        return creep.heap.get('targetId') || null;
     }
 
     /**
@@ -46,7 +50,7 @@ class CreepHeapUtility {
     static setCreepTargetId(creep, id) {
         if (!creep) return;
         if (!creep.heap) creep.heap = CreepHeapUtility.getDefaultHeap();
-        creep.heap.targetId = id;
+        creep.heap.set('targetId', id);
     }
 
     /**
@@ -56,7 +60,7 @@ class CreepHeapUtility {
      */
     static getCreepActionIntent(creep) {
         if (!creep || !creep.heap) return null;
-        return creep.heap.actionIntent || null;
+        return creep.heap.get('actionIntent') || null;
     }
 
     /**
@@ -67,7 +71,7 @@ class CreepHeapUtility {
     static setCreepActionIntent(creep, intent) {
         if (!creep) return;
         if (!creep.heap) creep.heap = CreepHeapUtility.getDefaultHeap();
-        creep.heap.actionIntent = intent;
+        creep.heap.set('actionIntent', intent);
     }
 }
 
