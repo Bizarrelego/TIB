@@ -248,19 +248,19 @@ class TaskAssignmentManager {
 
     static assignBuilderWork(creep, roomState) {
         if (roomState.repairTargets?.length > 0) {
-            // Check: Replaced array loop with pos.findClosestByRange for faster engine-side C++ execution.
-            const closest = creep.pos.findClosestByRange(roomState.repairTargets);
-            if (closest) {
-                creep.heap.set('targetId', closest.id);
+            // Check: Replaced pos.findClosestByRange with O(1) global state array access to satisfy 'Zero Native Polling'.
+            const target = roomState.repairTargets[0];
+            if (target) {
+                creep.heap.set('targetId', target.id);
                 creep.heap.set('actionIntent', ActionConstants.get('ACTION_REPAIR'));
                 return;
             }
         }
 
         if (roomState.constructionSites?.length > 0) {
-            const closestSite = creep.pos.findClosestByRange(roomState.constructionSites);
-            if (closestSite) {
-                creep.heap.set('targetId', closestSite.id);
+            const targetSite = roomState.constructionSites[0];
+            if (targetSite) {
+                creep.heap.set('targetId', targetSite.id);
                 creep.heap.set('actionIntent', ActionConstants.get('ACTION_BUILD'));
                 return;
             }
