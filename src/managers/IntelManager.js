@@ -90,8 +90,7 @@ class IntelManager {
         const hostileCreeps = state.hostiles || [];
         const towers = state.towers || [];
         const hostileTowers = towers.filter(s => !s.my && s.structureType === STRUCTURE_TOWER);
-        // We use state.structureIds and filtering for invaderCores if needed, but let's just use room.find for invader core since it's not in state
-        const invaderCores = room.find(FIND_HOSTILE_STRUCTURES, { filter: s => s.structureType === STRUCTURE_INVADER_CORE });
+        const invaderCores = state.invaderCores || [];
 
         const hostilesObj = mem.hostiles;
         hostilesObj.creeps = hostileCreeps.length;
