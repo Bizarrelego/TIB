@@ -14,6 +14,7 @@ const createRoomMemoryTemplate = () => ({
 
 class IntelManager {
     static run() {
+        if (Game.cpu.bucket <= 500) return;
         // Run every 10 ticks to save CPU
         if (Game.time % 10 !== 0) return;
         
