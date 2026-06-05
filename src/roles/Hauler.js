@@ -1,0 +1,51 @@
+const Hauler = {
+    run: function (creep) {
+        if (creep.fatigue > 0) return;
+
+        if (!creep.heap) return;
+
+        const targetId = creep.heap.targetId;
+        const actionIntent = creep.heap.actionIntent;
+
+        if (!targetId || !actionIntent || actionIntent === 'idle') return;
+
+        // Use native getObjectById since the utility doesn't exist
+        const target = Game.getObjectById(targetId);
+        if (!target) {
+            creep.heap.state = 'idle';
+            return;
+        }
+
+        let result;
+        if (actionIntent === 'withdraw' || actionIntent === 'INTENT_WITHDRAW') {
+            // Handle Ruin/Tombstone prioritization by withdrawing what they have if it's not energy
+            if (target.store && (target.structureType === undefined || target.structureType === STRUCTURE_RUIN || target instanceof Tombstone || target instanceof Ruin)) {
+                // Determine resource type to withdraw
+                const resourceType = Object.keys(target.store)[0] || RESOURCE_ENERGY;
+                result = creep.withdraw(target, resourceType);
+            } else {
+                result = creep.withdraw(target, RESOURCE_ENERGY);
+            }
+        } else if (actionIntent === 'pickup' || actionIntent === 'INTENT_PICKUP') {
+            result = creep.pickup(target);
+        } else if (actionIntent === 'transfer' || actionIntent === 'INTENT_TRANSFER') {
+            result = creep.transfer(target, RESOURCE_ENERGY);
+        } else if (actionIntent === 'drop' || actionIntent === 'INTENT_DROP') {
+            result = creep.drop(RESOURCE_ENERGY);
+        } else {
+            creep.heap.state = 'idle';
+            return;
+        }
+
+        if (result === ERR_NOT_IN_RANGE) {
+            creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
+        } else if (result === OK ||
+            result === ERR_NOT_ENOUGH_RESOURCES ||
+            result === ERR_FULL ||
+            result === ERR_INVALID_TARGET) {
+            creep.heap.state = 'idle';
+        }
+    }
+};
+
+module.exports = Hauler;
