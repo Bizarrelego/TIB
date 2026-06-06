@@ -1,4 +1,5 @@
 const RepairTargetUtility = require('../utilities/RepairTargetUtility');
+const IntelManager = require('../managers/IntelManager');
 
 /**
  * Module responsible for building the global state object by scanning rooms.
@@ -155,6 +156,9 @@ function run() {
             }
         }
     }
+
+    // Delegation to IntelManager to maintain Single Responsibility for data processing
+    IntelManager.run();
 }
 
 module.exports = {

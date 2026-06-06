@@ -20,19 +20,23 @@ module.exports.loop = function () {
 
     // Memory Cleanup
     // Improvement: Clean dead memory first to prevent iteration over dead entities
-    MemoryCleanupManager.run();
+    MemoryCleanupManager.run(); // Integrates MemoryCleanupManager into main loop
 
     // 1. Global State Scanning
-    GlobalStateScanner.run();
+    GlobalStateScanner.run(); // Ensures GlobalStateScanner runs at start
+
+    // Removed IntelManager.run() from here to maintain the "Eyes" single responsibility
+    // and strictly adhere to Skeleton Top-Down Architecture Constraints.
+    // IntelManager execution has been shifted inside GlobalStateScanner.
 
     // 2. Colony Spawning
-    SpawnManager.run();
+    SpawnManager.run(); // Integrates SpawnManager into main loop
 
     // 3. Task Assignment
-    TaskAssignmentManager.run();
+    TaskAssignmentManager.run(); // Integrates TaskAssignmentManager into main loop
 
     // 4. Intent Execution
-    RoleExecutor.run();
+    RoleExecutor.run(); // Ensures RoleExecutor is called for all active creeps
 
     // Profiler Reporting
     ProfilerUtility.report();
