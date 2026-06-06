@@ -1,14 +1,16 @@
+const ActionConstants = require('../constants/ActionConstants');
+
 class CreepHeapUtility {
     /**
      * Gets the default heap structure for a creep.
-     * @returns {Map}
+     * @returns {Object}
      */
     static getDefaultHeap() {
-        const heap = new Map();
-        heap.set('state', 'idle');
-        heap.set('targetId', null);
-        heap.set('actionIntent', null);
-        return heap;
+        return {
+            state: 'idle',
+            targetId: null,
+            actionIntent: ActionConstants.ACTION_IDLE
+        };
     }
 
     /**
@@ -18,7 +20,7 @@ class CreepHeapUtility {
      */
     static getCreepState(creep) {
         if (!creep || !creep.heap) return 'idle';
-        return creep.heap.get('state') || 'idle';
+        return creep.heap.state || 'idle';
     }
 
     /**
@@ -29,7 +31,7 @@ class CreepHeapUtility {
     static setCreepState(creep, state) {
         if (!creep) return;
         if (!creep.heap) creep.heap = CreepHeapUtility.getDefaultHeap();
-        creep.heap.set('state', state);
+        creep.heap.state = state;
     }
 
     /**
@@ -39,7 +41,7 @@ class CreepHeapUtility {
      */
     static getCreepTargetId(creep) {
         if (!creep || !creep.heap) return null;
-        return creep.heap.get('targetId') || null;
+        return creep.heap.targetId || null;
     }
 
     /**
@@ -50,7 +52,7 @@ class CreepHeapUtility {
     static setCreepTargetId(creep, id) {
         if (!creep) return;
         if (!creep.heap) creep.heap = CreepHeapUtility.getDefaultHeap();
-        creep.heap.set('targetId', id);
+        creep.heap.targetId = id;
     }
 
     /**
@@ -59,8 +61,8 @@ class CreepHeapUtility {
      * @returns {string|null}
      */
     static getCreepActionIntent(creep) {
-        if (!creep || !creep.heap) return null;
-        return creep.heap.get('actionIntent') || null;
+        if (!creep || !creep.heap) return ActionConstants.ACTION_IDLE;
+        return creep.heap.actionIntent || ActionConstants.ACTION_IDLE;
     }
 
     /**
@@ -71,7 +73,7 @@ class CreepHeapUtility {
     static setCreepActionIntent(creep, intent) {
         if (!creep) return;
         if (!creep.heap) creep.heap = CreepHeapUtility.getDefaultHeap();
-        creep.heap.set('actionIntent', intent);
+        creep.heap.actionIntent = intent;
     }
 }
 

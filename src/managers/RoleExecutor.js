@@ -1,3 +1,6 @@
+const ActionConstants = require('../constants/ActionConstants');
+const CreepHeapUtility = require('../utilities/CreepHeapUtility');
+
 /**
  * Top-Down Role Executor
  * Processes intent execution based on heap-stored actions.
@@ -16,7 +19,8 @@ class RoleExecutor {
 
             let heap = global.creepHeap.get(creep.name);
             if (!heap) {
-                heap = { state: 'idle', actionIntent: 'idle', targetId: null, sleepUntil: 0 };
+                heap = CreepHeapUtility.getDefaultHeap();
+                heap.sleepUntil = 0;
                 global.creepHeap.set(creep.name, heap);
             }
             creep.heap = heap;
@@ -26,9 +30,9 @@ class RoleExecutor {
             const actionIntent = creep.heap.actionIntent;
             const targetId = creep.heap.targetId;
 
-            if (!actionIntent || actionIntent === 'idle') continue;
+            if (!actionIntent || actionIntent === ActionConstants.ACTION_IDLE) continue;
 
-            if (actionIntent === 'scout' || actionIntent === 'move_room') {
+            if (actionIntent === ActionConstants.ACTION_SCOUT || actionIntent === ActionConstants.ACTION_MOVE_ROOM) {
                 RoleExecutor.executeCrossRoomTask(creep);
                 continue;
             }
@@ -36,7 +40,7 @@ class RoleExecutor {
             const target = Game.getObjectById(targetId);
             if (!target) {
                 creep.heap.state = 'idle';
-                creep.heap.actionIntent = 'idle';
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
                 continue;
             }
 
@@ -48,21 +52,21 @@ class RoleExecutor {
         let result;
 
         switch (actionIntent) {
-            case 'harvest':
+            case ActionConstants.ACTION_HARVEST:
                 result = creep.harvest(target);
                 if (result === ERR_NOT_ENOUGH_RESOURCES && target.ticksToRegeneration) {
                     creep.heap.sleepUntil = Game.time + target.ticksToRegeneration;
                     creep.heap.state = 'idle';
-                    creep.heap.actionIntent = 'idle';
+                    creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
                 }
                 break;
-            case 'pickup':
+            case ActionConstants.ACTION_PICKUP:
                 result = creep.pickup(target);
                 break;
-            case 'transfer':
+            case ActionConstants.ACTION_TRANSFER:
                 result = creep.transfer(target, RESOURCE_ENERGY);
                 break;
-            case 'upgrade':
+            case ActionConstants.ACTION_UPGRADE:
                 if (creep.pos.getRangeTo(target) > 3) {
                     result = ERR_NOT_IN_RANGE;
                 } else {
@@ -73,25 +77,25 @@ class RoleExecutor {
                     }
                 }
                 break;
-            case 'withdraw':
+            case ActionConstants.ACTION_WITHDRAW:
                 result = creep.withdraw(target, RESOURCE_ENERGY);
                 break;
-            case 'build':
+            case ActionConstants.ACTION_BUILD:
                 result = creep.build(target);
                 break;
-            case 'drop':
+            case ActionConstants.ACTION_DROP:
                 if (creep.pos.getRangeTo(target) > 2) {
                     result = ERR_NOT_IN_RANGE;
                 } else {
                     result = creep.drop(RESOURCE_ENERGY);
                 }
                 break;
-            case 'repair':
+            case ActionConstants.ACTION_REPAIR:
                 result = creep.repair(target);
                 break;
             default:
                 creep.heap.state = 'idle';
-                creep.heap.actionIntent = 'idle';
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
                 return;
         }
 
@@ -100,20 +104,20 @@ class RoleExecutor {
         } else if (
             result === ERR_FULL || 
             result === ERR_INVALID_TARGET ||
-            (result === ERR_NOT_ENOUGH_RESOURCES && actionIntent !== 'upgrade')
+            (result === ERR_NOT_ENOUGH_RESOURCES && actionIntent !== ActionConstants.ACTION_UPGRADE)
         ) {
             creep.heap.state = 'idle';
-            creep.heap.actionIntent = 'idle';
-        } else if (result === OK && actionIntent !== 'harvest' && actionIntent !== 'upgrade' && actionIntent !== 'build' && actionIntent !== 'repair') {
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+        } else if (result === OK && actionIntent !== ActionConstants.ACTION_HARVEST && actionIntent !== ActionConstants.ACTION_UPGRADE && actionIntent !== ActionConstants.ACTION_BUILD && actionIntent !== ActionConstants.ACTION_REPAIR) {
             creep.heap.state = 'idle';
-            creep.heap.actionIntent = 'idle';
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
         }
     }
 
     static executeCrossRoomTask(creep) {
         const targetRoom = creep.memory.targetRoom;
         if (!targetRoom) {
-            creep.heap.actionIntent = 'idle';
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
             return;
         }
 
@@ -127,13 +131,13 @@ class RoleExecutor {
 
             if (moveResult === ERR_NO_PATH) {
                 creep.memory.targetRoom = null;
-                creep.heap.actionIntent = 'idle';
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
             }
         } else {
             if (creep.pos.x === 0 || creep.pos.x === 49 || creep.pos.y === 0 || creep.pos.y === 49) {
                 creep.moveTo(new RoomPosition(25, 25, creep.room.name), { reusePath: 10, ignoreCreeps: true });
             } else {
-                creep.heap.actionIntent = 'idle';
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
             }
         }
     }
