@@ -12,7 +12,7 @@ class EnergySourceUtility {
      */
     static findAvailableDroppedEnergy(room) {
         const roomName = typeof room === 'string' ? room : room.name;
-        const state = global.State && global.State.rooms ? global.State.rooms.get(roomName) : null;
+        const state = global.State && global.State.rooms ? global.State.rooms[roomName] : null;
         if (!state || !state.droppedEnergy) return [];
 
         const energyDrops = state.droppedEnergy.filter(drop =>
@@ -28,7 +28,7 @@ class EnergySourceUtility {
      */
     static findEnergyInRuinsAndTombstones(room) {
         const roomName = typeof room === 'string' ? room : room.name;
-        const state = global.State && global.State.rooms ? global.State.rooms.get(roomName) : null;
+        const state = global.State && global.State.rooms ? global.State.rooms[roomName] : null;
         if (!state) return [];
 
         let targets = [];
@@ -59,7 +59,7 @@ class EnergySourceUtility {
      */
     static findHarvestableSources(room) {
         const roomName = typeof room === 'string' ? room : room.name;
-        const state = global.State && global.State.rooms ? global.State.rooms.get(roomName) : null;
+        const state = global.State && global.State.rooms ? global.State.rooms[roomName] : null;
         if (!state || !state.sources) return [];
 
         return state.sources.filter(source =>
