@@ -1,6 +1,7 @@
 
 const ActionConstants = require('../constants/ActionConstants');
 const CreepHeapUtility = require('../utilities/CreepHeapUtility');
+const WithdrawTargetUtility = require('../utilities/WithdrawTargetUtility');
 
 /**
  * Top-Down, Heap-Driven Task Assignment Manager
@@ -124,29 +125,20 @@ class TaskAssignmentManager {
     static assignHauler(creep, roomState) {
         if (creep.heap.state === 'gather') {
             // Check: Prioritize Ruin and Tombstone objects explicitly for Scavenging
-            let bestTarget = null;
-            let intent = '';
+            const scavengeTargets = WithdrawTargetUtility.getScavengeTargets(roomState);
 
-            const evaluateScavenge = (target, amount, actionIntent) => {
-                if (bestTarget) return; // Only need the first valid one
-
+            for (let i = 0; i < scavengeTargets.length; i++) {
+                const target = scavengeTargets[i];
+                const amount = target.store.getUsedCapacity(RESOURCE_ENERGY);
                 const claimed = target.__gatherClaimed || 0;
                 const remaining = amount - claimed;
 
                 if (remaining >= Math.min(50, creep.store.getFreeCapacity(RESOURCE_ENERGY))) {
-                    bestTarget = target;
-                    intent = actionIntent;
+                    target.__gatherClaimed = claimed + creep.store.getFreeCapacity(RESOURCE_ENERGY);
+                    creep.heap.targetId = target.id;
+                    creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
+                    return;
                 }
-            };
-
-            roomState.tombstones?.forEach(t => evaluateScavenge(t, t.store.getUsedCapacity(RESOURCE_ENERGY), ActionConstants.ACTION_WITHDRAW));
-            roomState.ruins?.forEach(r => evaluateScavenge(r, r.store.getUsedCapacity(RESOURCE_ENERGY), ActionConstants.ACTION_WITHDRAW));
-
-            if (bestTarget) {
-                bestTarget.__gatherClaimed = (bestTarget.__gatherClaimed || 0) + creep.store.getFreeCapacity(RESOURCE_ENERGY);
-                creep.heap.targetId = bestTarget.id;
-                creep.heap.actionIntent = intent;
-                return;
             }
 
             // Fallback to hashed assignments if no scavenging targets are available
@@ -160,6 +152,7 @@ class TaskAssignmentManager {
                 const containers = roomState.sourceContainers?.filter(c => c.pos.getRangeTo(targetHarvester) <= 2) || [];
 
                 let targetDrop = null;
+                let intent = '';
 
                 if (drops.length > 0) {
                     targetDrop = drops[0];
