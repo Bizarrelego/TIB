@@ -1,6 +1,13 @@
 const ActionConstants = require('../constants/ActionConstants');
 const CreepHeapUtility = require('../utilities/CreepHeapUtility');
 
+const roles = {
+    harvester: require('../roles/Harvester'),
+    hauler: require('../roles/Hauler'),
+    upgrader: require('../roles/Upgrader'),
+    builder: require('../roles/Builder')
+};
+
 /**
  * Top-Down Role Executor
  * Processes intent execution based on heap-stored actions.
@@ -28,7 +35,6 @@ class RoleExecutor {
             if (Game.time < creep.heap.sleepUntil) continue;
 
             const actionIntent = creep.heap.actionIntent;
-            const targetId = creep.heap.targetId;
 
             if (!actionIntent || actionIntent === ActionConstants.ACTION_IDLE) continue;
 
@@ -37,80 +43,13 @@ class RoleExecutor {
                 continue;
             }
 
-            const target = Game.getObjectById(targetId);
-            if (!target) {
+            const roleLogic = roles[creep.memory.role];
+            if (roleLogic) {
+                roleLogic.run(creep);
+            } else {
                 creep.heap.state = 'idle';
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
-                continue;
             }
-
-            RoleExecutor.executeTask(creep, target, actionIntent);
-        }
-    }
-
-    static executeTask(creep, target, actionIntent) {
-        let result;
-
-        switch (actionIntent) {
-            case ActionConstants.ACTION_HARVEST:
-                result = creep.harvest(target);
-                if (result === ERR_NOT_ENOUGH_RESOURCES && target.ticksToRegeneration) {
-                    creep.heap.sleepUntil = Game.time + target.ticksToRegeneration;
-                    creep.heap.state = 'idle';
-                    creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
-                }
-                break;
-            case ActionConstants.ACTION_PICKUP:
-                result = creep.pickup(target);
-                break;
-            case ActionConstants.ACTION_TRANSFER:
-                result = creep.transfer(target, RESOURCE_ENERGY);
-                break;
-            case ActionConstants.ACTION_UPGRADE:
-                if (creep.pos.getRangeTo(target) > 3) {
-                    result = ERR_NOT_IN_RANGE;
-                } else {
-                    result = creep.upgradeController(target);
-                    if (creep.heap.secondaryTargetId && creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                        const secondary = Game.getObjectById(creep.heap.secondaryTargetId);
-                        if (secondary) creep.pickup(secondary);
-                    }
-                }
-                break;
-            case ActionConstants.ACTION_WITHDRAW:
-                result = creep.withdraw(target, RESOURCE_ENERGY);
-                break;
-            case ActionConstants.ACTION_BUILD:
-                result = creep.build(target);
-                break;
-            case ActionConstants.ACTION_DROP:
-                if (creep.pos.getRangeTo(target) > 2) {
-                    result = ERR_NOT_IN_RANGE;
-                } else {
-                    result = creep.drop(RESOURCE_ENERGY);
-                }
-                break;
-            case ActionConstants.ACTION_REPAIR:
-                result = creep.repair(target);
-                break;
-            default:
-                creep.heap.state = 'idle';
-                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
-                return;
-        }
-
-        if (result === ERR_NOT_IN_RANGE) {
-            creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
-        } else if (
-            result === ERR_FULL || 
-            result === ERR_INVALID_TARGET ||
-            (result === ERR_NOT_ENOUGH_RESOURCES && actionIntent !== ActionConstants.ACTION_UPGRADE)
-        ) {
-            creep.heap.state = 'idle';
-            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
-        } else if (result === OK && actionIntent !== ActionConstants.ACTION_HARVEST && actionIntent !== ActionConstants.ACTION_UPGRADE && actionIntent !== ActionConstants.ACTION_BUILD && actionIntent !== ActionConstants.ACTION_REPAIR) {
-            creep.heap.state = 'idle';
-            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
         }
     }
 
