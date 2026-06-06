@@ -6,20 +6,20 @@ const Hauler = {
 
         if (!creep.heap) return;
 
-        const targetId = creep.heap.get('targetId');
-        const actionIntent = creep.heap.get('actionIntent');
+        const targetId = creep.heap.targetId;
+        const actionIntent = creep.heap.actionIntent;
 
-        if (!targetId || !actionIntent || actionIntent === ActionConstants.get('ACTION_IDLE')) return;
+        if (!targetId || !actionIntent || actionIntent === ActionConstants.ACTION_IDLE) return;
 
         // Use native getObjectById since the utility doesn't exist
         const target = Game.getObjectById(targetId);
         if (!target) {
-            creep.heap.set('state', 'idle');
+            creep.heap.state = 'idle';
             return;
         }
 
         let result;
-        if (actionIntent === ActionConstants.get('ACTION_WITHDRAW')) {
+        if (actionIntent === ActionConstants.ACTION_WITHDRAW) {
             // Handle Ruin/Tombstone prioritization by withdrawing what they have if it's not energy
             if (target.store && (target.structureType === undefined || target.structureType === STRUCTURE_RUIN || target instanceof Tombstone || target instanceof Ruin)) {
                 // Determine resource type to withdraw
@@ -28,14 +28,14 @@ const Hauler = {
             } else {
                 result = creep.withdraw(target, RESOURCE_ENERGY);
             }
-        } else if (actionIntent === ActionConstants.get('ACTION_PICKUP')) {
+        } else if (actionIntent === ActionConstants.ACTION_PICKUP) {
             result = creep.pickup(target);
-        } else if (actionIntent === ActionConstants.get('ACTION_TRANSFER')) {
+        } else if (actionIntent === ActionConstants.ACTION_TRANSFER) {
             result = creep.transfer(target, RESOURCE_ENERGY);
-        } else if (actionIntent === ActionConstants.get('ACTION_DROP')) {
+        } else if (actionIntent === ActionConstants.ACTION_DROP) {
             result = creep.drop(RESOURCE_ENERGY);
         } else {
-            creep.heap.set('state', 'idle');
+            creep.heap.state = 'idle';
             return;
         }
 
@@ -45,7 +45,7 @@ const Hauler = {
             result === ERR_NOT_ENOUGH_RESOURCES ||
             result === ERR_FULL ||
             result === ERR_INVALID_TARGET) {
-            creep.heap.set('state', 'idle');
+            creep.heap.state = 'idle';
         }
     }
 };

@@ -22,18 +22,18 @@ class TaskAssignmentManager {
             let heap = global.creepHeap.get(creep.name);
             if (!heap) {
                 heap = CreepHeapUtility.getDefaultHeap();
-                heap.set('secondaryTargetId', null);
+                heap.secondaryTargetId = null;
                 global.creepHeap.set(creep.name, heap);
             }
             creep.heap = heap;
 
-            if (creep.heap.get('actionIntent') !== ActionConstants.get('ACTION_IDLE') && creep.heap.get('actionIntent') !== null) {
+            if (creep.heap.actionIntent !== ActionConstants.ACTION_IDLE && creep.heap.actionIntent !== null) {
                 TaskAssignmentManager.validateCurrentTask(creep);
                 
-                if (creep.heap.get('actionIntent') !== ActionConstants.get('ACTION_IDLE')) {
-                    if (creep.heap.get('actionIntent') === ActionConstants.get('ACTION_UPGRADE')) {
+                if (creep.heap.actionIntent !== ActionConstants.ACTION_IDLE) {
+                    if (creep.heap.actionIntent === ActionConstants.ACTION_UPGRADE) {
                         const drop = roomState.droppedEnergy?.find(d => creep.pos.getRangeTo(d) <= 3);
-                        creep.heap.set('secondaryTargetId', drop ? drop.id : null);
+                        creep.heap.secondaryTargetId = drop ? drop.id : null;
                     }
                     TaskAssignmentManager.reregisterClaim(creep);
                     continue; 
@@ -46,14 +46,14 @@ class TaskAssignmentManager {
     }
 
     static reregisterClaim(creep) {
-        if (!creep.heap.get('targetId')) return;
-        const target = Game.getObjectById(creep.heap.get('targetId'));
+        if (!creep.heap.targetId) return;
+        const target = Game.getObjectById(creep.heap.targetId);
         if (!target) return;
 
         // Check: Replaced Map claims with tick-volatile object properties to optimize CPU.
-        if (creep.heap.get('state') === 'gather') {
+        if (creep.heap.state === 'gather') {
             target.__gatherClaimed = (target.__gatherClaimed || 0) + creep.store.getFreeCapacity();
-        } else if (creep.heap.get('state') === 'work' && (creep.heap.get('actionIntent') === ActionConstants.get('ACTION_TRANSFER') || creep.heap.get('actionIntent') === ActionConstants.get('ACTION_BUILD'))) {
+        } else if (creep.heap.state === 'work' && (creep.heap.actionIntent === ActionConstants.ACTION_TRANSFER || creep.heap.actionIntent === ActionConstants.ACTION_BUILD)) {
             target.__deliveryClaimed = (target.__deliveryClaimed || 0) + creep.store.getUsedCapacity(RESOURCE_ENERGY);
         }
     }
@@ -62,38 +62,38 @@ class TaskAssignmentManager {
         const used = creep.store.getUsedCapacity(RESOURCE_ENERGY);
         const free = creep.store.getFreeCapacity(RESOURCE_ENERGY);
 
-        if (!creep.heap.get('state') || creep.heap.get('state') === 'idle') creep.heap.set('state', 'gather');
+        if (!creep.heap.state || creep.heap.state === 'idle') creep.heap.state = 'gather';
 
-        if (creep.heap.get('state') === 'gather' && free === 0) {
-            creep.heap.set('state', 'work');
-            creep.heap.set('targetId', null);
-        } else if (creep.heap.get('state') === 'work' && used === 0) {
-            creep.heap.set('state', 'gather');
-            creep.heap.set('targetId', null);
+        if (creep.heap.state === 'gather' && free === 0) {
+            creep.heap.state = 'work';
+            creep.heap.targetId = null;
+        } else if (creep.heap.state === 'work' && used === 0) {
+            creep.heap.state = 'gather';
+            creep.heap.targetId = null;
         }
     }
 
     static validateCurrentTask(creep) {
-        if (!creep.heap.get('targetId')) return;
-        const target = Game.getObjectById(creep.heap.get('targetId'));
+        if (!creep.heap.targetId) return;
+        const target = Game.getObjectById(creep.heap.targetId);
         
         if (!target) {
-            creep.heap.set('targetId', null);
-            creep.heap.set('actionIntent', ActionConstants.get('ACTION_IDLE'));
+            creep.heap.targetId = null;
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
             return;
         }
 
-        if (creep.heap.get('state') === 'gather') {
+        if (creep.heap.state === 'gather') {
             if ((target.amount !== undefined && target.amount < 50) || 
                 (target.store && target.store.getUsedCapacity(RESOURCE_ENERGY) < 50)) {
-                creep.heap.set('targetId', null);
-                creep.heap.set('actionIntent', ActionConstants.get('ACTION_IDLE'));
+                creep.heap.targetId = null;
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
             }
-        } else if (creep.heap.get('state') === 'work') {
+        } else if (creep.heap.state === 'work') {
             if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0 || 
                (target.store && target.store.getFreeCapacity(RESOURCE_ENERGY) === 0)) {
-                creep.heap.set('targetId', null);
-                creep.heap.set('actionIntent', ActionConstants.get('ACTION_IDLE'));
+                creep.heap.targetId = null;
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
             }
         }
     }
@@ -112,17 +112,17 @@ class TaskAssignmentManager {
 
         // Check: Removed string hashing loop. O(1) modulus assignment optimizes performance.
         const source = sources[creep.name.length % sources.length];
-        creep.heap.set('targetId', source.id);
-        creep.heap.set('actionIntent', ActionConstants.get('ACTION_HARVEST'));
+        creep.heap.targetId = source.id;
+        creep.heap.actionIntent = ActionConstants.ACTION_HARVEST;
 
-        if (!creep.heap.get('sitTargetId') && roomState.sourceContainers?.length) {
+        if (!creep.heap.sitTargetId && roomState.sourceContainers?.length) {
             const container = roomState.sourceContainers.find(c => creep.pos.getRangeTo(c) <= 2);
-            if (container) creep.heap.set('sitTargetId', container.id);
+            if (container) creep.heap.sitTargetId = container.id;
         }
     }
 
     static assignHauler(creep, roomState) {
-        if (creep.heap.get('state') === 'gather') {
+        if (creep.heap.state === 'gather') {
             // Check: Prioritize Ruin and Tombstone objects explicitly for Scavenging
             let bestTarget = null;
             let intent = '';
@@ -139,13 +139,13 @@ class TaskAssignmentManager {
                 }
             };
 
-            roomState.tombstones?.forEach(t => evaluateScavenge(t, t.store.getUsedCapacity(RESOURCE_ENERGY), ActionConstants.get('ACTION_WITHDRAW')));
-            roomState.ruins?.forEach(r => evaluateScavenge(r, r.store.getUsedCapacity(RESOURCE_ENERGY), ActionConstants.get('ACTION_WITHDRAW')));
+            roomState.tombstones?.forEach(t => evaluateScavenge(t, t.store.getUsedCapacity(RESOURCE_ENERGY), ActionConstants.ACTION_WITHDRAW));
+            roomState.ruins?.forEach(r => evaluateScavenge(r, r.store.getUsedCapacity(RESOURCE_ENERGY), ActionConstants.ACTION_WITHDRAW));
 
             if (bestTarget) {
                 bestTarget.__gatherClaimed = (bestTarget.__gatherClaimed || 0) + creep.store.getFreeCapacity(RESOURCE_ENERGY);
-                creep.heap.set('targetId', bestTarget.id);
-                creep.heap.set('actionIntent', intent);
+                creep.heap.targetId = bestTarget.id;
+                creep.heap.actionIntent = intent;
                 return;
             }
 
@@ -163,22 +163,22 @@ class TaskAssignmentManager {
 
                 if (drops.length > 0) {
                     targetDrop = drops[0];
-                    intent = ActionConstants.get('ACTION_PICKUP');
+                    intent = ActionConstants.ACTION_PICKUP;
                 } else if (containers.length > 0 && containers[0].store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
                     targetDrop = containers[0];
-                    intent = ActionConstants.get('ACTION_WITHDRAW');
+                    intent = ActionConstants.ACTION_WITHDRAW;
                 }
 
                 if (targetDrop) {
                     targetDrop.__gatherClaimed = (targetDrop.__gatherClaimed || 0) + creep.store.getFreeCapacity(RESOURCE_ENERGY);
-                    creep.heap.set('targetId', targetDrop.id);
-                    creep.heap.set('actionIntent', intent);
+                    creep.heap.targetId = targetDrop.id;
+                    creep.heap.actionIntent = intent;
                     return;
                 }
             }
 
             if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                creep.heap.set('state', 'work');
+                creep.heap.state = 'work';
                 TaskAssignmentManager.assignHaulerWork(creep, roomState);
             }
         } else {
@@ -197,33 +197,33 @@ class TaskAssignmentManager {
                 
                 if (remainingSpace > 0) {
                     target.__deliveryClaimed = claimed + creep.store.getUsedCapacity(RESOURCE_ENERGY);
-                    creep.heap.set('targetId', target.id);
-                    creep.heap.set('actionIntent', ActionConstants.get('ACTION_TRANSFER'));
+                    creep.heap.targetId = target.id;
+                    creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
                     return;
                 }
             }
 
-            creep.heap.set('targetId', roomState.controller.id);
-            creep.heap.set('actionIntent', ActionConstants.get('ACTION_DROP'));
+            creep.heap.targetId = roomState.controller.id;
+            creep.heap.actionIntent = ActionConstants.ACTION_DROP;
         }
     }
 
     static assignUpgrader(creep, roomState) {
         if (roomState.controller) {
-            creep.heap.set('targetId', roomState.controller.id);
-            creep.heap.set('actionIntent', ActionConstants.get('ACTION_UPGRADE'));
+            creep.heap.targetId = roomState.controller.id;
+            creep.heap.actionIntent = ActionConstants.ACTION_UPGRADE;
 
-            if (!creep.heap.get('sitTargetId') && roomState.controllerContainers?.length > 0) {
-                creep.heap.set('sitTargetId', roomState.controllerContainers[0].id);
+            if (!creep.heap.sitTargetId && roomState.controllerContainers?.length > 0) {
+                creep.heap.sitTargetId = roomState.controllerContainers[0].id;
             }
         }
     }
 
     static assignBuilder(creep, roomState) {
-        if (creep.heap.get('state') === 'gather') {
+        if (creep.heap.state === 'gather') {
             if (roomState.spawns?.length > 0 && roomState.spawns[0].store.getUsedCapacity(RESOURCE_ENERGY) > 100) {
-                creep.heap.set('targetId', roomState.spawns[0].id);
-                creep.heap.set('actionIntent', ActionConstants.get('ACTION_WITHDRAW'));
+                creep.heap.targetId = roomState.spawns[0].id;
+                creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
                 return;
             }
             
@@ -232,13 +232,13 @@ class TaskAssignmentManager {
                 for (let i = 1; i < roomState.droppedEnergy.length; i++) {
                     if (roomState.droppedEnergy[i].amount > maxDrop.amount) maxDrop = roomState.droppedEnergy[i];
                 }
-                creep.heap.set('targetId', maxDrop.id);
-                creep.heap.set('actionIntent', ActionConstants.get('ACTION_PICKUP'));
+                creep.heap.targetId = maxDrop.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_PICKUP;
                 return;
             }
 
             if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                creep.heap.set('state', 'work');
+                creep.heap.state = 'work';
                 TaskAssignmentManager.assignBuilderWork(creep, roomState);
             }
         } else {
@@ -251,8 +251,8 @@ class TaskAssignmentManager {
             // Check: Replaced pos.findClosestByRange with O(1) global state array access to satisfy 'Zero Native Polling'.
             const target = roomState.repairTargets[0];
             if (target) {
-                creep.heap.set('targetId', target.id);
-                creep.heap.set('actionIntent', ActionConstants.get('ACTION_REPAIR'));
+                creep.heap.targetId = target.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_REPAIR;
                 return;
             }
         }
@@ -260,15 +260,15 @@ class TaskAssignmentManager {
         if (roomState.constructionSites?.length > 0) {
             const targetSite = roomState.constructionSites[0];
             if (targetSite) {
-                creep.heap.set('targetId', targetSite.id);
-                creep.heap.set('actionIntent', ActionConstants.get('ACTION_BUILD'));
+                creep.heap.targetId = targetSite.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_BUILD;
                 return;
             }
         }
 
         if (roomState.controller) {
-            creep.heap.set('targetId', roomState.controller.id);
-            creep.heap.set('actionIntent', ActionConstants.get('ACTION_UPGRADE'));
+            creep.heap.targetId = roomState.controller.id;
+            creep.heap.actionIntent = ActionConstants.ACTION_UPGRADE;
         }
     }
 
@@ -300,8 +300,8 @@ class TaskAssignmentManager {
 
         if (bestTarget) {
             bestTarget.__deliveryClaimed = (bestTarget.__deliveryClaimed || 0) + creep.store.getUsedCapacity(RESOURCE_ENERGY);
-            creep.heap.set('targetId', bestTarget.id);
-            creep.heap.set('actionIntent', ActionConstants.get('ACTION_TRANSFER'));
+            creep.heap.targetId = bestTarget.id;
+            creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
             return true;
         }
 
