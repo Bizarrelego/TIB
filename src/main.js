@@ -5,8 +5,7 @@
 
 // Core Managers
 const GlobalStateScanner = require('./state/GlobalStateScanner');
-const SpawnManager = require('./colonies/SpawnManager');
-const TaskAssignmentManager = require('./managers/TaskAssignmentManager');
+const ColonyManager = require('./colonies/ColonyManager');
 const RoleExecutor = require('./managers/RoleExecutor');
 
 // Utilities
@@ -29,13 +28,10 @@ module.exports.loop = function () {
     // and strictly adhere to Skeleton Top-Down Architecture Constraints.
     // IntelManager execution has been shifted inside GlobalStateScanner.
 
-    // 2. Colony Spawning
-    SpawnManager.run(); // Integrates SpawnManager into main loop
+    // 2. Colony Management (Spawning & Task Assignment)
+    ColonyManager.run();
 
-    // 3. Task Assignment
-    TaskAssignmentManager.run(); // Integrates TaskAssignmentManager into main loop
-
-    // 4. Intent Execution
+    // 3. Intent Execution
     RoleExecutor.run(); // Ensures RoleExecutor is called for all active creeps
 
     // Profiler Reporting
