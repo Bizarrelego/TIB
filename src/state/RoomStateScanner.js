@@ -3,16 +3,6 @@ const EnergySourceUtility = require('../utilities/EnergySourceUtility');
 const DroppedResourceUtility = require('../utilities/DroppedResourceUtility');
 
 const createRoomStateTemplate = () => {
-    const counts = new Map();
-    counts.set('harvester', 0);
-    counts.set('hauler', 0);
-    counts.set('upgrader', 0);
-    counts.set('builder', 0);
-    counts.set('repairer', 0);
-    counts.set('defender', 0);
-    counts.set('miner', 0);
-    counts.set('scout', 0);
-
     return {
         controller: null,
         extractor: null,
@@ -34,14 +24,20 @@ const createRoomStateTemplate = () => {
         structureIds: [],
         repairTargets: [],
         creeps: [],
-        creepCounts: counts
+        creepCounts: {
+            harvester: 0,
+            hauler: 0,
+            upgrader: 0,
+            builder: 0,
+            repairer: 0,
+            defender: 0,
+            miner: 0,
+            scout: 0
+        }
     };
 };
 
 function run(roomsMap) {
-    const fStr = 'fi' + 'nd';
-    const eStr = 'getE' + 'ventLog';
-
     for (const roomName in Game.rooms) {
         const roomObj = Game.rooms[roomName];
 
@@ -69,16 +65,16 @@ function run(roomsMap) {
         state.harvestableSources = [];
         state.extractor = null;
 
-        for (const role of state.creepCounts.keys()) {
-            state.creepCounts.set(role, 0);
+        for (const role in state.creepCounts) {
+            state.creepCounts[role] = 0;
         }
 
         state.controller = roomObj.controller;
-        state.mineral = roomObj[fStr](FIND_MINERALS)[0] || null;
-        state.sources = roomObj[fStr](FIND_SOURCES);
-        state.constructionSites = roomObj[fStr](FIND_MY_CONSTRUCTION_SITES);
+        state.mineral = roomObj.find(FIND_MINERALS)[0] || null;
+        state.sources = roomObj.find(FIND_SOURCES);
+        state.constructionSites = roomObj.find(FIND_MY_CONSTRUCTION_SITES);
 
-        const events = roomObj[eStr]();
+        const events = roomObj.getEventLog();
         let hasHostileEvent = false;
         for (let i = 0; i < events.length; i++) {
             if (events[i].event === EVENT_ATTACK || events[i].event === EVENT_HEAL) {
@@ -89,12 +85,12 @@ function run(roomsMap) {
 
         // Bolt Radar optimization: Reduces native search calls from 20 per tick to 0 via event arrays
         if (hasHostileEvent || (state.hostiles && state.hostiles.length > 0) || Game.time % 13 === 0) {
-            state.hostiles = roomObj[fStr](FIND_HOSTILE_CREEPS);
+            state.hostiles = roomObj.find(FIND_HOSTILE_CREEPS);
         } else if (!state.hostiles) {
             state.hostiles = [];
         }
 
-        const structures = roomObj[fStr](FIND_STRUCTURES);
+        const structures = roomObj.find(FIND_STRUCTURES);
         for (let i = 0; i < structures.length; i++) {
             const s = structures[i];
             state.structureIds.push(s.id);
@@ -107,21 +103,21 @@ function run(roomsMap) {
             }
         }
 
-        const drops = roomObj[fStr](FIND_DROPPED_RESOURCES);
+        const drops = roomObj.find(FIND_DROPPED_RESOURCES);
         for (let i = 0; i < drops.length; i++) {
             if (drops[i].resourceType === RESOURCE_ENERGY) {
                 state.droppedEnergy.push(drops[i]);
             }
         }
 
-        const ruins = roomObj[fStr](FIND_RUINS);
+        const ruins = roomObj.find(FIND_RUINS);
         for (let i = 0; i < ruins.length; i++) {
             if (ruins[i].store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
                 state.ruins.push(ruins[i]);
             }
         }
 
-        const tombstones = roomObj[fStr](FIND_TOMBSTONES);
+        const tombstones = roomObj.find(FIND_TOMBSTONES);
         for (let i = 0; i < tombstones.length; i++) {
             if (tombstones[i].store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
                 state.tombstones.push(tombstones[i]);
