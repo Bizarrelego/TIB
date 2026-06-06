@@ -4,20 +4,12 @@ const DroppedResourceUtility = require('../utilities/DroppedResourceUtility');
 
 const createRoomStateTemplate = () => ({
     controller: null,
-    storage: null,
-    terminal: null,
-    factory: null,
     extractor: null,
     mineral: null,
     sources: [],
     spawns: [],
     extensions: [],
-    towers: [],
-    links: [],
     labs: [],
-    containers: [],
-    sourceContainers: [],
-    controllerContainers: [],
     droppedEnergy: [],
     ruins: [],
     tombstones: [],
@@ -64,12 +56,7 @@ function run(roomsMap) {
         state.spawns = [];
         state.extensions = [];
         state.invaderCores = [];
-        state.towers = [];
-        state.links = [];
         state.labs = [];
-        state.containers = [];
-        state.sourceContainers = [];
-        state.controllerContainers = [];
         state.droppedEnergy = [];
         state.ruins = [];
         state.tombstones = [];
@@ -77,9 +64,6 @@ function run(roomsMap) {
         state.availableDroppedEnergy = [];
         state.energyInRuinsAndTombstones = [];
         state.harvestableSources = [];
-        state.storage = null;
-        state.terminal = null;
-        state.factory = null;
         state.extractor = null;
 
         for (const role of state.creepCounts.keys()) {
@@ -114,25 +98,9 @@ function run(roomsMap) {
             switch (s.structureType) {
                 case STRUCTURE_SPAWN: state.spawns.push(s); break;
                 case STRUCTURE_EXTENSION: state.extensions.push(s); break;
-                case STRUCTURE_TOWER: state.towers.push(s); break;
-                case STRUCTURE_CONTAINER: state.containers.push(s); break;
-                case STRUCTURE_LINK: state.links.push(s); break;
                 case STRUCTURE_LAB: state.labs.push(s); break;
-                case STRUCTURE_STORAGE: state.storage = s; break;
-                case STRUCTURE_TERMINAL: state.terminal = s; break;
-                case STRUCTURE_FACTORY: state.factory = s; break;
                 case STRUCTURE_EXTRACTOR: state.extractor = s; break;
                 case STRUCTURE_INVADER_CORE: state.invaderCores.push(s); break;
-            }
-        }
-
-        // Centralize container categorization to prevent TaskAssignmentManager from using room.find()
-        for (let i = 0; i < state.containers.length; i++) {
-            const c = state.containers[i];
-            if (state.controller && c.pos.inRangeTo(state.controller, 3)) {
-                state.controllerContainers.push(c);
-            } else if (state.sources.some(s => s.pos.inRangeTo(c, 2))) {
-                state.sourceContainers.push(c);
             }
         }
 
