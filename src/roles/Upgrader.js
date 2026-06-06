@@ -17,19 +17,14 @@ const Upgrader = {
         }
 
         if (actionIntent === ActionConstants.ACTION_UPGRADE) {
-            if (creep.pos.getRangeTo(target) > 3) {
-                creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
-            } else {
-                const result = creep.upgradeController(target);
-                if (result === OK && creep.heap.secondaryTargetId && creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                    const secondary = Game.getObjectById(creep.heap.secondaryTargetId);
-                    if (secondary) creep.pickup(secondary);
-                } else if (result === ERR_NOT_ENOUGH_RESOURCES || result === ERR_INVALID_TARGET) {
-                    creep.heap.state = 'idle';
-                }
+            const result = creep.upgradeController(target);
+            if (creep.heap.secondaryTargetId) {
+                const secondary = Game.getObjectById(creep.heap.secondaryTargetId);
+                if (secondary) creep.pickup(secondary);
             }
-        } else {
-            creep.heap.state = 'idle';
+            if (result === ERR_NOT_IN_RANGE || result === OK || result === ERR_NOT_ENOUGH_RESOURCES || result === ERR_INVALID_TARGET) {
+                creep.heap.state = 'idle';
+            }
         }
     }
 };

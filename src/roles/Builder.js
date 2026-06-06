@@ -26,19 +26,10 @@ const Builder = {
         } else if (actionIntent === ActionConstants.ACTION_PICKUP) {
             result = creep.pickup(target);
         } else if (actionIntent === ActionConstants.ACTION_DROP) {
-            if (creep.pos.getRangeTo(target) > 2) {
-                result = ERR_NOT_IN_RANGE;
-            } else {
-                result = creep.drop(RESOURCE_ENERGY);
-            }
-        } else {
-            creep.heap.state = 'idle';
-            return;
+            result = creep.drop(RESOURCE_ENERGY);
         }
 
-        if (result === ERR_NOT_IN_RANGE) {
-            creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
-        } else if (result === OK || result === ERR_FULL || result === ERR_INVALID_TARGET || result === ERR_NOT_ENOUGH_RESOURCES) {
+        if (result === ERR_NOT_IN_RANGE || result === OK || result === ERR_FULL || result === ERR_INVALID_TARGET || result === ERR_NOT_ENOUGH_RESOURCES) {
             creep.heap.state = 'idle';
         }
     }

@@ -14,7 +14,7 @@ const roles = {
  */
 class RoleExecutor {
     static run() {
-        if (!global.creepHeap) global.creepHeap = new Map();
+        if (!global.creepHeap) global.creepHeap = {};
         
         // Check: Object.values is faster than Object.keys followed by property lookup.
         const creeps = Object.values(Game.creeps);
@@ -24,11 +24,11 @@ class RoleExecutor {
             
             if (creep.spawning || creep.fatigue > 0) continue;
 
-            let heap = global.creepHeap.get(creep.name);
+            let heap = global.creepHeap[creep.name];
             if (!heap) {
                 heap = CreepHeapUtility.getDefaultHeap();
                 heap.sleepUntil = 0;
-                global.creepHeap.set(creep.name, heap);
+                global.creepHeap[creep.name] = heap;
             }
             creep.heap = heap;
 
