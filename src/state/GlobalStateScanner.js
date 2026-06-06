@@ -21,8 +21,8 @@ function run() {
         const roomState = global.State.rooms.get(roomName);
         if (roomState) {
             roomState.creeps.push(creep);
-            if (role && roomState.creepCounts.has(role)) {
-                roomState.creepCounts.set(role, roomState.creepCounts.get(role) + 1);
+            if (role && roomState.creepCounts[role] !== undefined) {
+                roomState.creepCounts[role]++;
             }
         }
     }
