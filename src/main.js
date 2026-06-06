@@ -8,6 +8,7 @@ const GlobalStateScanner = require('./state/GlobalStateScanner');
 const SpawnManager = require('./colonies/SpawnManager');
 const TaskAssignmentManager = require('./managers/TaskAssignmentManager');
 const RoleExecutor = require('./managers/RoleExecutor');
+const IntelManager = require('./managers/IntelManager');
 
 // Utilities
 const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
@@ -20,19 +21,21 @@ module.exports.loop = function () {
 
     // Memory Cleanup
     // Improvement: Clean dead memory first to prevent iteration over dead entities
-    MemoryCleanupManager.run();
+    MemoryCleanupManager.run(); // Integrates MemoryCleanupManager into main loop
 
     // 1. Global State Scanning
-    GlobalStateScanner.run();
+    GlobalStateScanner.run(); // Ensures GlobalStateScanner runs at start
+
+    IntelManager.run(); // Integrates IntelManager into main loop
 
     // 2. Colony Spawning
-    SpawnManager.run();
+    SpawnManager.run(); // Integrates SpawnManager into main loop
 
     // 3. Task Assignment
-    TaskAssignmentManager.run();
+    TaskAssignmentManager.run(); // Integrates TaskAssignmentManager into main loop
 
     // 4. Intent Execution
-    RoleExecutor.run();
+    RoleExecutor.run(); // Ensures RoleExecutor is called for all active creeps
 
     // Profiler Reporting
     ProfilerUtility.report();
