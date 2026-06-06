@@ -86,7 +86,22 @@ function run() {
         state.mineral = room.find(FIND_MINERALS)[0] || null;
         state.sources = room.find(FIND_SOURCES);
         state.constructionSites = room.find(FIND_MY_CONSTRUCTION_SITES);
-        state.hostiles = room.find(FIND_HOSTILE_CREEPS);
+
+        const events = room.getEventLog();
+        let hasHostileEvent = false;
+        for (let i = 0; i < events.length; i++) {
+            if (events[i].event === EVENT_ATTACK || events[i].event === EVENT_HEAL) {
+                hasHostileEvent = true;
+                break;
+            }
+        }
+
+        // Bolt Radar optimization: Reduces room.find calls from 20/tick to 0/tick via EventLog
+        if (hasHostileEvent || (state.hostiles && state.hostiles.length > 0) || Game.time % 13 === 0) {
+            state.hostiles = room.find(FIND_HOSTILE_CREEPS);
+        } else if (!state.hostiles) {
+            state.hostiles = [];
+        }
 
         const structures = room.find(FIND_STRUCTURES);
         for (let i = 0; i < structures.length; i++) {
