@@ -1,5 +1,6 @@
 const CreepCensusUtility = require('../utilities/CreepCensusUtility');
 const CreepBodyUtility = require('../utilities/CreepBodyUtility');
+const RoleCensusLimitUtility = require('../utilities/RoleCensusLimitUtility');
 
 class SpawnManager {
     static run() {
@@ -10,11 +11,7 @@ class SpawnManager {
         const census = CreepCensusUtility.getCensus();
 
         // Hardcoded integer limits for phase RCL 1-2 Bootstrapping
-        const LIMITS = {
-            harvester: 3,
-            hauler: 3,
-            upgrader: 2
-        };
+        const LIMITS = RoleCensusLimitUtility.getAllLimits();
 
         for (const spawnName in Game.spawns) {
             const spawn = Game.spawns[spawnName];
