@@ -1,12 +1,12 @@
 const ActionConstants = require('../constants/ActionConstants');
 const CreepHeapUtility = require('../utilities/CreepHeapUtility');
 
-const roles = { /* Map roles to their respective logic modules */
-    'harvester': require('../roles/Harvester'),
-    'hauler': require('../roles/Hauler'),
-    'upgrader': require('../roles/Upgrader'),
-    'builder': require('../roles/Builder') /* map builder role */
-};
+const roles = new Map([
+    ['harvester', require('../roles/Harvester')],
+    ['hauler', require('../roles/Hauler')],
+    ['upgrader', require('../roles/Upgrader')],
+    ['builder', require('../roles/Builder')] // integrate builder role module
+]);
 
 /**
  * Top-Down Role Executor
@@ -43,9 +43,9 @@ class RoleExecutor {
                 continue;
             }
 
-            const roleLogic = roles[creep.memory.role]; /* Retrieve role logic dynamically */
+            const roleLogic = roles.get(creep.memory.role); // Retrieve role logic for builder and others
             if (roleLogic) {
-                roleLogic.run(creep); /* Execute primary logic function */
+                roleLogic.run(creep); // Execute role logic
             } else {
                 creep.heap.state = 'idle';
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
