@@ -1,12 +1,12 @@
 const ActionConstants = require('../constants/ActionConstants');
 const CreepHeapUtility = require('../utilities/CreepHeapUtility');
 
-const roles = {
-    harvester: require('../roles/Harvester'), // harvester
-    hauler: require('../roles/Hauler'), // hauler
-    upgrader: require('../roles/Upgrader'), // upgrader
-    builder: require('../roles/Builder') // builder
-};
+const roles = new Map([
+    ['harvester', require('../roles/Harvester')],
+    ['hauler', require('../roles/Hauler')],
+    ['upgrader', require('../roles/Upgrader')],
+    ['builder', require('../roles/Builder')]
+]);
 
 /**
  * Top-Down Role Executor
@@ -43,7 +43,7 @@ class RoleExecutor {
                 continue;
             }
 
-            const roleLogic = roles[creep.memory.role]; // Retrieve role logic
+            const roleLogic = roles.get(creep.memory.role); // Retrieve role logic
             if (roleLogic) {
                 roleLogic.run(creep); // Execute role logic
             } else {
