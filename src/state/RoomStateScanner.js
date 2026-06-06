@@ -3,15 +3,15 @@ const EnergySourceUtility = require('../utilities/EnergySourceUtility');
 const DroppedResourceUtility = require('../utilities/DroppedResourceUtility');
 
 const createRoomStateTemplate = () => {
-    const counts = Object.create(null);
-    counts.harvester = 0;
-    counts.hauler = 0;
-    counts.upgrader = 0;
-    counts.builder = 0;
-    counts.repairer = 0;
-    counts.defender = 0;
-    counts.miner = 0;
-    counts.scout = 0;
+    const counts = new Map();
+    counts.set('harvester', 0);
+    counts.set('hauler', 0);
+    counts.set('upgrader', 0);
+    counts.set('builder', 0);
+    counts.set('repairer', 0);
+    counts.set('defender', 0);
+    counts.set('miner', 0);
+    counts.set('scout', 0);
 
     return {
         controller: null,
@@ -69,8 +69,8 @@ function run(roomsMap) {
         state.harvestableSources = [];
         state.extractor = null;
 
-        for (const role in state.creepCounts) {
-            state.creepCounts[role] = 0;
+        for (const role of state.creepCounts.keys()) {
+            state.creepCounts.set(role, 0);
         }
 
         state.controller = roomObj.controller;
