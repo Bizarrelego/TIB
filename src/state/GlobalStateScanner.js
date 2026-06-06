@@ -1,5 +1,7 @@
 const RepairTargetUtility = require('../utilities/RepairTargetUtility');
 const IntelManager = require('../managers/IntelManager');
+const EnergySourceUtility = require('../utilities/EnergySourceUtility');
+const DroppedResourceUtility = require('../utilities/DroppedResourceUtility');
 
 /**
  * Module responsible for building the global state object by scanning rooms.
@@ -27,6 +29,10 @@ const createRoomStateTemplate = () => ({
     ruins: [],
     tombstones: [],
     constructionSites: [],
+    validDroppedEnergy: [],
+    availableDroppedEnergy: [],
+    energyInRuinsAndTombstones: [],
+    harvestableSources: [],
     hostiles: [],
     invaderCores: [],
     structureIds: [],
@@ -73,6 +79,10 @@ function run() {
         state.droppedEnergy = [];
         state.ruins = [];
         state.tombstones = [];
+        state.validDroppedEnergy = [];
+        state.availableDroppedEnergy = [];
+        state.energyInRuinsAndTombstones = [];
+        state.harvestableSources = [];
         state.storage = null;
         state.terminal = null;
         state.factory = null;
@@ -155,6 +165,12 @@ function run() {
 
         // Must run after structures are scanned and added to state.structureIds
         state.repairTargets = RepairTargetUtility.getRepairTargets(roomName, 0.8);
+
+        // Cache utility outputs for O(1) access by managers later in the tick
+        state.validDroppedEnergy = DroppedResourceUtility.getDroppedEnergy(roomName);
+        state.availableDroppedEnergy = EnergySourceUtility.findAvailableDroppedEnergy(roomName);
+        state.energyInRuinsAndTombstones = EnergySourceUtility.findEnergyInRuinsAndTombstones(roomName);
+        state.harvestableSources = EnergySourceUtility.findHarvestableSources(roomName);
     }
 
     const creepNames = Object.keys(Game.creeps);
