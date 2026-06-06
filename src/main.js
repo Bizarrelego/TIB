@@ -8,7 +8,6 @@ const GlobalStateScanner = require('./state/GlobalStateScanner');
 const SpawnManager = require('./colonies/SpawnManager');
 const TaskAssignmentManager = require('./managers/TaskAssignmentManager');
 const RoleExecutor = require('./managers/RoleExecutor');
-const IntelManager = require('./managers/IntelManager');
 
 // Utilities
 const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
@@ -26,7 +25,9 @@ module.exports.loop = function () {
     // 1. Global State Scanning
     GlobalStateScanner.run(); // Ensures GlobalStateScanner runs at start
 
-    IntelManager.run(); // Integrates IntelManager into main loop
+    // Removed IntelManager.run() from here to maintain the "Eyes" single responsibility
+    // and strictly adhere to Skeleton Top-Down Architecture Constraints.
+    // IntelManager execution has been shifted inside GlobalStateScanner.
 
     // 2. Colony Spawning
     SpawnManager.run(); // Integrates SpawnManager into main loop
