@@ -10,16 +10,18 @@ class RoleCensusLimitUtility {
      * RCL 3: Max haulers + upgraders for aggressive RCL push.
      * RCL 4+: Fewer builders (maintenance), more upgraders.
      */
-    static CENSUS_BY_RCL = {
-        1: { harvester: 2, hauler: 2, upgrader: 1, builder: 0 },
-        2: { harvester: 2, hauler: 3, upgrader: 2, builder: 2 },
-        3: { harvester: 2, hauler: 4, upgrader: 3, builder: 2 },
-        4: { harvester: 2, hauler: 4, upgrader: 4, builder: 1 },
-        5: { harvester: 2, hauler: 4, upgrader: 4, builder: 1 },
-        6: { harvester: 2, hauler: 4, upgrader: 4, builder: 1 },
-        7: { harvester: 2, hauler: 4, upgrader: 4, builder: 1 },
-        8: { harvester: 2, hauler: 3, upgrader: 1, builder: 1 }
-    };
+    static get CENSUS_BY_RCL() {
+        return {
+            1: { harvester: 2, hauler: 2, upgrader: 1, builder: 0 },
+            2: { harvester: 2, hauler: 3, upgrader: 2, builder: 2 },
+            3: { harvester: 2, hauler: 4, upgrader: 3, builder: 2 },
+            4: { harvester: 2, hauler: 4, upgrader: 4, builder: 1 },
+            5: { harvester: 2, hauler: 4, upgrader: 4, builder: 1 },
+            6: { harvester: 2, hauler: 4, upgrader: 4, builder: 1 },
+            7: { harvester: 2, hauler: 4, upgrader: 4, builder: 1 },
+            8: { harvester: 2, hauler: 3, upgrader: 1, builder: 1 }
+        };
+    }
 
     static getLimit(role, rcl) {
         const limits = this.CENSUS_BY_RCL[rcl] || this.CENSUS_BY_RCL[4];
