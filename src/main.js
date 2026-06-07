@@ -5,11 +5,13 @@
 
 // Core Managers
 const GlobalStateScanner = require('./state/GlobalStateScanner');
-const ColonyManager = require('./colonies/ColonyManager');
+const RoomStateScanner = require('./state/RoomStateScanner');
+const SpawnManager = require('./colonies/SpawnManager');
+const TaskAssignmentManager = require('./managers/TaskAssignmentManager');
 const RoleExecutor = require('./managers/RoleExecutor');
+const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
 
 // Utilities
-const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
 const ProfilerUtility = require('./utilities/ProfilerUtility');
 const Logger = require('./utilities/Logger');
 
@@ -17,22 +19,36 @@ module.exports.loop = function () {
     // Profiler Start
     ProfilerUtility.start();
 
-    // Memory Cleanup
-    // Improvement: Clean dead memory first to prevent iteration over dead entities
-    MemoryCleanupManager.run(); // Integrates MemoryCleanupManager into main loop
+    try {
+        // Memory Cleanup
+        MemoryCleanupManager.run();
 
-    // 1. Global State Scanning
-    GlobalStateScanner.run(); // Ensures GlobalStateScanner runs at start
+        // 1. Global State Scanning
+        GlobalStateScanner.run();
 
-    // Removed IntelManager.run() from here to maintain the "Eyes" single responsibility
-    // and strictly adhere to Skeleton Top-Down Architecture Constraints.
-    // IntelManager execution has been shifted inside GlobalStateScanner.
+        // 2. Room State Scanning for Owned Rooms
+        if (!global.State) global.State = { rooms: new Map() };
+        for (const roomName in Game.rooms) {
+            const room = Game.rooms[roomName];
+            if (room.controller && room.controller.my) {
+                RoomStateScanner.run(room);
+            }
+        }
 
-    // 2. Colony Management (Spawning & Task Assignment)
-    ColonyManager.run();
+        // 3. Spawning
+        for (const spawnName in Game.spawns) {
+            SpawnManager.run(Game.spawns[spawnName]);
+        }
 
-    // 3. Intent Execution
-    RoleExecutor.run(); // Ensures RoleExecutor is called for all active creeps
+        // 4. Task Assignment
+        TaskAssignmentManager.run();
+
+        // 5. Intent Execution
+        RoleExecutor.run();
+
+    } catch (e) {
+        console.log(`Error in main loop: ${e.message}\n${e.stack}`);
+    }
 
     // Profiler Reporting
     ProfilerUtility.report();

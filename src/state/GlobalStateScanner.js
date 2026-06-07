@@ -1,4 +1,3 @@
-const IntelManager = require('../managers/IntelManager');
 const RoomStateScanner = require('./RoomStateScanner');
 
 /**
@@ -10,8 +9,13 @@ const RoomStateScanner = require('./RoomStateScanner');
 function run() {
     if (!global.State) global.State = { rooms: new Map() };
 
-    // Delegate per-room scanning to RoomStateScanner
-    RoomStateScanner.run(global.State.rooms);
+    // Clear creeps and creepCounts for all initialized rooms from the previous tick
+    for (const roomState of global.State.rooms.values()) {
+        roomState.creeps = [];
+        for (const role in roomState.creepCounts) {
+            roomState.creepCounts[role] = 0;
+        }
+    }
 
     const creepNames = Object.keys(Game.creeps);
     for (let i = 0; i < creepNames.length; i++) {
@@ -19,17 +23,17 @@ function run() {
         const roomName = creep.memory.room || creep.room.name;
         const role = creep.memory.role;
 
-        const roomState = global.State.rooms.get(roomName);
-        if (roomState) {
-            roomState.creeps.push(creep);
-            if (role && roomState.creepCounts[role] !== undefined) {
-                roomState.creepCounts[role]++;
-            }
+        let roomState = global.State.rooms.get(roomName);
+        if (!roomState) {
+            roomState = RoomStateScanner.createRoomStateTemplate();
+            global.State.rooms.set(roomName, roomState);
+        }
+
+        roomState.creeps.push(creep);
+        if (role && roomState.creepCounts[role] !== undefined) {
+            roomState.creepCounts[role]++;
         }
     }
-
-    // Delegation to IntelManager to maintain Single Responsibility for data processing
-    IntelManager.run();
 }
 
 module.exports = {
