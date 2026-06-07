@@ -17,13 +17,23 @@ class CreepSpawnRequestUtility {
             return false;
         }
 
+        const requestMemory = new Map();
+        if (memory) {
+            for (const key in memory) {
+                requestMemory.set(key, memory[key]);
+            }
+        }
+        requestMemory.set('role', role);
+        requestMemory.set('colony', roomName);
+
         const request = {
             roomName: roomName,
             role: role,
             bodyParts: bodyParts,
-            memory: Object.assign({}, memory, { role: role, colony: roomName })
+            memory: requestMemory
         };
 
+        // Submit the formatted request to the centralized queue
         SpawnQueueUtility.enqueue(request);
         return true;
     }
