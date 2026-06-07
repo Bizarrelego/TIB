@@ -71,10 +71,16 @@ const Upgrader = {
 
         } else if (actionIntent === ActionConstants.ACTION_PICKUP) {
             const result = creep.pickup(target);
-            if (result === ERR_NOT_IN_RANGE) {
+            if (result === OK) {
+                if (creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+                    creep.heap.state = 'idle';
+                    creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+                    creep.heap.targetId = null;
+                }
+                return;
+            } else if (result === ERR_NOT_IN_RANGE) {
                 creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });
-            } else {
-                // After pickup, go idle to get reassigned to upgrade
+            } else if (result === ERR_FULL || result === ERR_INVALID_TARGET || result === ERR_NOT_ENOUGH_RESOURCES) {
                 creep.heap.state = 'idle';
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
                 creep.heap.targetId = null;
@@ -82,10 +88,16 @@ const Upgrader = {
 
         } else if (actionIntent === ActionConstants.ACTION_WITHDRAW) {
             const result = creep.withdraw(target, RESOURCE_ENERGY);
-            if (result === ERR_NOT_IN_RANGE) {
+            if (result === OK) {
+                if (creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+                    creep.heap.state = 'idle';
+                    creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+                    creep.heap.targetId = null;
+                }
+                return;
+            } else if (result === ERR_NOT_IN_RANGE) {
                 creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });
-            } else {
-                // After withdraw, go idle to get reassigned to upgrade
+            } else if (result === ERR_FULL || result === ERR_INVALID_TARGET || result === ERR_NOT_ENOUGH_RESOURCES) {
                 creep.heap.state = 'idle';
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
                 creep.heap.targetId = null;
