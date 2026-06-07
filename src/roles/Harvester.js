@@ -21,6 +21,19 @@ const Harvester = {
         }
 
         if (actionIntent === ActionConstants.ACTION_HARVEST) {
+            // Container-sit: path to the container and sit on it for direct deposit
+            if (creep.heap.sitTargetId) {
+                const container = GameObjectUtility.getById(creep.heap.sitTargetId);
+                if (container && creep.pos.getRangeTo(container) > 0) {
+                    creep.moveTo(container, { reusePath: 10, visualizePathStyle: { stroke: '#ffaa00' } });
+                    // Still try to harvest if in range of source while walking
+                    if (creep.pos.getRangeTo(target) <= 1) {
+                        creep.harvest(target);
+                    }
+                    return;
+                }
+            }
+
             const result = creep.harvest(target);
             
             if (result === ERR_NOT_IN_RANGE) {
@@ -45,4 +58,4 @@ const Harvester = {
     }
 };
 
-module.exports = Harvester;
+module.exports = Harvester;

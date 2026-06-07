@@ -1,5 +1,5 @@
 /**
- * Clears memory of dead creeps to prevent heap bloat.
+ * Clears memory of dead creeps and stale heap entries to prevent bloat.
  */
 class MemoryCleanupManager {
     static run() {
@@ -9,6 +9,15 @@ class MemoryCleanupManager {
         for (const name in Memory.creeps) {
             if (!Game.creeps[name]) {
                 delete Memory.creeps[name];
+            }
+        }
+
+        // Clean stale heap entries for dead creeps
+        if (global.creepHeap && global.creepHeap instanceof Map) {
+            for (const name of global.creepHeap.keys()) {
+                if (!Game.creeps[name]) {
+                    global.creepHeap.delete(name);
+                }
             }
         }
     }

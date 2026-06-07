@@ -1,9 +1,9 @@
 class RoleCensusLimitUtility {
     static get LIMITS() {
         return {
-            harvester: 3,
-            hauler: 3,
-            upgrader: 2,
+            harvester: 2,
+            hauler: 4,
+            upgrader: 3,
             builder: 1
         };
     }

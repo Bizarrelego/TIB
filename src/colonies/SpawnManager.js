@@ -5,8 +5,14 @@ const CreepSpawnRequestUtility = require('../utilities/CreepSpawnRequestUtility'
 const SpawnQueueUtility = require('../utilities/SpawnQueueUtility');
 const SpawnRequestPrioritizationUtility = require('../utilities/SpawnRequestPrioritizationUtility');
 
+// Emergency bootstrap body — cheapest possible functional creep (200 energy)
+const EMERGENCY_BODY = [WORK, CARRY, MOVE];
+
 class SpawnManager {
     static run(spawn) {
+        // Clear the queue at the start of each tick to prevent duplicate accumulation
+        SpawnQueueUtility.clear();
+
         this.enqueueSpawnRequests(spawn);
         this.processSpawnQueue(spawn);
     }
@@ -16,6 +22,7 @@ class SpawnManager {
         const queuedCounts = SpawnQueueUtility.getRoleCounts();
         const limits = RoleCensusLimitUtility.getAllLimits() || {};
         const roomName = spawn.room.name;
+        const energyCapacity = spawn.room.energyCapacityAvailable;
 
         const getCount = (role) => {
             const active = (activeCounts && typeof activeCounts.has === 'function' && activeCounts.has(role)) ? activeCounts.get(role) : 0;
@@ -26,13 +33,16 @@ class SpawnManager {
         const harvesterCount = getCount('harvester');
         const haulerCount = getCount('hauler');
 
-        // Bootstrap sequence: Force 1 Harvester, then 1 Hauler before queueing anything else
+        // Emergency bootstrap: spawn minimal body when 0 harvesters exist
         if (harvesterCount === 0 && (limits['harvester'] || 0) > 0) {
-            CreepSpawnRequestUtility.requestCreep(roomName, 'harvester', CreepBodyUtility.getBody('harvester'));
+            const body = energyCapacity >= 300 ? CreepBodyUtility.getBody('harvester', energyCapacity) : EMERGENCY_BODY;
+            CreepSpawnRequestUtility.requestCreep(roomName, 'harvester', body);
             return; 
         }
+        // Ensure at least 1 hauler before filling other roles
         if (harvesterCount >= 1 && haulerCount === 0 && (limits['hauler'] || 0) > 0) {
-            CreepSpawnRequestUtility.requestCreep(roomName, 'hauler', CreepBodyUtility.getBody('hauler'));
+            const body = energyCapacity >= 300 ? CreepBodyUtility.getBody('hauler', energyCapacity) : EMERGENCY_BODY;
+            CreepSpawnRequestUtility.requestCreep(roomName, 'hauler', body);
             return;
         }
 
@@ -43,7 +53,7 @@ class SpawnManager {
 
             if (totalCount < limit) {
                 const missingCount = limit - totalCount;
-                const bodyParts = CreepBodyUtility.getBody(role);
+                const bodyParts = CreepBodyUtility.getBody(role, energyCapacity);
 
                 if (bodyParts && bodyParts.length > 0) {
                     for (let i = 0; i < missingCount; i++) {

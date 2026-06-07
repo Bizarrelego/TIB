@@ -25,6 +25,7 @@ class CreepSpawnRequestUtility {
         }
         requestMemory.set('role', role);
         requestMemory.set('colony', roomName);
+        requestMemory.set('room', roomName);
 
         const request = {
             roomName: roomName,

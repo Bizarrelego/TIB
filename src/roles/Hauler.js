@@ -58,4 +58,4 @@ const Hauler = {
     }
 };
 
-module.exports = Hauler;
+module.exports = Hauler;

@@ -10,6 +10,8 @@ const SpawnManager = require('./colonies/SpawnManager');
 const TaskAssignmentManager = require('./managers/TaskAssignmentManager');
 const RoleExecutor = require('./managers/RoleExecutor');
 const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
+const IntelManager = require('./managers/IntelManager');
+const RoomPlanner = require('./managers/RoomPlanner');
 
 // Utilities
 const ProfilerUtility = require('./utilities/ProfilerUtility');
@@ -37,17 +39,23 @@ module.exports.loop = function () {
         }
     }, 'RoomStateScanner')();
 
-    // 3. Spawning
+    // 3. Intel Gathering (serializes visible room data to Memory)
+    ErrorHandlingUtility.wrap(() => IntelManager.run(), 'IntelManager')();
+
+    // 4. Room Planning (generates and executes blueprints)
+    ErrorHandlingUtility.wrap(() => RoomPlanner.run(), 'RoomPlanner')();
+
+    // 5. Spawning
     ErrorHandlingUtility.wrap(() => {
         for (const spawnName in Game.spawns) {
             SpawnManager.run(Game.spawns[spawnName]);
         }
     }, 'SpawnManager')();
 
-    // 4. Task Assignment
+    // 6. Task Assignment
     ErrorHandlingUtility.wrap(() => TaskAssignmentManager.run(), 'TaskAssignmentManager')();
 
-    // 5. Intent Execution
+    // 7. Intent Execution
     ErrorHandlingUtility.wrap(() => RoleExecutor.run(), 'RoleExecutor')();
 
     // Profiler Reporting
