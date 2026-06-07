@@ -5,19 +5,17 @@ const CreepSpawnRequestUtility = require('../utilities/CreepSpawnRequestUtility'
 const SpawnQueueUtility = require('../utilities/SpawnQueueUtility');
 
 class SpawnManager {
-    static run() {
-        this.enqueueSpawnRequests();
-        this.processSpawnQueue();
+    static run(spawn) {
+        this.enqueueSpawnRequests(spawn);
+        this.processSpawnQueue(spawn);
     }
 
-    static enqueueSpawnRequests() {
+    static enqueueSpawnRequests(spawn) {
         const activeCounts = CreepCensusUtility.getCensus();
         const queuedCounts = SpawnQueueUtility.getRoleCounts();
         const limits = RoleCensusLimitUtility.getAllLimits();
 
-        const spawnValues = Object.values(Game.spawns);
-        if (spawnValues.length === 0) return;
-        const roomName = spawnValues[0].room.name;
+        const roomName = spawn.room.name;
 
         // Queue new spawn requests for any missing creeps
         for (const role in limits) {
@@ -39,35 +37,29 @@ class SpawnManager {
         }
     }
 
-    static processSpawnQueue() {
-        for (const spawnName in Game.spawns) {
-            const spawn = Game.spawns[spawnName];
+    static processSpawnQueue(spawn) {
+        if (spawn.spawning) return;
 
-            if (spawn.spawning) continue;
+        const request = SpawnQueueUtility.dequeue();
+        if (!request) return;
 
-            const request = SpawnQueueUtility.dequeue();
-            if (!request) break;
+        const cost = request.bodyParts.reduce((cost, part) => cost + BODYPART_COST[part], 0);
 
-            const cost = request.bodyParts.reduce((cost, part) => cost + BODYPART_COST[part], 0);
+        if (spawn.room.energyAvailable >= cost) {
+            const name = request.role + '_' + Game.time + '_' + Math.floor(Math.random() * 1000);
 
-            if (spawn.room.energyAvailable >= cost) {
-                const name = request.role + '_' + Game.time + '_' + Math.floor(Math.random() * 1000);
-
-                // Convert Map back to a plain object since Screeps Memory API requires it
-                const plainMemory = {};
-                for (const [key, value] of request.memory) {
-                    plainMemory[key] = value;
-                }
-
-                spawn.spawnCreep(request.bodyParts, name, {
-                    memory: plainMemory
-                });
-            } else {
-                // If we can't spawn the next creep, put it back at the front of the queue
-                // We break because we want to maintain the queue order
-                SpawnQueueUtility.unshift(request);
-                break;
+            // Convert Map back to a plain object since Screeps Memory API requires it
+            const plainMemory = {};
+            for (const [key, value] of request.memory) {
+                plainMemory[key] = value;
             }
+
+            spawn.spawnCreep(request.bodyParts, name, {
+                memory: plainMemory
+            });
+        } else {
+            // If we can't spawn the next creep, put it back at the front of the queue
+            SpawnQueueUtility.unshift(request);
         }
     }
 }

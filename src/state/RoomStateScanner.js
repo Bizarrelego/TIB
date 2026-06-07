@@ -52,47 +52,44 @@ const createRoomStateTemplate = () => ({
 });
 
 class RoomStateScanner {
-    static run(roomStatesMap) {
-        for (const roomName in Game.rooms) {
-            const room = Game.rooms[roomName];
+    static run(room) {
+        if (!global.State) global.State = { rooms: new Map() };
 
-            // V8 GC Optimization: Reuse state objects to avoid thrashing
-            let state = roomStatesMap.get(roomName);
-            if (!state) {
-                state = createRoomStateTemplate();
-                roomStatesMap.set(roomName, state);
-            }
+        const roomName = room.name;
 
-            // Reset arrays and counts
-            state.structureIds = [];
-            state.repairTargets = [];
-            state.creeps = [];
-            state.spawns = [];
-            state.extensions = [];
-            state.invaderCores = [];
-            state.towers = [];
-            state.links = [];
-            state.labs = [];
-            state.containers = [];
-            state.sourceContainers = [];
-            state.controllerContainers = [];
-            state.droppedEnergy = [];
-            state.ruins = [];
-            state.tombstones = [];
-            state.validDroppedEnergy = [];
-            state.availableDroppedEnergy = [];
-            state.energyInRuinsAndTombstones = [];
-            state.harvestableSources = [];
-            state.storage = null;
-            state.terminal = null;
-            state.factory = null;
-            state.extractor = null;
+        // V8 GC Optimization: Reuse state objects to avoid thrashing
+        let state = global.State.rooms.get(roomName);
+        if (!state) {
+            state = createRoomStateTemplate();
+            global.State.rooms.set(roomName, state);
+        }
 
-            for (const role in state.creepCounts) {
-                state.creepCounts[role] = 0;
-            }
+        // Reset arrays and counts (Note: creeps and creepCounts are NOT reset here
+        // because GlobalStateScanner populates them earlier in the tick)
+        state.structureIds = [];
+        state.repairTargets = [];
+        state.spawns = [];
+        state.extensions = [];
+        state.invaderCores = [];
+        state.towers = [];
+        state.links = [];
+        state.labs = [];
+        state.containers = [];
+        state.sourceContainers = [];
+        state.controllerContainers = [];
+        state.droppedEnergy = [];
+        state.ruins = [];
+        state.tombstones = [];
+        state.validDroppedEnergy = [];
+        state.availableDroppedEnergy = [];
+        state.energyInRuinsAndTombstones = [];
+        state.harvestableSources = [];
+        state.storage = null;
+        state.terminal = null;
+        state.factory = null;
+        state.extractor = null;
 
-            state.controller = room.controller;
+        state.controller = room.controller;
 
             // Cache static objects like sources and minerals to avoid engine polling overhead
             if (state.cache.sourceIds.length === 0) {
@@ -187,8 +184,8 @@ class RoomStateScanner {
             state.availableDroppedEnergy = EnergySourceUtility.findAvailableDroppedEnergy(roomName);
             state.energyInRuinsAndTombstones = EnergySourceUtility.findEnergyInRuinsAndTombstones(roomName);
             state.harvestableSources = EnergySourceUtility.findHarvestableSources(roomName);
-        }
     }
 }
 
+RoomStateScanner.createRoomStateTemplate = createRoomStateTemplate;
 module.exports = RoomStateScanner;
