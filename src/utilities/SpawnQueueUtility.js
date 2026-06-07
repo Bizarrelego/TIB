@@ -14,9 +14,27 @@ class SpawnQueueUtility {
         queue.push(request);
     }
 
+    static unshift(request) {
+        const queue = this.getQueue();
+        queue.unshift(request);
+    }
+
     static dequeue() {
         const queue = this.getQueue();
         return queue.shift();
+    }
+
+    static getRoleCounts() {
+        const queue = this.getQueue();
+        const counts = {};
+        for (const req of queue) {
+            if (counts[req.role] === undefined) {
+                counts[req.role] = 1;
+            } else {
+                counts[req.role]++;
+            }
+        }
+        return counts;
     }
 
     static clear() {

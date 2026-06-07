@@ -24,6 +24,7 @@ class CreepSpawnRequestUtility {
             memory: Object.assign({}, memory, { role: role, colony: roomName })
         };
 
+        // Submit the formatted request to the centralized queue
         SpawnQueueUtility.enqueue(request);
         return true;
     }
