@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Screeps Tigga-Style Architecture (Full Empire Flow)</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #121212;
+    color: #e0e0e0;
+    margin: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  /* --- Navigation Tabs --- */
+  #top-nav {
+    background-color: #1a1a1a;
+    border-bottom: 2px solid #333;
+    display: flex;
+    padding: 0 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    z-index: 10;
+  }
+
+  .tab-btn {
+    background: none;
+    border: none;
+    color: #888;
+    padding: 15px 25px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+  }
+
+  .tab-btn:hover {
+    color: #d4d4d4;
+  }
+
+  .tab-btn.active {
+    color: #4ba3e3;
+    border-bottom: 3px solid #4ba3e3;
+  }
+
+  /* --- View Containers --- */
+  .view-content {
+    display: none;
+    flex-grow: 1;
+    overflow: hidden;
+    height: calc(100vh - 53px);
+  }
+
+  .view-content.active {
+    display: flex;
+  }
+
+  /* --- Tree View (Tab 1) --- */
+  #tree-container {
+    flex-grow: 1;
+    position: relative;
+    background: radial-gradient(circle at center, #1a1a1a 0%, #121212 100%);
+  }
+
+  #side-panel {
+    width: 480px;
+    background-color: #1e1e1e;
+    border-left: 1px solid #333;
+    padding: 20px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    box-shadow: -4px 0 15px rgba(0,0,0,0.8);
+    display: flex;
+    flex-direction: column;
+    z-index: 5;
+  }
+
+  #side-panel h2 {
+    margin-top: 0;
+    font-size: 22px;
+    border-bottom: 2px solid #333;
+    padding-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 15px;
+    color: #fff;
+  }
+
+  .type-kernel { background-color: #8e44ad; }
+  .type-phase { background-color: #c0392b; }
+  .type-data { background-color: #2980b9; }
+  .type-manager { background-color: #27ae60; }
+  .type-subsystem { background-color: #d35400; }
+  .type-task { background-color: #7f8c8d; }
+  .type-progression { background-color: #f39c12; }
+  .type-offense { background-color: #8b0000; }
+
+  #side-panel p, #side-panel ul, #side-panel ol {
+    line-height: 1.6;
+    font-size: 14px;
+    color: #d4d4d4;
+  }
+
+  #side-panel ul, #side-panel ol {
+    padding-left: 20px;
+  }
+
+  #side-panel li { margin-bottom: 8px; }
+
+  code {
+    background-color: #2a2a2a;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-family: 'Courier New', Courier, monospace;
+    color: #ce9178;
+    border: 1px solid #333;
+  }
+
+  .roles-list {
+    margin-top: 20px;
+    background: #1a1a1a;
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid #333;
+  }
+  
+  .roles-list h3 {
+    margin-top: 0;
+    font-size: 16px;
+    color: #dcdcaa;
+    border-bottom: 1px solid #333;
+    padding-bottom: 5px;
+  }
+
+  .implementation-box {
+    margin-top: 15px;
+    background: #252526;
+    border-left: 4px solid #4ba3e3;
+    padding: 10px 15px;
+    font-size: 13px;
+    color: #ccc;
+  }
+
+  .implementation-box strong {
+    color: #4ba3e3;
+    display: block;
+    margin-bottom: 5px;
+  }
+
+  /* D3 Nodes */
+  .node circle { stroke-width: 2.5px; transition: all 0.2s ease-in-out; }
+  .node:hover circle { stroke-width: 4px; filter: brightness(1.2); }
+  .node text { font: 13px 'Segoe UI', sans-serif; fill: #e0e0e0; text-shadow: 0 1px 4px rgba(0,0,0,1); }
+  .link { fill: none; stroke: #444; stroke-width: 1.5px; transition: stroke 0.3s; }
+
+  div.tooltip {
+    position: absolute; text-align: left; padding: 10px 15px; font: 13px sans-serif;
+    background: rgba(25, 25, 25, 0.95); color: #e0e0e0; border-left: 3px solid #4ba3e3;
+    border-radius: 0 4px 4px 0; pointer-events: none; max-width: 300px;
+    box-shadow: 0 6px 12px rgba(0,0,0,0.6); z-index: 10; line-height: 1.4;
+  }
+
+  /* --- Views --- */
+  #view-comp, #view-rcl, #view-adv {
+    padding: 30px;
+    overflow-y: auto;
+    background-color: #121212;
+  }
+
+  .comp-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+    gap: 20px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+
+  .section-header {
+    grid-column: 1 / -1;
+    color: #f39c12;
+    border-bottom: 2px solid #333;
+    padding-bottom: 10px;
+    margin-top: 30px;
+    margin-bottom: 10px;
+    font-size: 24px;
+    font-weight: bold;
+  }
+
+  .comp-card {
+    background-color: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 20px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  }
+
+  .comp-card h3 {
+    color: #4ba3e3;
+    margin-top: 0;
+    font-size: 18px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 10px;
+  }
+
+  .comp-card p {
+    font-size: 14px;
+    color: #d4d4d4;
+    line-height: 1.6;
+    margin-bottom: 15px;
+  }
+
+  .comp-card .math-block {
+    background-color: #0d0d0d;
+    padding: 15px;
+    border-radius: 4px;
+    border-left: 3px solid #c0392b;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    color: #ce9178;
+    overflow-x: auto;
+    white-space: pre-wrap;
+  }
+
+  .comp-card .justification {
+    margin-top: 15px;
+    font-size: 13px;
+    color: #27ae60;
+    font-style: italic;
+  }
+
+  /* RCL Specific Styles */
+  .rcl-card {
+    background-color: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 0;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .rcl-header {
+    background-color: #f39c12;
+    color: #121212;
+    padding: 15px 20px;
+    font-size: 20px;
+    font-weight: bold;
+    border-radius: 6px 6px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .rcl-content {
+    padding: 20px;
+  }
+
+  .rcl-objective {
+    font-size: 16px;
+    font-weight: bold;
+    color: #4ba3e3;
+    margin-bottom: 10px;
+  }
+
+  .rcl-sub {
+    list-style-type: square;
+    color: #d4d4d4;
+    padding-left: 20px;
+    margin-bottom: 15px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .rcl-asap {
+    background-color: #252526;
+    border-left: 4px solid #27ae60;
+    padding: 10px 15px;
+    font-size: 13px;
+    color: #ccc;
+  }
+
+  .rcl-asap strong {
+    color: #27ae60;
+    display: block;
+    margin-bottom: 5px;
+  }
+
+</style>
+</head>
+<body>
+
+<div id="top-nav">
+  <button id="tab-tree" class="tab-btn active" onclick="switchTab('tree')">Execution Tree</button>
+  <button id="tab-comp" class="tab-btn" onclick="switchTab('comp')">Core Components</button>
+  <button id="tab-rcl" class="tab-btn" onclick="switchTab('rcl')">RCL Milestones</button>
+  <button id="tab-adv" class="tab-btn" onclick="switchTab('adv')">Advanced Systems & Math</button>
+</div>
+
+<!-- TAB 1: EXECUTION TREE -->
+<div id="view-tree" class="view-content active">
+  <div id="tree-container"></div>
+  <div id="side-panel">
+    <h2 id="panel-title" style="color: #fff;">Kernel Architecture</h2>
+    <div id="panel-badge" class="badge type-kernel">OS ROOT</div>
+    <div id="panel-content">
+      <p>Select a node to view its structural implementation, CPU optimization strategies, and execution logic.</p>
+      <div class="implementation-box">
+        <strong>Core Philosophy</strong>
+        This architecture strictly enforces O(1) lookups, eliminates redundant array iterations, and defers all memory serialization. Order of execution is absolute to guarantee performance under 500 CPU. It spans all requirements for a competitive empire.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 2: CORE COMPONENTS -->
+<div id="view-comp" class="view-content">
+  <div class="comp-grid">
+    
+    <div class="comp-card">
+      <h3>1. Sub-Tick Intent Ledger</h3>
+      <p>The Traffic Manager prevents physical collisions; this ledger prevents resource collisions. Native Screeps APIs update state at the end of the tick. If two creeps query an empty container simultaneously, both fire `withdraw` intents, but one fails, wasting CPU.</p>
+      <div class="math-block">class VirtualLedger {
+  constructor() { this.store = {}; }
+  registerIntent(targetId, resource, amount, isWithdraw) {
+    let current = this.get(targetId, resource);
+    this.store[targetId][resource] = isWithdraw ? current - amount : current + amount;
+  }
+}</div>
+      <div class="justification">Optimization Check: Eliminates ERR_NOT_ENOUGH_RESOURCES wastes. Creeps read the virtual heap ledger instead of the native API, ensuring immediate capacity awareness.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>2. Min-Cut / Max-Flow Rampart Generation</h3>
+      <p>Do not place ramparts manually or blanket the outer wall. You must calculate programmatic choke points to minimize construction and repair costs.</p>
+      <div class="math-block">1. Generate DistanceTransform grid from unwalkable walls.
+2. Apply Ford-Fulkerson algorithm.
+3. Source = Room Exits. Sink = Base Core (Spawns/Storage).
+4. Extract minimum cross-section tiles.
+5. Output: Array of {x,y} for automated ConstructionSites.</div>
+      <div class="justification">Optimization Check: Drastically reduces energy diverted to rampart repair, freeing economy for upgrades and market compression.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>3. Cascading CPU Throttling Engine</h3>
+      <p>Soft throttling ("if bucket is low") fails during prolonged sieges. You must implement a hardcoded, cascading switch statement to ruthlessly cut non-essential operations.</p>
+      <div class="math-block">switch(true) {
+  case (bucket === 10000): Game.cpu.generatePixel();
+  case (bucket > 8000): runGlobalOperations();
+  case (bucket > 5000): runUpgraders(); runRemoteMining();
+  case (bucket > 1000): runDefense(); runLogistics();
+  default: runSpawns(); runTrafficManager();
+}</div>
+      <div class="justification">Optimization Check: Guarantees base survival under extreme CPU strain by prioritizing combat and energy flow over progression.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>4. Creep Pre-Spawning Matrix</h3>
+      <p>Spawning a replacement creep *after* the previous one dies leaves a source empty during travel time. You must mathematically guarantee 100% source saturation.</p>
+      <div class="math-block">let spawnTime = creep.body.length * 3;
+let cachedPathLength = global.Cache.distances[`spawn_to_source_${src.id}`];
+
+if (creep.ticksToLive <= (spawnTime + cachedPathLength)) {
+  SpawnManager.enqueueReplacement();
+}</div>
+      <div class="justification">Optimization Check: Maximizes room TEP (Total Energy Potential) extraction by ensuring the replacement arrives on the exact tick the predecessor dies.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>5. Dynamic Market Pricing (EMA)</h3>
+      <p>Hardcoded credit limits lead to starvation or being scammed by market bots. You must implement an Exponential Moving Average to track price history.</p>
+      <div class="math-block">const ALPHA = 2 / (DAYS + 1);
+EMA_today = (CurrentPrice * ALPHA) + (EMA_yesterday * (1 - ALPHA));
+
+// Trade Execution Limits:
+BuyLimit = EMA - (1 * StandardDeviation);
+SellLimit = EMA + (1 * StandardDeviation);</div>
+      <div class="justification">Optimization Check: Automates terminal trades to guarantee profitability and adapt to global server economic shifts without manual intervention.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>6. Advanced Tower Drain Calculus</h3>
+      <p>Enemy towers deal 150 damage at range &le;5, decaying linearly to 60 at range &ge;20. Drainer creeps must calculate their exact survivability before stepping.</p>
+      <div class="math-block">let towerDamage = calculateFalloff(distToTower);
+let totalIncoming = towerDamage * activeTowers;
+let selfHeal = creep.activeParts(HEAL) * 12;
+
+let netHealth = creep.hits + selfHeal - totalIncoming;
+
+if (netHealth <= 0) { abortMove(); }
+else { creep.heal(creep); creep.move(target); }</div>
+      <div class="justification">Optimization Check: Prevents creep loss during sieges. Ensures drainers safely edge enemy towers and pre-queue heals on the exact tick damage is received.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>7. Cross-Shard Synchronization</h3>
+      <p>A max-tier empire must expand across shards. Native memory does not bridge shards. You must deploy an InterShardMemory serialization engine.</p>
+      <div class="math-block">let payload = {
+  arbitrage: [{res: 'X', maxPrice: 10}],
+  portals: [{shard: 'shard2', room: 'W10N10'}]
+};
+InterShardMemory.setLocal(JSON.stringify(payload));
+// Target shard parses InterShardMemory.getRemote('shard1')</div>
+      <div class="justification">Optimization Check: Unlocks multi-shard economy arbitrage and coordinates inter-shard pioneer drops without manual hardcoding.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>8. Simultaneous Swarm Swapping (Shoving)</h3>
+      <p>DFS Traffic Managers fail in dense environments like bunkers or source clusters. You must implement Shoving: if Creep A moves into Creep B, and B is idle, issue an opposite move intent to B.</p>
+      <div class="math-block">if (targetTile.hasCreep && targetTile.creep.isIdle) {
+  targetTile.creep.move(OPPOSITE_DIR);
+  creep.move(targetTile);
+}</div>
+      <div class="justification">Optimization Check: Prevents logistics gridlock in 1-tile wide corridors. Allows creeps to pass through each other in a single tick.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>9. Intent Conflict Matrix & Action Maximization</h3>
+      <p>Screeps executes intents in a hardcoded order. Conflicting intents (build, repair, attack) cancel. Non-conflicting intents (move, transfer, drop, rangedHeal) can fire simultaneously. Stack them aggressively.</p>
+      <div class="math-block">// Fire simultaneously without conflict:
+creep.move(dir);
+creep.rangedAttack(target);
+creep.heal(creep);</div>
+      <div class="justification">Optimization Check: Maximizes utility per tick. Haulers transfer while moving; attackers kite, shoot, and heal simultaneously without wasting CPU on rejected API calls.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>10. Death Spiral Recovery Protocol (MVC)</h3>
+      <p>If an RCL 8 room is wiped and storage hits 0, standard managers lock up trying to spawn 2300-energy harvesters. A Minimal Viable Creep (MVC) override must instantly clear the queue.</p>
+      <div class="math-block">if (room.energyAvailable < 300 && harvesters === 0) {
+  SpawnManager.clearQueue();
+  SpawnManager.enqueue({body: [WORK, CARRY, MOVE, MOVE], role: 'emergencyBuilder'});
+}</div>
+      <div class="justification">Optimization Check: Guarantees autonomous recovery from absolute zero. Emergency creeps ignore complex logistics to directly harvest and fill the spawn.</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- TAB 3: RCL PROGRESSION -->
+<div id="view-rcl" class="view-content">
+  <div class="comp-grid">
+    
+    <div class="rcl-card">
+      <div class="rcl-header">
+        <span>RCL 1: Bootstrap</span>
+        <span>0 / 200 Energy</span>
+      </div>
+      <div class="rcl-content">
+        <div class="rcl-objective">Objective: Saturate Sources & Upgrade Fast</div>
+        <ul class="rcl-sub">
+          <li>Do not build roads or structures. Every energy unit goes to the controller.</li>
+          <li>Do not use dedicated roles. Spawn generic `worker` creeps ([WORK, CARRY, MOVE]).</li>
+          <li>Utilize drop-mining if source saturation limits are reached.</li>
+        </ul>
+        <div class="rcl-asap">
+          <strong>ASAP Strategy</strong>
+          Queue 15 `worker` creeps immediately. The first 5 surround the source; the rest harvest dropped energy and dump it directly into the controller. Ignore traffic efficiency; brute-force the 200 energy requirement.
+        </div>
+      </div>
+    </div>
+
+    <div class="rcl-card">
+      <div class="rcl-header">
+        <span>RCL 2: Core Infrastructure</span>
+        <span>0 / 500 Energy</span>
+      </div>
+      <div class="rcl-content">
+        <div class="rcl-objective">Objective: 500 Capacity & Role Split</div>
+        <ul class="rcl-sub">
+          <li>Build exactly 5 extensions adjacent to the spawn to minimize hauler travel.</li>
+          <li>Build 1 container at the controller and 1 at each source.</li>
+          <li>Transition from generic workers to `harvester` and `hauler` pairs.</li>
+        </ul>
+        <div class="rcl-asap">
+          <strong>ASAP Strategy</strong>
+          Lock harvesters to stationary source tiles (TrafficManager Working Area = 0). Route all haulers to fill the 5 extensions first, then dump overflow into the controller container for dedicated upgraders.
+        </div>
+      </div>
+    </div>
+
+    <div class="rcl-card">
+      <div class="rcl-header">
+        <span>RCL 3: Defense & Networking</span>
+        <span>0 / 800 Energy</span>
+      </div>
+      <div class="rcl-content">
+        <div class="rcl-objective">Objective: Tower Defense & Road Grid</div>
+        <ul class="rcl-sub">
+          <li>Build 1 Tower immediately to defend against random invader spawns.</li>
+          <li>Build roads connecting Spawn -> Sources -> Controller.</li>
+          <li>Build 5 more extensions (10 total).</li>
+        </ul>
+        <div class="rcl-asap">
+          <strong>ASAP Strategy</strong>
+          Tower logic prioritizes hostile creeps > healing defenders > repairing roads at 10% health. Scale haulers up to [CARRYx4, MOVEx2] to match the road speed bonus and reduce traffic congestion. Activate Poaching logic if nearby hostile remotes are undefended.
+        </div>
+      </div>
+    </div>
+
+    <div class="rcl-card">
+      <div class="rcl-header">
+        <span>RCL 4: Storage & Expansion</span>
+        <span>0 / 1,300 Energy</span>
+      </div>
+      <div class="rcl-content">
+        <div class="rcl-objective">Objective: Central Buffer & Remote Mining</div>
+        <ul class="rcl-sub">
+          <li>Build Storage to act as the permanent energy buffer.</li>
+          <li>Build 10 more extensions (20 total).</li>
+          <li>Deploy `remoteDefender` and `harvester` pairs to 1-2 adjacent rooms.</li>
+        </ul>
+        <div class="rcl-asap">
+          <strong>ASAP Strategy</strong>
+          Shift all domestic logistics to a hub model. Haulers pull exclusively from sources and dump into Storage. A specialized `fastFiller` pulls from Storage to fill Spawns/Extensions. Begin hoarding energy.
+        </div>
+      </div>
+    </div>
+
+    <div class="rcl-card">
+      <div class="rcl-header">
+        <span>RCL 5: Link Logistics</span>
+        <span>0 / 1,800 Energy</span>
+      </div>
+      <div class="rcl-content">
+        <div class="rcl-objective">Objective: Decouple Domestic Hauling</div>
+        <ul class="rcl-sub">
+          <li>Build 2 Links (1 at furthest Source, 1 at Storage hub).</li>
+          <li>Build 2nd Tower. Build 10 more extensions (30 total).</li>
+          <li>Expand remote mining to 3-4 adjacent rooms.</li>
+        </ul>
+        <div class="rcl-asap">
+          <strong>ASAP Strategy</strong>
+          Retire haulers for the linked source. The harvester dumps directly into the source Link, which beams it to the hub Link. A `hubManager` stationary creep transfers energy from the hub Link to Storage.
+        </div>
+      </div>
+    </div>
+
+    <div class="rcl-card">
+      <div class="rcl-header">
+        <span>RCL 6: Market & Minerals</span>
+        <span>0 / 2,300 Energy</span>
+      </div>
+      <div class="rcl-content">
+        <div class="rcl-objective">Objective: Terminal Trading & Extractor</div>
+        <ul class="rcl-sub">
+          <li>Build Terminal. Implement EMA market pricing scripts.</li>
+          <li>Build Extractor. Deploy `mineralMiner`.</li>
+          <li>Build 3rd Link (at the 2nd Source) and 10 more extensions (40 total).</li>
+          <li>Build 3 Labs to begin basic compound synthesis.</li>
+        </ul>
+        <div class="rcl-asap">
+          <strong>ASAP Strategy</strong>
+          Terminal Manager activates. Automatically sell surplus minerals for credits, and buy missing energy if Storage drops below 50,000. Balance energy levels automatically with other owned Colonies.
+        </div>
+      </div>
+    </div>
+
+    <div class="rcl-card">
+      <div class="rcl-header">
+        <span>RCL 7: Industry & Military Prep</span>
+        <span>0 / 5,300 Energy</span>
+      </div>
+      <div class="rcl-content">
+        <div class="rcl-objective">Objective: Factory Compression & 2nd Spawn</div>
+        <ul class="rcl-sub">
+          <li>Build 2nd Spawn to double military/civilian output.</li>
+          <li>Build Factory. Compress surplus energy into Batteries.</li>
+          <li>Build 3rd Tower. 4th Link (Controller). 10 more extensions (50 total).</li>
+          <li>Build 3 more Labs (6 total).</li>
+        </ul>
+        <div class="rcl-asap">
+          <strong>ASAP Strategy</strong>
+          Retire upgraders hauling from Storage. Use the 4th Link to beam energy directly to the controller container. Begin synthesizing T2 boosts (e.g., UHO2, KHO2) for impending military operations.
+        </div>
+      </div>
+    </div>
+
+    <div class="rcl-card">
+      <div class="rcl-header">
+        <span>RCL 8: Empire Domination</span>
+        <span>12,900 Energy</span>
+      </div>
+      <div class="rcl-content">
+        <div class="rcl-objective">Objective: Power, Nukes, and Expansion</div>
+        <ul class="rcl-sub">
+          <li>Build 3rd Spawn, Power Spawn, Observer, and Nuker.</li>
+          <li>Build remaining Towers (6 total) and Labs (10 total).</li>
+          <li>Launch automated claim operations to scale the empire.</li>
+        </ul>
+        <div class="rcl-asap">
+          <strong>ASAP Strategy</strong>
+          Fully functional Lab Array synthesizes T3 boosts. SpawnManager queues T3-boosted Quad Swarms. Intel Manager flags SK and Power rooms for continuous exploitation. Bucket surplus triggers automated RCL 1 bootstrapping in new sectors.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- TAB 4: ADVANCED SYSTEMS & MATH -->
+<div id="view-adv" class="view-content">
+  <div class="comp-grid">
+
+    <!-- CATEGORY: 20-CPU CAP & EARLY GAME EXTREME EFFICIENCY -->
+    <div class="section-header">20-CPU Cap & Extreme Early Efficiency</div>
+
+    <div class="comp-card">
+      <h3>52. Aggressive Tick Slicing (20-CPU Mode)</h3>
+      <p>Running all managers linearly every tick is a 100-CPU privilege. At 20 CPU, you must mathematically stagger non-critical systems. Traffic runs every tick, but Spawn and Economy logic can sleep.</p>
+      <div class="math-block">if (Game.time % 10 === 0) SpawnManager.run();
+if (Game.time % 5 === 0) EconomyManager.run();
+if (Game.time % 1000 === 0) RoomPlanner.run();</div>
+      <div class="justification">Optimization Check: Drops average CPU per tick from 15 to under 3 during early-game progression, completely preventing bucket starvation.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>53. Zero-Pathing Stationary Harvesting</h3>
+      <p><code>PathFinder</code> is the #1 CPU sink in early game. A harvester should calculate the optimal mining spot exactly once in its lifetime, walk to it, and never invoke pathing algorithms again.</p>
+      <div class="math-block">if (!creep.heap.inPosition) {
+  creep.moveTo(optimalPos);
+  if (creep.pos.isEqualTo(optimalPos)) creep.heap.inPosition = true;
+} else {
+  creep.harvest(source); // 0 CPU spent on movement logic
+}</div>
+      <div class="justification">Optimization Check: Eliminates recurring path recalculations for the highest-frequency task in the game, securing massive CPU overhead savings.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>54. Single-Site Construction Throttling</h3>
+      <p>Placing 20 construction sites at RCL 2 drains your CPU because the Screeps engine must natively parse and update every active site object. Additionally, builders waste fatigue bouncing between multiple sites.</p>
+      <div class="math-block">let activeSites = room.find(FIND_MY_CONSTRUCTION_SITES);
+if (activeSites.length > 0) return; // Wait until current site is finished
+RoomPlanner.placeNextHighestPrioritySite();</div>
+      <div class="justification">Optimization Check: Forces laser-focus on one structure at a time. Saves engine CPU tax and prevents builders from walking inefficient zigzag paths.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>65. Ruin & Tombstone Scavenging</h3>
+      <p>Early game economy relies on sources. You are ignoring the massive influx of free resources from dead neighbor bases or failed invasions. Prioritize looting ruins over harvesting.</p>
+      <div class="math-block">let ruins = room.find(FIND_RUINS, { filter: r => r.store.getUsedCapacity() > 0 });
+if (ruins.length > 0) {
+  TaskDispatcher.assign(hauler, 'TaskLoot', ruins[0].id);
+}</div>
+      <div class="justification">Optimization Check: Injects thousands of free energy (and potentially T3 boosts from dead invaders) directly into your RCL progression without the CPU or time cost of mining.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>55. Hardcoded Offset Stamps (0-CPU Planning)</h3>
+      <p>Running DistanceTransform and Min-Cut algorithms at RCL 2 will instantly crash a 20-CPU bucket. You must hardcode the initial RCL 1-4 layout relative to the primary Spawn's coordinates.</p>
+      <div class="math-block">const EXTENSION_STAMP = [{x:1, y:1}, {x:-1, y:1}, {x:0, y:2}];
+let spawnPos = global.Cache.structures[room.name].spawns[0].pos;
+let extPos = { x: spawnPos.x + EXTENSION_STAMP[0].x, y: spawnPos.y + EXTENSION_STAMP[0].y };</div>
+      <div class="justification">Optimization Check: Bypasses 5-15 CPU heavy matrix math algorithms entirely during the volatile bootstrap phase.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>56. Naked Decoy Blocking (RCL 1-2 Griefing)</h3>
+      <p>If you share a sector with another player, do not wait until RCL 3 to attack. Send a 50-energy `[MOVE]` creep to permanently stand on their initial extension Construction Sites.</p>
+      <div class="math-block">let targetSite = enemyRoom.find(FIND_CONSTRUCTION_SITES)[0];
+TrafficManager.parkOnTile(decoy, targetSite.pos);
+// Decoy refuses to move, blocking the enemy builder indefinitely</div>
+      <div class="justification">Optimization Check: Costs 50 energy and 0.2 CPU to permanently paralyze a neighbor's RCL 2 progression while you continue scaling to RCL 4 unabated.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>57. Bucket-Gated Distance Transforms</h3>
+      <p>Distance Transforms (DT) and Min-Cut algorithms are necessary for optimal bunker placement, but executing them early on a 20-CPU cap will instantly drain your bucket. The OS must delay these calculations until the CPU bucket hits a safe surplus threshold.</p>
+      <div class="math-block">if (room.memory.needsPlanning && Game.cpu.bucket > 8000) {
+  let dtMatrix = runDistanceTransform(room.name);
+  RoomPlanner.generateBunkerStamps(dtMatrix);
+  room.memory.needsPlanning = false;
+}</div>
+      <div class="justification">Optimization Check: Defers massive 10-15 CPU spikes. Ensures the bot still calculates a mathematically perfect base layout without sacrificing immediate logistics and survival operations.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>58. Fatigue-Gated Execution</h3>
+      <p>A creep with fatigue > 0 physically cannot move. Running its movement logic, checking its pathing cache, or evaluating traffic shoving is a complete waste of CPU. The OS must hard-halt movement logic instantly.</p>
+      <div class="math-block">if (creep.fatigue > 0) {
+  TrafficManager.registerIntent(creep.pos); // Just register stationary pos
+  return; // Skip all movement logic entirely
+}</div>
+      <div class="justification">Optimization Check: Truncates the execution tree for heavy haulers traversing swamps or roads. Saves massive CPU overhead on 20-CPU limits by simply acknowledging game physics.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>59. Source Regeneration Sleep</h3>
+      <p>If a source is empty, a harvester executing `harvest()` returns `ERR_NOT_ENOUGH_RESOURCES`. Polling the source every tick wastes CPU. Calculate the exact wake tick.</p>
+      <div class="math-block">if (source.energy === 0) {
+  creep.heap.wakeTick = Game.time + source.ticksToRegeneration;
+  return;
+}</div>
+      <div class="justification">Optimization Check: Completely removes stationary harvesters from the active execution pipeline for up to 300 ticks at a time, drastically lowering the base CPU floor.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>63. Event-Driven State Updates (0-CPU Radar)</h3>
+      <p>Running `room.find(FIND_HOSTILE_CREEPS)` across 15 remote rooms every tick will exceed your 20-CPU budget instantly. You must use the native event log to detect combat without array iteration.</p>
+      <div class="math-block">let events = room.getEventLog();
+let underAttack = events.some(e => e.event === EVENT_ATTACK);
+if (underAttack) DefenseManager.wake(room.name);</div>
+      <div class="justification">Optimization Check: Reduces a 0.5 CPU array scan down to 0.02 CPU per room. The Defense Manager sleeps permanently until the engine natively flags combat in the area.</div>
+    </div>
+
+    <!-- CATEGORY: OS & MEMORY -->
+    <div class="section-header">OS & Memory Architecture</div>
+
+    <div class="comp-card">
+      <h3>20. Memory Segmentation (RawMemory)</h3>
+      <p>The standard `Memory` object is parsed globally via `JSON.stringify/parse` and hard-capped at 2MB. Top bots completely bypass this for persistent data by utilizing the 100 available 100KB segments.</p>
+      <div class="math-block">// Assignment mapping:
+// Segments 0-10: Cross-room Intel & Heatmaps
+// Segments 11-20: Distance Transforms & Room Plans
+
+RawMemory.setActiveSegments([0, 11]); 
+let intelData = JSON.parse(RawMemory.segments[0] || "{}");</div>
+      <div class="justification">Optimization Check: Prevents the bot from crashing when scaling past 20 rooms. Segments are only parsed when explicitly requested, eliminating idle CPU drain.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>21. Node.js v24 V8 Optimizations</h3>
+      <p>The upgrade to Node v24 introduces native compiler improvements that must be exploited. Do not use standard objects <code>{}</code> for massive dictionaries; use <code>Map()</code>.</p>
+      <div class="math-block">// Use Map for O(1) lookups instead of objects
+global.Cache.structures = new Map();
+global.Cache.structures.set(id, obj);
+
+// Use native structuredClone for deep copies
+let clone = structuredClone(baseMatrix);</div>
+      <div class="justification">Optimization Check: `Map()` lookups bypass the prototype chain, making them significantly faster in modern V8.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>22. Heap-Only Creep Memory (Memory Proxy)</h3>
+      <p>Writing directly to `creep.memory` natively serializes to `Memory.creeps`, forcing massive JSON parsing overhead. You must proxy memory to the heap, persisting only the absolute minimum required data (`role`, `colony`).</p>
+      <div class="math-block">// Instead of: creep.memory._path = [...]
+Object.defineProperty(Creep.prototype, 'heap', {
+  get() {
+    if (!global.Cache.creeps[this.name]) global.Cache.creeps[this.name] = {};
+    return global.Cache.creeps[this.name];
+  }
+});
+creep.heap._path = [...]; // 0 serialization cost</div>
+      <div class="justification">Optimization Check: Strips tens of thousands of characters from the global Memory string. Prevents the 2MB limit crash.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>23. Global Error Boundary (Sandboxing)</h3>
+      <p>A single exception inside a sub-manager will crash the entire Node.js loop, halting all colonies instantly. Every Manager must be sandboxed within an isolated `try/catch` block.</p>
+      <div class="math-block">try {
+  ColonyManager.run(colonyData);
+} catch (e) {
+  Logger.error(`[CRITICAL] Colony ${colonyData.name} crashed: ${e.stack}`);
+}</div>
+      <div class="justification">Optimization Check: Guarantees 100% uptime for the empire. If one remote miner's pathing fails, only that specific routine halts.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>24. Global Reset Recovery (Heap Rehydration)</h3>
+      <p>The Screeps VM occasionally restarts the global environment, wiping `global.Cache`. If the OS does not explicitly detect this and rehydrate critical O(1) dictionaries, ID lookups will fail.</p>
+      <div class="math-block">if (!global.Cache || !global.Cache.initialized) {
+  global.Cache = { structures: new Map(), distances: new Map(), initialized: true };
+  RawMemory._parsed = JSON.parse(RawMemory.get()); 
+  RehydrateCostMatrices();
+}</div>
+      <div class="justification">Optimization Check: Prevents cascading failures following a server tick reset.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>25. CPU Bucket Forecasting</h3>
+      <p>A static threshold is reactive. The OS must track the trajectory of the bucket across 10 ticks and preemptively suspend high-cost logic if the trend is steeply negative.</p>
+      <div class="math-block">let bucketDelta = currentBucket - Memory.lastBucket;
+Memory.bucketTrend.push(bucketDelta);
+let avgDrain = Math.average(Memory.bucketTrend);
+
+if (avgDrain < -50 && currentBucket < 5000) {
+  triggerAusterityMode(); // Preemptively halt logic
+}</div>
+      <div class="justification">Optimization Check: Prevents the bucket from ever hitting the critical 500 threshold during massive sieges.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>26. V8 Object Pooling & GC Mitigation</h3>
+      <p>Generating thousands of short-lived intent wrappers triggers the V8 JavaScript engine's garbage collector. Maintain heap pools specifically for large arrays to prevent VM slowdowns.</p>
+      <div class="math-block">class ObjectPool {
+  get() { return this.pool.length ? this.pool.pop() : {}; }
+  release(obj) { 
+    for(let k in obj) delete obj[k]; 
+    this.pool.push(obj); 
+  }
+}</div>
+      <div class="justification">Optimization Check: Stabilizes CPU usage in constrained limits. Eliminates random CPU spikes.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>66. Heap Event Bus (PubSub)</h3>
+      <p>Managers iterating over global states to check for changes wastes CPU. Implement a Publisher/Subscriber model. Managers only execute when an event is emitted to the heap bus.</p>
+      <div class="math-block">EventBus.subscribe('HOSTILE_SPOTTED', (roomName) => {
+  DefenseManager.wake(roomName);
+});
+// Inside Intel Manager:
+EventBus.publish('HOSTILE_SPOTTED', currentRoom);</div>
+      <div class="justification">Optimization Check: Completely eliminates polling CPU costs. Subsystems remain dormant (0 CPU) until explicitly required to act.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>67. Room Terrain Hashing</h3>
+      <p>Checking if a room needs its CostMatrix updated requires parsing all structures. Instead, hash the number of structures and their IDs. If the hash matches the cached hash, skip the update.</p>
+      <div class="math-block">let currentHash = generateRoomHash(room);
+if (global.Cache[room.name].hash !== currentHash) {
+  updateCostMatrix(room);
+  global.Cache[room.name].hash = currentHash;
+}</div>
+      <div class="justification">Optimization Check: Bypasses expensive room parsing logic 99% of the time, updating matrices only on the exact tick a structure is built or destroyed.</div>
+    </div>
+
+    <!-- CATEGORY: EARLY GAME & ECONOMY -->
+    <div class="section-header">Mid-Game & Logistics Efficiency</div>
+
+    <div class="comp-card">
+      <h3>27. Static Upgrading (Energy Piles)</h3>
+      <p>Upgraders wasting ticks walking to sources kills progression speed. Haulers must drop energy precisely on the upgrader's tile. Upgraders sit statically.</p>
+      <div class="math-block">// Upgrader logic (does not move):
+creep.pickup(creep.pos.lookFor(LOOK_ENERGY)[0]);
+creep.upgradeController(creep.room.controller);</div>
+      <div class="justification">Optimization Check: Upgraders execute <code>pickup</code> and <code>upgradeController</code> on the exact same tick, achieving 100% upgrade uptime and maximizing RCL velocity.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>28. Micro-Hub Fast-Filling (RCL 2-3)</h3>
+      <p>Early extensions should not be placed haphazardly. Place them in tight 'flower' patterns around a central walkable tile. A single `fastFiller` creep sits in the center.</p>
+      <div class="math-block">let targetExtensions = fastFiller.pos.findInRange(FIND_MY_STRUCTURES, 1);
+for (let ext of targetExtensions) {
+  if (ext.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+    fastFiller.transfer(ext, RESOURCE_ENERGY);
+  }
+}</div>
+      <div class="justification">Optimization Check: Fills up to 5 extensions simultaneously in a single tick without ever issuing a costly <code>move</code> intent.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>29. Top-Down Task Assignment (Anti-Bidding)</h3>
+      <p>Creeps must never "bid" on jobs. Bidding forces every creep to iterate over available missions, resulting in an O(Creeps * Jobs) CPU trap. Managers assign tasks top-down.</p>
+      <div class="math-block">// CORRECT: Manager maps needs, finds best creep in O(1) or O(N)
+let criticalJob = LogisticsLedger.popHighestUrgency();
+let bestCreep = findClosestIdleHauler(criticalJob.pos, requiredCapacity);
+if (!bestCreep) SpawnManager.enqueueDynamic(criticalJob.requirements);
+TaskDispatcher.assign(bestCreep, criticalJob);</div>
+      <div class="justification">Optimization Check: Shifts decision-making from hundreds of independent creep agents to a single manager. Eliminates redundant loop iterations.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>30. Sub-Tick Spawn Ledger</h3>
+      <p>If a room has 3000 energy, 3 managers might try to queue 2000-energy creeps simultaneously. Without a sub-tick ledger, the engine throws `ERR_NOT_ENOUGH_ENERGY` on the rest, wasting CPU.</p>
+      <div class="math-block">class SpawnLedger {
+  constructor(room) { this.energy = room.energyAvailable; }
+  canSpawn(cost) { return this.energy >= cost; }
+  deduct(cost) { this.energy -= cost; }
+}</div>
+      <div class="justification">Optimization Check: Pre-validates spawn requests within the same tick. Prevents managers from generating bodies the backend engine will reject.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>31. Containerless Remote Mining</h3>
+      <p>Containers in remote rooms cost 250k energy to maintain over their lifespan. Elite bots drop energy directly on the ground and dynamically size haulers to sweep it before decay.</p>
+      <div class="math-block">let droppedEnergy = sourcePos.lookFor(LOOK_ENERGY);
+if (droppedEnergy.length > 0) {
+  hauler.pickup(droppedEnergy[0]);
+}</div>
+      <div class="justification">Optimization Check: Eliminates `TaskRepair` completely in remote rooms. Saves 1 CPU per room per tick and drastically increases net energy yield.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>32. Train Hauling (Creep Pulling)</h3>
+      <p>Adding MOVE parts to heavy haulers reduces payload capacity. Decouple movement by spawning a 0-MOVE cart and a pure-MOVE engine to drag it across highways.</p>
+      <div class="math-block">// Engine Creep: [MOVE x 25]
+// Cart Creep: [CARRY x 50]
+engine.pull(cart);
+engine.move(direction);
+cart.move(engine); // Required API sequence</div>
+      <div class="justification">Optimization Check: Maximizes energy density per tile on remote routes. Saves spawn time by reusing one fast engine to pull multiple slow carts.</div>
+    </div>
+
+    <!-- CATEGORY: PATHING & TRAFFIC -->
+    <div class="section-header">Pathing & Traffic Manipulation</div>
+
+    <div class="comp-card">
+      <h3>33. Swamp Avoidance Matrix (Early RCL)</h3>
+      <p>Before roads are built at RCL 3, pathing through swamps generates massive fatigue. The OS must inject a custom CostMatrix that heavily penalizes swamp tiles.</p>
+      <div class="math-block">let terrain = Game.map.getRoomTerrain(roomName);
+for (let y = 0; y < 50; y++) {
+  for (let x = 0; x < 50; x++) {
+    if (terrain.get(x, y) === TERRAIN_MASK_SWAMP) matrix.set(x, y, 5);
+  }
+}</div>
+      <div class="justification">Optimization Check: Forces creeps to route over plains, preventing early-game logistics from stalling due to 5x tick delays per tile.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>34. Directional CostMatrices (One-Way Traffic)</h3>
+      <p>In heavy hubs, creeps pathing head-on trigger Shoving logic, which is cheap but not free. Imposing one-way circular roads eliminates shoving entirely.</p>
+      <div class="math-block">let matrix = new PathFinder.CostMatrix();
+if (creep.memory.direction === LEFT) {
+  matrix.set(roadRightX, roadRightY, 255);
+}
+PathFinder.search(creep.pos, target, { roomCallback: () => matrix });</div>
+      <div class="justification">Optimization Check: Reduces Traffic Manager DFS resolutions by forcing creeps into natural roundabout flows.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>35. Cross-Room Pathing (Universe A*)</h3>
+      <p>Haulers and squads must not path blindly through enemy safe zones. Implement a custom <code>routeCallback</code> for <code>Game.map.findRoute</code> that weights rooms based on threat intel.</p>
+      <div class="math-block">let route = Game.map.findRoute(start, end, {
+  routeCallback(roomName) {
+    if (Memory.intel[roomName].threat > 5) return Infinity; // Avoid
+    if (isHighway(roomName)) return 1; // Prefer
+    return 2; // Swamp/Standard
+  }
+});</div>
+      <div class="justification">Optimization Check: Prevents catastrophic loss of remote miners and assault squads. Utilizes fast highway travel automatically.</div>
+    </div>
+
+    <!-- CATEGORY: DEFENSE & BASE PLANNING -->
+    <div class="section-header">Defense & Base Resilience</div>
+
+    <div class="comp-card">
+      <h3>36. DEFCON State Machine</h3>
+      <p>A strict hierarchy must dictate logic shifts, from ignoring scouts to triggering Safe Mode during a catastrophic breach.</p>
+      <div class="math-block">const DEFCON = {
+  4: { desc: "Harassment", logic: "Spawn remote defenders" },
+  3: { desc: "Siege", logic: "Recall civilian creeps, spawn Rampart Melee" },
+  2: { desc: "Breach Imminent", logic: "Halt upgrades, dump storage into ramparts" },
+  1: { desc: "Core Compromised", logic: "Trigger Safe Mode" }
+};</div>
+      <div class="justification">Optimization Check: Unifies Colony behavior under stress. Prevents haulers from suiciding into enemy formations.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>37. Rampart Dancing (Tank Cycling)</h3>
+      <p>Placing one melee creep on a choke point rampart wastes the HP pools of your backup defenders. Implement Rampart Dancing to rotate low-HP defenders off the wall.</p>
+      <div class="math-block">if (frontCreep.hits < frontCreep.hitsMax * 0.4 && backup.hits === backup.hitsMax) {
+  TrafficManager.registerSwap(frontCreep, backup);
+}</div>
+      <div class="justification">Optimization Check: Multiplies effective base defense HP by the number of idle defenders. Prevents single-target burst death.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>38. Active Killbox Funneling</h3>
+      <p>Static rampart defense is flawed. Intentionally leave a path into your base unramparted but surrounded by towers and melee defenders.</p>
+      <div class="math-block">// Room Planner intentionally omits 1 outer rampart.
+if (enemy.pos.inRangeTo(killboxCenter, 1)) {
+  rampartMelee.attack(enemy);
+  towers.forEach(t => t.attack(enemy));
+}</div>
+      <div class="justification">Optimization Check: Exploits default <code>PathFinder</code> behavior. Forces the enemy to march into concentrated fire.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>39. Automated Nuke Evacuation</h3>
+      <p>Nukes destroy all creeps and non-ramparted structures in a 5x5 radius. The base must detect, prep, and evacuate.</p>
+      <div class="math-block">let nukes = room.find(FIND_NUKES);
+if (nukes.length && nukes[0].timeToLand < 1000) {
+  let blastMatrix = generateBlastRadius(nukes);
+  evacuateCreeps(blastMatrix);
+}</div>
+      <div class="justification">Optimization Check: Forces the Logistics Manager to abandon doomed containers and redirect all energy to fortifying the core before impact.</div>
+    </div>
+
+    <!-- CATEGORY: COMBAT & SIEGE MECHANICS -->
+    <div class="section-header">Combat & Siege Mechanics</div>
+
+    <div class="comp-card">
+      <h3>40. Dynamic Body Calculus</h3>
+      <p>Hardcoding bodies like `[WORK, WORK, CARRY, MOVE]` fails when remote distances vary. Generate exact body arrays using calculus to match energy output precisely.</p>
+      <div class="math-block">let requiredCarry = Math.ceil((2 * distance * energyPerTick) / 50);
+let body = buildArray(requiredWork, requiredCarry);</div>
+      <div class="justification">Optimization Check: Perfect efficiency. Creeps cost exactly what is necessary to fully exploit the source, preserving energy for military output.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>41. Quad Rotation Matrix</h3>
+      <p>A Quad (4 creeps moving as a 2x2 square) must rotate to cycle damaged members to the back line while maintaining formation.</p>
+      <div class="math-block">function rotateQuad(quadArr, clockwise = true) {
+  let [a, b, c, d] = quadArr;
+  return clockwise ? [c, a, d, b] : [b, d, a, c];
+}</div>
+      <div class="justification">Optimization Check: Quad combat relies entirely on distributing damage across a collective HP pool. Rotation must happen in 1 tick.</div>
+    </div>
+    
+    <div class="comp-card">
+      <h3>64. Atomic Quad Movement (Chain Pulling)</h3>
+      <p>If a 4-creep Quad issues independent `move()` intents, variable fatigue or random traffic will cause 1 creep to lag behind, breaking the formation and causing a wipe. You must enforce atomic movement.</p>
+      <div class="math-block">// Creep 1 pulls 2, 2 pulls 3, 3 pulls 4
+quad[0].pull(quad[1]); quad[1].move(quad[0]);
+// ... chain applies to all
+quad[0].move(direction); // Leader moves the whole block</div>
+      <div class="justification">Optimization Check: Exploits the engine's `pull` mechanics to guarantee the Quad moves as a single unified object. It either succeeds entirely or fails entirely, preventing piecemeal deaths.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>42. Predictive Pre-Healing</h3>
+      <p>Healers cannot react to damage. If a creep takes 1500 damage and only has 1000 HP, it dies at the end of the tick. Healers must calculate enemy targeting logic and apply <code>heal()</code> before damage resolves.</p>
+      <div class="math-block">let predictedTarget = calculateEnemyTowerTarget(hostileTowers);
+if (predictedTarget) healer.heal(predictedTarget); </div>
+      <div class="justification">Optimization Check: Enables combat trains to survive one-shot mechanics by matching incoming damage with synchronous heals.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>43. HVT Dijkstra Penetration</h3>
+      <p>Siege creeps cannot path to the closest structure. They must use a modified Dijkstra flood-fill to calculate the cheapest path through enemy ramparts to destroy High-Value Targets (Spawns, Towers).</p>
+      <div class="math-block">let costMatrix = new PathFinder.CostMatrix();
+// Set rampart cost = hits / 1,000,000
+let optimalPath = runSiegeDijkstra(start, HVT.pos, costMatrix);</div>
+      <div class="justification">Optimization Check: Prevents your army from wasting 30,000 ticks chewing through a 300M HP decoy rampart when a 5M HP rampart leads directly to Spawn.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>60. Border Bouncing (I-Frames)</h3>
+      <p>Room transitions in Screeps take 1 tick. Creeps standing on exit tiles can step into the adjacent room to instantly drop aggro, dodge slow-moving projectile intents, and heal safely.</p>
+      <div class="math-block">if (incomingDamage > creep.hits && isOnBorder(creep)) {
+  creep.move(EXIT_DIRECTION); // Step out
+  creep.heap.wakeTick = Game.time + 2; // Heal in safe room, then step back
+}</div>
+      <div class="justification">Optimization Check: Exploits the engine's room transition physics to grant your siege engines artificial invulnerability frames (I-Frames).</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>61. Synchronized Burst Fire</h3>
+      <p>A defending tower heals 400 HP per tick. If 4 attackers hit a rampart independently for 300 damage, the tower out-heals them. You must align the attacks to execute on the exact same tick.</p>
+      <div class="math-block">if (Quad.membersReady < 4) return; // Hold fire
+Quad.members.forEach(m => m.attack(target)); // 1200 damage applied in 1 frame</div>
+      <div class="justification">Optimization Check: Ensures burst damage exceeds the target's per-tick healing capacity. Defeats sustained tower healing by converting distributed DPS into instant execution.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>62. Ranged Mass Attack (RMA) Spacing</h3>
+      <p>When defending against Quads, melee attacks are suicide. You must use `rangedMassAttack`. RMA deals maximum damage at range 1, scaling down to range 3. Defenders must maintain exactly Range 2 or 3 to hit all 4 creeps in the Quad without taking return melee hits.</p>
+      <div class="math-block">let dist = creep.pos.getRangeTo(quadCenter);
+if (dist <= 1) creep.move(retreatDir);
+if (dist <= 3) creep.rangedMassAttack(); // Hits all 4 quad members</div>
+      <div class="justification">Optimization Check: Multiplies DPS by 4. A single RMA hits every creep in the Quad, shredding their collective health pool while staying safely out of melee range.</div>
+    </div>
+
+    <!-- CATEGORY: ASYMMETRIC WARFARE & META-GAME -->
+    <div class="section-header">Asymmetric Warfare & Meta-Game</div>
+
+    <div class="comp-card">
+      <h3>44. Asymmetric Economic Warfare (Poaching)</h3>
+      <p>Do not wait until RCL 8 to attack. Target poorly defended neighbor remotes. Spawn cheap attackers to kill harvesters, followed by looters to steal the dropped energy.</p>
+      <div class="math-block">if (enemyHarvester && !hasDefender) {
+  SpawnManager.enqueueLooter(remote.name);
+}</div>
+      <div class="justification">Optimization Check: Spend 130 energy to steal 1000 energy. Creates a death spiral for poorly optimized neighbors.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>45. Remote Denial (Harassment)</h3>
+      <p>If an enemy remote has a small defender, send a cheap decoy to permanently loiter in their remote and kite the defender without engaging.</p>
+      <div class="math-block">if (creep.pos.inRangeTo(defender, 3)) {
+  let fleePath = PathFinder.search(creep.pos, {pos: defender.pos, range: 4}, {flee: true});
+  creep.moveByPath(fleePath.path);
+}</div>
+      <div class="justification">Optimization Check: A 150-energy decoy forces the enemy to continuously spawn 500-energy defenders, mathematically starving their upgrades.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>46. Core Sniping (Controller Downgrading)</h3>
+      <p>At low RCLs, bases are open. If you block or kill their upgraders, the controller downgrades, permanently unclaiming the room.</p>
+      <div class="math-block">if (room.rcl < 4 && !room.safeMode) {
+  let upgraderSpots = getWalkableTiles(enemyController);
+  TrafficManager.parkOnTile(blockader, upgraderSpots[0]);
+}</div>
+      <div class="justification">Optimization Check: Bypasses the need for massive dismantling forces. Wipes out enemy players using minimal energy investment.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>47. Market Arbitrage Engine</h3>
+      <p>Constantly scan the order book. If the margin between a buy order and a sell order exceeds the terminal energy transfer cost, execute the trade.</p>
+      <div class="math-block">let spread = buyOrder.price - sellOrder.price;
+let energyCost = Game.market.calcTransactionCost(amount, roomA, roomB) * ENERGY_PRICE;
+if ((spread * amount) > energyCost) Game.market.deal(...);</div>
+      <div class="justification">Optimization Check: Generates infinite credits passively. Funds the purchase of T3 boosts without requiring synthesis.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>68. Market Outlier Rejection</h3>
+      <p>Standard EMA pricing will bankrupt you. Malicious players post 1-unit orders at 1,000,000 credits to skew server averages. You must filter orders using Interquartile Range (IQR) before calculating averages.</p>
+      <div class="math-block">let validOrders = orders.filter(o => {
+  return o.price > lowerBound && o.price < upperBound && o.amount > 100;
+});
+let trueAverage = calculateEMA(validOrders);</div>
+      <div class="justification">Optimization Check: Prevents market manipulation. Guarantees your Terminal Manager does not sell thousands of rare compounds for 0.001 credits due to spoofed market data.</div>
+    </div>
+
+    <div class="comp-card">
+      <h3>48. Alliance Radar (Segment Multiplexing)</h3>
+      <p>Top alliances multiplex `RawMemory` segments to share intel matrices instantly across dozens of players.</p>
+      <div class="math-block">// Read LOAN alliance segment format
+let foreignIntel = JSON.parse(RawMemory.foreignSegment.data);
+mergeIntel(Memory.intel, foreignIntel);</div>
+      <div class="justification">Optimization Check: Provides global vision without the CPU and energy cost of spawning hundreds of scout creeps.</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // Tab Switching Logic
+  function switchTab(tabId) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.view-content').forEach(view => view.classList.remove('active'));
+
+    document.getElementById('tab-' + tabId).classList.add('active');
+    document.getElementById('view-' + tabId).classList.add('active');
+  }
+
+  // Color mapping logic for D3
+  const getTypeColor = (type) => {
+    switch(type) {
+      case 'OS Root': return '#8e44ad';
+      case 'Phase': return '#c0392b';
+      case 'Data Structure': return '#2980b9';
+      case 'Manager': return '#27ae60';
+      case 'Subsystem': return '#d35400';
+      case 'Task': return '#7f8c8d';
+      case 'Progression': return '#f39c12';
+      case 'Offense': return '#8b0000';
+      default: return '#555';
+    }
+  };
+
+  const getTypeClass = (type) => {
+    switch(type) {
+      case 'OS Root': return 'type-kernel';
+      case 'Phase': return 'type-phase';
+      case 'Data Structure': return 'type-data';
+      case 'Manager': return 'type-manager';
+      case 'Subsystem': return 'type-subsystem';
+      case 'Task': return 'type-task';
+      case 'Progression': return 'type-progression';
+      case 'Offense': return 'type-offense';
+      default: return '';
+    }
+  };
+
+  // Tree Data
+  const treeData = {
+    name: "main.loop()",
+    type: "OS Root",
+    info: "The absolute entry point. Manages execution phases to guarantee 500 CPU limit adherence.",
+    details: "The main loop acts as a strict scheduler. It never executes game logic directly. It invokes phases sequentially. If bucket drops below critical thresholds, it aggressively halts non-essential phases.",
+    children: [
+      {
+        name: "Phase 1: OS Init & Cache",
+        type: "Phase",
+        info: "Bypasses standard Memory parsing and validates the Heap.",
+        details: "Executes before any game data is processed. Eliminates the massive CPU cost of <code>JSON.parse(RawMemory)</code>.\n\n<ul><li><strong>Memory Hack:</strong> Hijacks <code>RawMemory._parsed</code> to maintain object reference across ticks.</li><li><strong>Cache Validation:</strong> Parses <code>room.getEventLog()</code>. If <code>EVENT_OBJECT_DESTROYED</code> is detected, purge ID from Heap cache.</li></ul>",
+        children: [
+          {
+            name: "Heap Cache",
+            type: "Data Structure",
+            info: "Persistent memory across ticks. Wiped only on global reset.",
+            details: "Stores object IDs, stringified pathing data, and memoized math.\n\n<div class='implementation-box'><strong>Implementation:</strong><br><code>global.Cache.structures['W1N1'].spawns</code> stores IDs. Lookups use <code>Game.getObjectById(id)</code> instead of <code>room.find()</code>, converting an O(N) search to an O(1) hash map retrieval.</div>"
+          }
+        ]
+      },
+      {
+        name: "Phase 2: Global State",
+        type: "Phase",
+        info: "Iterates all game objects exactly once to build O(1) lookup dictionaries.",
+        details: "Prevents managers from iterating arrays repeatedly.\n\n<div class='implementation-box'><strong>O(1) Grouping Map:</strong><br><code>State.creepsByRoom[roomName].byRole[role]</code><br><code>State.hostilesByRoom[roomName]</code></div>"
+      },
+      {
+        name: "Phase 3: Colonies",
+        type: "Phase",
+        info: "Decoupled Room OS execution. Iterates through claimed rooms.",
+        details: "A Colony passes the localized <code>Global State</code> segment to its Managers. Sub-managers process data and enqueue Intents.",
+        children: [
+          {
+            name: "RCL Progression",
+            type: "Progression",
+            info: "State machine governing Colony lifecycle and dynamic scaling.",
+            details: "<ol><li><strong>Bootstrap (RCL 1-2):</strong> Maximize <code>worker</code> swarms.</li><li><strong>Transition (RCL 3-4):</strong> Specialized <code>harvester</code>/<code>hauler</code> pairs.</li><li><strong>Logistics (RCL 5-6):</strong> Extract <code>fastFiller</code>. Terminals online.</li><li><strong>Industry (RCL 7-8):</strong> Lab reaction arrays. Factory compression.</li></ol>"
+          },
+          {
+            name: "Logistics Manager",
+            type: "Manager",
+            info: "Dynamic Urgency Ledger for energy distribution.",
+            details: "Matches providers to requesters using math.\n\n<div class='implementation-box'><strong>Urgency Formula:</strong><br><code>Urgency = BaseWeight * (Deficit/Capacity) * ThreatMultiplier / (Distance + 1)</code></div>",
+            roles: ["fastFiller", "hubManager", "hauler", "domesticHauler"]
+          },
+          {
+            name: "Economy & Outposts",
+            type: "Manager",
+            info: "Source harvesting, remote mining logic, and upgrades.",
+            details: "Evaluates Total Energy Potential (TEP).\n\n<ul><li><strong>Outpost Algorithm:</strong> Ranks neighboring rooms by Source Count - (Distance Cost + Threat Level).</li></ul>",
+            roles: ["harvester", "upgrader", "worker", "reservationGuard", "remoteDefender"]
+          },
+          {
+            name: "Room Planner",
+            type: "Manager",
+            info: "Automated stamp-based placement.",
+            details: "Computes a Distance Transform of the room to find a 13x13 open core area. Places predefined 'Stamps' (Bunker layout, Lab Array). Automatically generates construction sites."
+          },
+          {
+            name: "Defense Manager",
+            type: "Manager",
+            info: "Computes 2D Threat Matrix. Eliminates radial scans.",
+            details: "Solves CPU spikes during sieges.\n\n<ul><li><strong>Spatial Threat Mapping:</strong> Iterates hostiles, maps Attack/Ranged damage onto a <code>CostMatrix</code>.</li><li>Creeps check <code>threatMatrix.get(pos.x, pos.y)</code> in O(1).</li></ul>",
+            roles: ["rampartMelee", "rampartRanged"]
+          },
+          {
+            name: "Lab & Factory Manager",
+            type: "Manager",
+            info: "Commodities, boosts, and reaction chains.",
+            details: "<strong>Labs:</strong> Memoizes reaction trees. Reads <code>BoostQueue</code>. Assigns 2 labs as suppliers, rest as reactors.\n\n<strong>Factories:</strong> State machine for compression and commodities. Uses <code>TerminalManager</code> to buy missing bases."
+          }
+        ]
+      },
+      {
+        name: "Phase 4: Operations",
+        type: "Phase",
+        info: "Empire-Level Logic: Offense, Intelligence, Exploitation.",
+        details: "Managers operating outside a single Colony's jurisdiction. Request spawns from nearby Colonies.",
+        children: [
+          {
+            name: "Intel & Scouting",
+            type: "Subsystem",
+            info: "Global vision network and Observer coordination.",
+            details: "Deploys <code>globalScout</code>s continuously. Maintains <code>Memory.intel</code> matrix. Cycles Observers through 10-room radius flagging weak cores."
+          },
+          {
+            name: "Strategic Offense",
+            type: "Offense",
+            info: "Target designation, Drainers, Quads, and Nukes.",
+            details: "Highly coordinated military ops.\n\n<ul><li><strong>Swarm/Quad Op:</strong> Overrides default movement to execute <code>TrafficManager.registerQuadMove()</code>.</li><li><strong>Drainer Hunter:</strong> Edges towers to drain energy.</li><li><strong>Nuke Strike Op:</strong> Synchronizes multiple launches. Dispatches <code>soloDismantler</code>s.</li></ul>",
+            roles: ["quadAttacker", "quadHealer", "drainerHunter", "soloDismantler", "coreSniper"]
+          },
+          {
+            name: "Early Warfare (Poaching)",
+            type: "Offense",
+            info: "Asymmetric economic combat. Leeches energy from enemy remotes and forces defensive spending.",
+            details: "Executes at RCL 3+. Targets poorly defended neighbor remotes. Spawns cheap attackers to kill harvesters, followed by looters to steal the dropped energy.",
+            roles: ["highwayPatrol", "hostileStorageLooter", "drainerHunter"]
+          },
+          {
+            name: "SK & Power Ops",
+            type: "Subsystem",
+            info: "Extracts max-tier resources from central sectors.",
+            details: "<strong>SK Mining:</strong> Tracks lair spawn ticks via heap. <code>skGuard</code> locks exactly as spawners pop.\n\n<strong>Power Banks:</strong> Computes required damage. Sends <code>powerHauler</code>s precisely when Bank HP reaches kill threshold.",
+            roles: ["skMiner", "skGuard", "skHauler", "powerAttacker", "powerHealer", "powerHauler"]
+          },
+          {
+            name: "Expansion & Claims",
+            type: "Subsystem",
+            info: "Empire scaling protocol.",
+            details: "Triggered when bucket > 9000. Claims highest-scoring intel room. Dispatches massive swarm of <code>pioneerHarvester</code>s.",
+            roles: ["claimer", "pioneerHarvester", "pioneerQueen"]
+          }
+        ]
+      },
+      {
+        name: "Phase 5: Traffic Control",
+        type: "Phase",
+        info: "Unified collision resolution matrix.",
+        details: "Replaces native <code>creep.move()</code> with intent registration. Resolves deadlocks before firing commands.",
+        children: [
+          {
+            name: "DFS Resolver",
+            type: "Data Structure",
+            info: "Depth-First Search for creep movement.",
+            details: "<strong>How it works:</strong>\n1. Creeps register coordinates.\n2. Overlaps mapped to dependency graph.\n3. DFS finds empty adjacent tiles to shift idle creeps.\n4. Output: Conflict-free array."
+          },
+          {
+            name: "Pathing Cache",
+            type: "Subsystem",
+            info: "Stringified paths to bypass PathFinder.",
+            details: "Converts <code>PathFinder.search</code> into integer string (e.g., <code>'1112233'</code>). Creep shifts first char off string to move. <code>PathFinder</code> only called on obstacle detection."
+          }
+        ]
+      },
+      {
+        name: "Phase 6: Intents & Sleep",
+        type: "Phase",
+        info: "Fires batched intents and serializes memory.",
+        details: "The final execution phase.\n\n<ul><li><strong>Batching:</strong> All commands are fired at API simultaneously.</li><li><strong>Serialization:</strong> <code>RawMemory.set(JSON.stringify(Memory))</code> called ONLY if persistent data modified, saving ~5-10ms CPU.</li></ul>"
+      }
+    ]
+  };
+
+  // D3 Tree Rendering
+  const margin = {top: 40, right: 120, bottom: 40, left: 150},
+        container = document.getElementById('tree-container'),
+        width = container.clientWidth,
+        height = container.clientHeight;
+
+  const svg = d3.select("#tree-container").append("svg")
+      .attr("width", "100%")
+      .attr("height", "100%")
+      .call(d3.zoom().scaleExtent([0.3, 2.5]).on("zoom", function (event) {
+          svgGroup.attr("transform", event.transform)
+      }))
+    .append("g")
+      .attr("transform", `translate(${margin.left},${height/2}) scale(0.85)`);
+      
+  const svgGroup = svg;
+  const root = d3.hierarchy(treeData, d => d.children);
+  root.x0 = height / 2;
+  root.y0 = 0;
+
+  const treeMap = d3.tree().nodeSize([50, 310]); 
+  const tooltip = d3.select("body").append("div").attr("class", "tooltip").style("opacity", 0);
+  let i = 0;
+  
+  update(root);
+
+  function update(source) {
+    const treeDataData = treeMap(root);
+    const nodes = treeDataData.descendants(),
+          links = treeDataData.descendants().slice(1);
+
+    nodes.forEach(d => d.y = d.depth * 310);
+
+    const node = svgGroup.selectAll("g.node").data(nodes, d => d.id || (d.id = ++i));
+    const nodeEnter = node.enter().append("g")
+        .attr("class", "node")
+        .attr("transform", d => `translate(${source.y0},${source.x0})`)
+        .style("cursor", "pointer")
+        .on("click", click)
+        .on("mouseover", function(event, d) {
+          tooltip.transition().duration(150).style("opacity", 1);
+          tooltip.html(`<strong>${d.data.name}</strong><br><span style="color:#aaa">${d.data.info}</span>`)
+            .style("left", (event.pageX + 20) + "px")
+            .style("top", (event.pageY - 20) + "px")
+            .style("border-color", getTypeColor(d.data.type));
+        })
+        .on("mouseout", function() {
+          tooltip.transition().duration(200).style("opacity", 0);
+        });
+
+    nodeEnter.append("circle")
+        .attr("r", 1e-6)
+        .style("fill", d => d._children ? getTypeColor(d.data.type) : "#1a1a1a")
+        .style("stroke", d => getTypeColor(d.data.type));
+
+    nodeEnter.append("text")
+        .attr("dy", ".35em")
+        .attr("x", d => d.children || d._children ? -14 : 14)
+        .attr("text-anchor", d => d.children || d._children ? "end" : "start")
+        .text(d => d.data.name);
+
+    const nodeUpdate = nodeEnter.merge(node);
+    nodeUpdate.transition().duration(400).attr("transform", d => `translate(${d.y},${d.x})`);
+    nodeUpdate.select("circle").attr("r", 8)
+        .style("fill", d => d._children ? getTypeColor(d.data.type) : "#1a1a1a")
+        .style("stroke", d => getTypeColor(d.data.type));
+
+    const nodeExit = node.exit().transition().duration(400).attr("transform", d => `translate(${source.y},${source.x})`).remove();
+    nodeExit.select("circle").attr("r", 1e-6);
+    nodeExit.select("text").style("fill-opacity", 1e-6);
+
+    const link = svgGroup.selectAll("path.link").data(links, d => d.id);
+    const linkEnter = link.enter().insert("path", "g").attr("class", "link")
+        .attr("d", d => { const o = {x: source.x0, y: source.y0}; return diagonal(o, o); });
+
+    const linkUpdate = linkEnter.merge(link);
+    linkUpdate.transition().duration(400).attr("d", d => diagonal(d, d.parent));
+    const linkExit = link.exit().transition().duration(400).attr("d", d => {
+          const o = {x: source.x, y: source.y}; return diagonal(o, o);
+        }).remove();
+
+    nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
+
+    function diagonal(s, d) {
+      return `M ${s.y} ${s.x} C ${(s.y + d.y) / 2} ${s.x}, ${(s.y + d.y) / 2} ${d.x}, ${d.y} ${d.x}`;
+    }
+
+    function click(event, d) {
+      const title = document.getElementById('panel-title');
+      title.innerText = d.data.name;
+      title.style.color = getTypeColor(d.data.type);
+      
+      const badge = document.getElementById('panel-badge');
+      if(d.data.type) {
+          badge.className = `badge ${getTypeClass(d.data.type)}`;
+          badge.style.display = 'inline-block';
+          badge.innerText = d.data.type;
+      } else {
+          badge.style.display = 'none';
+      }
+
+      let contentHtml = `<p>${d.data.details.replace(/\n/g, '<br>')}</p>`;
+      
+      if(d.data.roles && d.data.roles.length > 0) {
+          contentHtml += `<div class="roles-list"><h3>Managed Roles</h3><ul>`;
+          d.data.roles.forEach(role => { contentHtml += `<li><code>${role}</code></li>`; });
+          contentHtml += `</ul></div>`;
+      }
+
+      document.getElementById('panel-content').innerHTML = contentHtml;
+
+      if (d.children) { d._children = d.children; d.children = null; } 
+      else { d.children = d._children; d._children = null; }
+      update(d);
+    }
+  }
+
+  window.addEventListener("resize", () => {
+    d3.select("#tree-container svg").attr("width", "100%").attr("height", "100%");
+  });
+  
+  setTimeout(() => {
+    d3.select('#tree-container svg').transition().duration(800).call(
+      d3.zoom().transform, 
+      d3.zoomIdentity.translate(margin.left + 50, height / 2).scale(0.8)
+    );
+  }, 100);
+</script>
+</body>
+</html>

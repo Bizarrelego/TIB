@@ -10,21 +10,31 @@ const HAULER_BODY_T2 = [CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE];
 const UPGRADER_BODY_T2 = [WORK, WORK, CARRY, MOVE, MOVE];
 const BUILDER_BODY_T2 = [WORK, WORK, CARRY, CARRY, MOVE, MOVE, MOVE];
 
+// Tier 3: RCL 3+ bodies (800 energy budget)
+const HARVESTER_BODY_T3 = [WORK, WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE];
+const HAULER_BODY_T3 = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE];
+const UPGRADER_BODY_T3 = [WORK, WORK, WORK, CARRY, CARRY, MOVE, MOVE, MOVE];
+const BUILDER_BODY_T3 = [WORK, WORK, WORK, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE];
+
 const CreepBodies = {
     tiers: {
         harvester: [
+            { minCapacity: 800, body: HARVESTER_BODY_T3 },
             { minCapacity: 550, body: HARVESTER_BODY_T2 },
             { minCapacity: 0, body: HARVESTER_BODY_T1 }
         ],
         hauler: [
+            { minCapacity: 600, body: HAULER_BODY_T3 },
             { minCapacity: 400, body: HAULER_BODY_T2 },
             { minCapacity: 0, body: HAULER_BODY_T1 }
         ],
         upgrader: [
+            { minCapacity: 650, body: UPGRADER_BODY_T3 },
             { minCapacity: 400, body: UPGRADER_BODY_T2 },
             { minCapacity: 0, body: UPGRADER_BODY_T1 }
         ],
         builder: [
+            { minCapacity: 700, body: BUILDER_BODY_T3 },
             { minCapacity: 450, body: BUILDER_BODY_T2 },
             { minCapacity: 0, body: BUILDER_BODY_T1 }
         ]

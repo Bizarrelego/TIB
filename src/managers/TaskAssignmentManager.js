@@ -81,8 +81,9 @@ class TaskAssignmentManager {
 
         // Harvesters don't use gather/work states — they just harvest forever
         if (role === 'harvester') return;
-        // Upgraders don't use gather/work states — they upgrade and opportunistically pickup
-        if (role === 'upgrader') return;
+
+        // Upgraders with a container don't need gather/work — they sit and withdraw
+        if (role === 'upgrader' && creep.heap.sitTargetId) return;
 
         const used = creep.store.getUsedCapacity(RESOURCE_ENERGY);
         const free = creep.store.getFreeCapacity(RESOURCE_ENERGY);
@@ -245,48 +246,55 @@ class TaskAssignmentManager {
     }
 
     static assignUpgrader(creep, roomState) {
-        if (roomState.controller) {
+        if (!roomState.controller) return;
+
+        // Assign container-sit if available
+        if (!creep.heap.sitTargetId && roomState.controllerContainers?.length > 0) {
+            // Spread upgraders across containers if multiple exist
+            const idx = djb2Hash(creep.name) % roomState.controllerContainers.length;
+            creep.heap.sitTargetId = roomState.controllerContainers[idx].id;
+        }
+
+        // If upgrader has a container, always assign upgrade — energy comes from container-sit
+        if (creep.heap.sitTargetId) {
             creep.heap.targetId = roomState.controller.id;
             creep.heap.actionIntent = ActionConstants.ACTION_UPGRADE;
+            return;
+        }
 
-            if (!creep.heap.sitTargetId && roomState.controllerContainers?.length > 0) {
-                creep.heap.sitTargetId = roomState.controllerContainers[0].id;
+        // No container — use gather/work state machine
+        if (creep.heap.state === 'gather') {
+            // Find closest energy source to pick up
+            const bestSource = TaskAssignmentManager.findClosestEnergy(creep, roomState);
+            if (bestSource) {
+                creep.heap.targetId = bestSource.id;
+                creep.heap.actionIntent = bestSource.actionIntent;
+                return;
             }
+            // Nothing to gather but have some energy — go work
+            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                creep.heap.state = 'work';
+                creep.heap.targetId = roomState.controller.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_UPGRADE;
+            }
+        } else {
+            // Work state — upgrade
+            creep.heap.targetId = roomState.controller.id;
+            creep.heap.actionIntent = ActionConstants.ACTION_UPGRADE;
         }
     }
 
     static assignBuilder(creep, roomState) {
         if (creep.heap.state === 'gather') {
-            // Only withdraw from spawn when it has enough energy to still spawn a basic creep after
-            if (roomState.spawns?.length > 0 && roomState.spawns[0].store.getUsedCapacity(RESOURCE_ENERGY) >= 250) {
-                creep.heap.targetId = roomState.spawns[0].id;
-                creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
-                return;
-            }
-            
-            // Try dropped energy — pick the largest pile
-            if (roomState.droppedEnergy?.length > 0) {
-                let maxDrop = roomState.droppedEnergy[0];
-                for (let i = 1; i < roomState.droppedEnergy.length; i++) {
-                    if (roomState.droppedEnergy[i].amount > maxDrop.amount) maxDrop = roomState.droppedEnergy[i];
-                }
-                creep.heap.targetId = maxDrop.id;
-                creep.heap.actionIntent = ActionConstants.ACTION_PICKUP;
+            // Distance-aware energy source selection
+            const bestSource = TaskAssignmentManager.findClosestEnergy(creep, roomState);
+            if (bestSource) {
+                creep.heap.targetId = bestSource.id;
+                creep.heap.actionIntent = bestSource.actionIntent;
                 return;
             }
 
-            // Try source containers
-            if (roomState.sourceContainers?.length > 0) {
-                for (let i = 0; i < roomState.sourceContainers.length; i++) {
-                    const container = roomState.sourceContainers[i];
-                    if (container.store.getUsedCapacity(RESOURCE_ENERGY) >= 50) {
-                        creep.heap.targetId = container.id;
-                        creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
-                        return;
-                    }
-                }
-            }
-
+            // Nothing to gather but have some energy — go work
             if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
                 creep.heap.state = 'work';
                 TaskAssignmentManager.assignBuilderWork(creep, roomState);
@@ -297,13 +305,39 @@ class TaskAssignmentManager {
     }
 
     static assignBuilderWork(creep, roomState) {
-        // Priority 1: Repair damaged structures
+        // Priority 1: Build construction sites — prefer nearly-complete ones
+        if (roomState.constructionSites?.length > 0) {
+            let bestSite = null;
+            let bestScore = -1;
+            for (let i = 0; i < roomState.constructionSites.length; i++) {
+                const s = roomState.constructionSites[i];
+                const dx = Math.abs(creep.pos.x - s.pos.x);
+                const dy = Math.abs(creep.pos.y - s.pos.y);
+                const dist = Math.max(dx, dy) || 1;
+                // Progress ratio: higher = closer to completion
+                const progress = s.progressTotal > 0 ? s.progress / s.progressTotal : 0;
+                // Score: prefer nearby + nearly-complete sites
+                const score = (1 + progress * 3) * 100 / dist;
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestSite = s;
+                }
+            }
+            if (bestSite) {
+                creep.heap.targetId = bestSite.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_BUILD;
+                return;
+            }
+        }
+
+        // Priority 2: Repair critically damaged structures (< 50% health only)
         if (roomState.repairTargets?.length > 0) {
-            // Pick closest repair target using Chebyshev distance
-            let bestTarget = roomState.repairTargets[0];
+            let bestTarget = null;
             let bestDist = Infinity;
             for (let i = 0; i < roomState.repairTargets.length; i++) {
                 const t = roomState.repairTargets[i];
+                // Only repair critically damaged structures
+                if (t.hits >= t.hitsMax * 0.5) continue;
                 const dx = Math.abs(creep.pos.x - t.pos.x);
                 const dy = Math.abs(creep.pos.y - t.pos.y);
                 const dist = Math.max(dx, dy);
@@ -312,29 +346,11 @@ class TaskAssignmentManager {
                     bestTarget = t;
                 }
             }
-            creep.heap.targetId = bestTarget.id;
-            creep.heap.actionIntent = ActionConstants.ACTION_REPAIR;
-            return;
-        }
-
-        // Priority 2: Build construction sites
-        if (roomState.constructionSites?.length > 0) {
-            // Pick closest construction site
-            let bestSite = roomState.constructionSites[0];
-            let bestDist = Infinity;
-            for (let i = 0; i < roomState.constructionSites.length; i++) {
-                const s = roomState.constructionSites[i];
-                const dx = Math.abs(creep.pos.x - s.pos.x);
-                const dy = Math.abs(creep.pos.y - s.pos.y);
-                const dist = Math.max(dx, dy);
-                if (dist < bestDist) {
-                    bestDist = dist;
-                    bestSite = s;
-                }
+            if (bestTarget) {
+                creep.heap.targetId = bestTarget.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_REPAIR;
+                return;
             }
-            creep.heap.targetId = bestSite.id;
-            creep.heap.actionIntent = ActionConstants.ACTION_BUILD;
-            return;
         }
 
         // Fallback: Upgrade controller
@@ -379,6 +395,93 @@ class TaskAssignmentManager {
         }
 
         return false;
+    }
+
+    /**
+     * Finds the closest available energy source for a creep to gather from.
+     * Used by both upgrader and builder gather phases.
+     * Returns { id, actionIntent } or null if nothing available.
+     */
+    static findClosestEnergy(creep, roomState) {
+        let bestTarget = null;
+        let bestDist = Infinity;
+        let bestIntent = null;
+
+        // Check dropped energy
+        if (roomState.droppedEnergy) {
+            for (let i = 0; i < roomState.droppedEnergy.length; i++) {
+                const drop = roomState.droppedEnergy[i];
+                if (drop.amount < 30) continue;
+                const claimed = drop.__gatherClaimed || 0;
+                if (drop.amount - claimed < 30) continue;
+                const dx = Math.abs(creep.pos.x - drop.pos.x);
+                const dy = Math.abs(creep.pos.y - drop.pos.y);
+                const dist = Math.max(dx, dy);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestTarget = drop;
+                    bestIntent = ActionConstants.ACTION_PICKUP;
+                }
+            }
+        }
+
+        // Check source containers
+        if (roomState.sourceContainers) {
+            for (let i = 0; i < roomState.sourceContainers.length; i++) {
+                const container = roomState.sourceContainers[i];
+                if (container.store.getUsedCapacity(RESOURCE_ENERGY) < 50) continue;
+                const claimed = container.__gatherClaimed || 0;
+                if (container.store.getUsedCapacity(RESOURCE_ENERGY) - claimed < 50) continue;
+                const dx = Math.abs(creep.pos.x - container.pos.x);
+                const dy = Math.abs(creep.pos.y - container.pos.y);
+                const dist = Math.max(dx, dy);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestTarget = container;
+                    bestIntent = ActionConstants.ACTION_WITHDRAW;
+                }
+            }
+        }
+
+        // Check controller containers
+        if (roomState.controllerContainers) {
+            for (let i = 0; i < roomState.controllerContainers.length; i++) {
+                const container = roomState.controllerContainers[i];
+                if (container.store.getUsedCapacity(RESOURCE_ENERGY) < 50) continue;
+                const claimed = container.__gatherClaimed || 0;
+                if (container.store.getUsedCapacity(RESOURCE_ENERGY) - claimed < 50) continue;
+                const dx = Math.abs(creep.pos.x - container.pos.x);
+                const dy = Math.abs(creep.pos.y - container.pos.y);
+                const dist = Math.max(dx, dy);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestTarget = container;
+                    bestIntent = ActionConstants.ACTION_WITHDRAW;
+                }
+            }
+        }
+
+        // Check spawn — only if spawn has enough to not starve spawning (300+)
+        if (roomState.spawns) {
+            for (let i = 0; i < roomState.spawns.length; i++) {
+                const spawn = roomState.spawns[i];
+                if (spawn.store.getUsedCapacity(RESOURCE_ENERGY) < 300) continue;
+                const dx = Math.abs(creep.pos.x - spawn.pos.x);
+                const dy = Math.abs(creep.pos.y - spawn.pos.y);
+                const dist = Math.max(dx, dy);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestTarget = spawn;
+                    bestIntent = ActionConstants.ACTION_WITHDRAW;
+                }
+            }
+        }
+
+        if (bestTarget) {
+            bestTarget.__gatherClaimed = (bestTarget.__gatherClaimed || 0) + creep.store.getFreeCapacity(RESOURCE_ENERGY);
+            return { id: bestTarget.id, actionIntent: bestIntent };
+        }
+        return null;
     }
 }
 

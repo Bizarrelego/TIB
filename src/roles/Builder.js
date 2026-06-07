@@ -28,8 +28,26 @@ const Builder = {
             result = creep.upgradeController(target);
         } else if (actionIntent === ActionConstants.ACTION_WITHDRAW) {
             result = creep.withdraw(target, RESOURCE_ENERGY);
+            // On successful withdraw, immediately idle for work assignment
+            if (result === OK) {
+                if (creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+                    creep.heap.state = 'idle';
+                    creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+                    creep.heap.targetId = null;
+                }
+                return;
+            }
         } else if (actionIntent === ActionConstants.ACTION_PICKUP) {
             result = creep.pickup(target);
+            // On successful pickup, immediately idle for work assignment
+            if (result === OK) {
+                if (creep.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+                    creep.heap.state = 'idle';
+                    creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+                    creep.heap.targetId = null;
+                }
+                return;
+            }
         } else if (actionIntent === ActionConstants.ACTION_DROP) {
             result = creep.drop(RESOURCE_ENERGY);
         }

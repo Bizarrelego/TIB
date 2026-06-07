@@ -26,6 +26,10 @@ const Upgrader = {
                 if (container) {
                     if (creep.pos.getRangeTo(container) > 0) {
                         creep.moveTo(container, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });
+                        // Still try to upgrade if in range while walking
+                        if (creep.pos.getRangeTo(target) <= 3) {
+                            creep.upgradeController(target);
+                        }
                         return;
                     }
                     // Sitting on container — withdraw when low on energy
@@ -45,12 +49,47 @@ const Upgrader = {
 
             if (result === ERR_NOT_IN_RANGE) {
                 creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });
-            } else if (result === ERR_NOT_ENOUGH_RESOURCES || result === ERR_INVALID_TARGET) {
+            } else if (result === ERR_NOT_ENOUGH_RESOURCES) {
+                // Out of energy — check if container is also empty
+                if (creep.heap.sitTargetId) {
+                    const container = GameObjectUtility.getById(creep.heap.sitTargetId);
+                    if (container && container.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                        // Container has energy, withdraw next tick — stay put
+                        return;
+                    }
+                }
+                // No energy anywhere — go idle for reassignment
+                creep.heap.state = 'idle';
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+                creep.heap.targetId = null;
+            } else if (result === ERR_INVALID_TARGET) {
                 creep.heap.state = 'idle';
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
                 creep.heap.targetId = null;
             }
             // On OK: do nothing — keep upgrading next tick
+
+        } else if (actionIntent === ActionConstants.ACTION_PICKUP) {
+            const result = creep.pickup(target);
+            if (result === ERR_NOT_IN_RANGE) {
+                creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });
+            } else {
+                // After pickup, go idle to get reassigned to upgrade
+                creep.heap.state = 'idle';
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+                creep.heap.targetId = null;
+            }
+
+        } else if (actionIntent === ActionConstants.ACTION_WITHDRAW) {
+            const result = creep.withdraw(target, RESOURCE_ENERGY);
+            if (result === ERR_NOT_IN_RANGE) {
+                creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });
+            } else {
+                // After withdraw, go idle to get reassigned to upgrade
+                creep.heap.state = 'idle';
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+                creep.heap.targetId = null;
+            }
         }
     }
 };
