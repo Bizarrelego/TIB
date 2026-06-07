@@ -1,23 +1,35 @@
+const EnergySinkUtility = require('./EnergySinkUtility');
+
 /**
  * Utility for identifying and prioritizing available energy sources.
  * Strictly reads from the global state without native polling.
  * @module EnergySourceUtility
  */
-
 class EnergySourceUtility {
     /**
      * Finds and sorts dropped energy resources in a room by amount (highest first).
+     * Explicitly ignores energy dropped at the controller drop-off position to prevent hauler loops.
      * @param {Room|string} room - The room object or room name.
      * @returns {Resource[]} Array of dropped energy Resource objects.
      */
     static findAvailableDroppedEnergy(room) {
         const roomName = typeof room === 'string' ? room : room.name;
+        const roomObj = typeof room === 'string' ? Game.rooms[room] : room;
         const state = global.State && global.State.rooms ? (typeof global.State.rooms.get === 'function' ? global.State.rooms.get(roomName) : global.State.rooms[roomName]) : null;
         if (!state || !state.droppedEnergy) return [];
 
-        const energyDrops = state.droppedEnergy.filter(drop =>
-            drop.amount > 0 && drop.resourceType === RESOURCE_ENERGY
-        );
+        const dropOffPos = EnergySinkUtility.findControllerEnergyDropOff(roomObj);
+
+        const energyDrops = state.droppedEnergy.filter(drop => {
+            if (drop.amount <= 0 || drop.resourceType !== RESOURCE_ENERGY) return false;
+            
+            // Prevent haulers from picking up energy designated for upgraders
+            if (dropOffPos && drop.pos && drop.pos.x === dropOffPos.x && drop.pos.y === dropOffPos.y) {
+                return false;
+            }
+            return true;
+        });
+
         return energyDrops.sort((a, b) => b.amount - a.amount);
     }
 

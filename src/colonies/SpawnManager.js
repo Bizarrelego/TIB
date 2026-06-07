@@ -15,15 +15,31 @@ class SpawnManager {
         const activeCounts = CreepCensusUtility.getCensus();
         const queuedCounts = SpawnQueueUtility.getRoleCounts();
         const limits = RoleCensusLimitUtility.getAllLimits();
-
         const roomName = spawn.room.name;
 
-        // Queue new spawn requests for any missing creeps
+        const getCount = (role) => {
+            const active = activeCounts.has(role) ? activeCounts.get(role) : 0;
+            const queued = queuedCounts.has(role) ? queuedCounts.get(role) : 0;
+            return active + queued;
+        };
+
+        const harvesterCount = getCount('harvester');
+        const haulerCount = getCount('hauler');
+
+        // Bootstrap sequence: Force 1 Harvester, then 1 Hauler before queueing anything else
+        if (harvesterCount === 0 && limits['harvester'] > 0) {
+            CreepSpawnRequestUtility.requestCreep(roomName, 'harvester', CreepBodyUtility.getBody('harvester'));
+            return; 
+        }
+        if (harvesterCount >= 1 && haulerCount === 0 && limits['hauler'] > 0) {
+            CreepSpawnRequestUtility.requestCreep(roomName, 'hauler', CreepBodyUtility.getBody('hauler'));
+            return;
+        }
+
+        // Standard queueing for remaining limits
         for (const role in limits) {
             const limit = limits[role];
-            const activeCount = activeCounts.has(role) ? activeCounts.get(role) : 0;
-            const queuedCount = queuedCounts.has(role) ? queuedCounts.get(role) : 0;
-            const totalCount = activeCount + queuedCount;
+            const totalCount = getCount(role);
 
             if (totalCount < limit) {
                 const missingCount = limit - totalCount;
@@ -49,19 +65,19 @@ class SpawnManager {
         const cost = request.bodyParts.reduce((cost, part) => cost + BODYPART_COST[part], 0);
 
         if (spawn.room.energyAvailable >= cost) {
-            SpawnQueueUtility.remove(request);
-
             const name = request.role + '_' + Game.time + '_' + Math.floor(Math.random() * 1000);
 
-            // Convert Map back to a plain object since Screeps Memory API requires it
             const plainMemory = {};
             for (const [key, value] of request.memory) {
                 plainMemory[key] = value;
             }
 
-            spawn.spawnCreep(request.bodyParts, name, {
-                memory: plainMemory
-            });
+            const result = spawn.spawnCreep(request.bodyParts, name, { memory: plainMemory });
+            
+            // Only remove from queue if the spawn successfully initiated
+            if (result === OK) {
+                SpawnQueueUtility.remove(request);
+            }
         }
     }
 }
