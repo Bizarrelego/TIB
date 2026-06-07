@@ -1,3 +1,5 @@
+const GameObjectUtility = require('./GameObjectUtility');
+
 /**
  * Utility module to identify structures that need repairing.
  * @module RepairTargetUtility
@@ -29,7 +31,7 @@ function getRepairTargets(roomName, threshold) {
     const repairTargets = [];
 
     for (let i = 0; i < structureIds.length; i++) {
-        const structure = Game.getObjectById(structureIds[i]);
+        const structure = GameObjectUtility.getById(structureIds[i]);
         if (!structure) continue;
 
         if (structure.structureType === STRUCTURE_WALL || structure.structureType === STRUCTURE_RAMPART) {

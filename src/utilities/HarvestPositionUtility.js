@@ -1,3 +1,4 @@
+const GameObjectUtility = require('./GameObjectUtility');
 const harvestPositionCache = new Map();
 
 class HarvestPositionUtility {
@@ -6,7 +7,7 @@ class HarvestPositionUtility {
             return harvestPositionCache.get(sourceId);
         }
 
-        const source = Game.getObjectById(sourceId);
+        const source = GameObjectUtility.getById(sourceId);
         if (!source) {
             return null;
         }

@@ -1,4 +1,5 @@
 const ActionConstants = require('../constants/ActionConstants');
+const GameObjectUtility = require('../utilities/GameObjectUtility');
 
 const Harvester = {
     run: function (creep) {
@@ -10,7 +11,7 @@ const Harvester = {
 
         if (!targetId || !actionIntent || actionIntent === ActionConstants.ACTION_IDLE) return;
 
-        const target = Game.getObjectById(targetId);
+        const target = GameObjectUtility.getById(targetId);
         if (!target) {
             creep.heap.state = 'idle';
             return;

@@ -1,4 +1,5 @@
 const ActionConstants = require('../constants/ActionConstants');
+const GameObjectUtility = require('../utilities/GameObjectUtility');
 
 const Upgrader = {
     run: function (creep) {
@@ -10,7 +11,7 @@ const Upgrader = {
 
         if (!targetId || !actionIntent || actionIntent === ActionConstants.ACTION_IDLE) return;
 
-        const target = Game.getObjectById(targetId);
+        const target = GameObjectUtility.getById(targetId);
         if (!target) {
             creep.heap.state = 'idle';
             return;
@@ -19,7 +20,7 @@ const Upgrader = {
         if (actionIntent === ActionConstants.ACTION_UPGRADE) {
             const result = creep.upgradeController(target);
             if (creep.heap.secondaryTargetId) {
-                const secondary = Game.getObjectById(creep.heap.secondaryTargetId);
+                const secondary = GameObjectUtility.getById(creep.heap.secondaryTargetId);
                 if (secondary) creep.pickup(secondary);
             }
             if (result === ERR_NOT_IN_RANGE || result === OK || result === ERR_NOT_ENOUGH_RESOURCES || result === ERR_INVALID_TARGET) {

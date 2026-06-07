@@ -2,6 +2,7 @@
 const ActionConstants = require('../constants/ActionConstants');
 const CreepHeapUtility = require('../utilities/CreepHeapUtility');
 const WithdrawTargetUtility = require('../utilities/WithdrawTargetUtility');
+const GameObjectUtility = require('../utilities/GameObjectUtility');
 
 /**
  * Top-Down, Heap-Driven Task Assignment Manager
@@ -48,7 +49,7 @@ class TaskAssignmentManager {
 
     static reregisterClaim(creep) {
         if (!creep.heap.targetId) return;
-        const target = Game.getObjectById(creep.heap.targetId);
+        const target = GameObjectUtility.getById(creep.heap.targetId);
         if (!target) return;
 
         // Check: Replaced Map claims with tick-volatile object properties to optimize CPU.
@@ -76,7 +77,7 @@ class TaskAssignmentManager {
 
     static validateCurrentTask(creep) {
         if (!creep.heap.targetId) return;
-        const target = Game.getObjectById(creep.heap.targetId);
+        const target = GameObjectUtility.getById(creep.heap.targetId);
         
         if (!target) {
             creep.heap.targetId = null;
