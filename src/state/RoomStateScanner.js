@@ -1,6 +1,7 @@
 const RepairTargetUtility = require('../utilities/RepairTargetUtility');
 const EnergySourceUtility = require('../utilities/EnergySourceUtility');
 const DroppedResourceUtility = require('../utilities/DroppedResourceUtility');
+const GameObjectUtility = require('../utilities/GameObjectUtility');
 
 const createRoomStateTemplate = () => ({
     controller: null,
@@ -40,6 +41,13 @@ const createRoomStateTemplate = () => ({
         defender: 0,
         miner: 0,
         scout: 0
+    },
+    cache: {
+        scannedAt: 0,
+        mineralId: null,
+        sourceIds: [],
+        structureIds: [],
+        lastConstructionSiteCount: 0
     }
 });
 
@@ -85,8 +93,16 @@ class RoomStateScanner {
             }
 
             state.controller = room.controller;
-            state.mineral = room['find'](FIND_MINERALS)[0] || null;
-            state.sources = room['find'](FIND_SOURCES);
+
+            // Cache static objects like sources and minerals to avoid engine polling overhead
+            if (state.cache.sourceIds.length === 0) {
+                state.cache.sourceIds = room['find'](FIND_SOURCES).map(s => s.id);
+                const mineral = room['find'](FIND_MINERALS)[0];
+                state.cache.mineralId = mineral ? mineral.id : null;
+            }
+            state.sources = state.cache.sourceIds.map(id => GameObjectUtility.getById(id)).filter(Boolean);
+            state.mineral = state.cache.mineralId ? GameObjectUtility.getById(state.cache.mineralId) : null;
+
             state.constructionSites = room['find'](FIND_MY_CONSTRUCTION_SITES);
 
             const events = room['getEventLog']();
@@ -105,7 +121,15 @@ class RoomStateScanner {
                 state.hostiles = [];
             }
 
-            const structures = room['find'](FIND_STRUCTURES);
+            // Cache structures periodically or if a construction site finishes
+            if (!state.cache.scannedAt || Game.time - state.cache.scannedAt > 13 || state.constructionSites.length !== state.cache.lastConstructionSiteCount) {
+                state.cache.structureIds = room['find'](FIND_STRUCTURES).map(s => s.id);
+                state.cache.scannedAt = Game.time;
+                state.cache.lastConstructionSiteCount = state.constructionSites.length;
+            }
+
+            const structures = state.cache.structureIds.map(id => GameObjectUtility.getById(id)).filter(Boolean);
+
             for (let i = 0; i < structures.length; i++) {
                 const s = structures[i];
                 state.structureIds.push(s.id);
