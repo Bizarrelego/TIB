@@ -52,8 +52,15 @@ class SpawnManager {
 
             if (spawn.room.energyAvailable >= cost) {
                 const name = request.role + '_' + Game.time + '_' + Math.floor(Math.random() * 1000);
+
+                // Convert Map back to a plain object since Screeps Memory API requires it
+                const plainMemory = {};
+                for (const [key, value] of request.memory) {
+                    plainMemory[key] = value;
+                }
+
                 spawn.spawnCreep(request.bodyParts, name, {
-                    memory: request.memory
+                    memory: plainMemory
                 });
             } else {
                 // If we can't spawn the next creep, put it back at the front of the queue
