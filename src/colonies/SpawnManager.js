@@ -22,7 +22,9 @@ class SpawnManager {
         // Queue new spawn requests for any missing creeps
         for (const role in limits) {
             const limit = limits[role];
-            const totalCount = (activeCounts[role] || 0) + (queuedCounts[role] || 0);
+            const activeCount = activeCounts.has(role) ? activeCounts.get(role) : 0;
+            const queuedCount = queuedCounts.has(role) ? queuedCounts.get(role) : 0;
+            const totalCount = activeCount + queuedCount;
 
             if (totalCount < limit) {
                 const missingCount = limit - totalCount;

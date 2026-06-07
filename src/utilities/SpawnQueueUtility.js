@@ -26,12 +26,12 @@ class SpawnQueueUtility {
 
     static getRoleCounts() {
         const queue = this.getQueue();
-        const counts = Object.create(null);
+        const counts = new Map();
         for (const req of queue) {
-            if (counts[req.role] === undefined) {
-                counts[req.role] = 1;
+            if (!counts.has(req.role)) {
+                counts.set(req.role, 1);
             } else {
-                counts[req.role]++;
+                counts.set(req.role, counts.get(req.role) + 1);
             }
         }
         return counts;

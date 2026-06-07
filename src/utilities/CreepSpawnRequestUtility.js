@@ -17,8 +17,14 @@ class CreepSpawnRequestUtility {
             return false;
         }
 
-        const requestMemory = Object.create(null);
-        Object.assign(requestMemory, memory, { role: role, colony: roomName });
+        const requestMemory = new Map();
+        if (memory) {
+            for (const key in memory) {
+                requestMemory.set(key, memory[key]);
+            }
+        }
+        requestMemory.set('role', role);
+        requestMemory.set('colony', roomName);
 
         const request = {
             roomName: roomName,
