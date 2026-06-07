@@ -17,11 +17,14 @@ class CreepSpawnRequestUtility {
             return false;
         }
 
+        const requestMemory = Object.create(null);
+        Object.assign(requestMemory, memory, { role: role, colony: roomName });
+
         const request = {
             roomName: roomName,
             role: role,
             bodyParts: bodyParts,
-            memory: Object.assign({}, memory, { role: role, colony: roomName })
+            memory: requestMemory
         };
 
         // Submit the formatted request to the centralized queue
