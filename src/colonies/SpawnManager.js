@@ -3,6 +3,7 @@ const CreepBodyUtility = require('../utilities/CreepBodyUtility');
 const RoleCensusLimitUtility = require('../utilities/RoleCensusLimitUtility');
 const CreepSpawnRequestUtility = require('../utilities/CreepSpawnRequestUtility');
 const SpawnQueueUtility = require('../utilities/SpawnQueueUtility');
+const SpawnRequestPrioritizationUtility = require('../utilities/SpawnRequestPrioritizationUtility');
 
 class SpawnManager {
     static run(spawn) {
@@ -40,12 +41,16 @@ class SpawnManager {
     static processSpawnQueue(spawn) {
         if (spawn.spawning) return;
 
-        const request = SpawnQueueUtility.dequeue();
+        const queue = SpawnQueueUtility.getQueue();
+        const request = SpawnRequestPrioritizationUtility.getPrioritizedSpawnRequest(queue);
+
         if (!request) return;
 
         const cost = request.bodyParts.reduce((cost, part) => cost + BODYPART_COST[part], 0);
 
         if (spawn.room.energyAvailable >= cost) {
+            SpawnQueueUtility.remove(request);
+
             const name = request.role + '_' + Game.time + '_' + Math.floor(Math.random() * 1000);
 
             // Convert Map back to a plain object since Screeps Memory API requires it
@@ -57,9 +62,6 @@ class SpawnManager {
             spawn.spawnCreep(request.bodyParts, name, {
                 memory: plainMemory
             });
-        } else {
-            // If we can't spawn the next creep, put it back at the front of the queue
-            SpawnQueueUtility.unshift(request);
         }
     }
 }
