@@ -1,4 +1,5 @@
 const ActionConstants = require('../constants/ActionConstants');
+const GameObjectUtility = require('../utilities/GameObjectUtility');
 
 const Hauler = {
     run: function (creep) {
@@ -11,8 +12,7 @@ const Hauler = {
 
         if (!targetId || !actionIntent || actionIntent === ActionConstants.ACTION_IDLE) return;
 
-        // Use native getObjectById since the utility doesn't exist
-        const target = Game.getObjectById(targetId);
+        const target = GameObjectUtility.getById(targetId);
         if (!target) {
             creep.heap.state = 'idle';
             return;

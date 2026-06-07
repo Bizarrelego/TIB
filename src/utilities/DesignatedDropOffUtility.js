@@ -1,3 +1,4 @@
+const GameObjectUtility = require('./GameObjectUtility');
 const cache = new Map();
 
 class DesignatedDropOffUtility {
@@ -15,7 +16,7 @@ class DesignatedDropOffUtility {
             return cache.get(cacheKey);
         }
 
-        const controller = Game.getObjectById(controllerId);
+        const controller = GameObjectUtility.getById(controllerId);
         if (!controller) return null;
 
         // Hardcoded position relative to the controller (x + 1, y)
@@ -42,7 +43,7 @@ class DesignatedDropOffUtility {
             return cache.get(cacheKey);
         }
 
-        const spawn = Game.getObjectById(spawnId);
+        const spawn = GameObjectUtility.getById(spawnId);
         if (!spawn) return null;
 
         // Hardcoded position relative to the spawn (x - 1, y)
