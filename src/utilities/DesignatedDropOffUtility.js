@@ -19,11 +19,29 @@ class DesignatedDropOffUtility {
         const controller = GameObjectUtility.getById(controllerId);
         if (!controller) return null;
 
-        // Hardcoded position relative to the controller (x + 1, y)
-        // Ensures it stays within map bounds
-        const x = Math.min(49, controller.pos.x + 1);
-        const y = controller.pos.y;
-        const pos = new RoomPosition(x, y, controller.pos.roomName);
+        // Find a walkable tile within range 2 of the controller
+        const terrain = Game.map.getRoomTerrain(controller.pos.roomName);
+        let pos = null;
+
+        for (let r = 1; r <= 3; r++) {
+            for (let dx = -r; dx <= r; dx++) {
+                for (let dy = -r; dy <= r; dy++) {
+                    if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+                    const x = controller.pos.x + dx;
+                    const y = controller.pos.y + dy;
+                    if (x >= 2 && x <= 47 && y >= 2 && y <= 47) {
+                        if (terrain.get(x, y) !== TERRAIN_MASK_WALL) {
+                            pos = new RoomPosition(x, y, controller.pos.roomName);
+                            break;
+                        }
+                    }
+                }
+                if (pos) break;
+            }
+            if (pos) break;
+        }
+
+        if (!pos) pos = controller.pos; // Fallback
 
         cache.set(cacheKey, pos);
         return pos;

@@ -1,5 +1,6 @@
 const ActionConstants = require('../constants/ActionConstants');
 const GameObjectUtility = require('../utilities/GameObjectUtility');
+const DesignatedDropOffUtility = require('../utilities/DesignatedDropOffUtility');
 
 const Upgrader = {
     run: function (creep) {
@@ -58,7 +59,15 @@ const Upgrader = {
                         return;
                     }
                 }
-                // No energy anywhere — go idle for reassignment
+                // No energy anywhere. Route to the exact drop-off tile so we catch hauler deliveries.
+                const dropPos = DesignatedDropOffUtility.getUpgraderDropOffPosition(target.id);
+                if (dropPos && (creep.pos.x !== dropPos.x || creep.pos.y !== dropPos.y)) {
+                    creep.moveTo(dropPos, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });
+                    return;
+                }
+
+                // If we are already exactly on the drop-off tile, go idle to see if TaskAssignmentManager 
+                // can find dropped energy around us on the next tick
                 creep.heap.state = 'idle';
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
                 creep.heap.targetId = null;

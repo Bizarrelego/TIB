@@ -276,6 +276,11 @@ class TaskAssignmentManager {
                 creep.heap.state = 'work';
                 creep.heap.targetId = roomState.controller.id;
                 creep.heap.actionIntent = ActionConstants.ACTION_UPGRADE;
+            } else {
+                // Starving, 0 energy, nothing to gather:
+                // Route to the designated drop-off tile so we are ready exactly where haulers drop it
+                creep.heap.targetId = roomState.controller.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_UPGRADE;
             }
         } else {
             // Work state — upgrade
