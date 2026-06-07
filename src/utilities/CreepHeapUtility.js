@@ -9,7 +9,8 @@ class CreepHeapUtility {
         return {
             state: 'idle',
             targetId: null,
-            actionIntent: ActionConstants.ACTION_IDLE
+            actionIntent: ActionConstants.ACTION_IDLE,
+            harvestPosition: null
         };
     }
 
@@ -74,6 +75,27 @@ class CreepHeapUtility {
         if (!creep) return;
         if (!creep.heap) creep.heap = CreepHeapUtility.getDefaultHeap();
         creep.heap.actionIntent = intent;
+    }
+
+    /**
+     * Safely gets the assigned harvestPosition from the creep's heap.
+     * @param {Creep} creep
+     * @returns {RoomPosition|null}
+     */
+    static getCreepHarvestPosition(creep) {
+        if (!creep || !creep.heap) return null;
+        return creep.heap.harvestPosition || null;
+    }
+
+    /**
+     * Safely sets the assigned harvestPosition on the creep's heap.
+     * @param {Creep} creep
+     * @param {RoomPosition|null} pos
+     */
+    static setCreepHarvestPosition(creep, pos) {
+        if (!creep) return;
+        if (!creep.heap) creep.heap = CreepHeapUtility.getDefaultHeap();
+        creep.heap.harvestPosition = pos;
     }
 }
 
