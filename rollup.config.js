@@ -5,7 +5,7 @@ import wasm from '@rollup/plugin-wasm';
 export default {
   input: 'src/main.js',
   output: {
-    file: 'dist/main.js',
+    file: '../../../AppData/Local/Screeps/scripts/127_0_0_1___21025/default/main.js',
     format: 'cjs',
     exports: 'auto'
   },
