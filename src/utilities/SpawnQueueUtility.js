@@ -24,6 +24,14 @@ class SpawnQueueUtility {
         return queue.shift();
     }
 
+    static remove(request) {
+        const queue = this.getQueue();
+        const index = queue.indexOf(request);
+        if (index !== -1) {
+            queue.splice(index, 1);
+        }
+    }
+
     static getRoleCounts() {
         const queue = this.getQueue();
         const counts = new Map();
