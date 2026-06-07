@@ -14,19 +14,20 @@ const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
 // Utilities
 const ProfilerUtility = require('./utilities/ProfilerUtility');
 const Logger = require('./utilities/Logger');
+const ErrorHandlingUtility = require('./utilities/ErrorHandlingUtility');
 
 module.exports.loop = function () {
     // Profiler Start
     ProfilerUtility.start();
 
-    try {
-        // Memory Cleanup
-        MemoryCleanupManager.run();
+    // Memory Cleanup
+    ErrorHandlingUtility.wrap(() => MemoryCleanupManager.run(), 'MemoryCleanupManager')();
 
-        // 1. Global State Scanning
-        GlobalStateScanner.run();
+    // 1. Global State Scanning
+    ErrorHandlingUtility.wrap(() => GlobalStateScanner.run(), 'GlobalStateScanner')();
 
-        // 2. Room State Scanning for Owned Rooms
+    // 2. Room State Scanning for Owned Rooms
+    ErrorHandlingUtility.wrap(() => {
         if (!global.State) global.State = { rooms: new Map() };
         for (const roomName in Game.rooms) {
             const room = Game.rooms[roomName];
@@ -34,21 +35,20 @@ module.exports.loop = function () {
                 RoomStateScanner.run(room);
             }
         }
+    }, 'RoomStateScanner')();
 
-        // 3. Spawning
+    // 3. Spawning
+    ErrorHandlingUtility.wrap(() => {
         for (const spawnName in Game.spawns) {
             SpawnManager.run(Game.spawns[spawnName]);
         }
+    }, 'SpawnManager')();
 
-        // 4. Task Assignment
-        TaskAssignmentManager.run();
+    // 4. Task Assignment
+    ErrorHandlingUtility.wrap(() => TaskAssignmentManager.run(), 'TaskAssignmentManager')();
 
-        // 5. Intent Execution
-        RoleExecutor.run();
-
-    } catch (e) {
-        console.log(`Error in main loop: ${e.message}\n${e.stack}`);
-    }
+    // 5. Intent Execution
+    ErrorHandlingUtility.wrap(() => RoleExecutor.run(), 'RoleExecutor')();
 
     // Profiler Reporting
     ProfilerUtility.report();
