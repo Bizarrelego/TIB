@@ -178,6 +178,20 @@ class TaskAssignmentManager {
         } else {
             TaskAssignmentManager.assignHaulerWork(creep, roomState);
         }
+    } 
+
+    static assignHaulerTask(creep, roomName) {
+        if (creep.heap.actionIntent && creep.heap.actionIntent !== ActionConstants.ACTION_IDLE) return;
+
+        // Hauler state machine: Empty -> Pickup, Full -> Drop/Transfer
+        if (creep.store.getUsedCapacity() === 0) {
+            creep.heap.state = 'pickup';
+        } else if (creep.store.getFreeCapacity() === 0) {
+            creep.heap.state = 'dropoff';
+        } else if (creep.heap.state !== 'pickup' && creep.heap.state !== 'dropoff') {
+            // Failsafe: If partially full and stuck in an invalid/idle state, default to dropoff
+            creep.heap.state = 'dropoff';
+        }
     }
 
     static assignHaulerWork(creep, roomState) {

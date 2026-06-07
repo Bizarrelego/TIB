@@ -1,5 +1,6 @@
 const ActionConstants = require('../constants/ActionConstants');
 const GameObjectUtility = require('../utilities/GameObjectUtility');
+const DesignatedDropOffUtility = require('../utilities/DesignatedDropOffUtility');
 
 const Hauler = {
     run: function (creep) {
@@ -15,27 +16,32 @@ const Hauler = {
         const target = GameObjectUtility.getById(targetId);
         if (!target) {
             creep.heap.state = 'idle';
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            creep.heap.targetId = null;
             return;
         }
 
         let result;
         if (actionIntent === ActionConstants.ACTION_WITHDRAW) {
-            // Handle Ruin/Tombstone prioritization by withdrawing what they have if it's not energy
-            if (target.store && (target.structureType === undefined || target.structureType === STRUCTURE_RUIN || target instanceof Tombstone || target instanceof Ruin)) {
-                // Determine resource type to withdraw
-                const resourceType = Object.keys(target.store)[0] || RESOURCE_ENERGY;
-                result = creep.withdraw(target, resourceType);
-            } else {
-                result = creep.withdraw(target, RESOURCE_ENERGY);
-            }
+            const resourceType = (target.store && Object.keys(target.store)[0]) || RESOURCE_ENERGY;
+            result = creep.withdraw(target, resourceType);
         } else if (actionIntent === ActionConstants.ACTION_PICKUP) {
             result = creep.pickup(target);
         } else if (actionIntent === ActionConstants.ACTION_TRANSFER) {
-            result = creep.transfer(target, RESOURCE_ENERGY);
+            const resourceType = (creep.store && Object.keys(creep.store)[0]) || RESOURCE_ENERGY;
+            result = creep.transfer(target, resourceType);
         } else if (actionIntent === ActionConstants.ACTION_DROP) {
-            result = creep.drop(RESOURCE_ENERGY);
+            const dropPos = DesignatedDropOffUtility.getUpgraderDropOffPosition(targetId);
+            if (dropPos && (creep.pos.x !== dropPos.x || creep.pos.y !== dropPos.y)) {
+                creep.moveTo(dropPos, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
+                return; 
+            }
+            const resourceType = (creep.store && Object.keys(creep.store)[0]) || RESOURCE_ENERGY;
+            result = creep.drop(resourceType);
         } else {
             creep.heap.state = 'idle';
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            creep.heap.targetId = null;
             return;
         }
 
@@ -46,9 +52,10 @@ const Hauler = {
             result === ERR_FULL ||
             result === ERR_INVALID_TARGET) {
             creep.heap.state = 'idle';
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            creep.heap.targetId = null;
         }
     }
 };
 
 module.exports = Hauler;
-// Include Hauler.js in commit patch to satisfy code reviewer.
