@@ -54,13 +54,15 @@ class TaskAssignmentManager {
                 
                 if (creep.heap.actionIntent !== ActionConstants.ACTION_IDLE) {
                     if (creep.heap.actionIntent === ActionConstants.ACTION_UPGRADE) {
-                        const drops = roomState.droppedEnergy || [];
                         let foundDrop = null;
-                        for (let j = 0; j < drops.length; j++) {
-                            const d = drops[j];
-                            if (Math.max(Math.abs(creep.pos.x - d.pos.x), Math.abs(creep.pos.y - d.pos.y)) <= 1) {
-                                foundDrop = d;
-                                break;
+                        if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                            const drops = roomState.droppedEnergy || [];
+                            for (let j = 0; j < drops.length; j++) {
+                                const d = drops[j];
+                                if (Math.max(Math.abs(roomState.controller.pos.x - d.pos.x), Math.abs(roomState.controller.pos.y - d.pos.y)) <= 5) {
+                                    foundDrop = d;
+                                    break;
+                                }
                             }
                         }
                         creep.heap.secondaryTargetId = foundDrop ? foundDrop.id : null;
