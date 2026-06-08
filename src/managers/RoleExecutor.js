@@ -12,6 +12,9 @@ roles['filler'] = require('../roles/Filler');
 roles['scout'] = require('../roles/Scout');
 roles['repairman'] = require('../roles/Repairman');
 roles['defender'] = require('../roles/Defender');
+roles['meleeCreep'] = require('../roles/MeleeCreep');
+roles['rangerCreep'] = require('../roles/RangerCreep');
+roles['medicCreep'] = require('../roles/MedicCreep');
 
 /**
  * Top-Down Role Executor

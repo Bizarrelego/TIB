@@ -77,7 +77,7 @@ class RoleCensusLimitUtility {
         // Add dynamic scout limit
         limits.scout = (global.State && global.State.scoutQueue && global.State.scoutQueue.length > 0) ? 1 : 0;
 
-        // Add dynamic defender limit
+        // Add dynamic defender limit (legacy primitive defender)
         let hostilesFound = false;
         if (roomState && roomState.hostiles && roomState.hostiles.length > 0) hostilesFound = true;
         if (!hostilesFound && roomName && Memory.rooms && Memory.rooms[roomName] && Memory.rooms[roomName].outposts) {
@@ -91,6 +91,21 @@ class RoleCensusLimitUtility {
             }
         }
         limits.defender = hostilesFound ? 1 : 0;
+
+        // Military squad: spawn defensive squad when threats are present
+        const hasOffensiveQueue = global.State && global.State.militaryQueue && global.State.militaryQueue.length > 0;
+        if (hostilesFound) {
+            limits.meleeCreep = Math.min(2, (limits.meleeCreep || 0) + 1);
+            limits.rangerCreep = Math.min(2, (limits.rangerCreep || 0) + 1);
+            limits.medicCreep = Math.min(2, (limits.medicCreep || 0) + 1);
+        }
+
+        // Offensive squad: spawn when rcl >= 4 and there are aggression targets
+        if (rcl >= 4 && hasOffensiveQueue) {
+            limits.meleeCreep = Math.min(2, (limits.meleeCreep || 0) + 1);
+            limits.rangerCreep = Math.min(2, (limits.rangerCreep || 0) + 1);
+            limits.medicCreep = Math.min(2, (limits.medicCreep || 0) + 1);
+        }
 
         return limits;
     }

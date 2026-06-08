@@ -18,6 +18,9 @@ class CreepBodyUtility {
             case 'scout': return [MOVE];
             case 'repairman': return [WORK, CARRY, MOVE, MOVE];
             case 'defender': return [TOUGH, MOVE, ATTACK, MOVE];
+            case 'meleeCreep': return this.generateMelee(energyCapacity);
+            case 'rangerCreep': return this.generateRanger(energyCapacity);
+            case 'medicCreep': return this.generateMedic(energyCapacity);
             default: return [WORK, CARRY, MOVE];
         }
     }
@@ -113,6 +116,49 @@ class CreepBodyUtility {
 
     static generateBootstrapper(energy) {
         return [WORK, CARRY, MOVE]; // Minimal emergency logic
+    }
+
+    static generateMelee(energy) {
+        // Pattern: TOUGH TOUGH ATTACK ATTACK MOVE MOVE — scales by pairs
+        const body = [];
+        let cost = 0;
+        const blockCost = BODYPART_COST[TOUGH] * 2 + BODYPART_COST[ATTACK] * 2 + BODYPART_COST[MOVE] * 2; // 10+80+100=190
+        // Minimum 1 block
+        body.push(TOUGH, TOUGH, ATTACK, ATTACK, MOVE, MOVE);
+        cost += blockCost;
+        while (cost + blockCost <= energy && body.length + 6 <= 50) {
+            body.push(TOUGH, TOUGH, ATTACK, ATTACK, MOVE, MOVE);
+            cost += blockCost;
+        }
+        return body;
+    }
+
+    static generateRanger(energy) {
+        // Pattern: TOUGH RANGED_ATTACK MOVE — scales by triples
+        const body = [];
+        let cost = 0;
+        const blockCost = BODYPART_COST[TOUGH] + BODYPART_COST[RANGED_ATTACK] + BODYPART_COST[MOVE]; // 10+150+50=210
+        body.push(TOUGH, RANGED_ATTACK, MOVE);
+        cost += blockCost;
+        while (cost + blockCost <= energy && body.length + 3 <= 50) {
+            body.push(TOUGH, RANGED_ATTACK, MOVE);
+            cost += blockCost;
+        }
+        return body;
+    }
+
+    static generateMedic(energy) {
+        // Pattern: MOVE HEAL — scales by pairs
+        const body = [];
+        let cost = 0;
+        const blockCost = BODYPART_COST[MOVE] + BODYPART_COST[HEAL]; // 50+250=300
+        body.push(MOVE, HEAL);
+        cost += blockCost;
+        while (cost + blockCost <= energy && body.length + 2 <= 50) {
+            body.push(MOVE, HEAL);
+            cost += blockCost;
+        }
+        return body;
     }
 
     static buildArray(work, carry, move) {
