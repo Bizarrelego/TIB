@@ -51,7 +51,7 @@ class TaskAssignmentManager {
                 
                 if (creep.heap.actionIntent !== ActionConstants.ACTION_IDLE) {
                     if (creep.heap.actionIntent === ActionConstants.ACTION_UPGRADE) {
-                        const drop = roomState.droppedEnergy?.find(d => creep.pos.getRangeTo(d) <= 3);
+                        const drop = roomState.droppedEnergy?.find(d => creep.pos.getRangeTo(d) <= 1);
                         creep.heap.secondaryTargetId = drop ? drop.id : null;
                     }
                     TaskAssignmentManager.reregisterClaim(creep);
@@ -243,6 +243,15 @@ class TaskAssignmentManager {
                     creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
                     return;
                 }
+            }
+
+            // Find a stationary upgrader to drop energy for
+            const upgraders = roomState.creeps?.filter(c => c.my && c.memory.role === 'upgrader') || [];
+            if (upgraders.length > 0) {
+                const targetUpgrader = upgraders[djb2Hash(creep.name) % upgraders.length];
+                creep.heap.targetId = targetUpgrader.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_DROP;
+                return;
             }
 
             creep.heap.targetId = roomState.controller.id;

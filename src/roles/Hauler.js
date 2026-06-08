@@ -31,10 +31,17 @@ const Hauler = {
             const resourceType = (creep.store && Object.keys(creep.store)[0]) || RESOURCE_ENERGY;
             result = creep.transfer(target, resourceType);
         } else if (actionIntent === ActionConstants.ACTION_DROP) {
-            const dropPos = DesignatedDropOffUtility.getUpgraderDropOffPosition(targetId);
-            if (dropPos && (creep.pos.x !== dropPos.x || creep.pos.y !== dropPos.y)) {
-                creep.moveTo(dropPos, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
-                return; 
+            if (target.memory && target.memory.role === 'upgrader') {
+                if (creep.pos.getRangeTo(target) > 1) {
+                    creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
+                    return; 
+                }
+            } else {
+                const dropPos = DesignatedDropOffUtility.getUpgraderDropOffPosition(targetId);
+                if (dropPos && creep.pos.getRangeTo(dropPos) > 1) {
+                    creep.moveTo(dropPos, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
+                    return; 
+                }
             }
             const resourceType = (creep.store && Object.keys(creep.store)[0]) || RESOURCE_ENERGY;
             result = creep.drop(resourceType);

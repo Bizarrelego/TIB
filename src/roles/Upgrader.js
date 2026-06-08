@@ -42,14 +42,25 @@ const Upgrader = {
 
             const result = creep.upgradeController(target);
 
+            let movedToSecondary = false;
             // Opportunistic pickup of nearby dropped energy (same-tick stacking)
             if (creep.heap.secondaryTargetId) {
                 const secondary = GameObjectUtility.getById(creep.heap.secondaryTargetId);
-                if (secondary) creep.pickup(secondary);
+                if (secondary) {
+                    if (creep.pickup(secondary) === ERR_NOT_IN_RANGE) {
+                        creep.moveTo(secondary, { reusePath: 10, visualizePathStyle: { stroke: '#ffaa00' } });
+                        movedToSecondary = true;
+                    }
+                }
             }
 
             if (result === ERR_NOT_IN_RANGE) {
-                creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });
+                const dropPos = DesignatedDropOffUtility.getUpgraderDropOffPosition(target.id);
+                if (dropPos && creep.pos.getRangeTo(dropPos) > 1) {
+                    if (!movedToSecondary) creep.moveTo(dropPos, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });
+                } else {
+                    if (!movedToSecondary) creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });
+                }
             } else if (result === ERR_NOT_ENOUGH_RESOURCES) {
                 // Out of energy — check if container is also empty
                 if (creep.heap.sitTargetId) {
@@ -59,14 +70,14 @@ const Upgrader = {
                         return;
                     }
                 }
-                // No energy anywhere. Route to the exact drop-off tile so we catch hauler deliveries.
+                // No energy anywhere. Route to the drop-off area so we catch hauler deliveries.
                 const dropPos = DesignatedDropOffUtility.getUpgraderDropOffPosition(target.id);
-                if (dropPos && (creep.pos.x !== dropPos.x || creep.pos.y !== dropPos.y)) {
-                    creep.moveTo(dropPos, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });
+                if (dropPos && creep.pos.getRangeTo(dropPos) > 1) {
+                    if (!movedToSecondary) creep.moveTo(dropPos, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });
                     return;
                 }
 
-                // If we are already exactly on the drop-off tile, go idle to see if TaskAssignmentManager 
+                // If we are already exactly around the drop-off tile, go idle to see if TaskAssignmentManager 
                 // can find dropped energy around us on the next tick
                 creep.heap.state = 'idle';
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
