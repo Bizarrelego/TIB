@@ -24,7 +24,11 @@ class IntelManager {
 
         const visibleRooms = Object.keys(Game.rooms);
         for (let i = 0; i < visibleRooms.length; i++) {
-            IntelManager.scanAndSave(Game.rooms[visibleRooms[i]]);
+            const room = Game.rooms[visibleRooms[i]];
+            IntelManager.scanAndSave(room);
+            if (room.controller && room.controller.my && room.controller.level >= 3) {
+                IntelManager.evaluateOutposts(room);
+            }
         }
 
         global.State.scoutQueue = IntelManager.buildScoutQueue(visibleRooms);
@@ -130,6 +134,30 @@ class IntelManager {
             }
         }
         return queue;
+    }
+
+    static evaluateOutposts(room) {
+        if (!Memory.outposts) Memory.outposts = {};
+        
+        const exits = Game.map.describeExits(room.name);
+        const outposts = [];
+        for (const dir in exits) {
+            const adjRoom = exits[dir];
+            const intel = Memory.rooms[adjRoom];
+            if (!intel) continue;
+            
+            // Check if suitable for remote mining
+            if (intel.controller && intel.controller.owner) continue; // Owned by someone
+            if (intel.hostiles && (intel.hostiles.towers > 0 || intel.hostiles.invaderCore)) continue; // Hostile structures
+            if (intel.sources && intel.sources.length > 0) {
+                outposts.push(adjRoom);
+                // Register globally
+                Memory.outposts[adjRoom] = { sourceRoom: room.name, sources: intel.sources.length };
+            }
+        }
+        
+        // Save to our room's memory
+        room.memory.outposts = outposts;
     }
 }
 

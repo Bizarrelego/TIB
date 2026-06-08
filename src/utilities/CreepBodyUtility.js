@@ -12,6 +12,9 @@ class CreepBodyUtility {
             case 'upgrader': return this.generateUpgrader(energyCapacity);
             case 'builder': return this.generateBuilder(energyCapacity);
             case 'bootstrapper': return this.generateBootstrapper(energyCapacity);
+            case 'filler': return this.generateHauler(energyCapacity);
+            case 'remoteharvester': return this.generateHarvester(energyCapacity);
+            case 'remotehauler': return this.generateHauler(energyCapacity);
             default: return [WORK, CARRY, MOVE];
         }
     }

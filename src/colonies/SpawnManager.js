@@ -23,7 +23,8 @@ class SpawnManager {
         const roomName = spawn.room.name;
         const energyCapacity = spawn.room.energyCapacityAvailable;
         const rcl = spawn.room.controller ? spawn.room.controller.level : 1;
-        const limits = RoleCensusLimitUtility.getAllLimits(rcl) || {};
+        const roomState = global.State?.rooms?.get(roomName);
+        const limits = RoleCensusLimitUtility.getAllLimits(rcl, roomState, roomName) || {};
 
         const getCount = (role) => {
             const active = (activeCounts && typeof activeCounts.has === 'function' && activeCounts.has(role)) ? activeCounts.get(role) : 0;

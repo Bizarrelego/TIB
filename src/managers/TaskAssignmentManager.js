@@ -131,6 +131,102 @@ class TaskAssignmentManager {
         else if (role === 'builder') TaskAssignmentManager.assignBuilder(creep, roomState);
         else if (role === 'bootstrapper') TaskAssignmentManager.assignBootstrapper(creep, roomState);
         else if (role === 'upgrader') TaskAssignmentManager.assignUpgrader(creep, roomState);
+        else if (role === 'filler') TaskAssignmentManager.assignFiller(creep, roomState);
+        else if (role === 'remoteharvester') TaskAssignmentManager.assignRemoteHarvester(creep, roomState);
+        else if (role === 'remotehauler') TaskAssignmentManager.assignRemoteHauler(creep, roomState);
+    }
+
+    static assignRemoteHarvester(creep, homeState) {
+        if (!creep.memory.targetRoom) {
+            const outposts = Memory.rooms[creep.memory.colony]?.outposts || [];
+            if (outposts.length > 0) {
+                creep.memory.targetRoom = outposts[djb2Hash(creep.name) % outposts.length];
+            } else {
+                return;
+            }
+        }
+
+        if (creep.room.name !== creep.memory.targetRoom) {
+            creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+            return;
+        }
+
+        const roomState = global.State?.rooms?.get(creep.room.name);
+        if (!roomState) return;
+
+        TaskAssignmentManager.assignHarvester(creep, roomState);
+    }
+
+    static assignRemoteHauler(creep, homeState) {
+        if (creep.heap.state === 'gather') {
+            if (!creep.memory.targetRoom) {
+                const outposts = Memory.rooms[creep.memory.colony]?.outposts || [];
+                if (outposts.length > 0) {
+                    creep.memory.targetRoom = outposts[djb2Hash(creep.name) % outposts.length];
+                } else {
+                    return;
+                }
+            }
+            if (creep.room.name !== creep.memory.targetRoom) {
+                creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+                return;
+            }
+            const roomState = global.State?.rooms?.get(creep.room.name);
+            if (!roomState) return;
+
+            let bestTarget = null;
+            let bestAmount = 0;
+            const drops = roomState.droppedEnergy || [];
+            for (let i = 0; i < drops.length; i++) {
+                const d = drops[i];
+                const claimed = d.__gatherClaimed || 0;
+                const available = d.amount - claimed;
+                if (available > bestAmount) {
+                    bestAmount = available;
+                    bestTarget = d;
+                }
+            }
+
+            if (bestTarget && bestAmount >= 25) {
+                bestTarget.__gatherClaimed = (bestTarget.__gatherClaimed || 0) + creep.store.getFreeCapacity(RESOURCE_ENERGY);
+                creep.heap.targetId = bestTarget.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_PICKUP;
+            } else {
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            }
+            
+            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0 && !bestTarget) {
+                creep.heap.state = 'work';
+                creep.heap.targetId = null;
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            }
+
+        } else {
+            if (creep.room.name !== creep.memory.colony) {
+                creep.memory.targetRoom = creep.memory.colony;
+                creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+                return;
+            }
+            TaskAssignmentManager.assignHaulerWork(creep, homeState);
+        }
+    }
+
+    static assignFiller(creep, roomState) {
+        if (creep.heap.state === 'gather') {
+            // Filler only pulls from Storage
+            if (roomState.storage && roomState.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                creep.heap.targetId = roomState.storage.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
+            } else {
+                // If no storage (or empty), filler sleeps or idles
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            }
+        } else {
+            // Priority: Fill spawns, extensions, towers
+            if (TaskAssignmentManager.routeToCoreStructures(creep, roomState)) return;
+            // No core structures need energy? Idle.
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+        }
     }
 
     static assignHarvester(creep, roomState) {
@@ -280,8 +376,15 @@ class TaskAssignmentManager {
     }
 
     static assignHaulerWork(creep, roomState) {
-        // Priority 1: Fill spawn/extensions
-        if (TaskAssignmentManager.routeToStorage(creep, roomState)) return;
+        // Priority 1: Dump in Storage if it exists
+        if (roomState.storage && roomState.storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+            creep.heap.targetId = roomState.storage.id;
+            creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
+            return;
+        }
+
+        // Priority 2: Fill spawn/extensions (Pre-Storage behavior)
+        if (TaskAssignmentManager.routeToCoreStructures(creep, roomState)) return;
 
         // Priority 2: Drop/Transfer at controller
         if (roomState.controller) {
@@ -383,7 +486,7 @@ class TaskAssignmentManager {
         }
     }
 
-    static routeToStorage(creep, roomState) {
+    static routeToCoreStructures(creep, roomState) {
         let bestTarget = null;
         let bestScore = -1;
 
@@ -409,6 +512,10 @@ class TaskAssignmentManager {
 
         roomState.spawns?.forEach(evaluateTarget);
         roomState.extensions?.forEach(evaluateTarget);
+        roomState.towers?.forEach(t => {
+            // Only fill towers if they are missing > 200 energy
+            if (t.store.getFreeCapacity(RESOURCE_ENERGY) >= 200) evaluateTarget(t);
+        });
 
         if (bestTarget) {
             bestTarget.__deliveryClaimed = (bestTarget.__deliveryClaimed || 0) + creep.store.getUsedCapacity(RESOURCE_ENERGY);
@@ -497,7 +604,7 @@ class TaskAssignmentManager {
             }
         } else {
             // Work phase: Fill Spawns/Extensions first to get real creeps spawning
-            if (TaskAssignmentManager.routeToStorage(creep, roomState)) return;
+            if (TaskAssignmentManager.routeToCoreStructures(creep, roomState)) return;
 
             // Priority 2: Build critical structures (like containers)
             if (roomState.constructionSites && roomState.constructionSites.length > 0) {

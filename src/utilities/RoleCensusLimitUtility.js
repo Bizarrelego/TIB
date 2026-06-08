@@ -23,13 +23,49 @@ class RoleCensusLimitUtility {
         };
     }
 
-    static getLimit(role, rcl) {
-        const limits = this.CENSUS_BY_RCL[rcl] || this.CENSUS_BY_RCL[4];
+    static getLimit(role, rcl, roomState, roomName) {
+        const limits = this.getAllLimits(rcl, roomState, roomName);
         return limits[role] || 0;
     }
 
-    static getAllLimits(rcl) {
-        return this.CENSUS_BY_RCL[rcl] || this.CENSUS_BY_RCL[4];
+    static getAllLimits(rcl, roomState, roomName) {
+        const limits = Object.assign({}, this.CENSUS_BY_RCL[rcl] || this.CENSUS_BY_RCL[4]);
+
+        if (roomState) {
+            let looseEnergy = 0;
+            if (roomState.droppedEnergy) {
+                for (let i = 0; i < roomState.droppedEnergy.length; i++) looseEnergy += roomState.droppedEnergy[i].amount;
+            }
+            if (roomState.sourceContainers) {
+                for (let i = 0; i < roomState.sourceContainers.length; i++) looseEnergy += roomState.sourceContainers[i].store.getUsedCapacity(RESOURCE_ENERGY);
+            }
+
+            if (looseEnergy > 1500) {
+                const extraHaulers = Math.min(4, Math.floor(looseEnergy / 1500));
+                limits.hauler += extraHaulers;
+            }
+
+            if (roomState.storage && roomState.storage.my) {
+                limits.filler = 1;
+            }
+        }
+
+        if (roomName && Memory.rooms && Memory.rooms[roomName] && Memory.rooms[roomName].outposts) {
+            const outposts = Memory.rooms[roomName].outposts;
+            let remoteSources = 0;
+            for (let i = 0; i < outposts.length; i++) {
+                const adjMem = Memory.rooms[outposts[i]];
+                if (adjMem && adjMem.sources) {
+                    remoteSources += adjMem.sources.length;
+                }
+            }
+            if (remoteSources > 0) {
+                limits.remoteharvester = remoteSources;
+                limits.remotehauler = remoteSources * 2; // 2 haulers per remote source
+            }
+        }
+
+        return limits;
     }
 }
 
