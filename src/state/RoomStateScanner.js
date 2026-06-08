@@ -187,6 +187,47 @@ class RoomStateScanner {
             state.energyInRuinsAndTombstones = EnergySourceUtility.findEnergyInRuinsAndTombstones(roomName);
             state.harvestableSources = EnergySourceUtility.findHarvestableSources(roomName);
     }
+
+    static scanRoom(roomName) {
+        const room = Game.rooms[roomName];
+        if (!room) return;
+
+        if (!Memory.rooms) Memory.rooms = {};
+        if (!Memory.rooms[roomName]) Memory.rooms[roomName] = {};
+
+        const scanned = {
+            sources: room.find(FIND_SOURCES),
+            minerals: room.find(FIND_MINERALS),
+            structures: {},
+            constructionSites: room.find(FIND_CONSTRUCTION_SITES),
+            creeps: {},
+            droppedResources: room.find(FIND_DROPPED_RESOURCES),
+            ruins: room.find(FIND_RUINS),
+            tombstones: room.find(FIND_TOMBSTONES)
+        };
+
+        const structures = room.find(FIND_STRUCTURES);
+        for (let i = 0; i < structures.length; i++) {
+            const structure = structures[i];
+            const type = structure.structureType;
+            if (!scanned.structures[type]) {
+                scanned.structures[type] = [];
+            }
+            scanned.structures[type].push(structure);
+        }
+
+        const creeps = room.find(FIND_CREEPS);
+        for (let i = 0; i < creeps.length; i++) {
+            const creep = creeps[i];
+            const role = creep.memory.role || 'unassigned';
+            if (!scanned.creeps[role]) {
+                scanned.creeps[role] = [];
+            }
+            scanned.creeps[role].push(creep);
+        }
+
+        Memory.rooms[roomName].scanned = scanned;
+    }
 }
 
 RoomStateScanner.createRoomStateTemplate = createRoomStateTemplate;

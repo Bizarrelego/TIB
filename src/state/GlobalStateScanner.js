@@ -39,6 +39,14 @@ function run() {
             roomState.creepCounts[role]++;
         }
     }
+
+    // Call RoomStateScanner.scanRoom() for the current colony's rooms
+    for (const roomName in Game.rooms) {
+        const room = Game.rooms[roomName];
+        if (room.controller && room.controller.my) {
+            RoomStateScanner.scanRoom(roomName);
+        }
+    }
 }
 
 module.exports = {
