@@ -22,27 +22,54 @@ const Hauler = {
 
         let result;
         if (actionIntent === ActionConstants.ACTION_WITHDRAW) {
-            const resourceType = (target.store && Object.keys(target.store)[0]) || RESOURCE_ENERGY;
+            let resourceType = RESOURCE_ENERGY;
+            if (target.store) {
+                const keys = Object.keys(target.store);
+                if (keys.length > 0) {
+                    let maxAmt = -1;
+                    for (let i = 0; i < keys.length; i++) {
+                        const amt = target.store.getUsedCapacity(keys[i]);
+                        if (amt > maxAmt) {
+                            maxAmt = amt;
+                            resourceType = keys[i];
+                        }
+                    }
+                }
+            }
             result = creep.withdraw(target, resourceType);
         } else if (actionIntent === ActionConstants.ACTION_PICKUP) {
             result = creep.pickup(target);
-        } else if (actionIntent === ActionConstants.ACTION_TRANSFER) {
-            const resourceType = (creep.store && Object.keys(creep.store)[0]) || RESOURCE_ENERGY;
-            result = creep.transfer(target, resourceType);
-        } else if (actionIntent === ActionConstants.ACTION_DROP) {
-            if (target.memory && target.memory.role === 'upgrader') {
-                if (creep.pos.getRangeTo(target) > 1) {
-                    creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
-                    return; 
-                }
-            } else {
-                if (creep.pos.getRangeTo(target) > 3) {
-                    creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
-                    return; 
+        } else if (actionIntent === ActionConstants.ACTION_TRANSFER || actionIntent === ActionConstants.ACTION_DROP) {
+            let resourceType = RESOURCE_ENERGY;
+            if (creep.store) {
+                const keys = Object.keys(creep.store);
+                if (keys.length > 0) {
+                    // Heavily prioritize non-energy resources to clear junk
+                    for (let i = 0; i < keys.length; i++) {
+                        if (creep.store.getUsedCapacity(keys[i]) > 0) {
+                            resourceType = keys[i];
+                            if (keys[i] !== RESOURCE_ENERGY) break;
+                        }
+                    }
                 }
             }
-            const resourceType = (creep.store && Object.keys(creep.store)[0]) || RESOURCE_ENERGY;
-            result = creep.drop(resourceType);
+            
+            if (actionIntent === ActionConstants.ACTION_TRANSFER) {
+                result = creep.transfer(target, resourceType);
+            } else {
+                if (target.memory && target.memory.role === 'upgrader') {
+                    if (creep.pos.getRangeTo(target) > 1) {
+                        creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
+                        return; 
+                    }
+                } else {
+                    if (creep.pos.getRangeTo(target) > 3) {
+                        creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
+                        return; 
+                    }
+                }
+                result = creep.drop(resourceType);
+            }
         } else {
             creep.heap.state = 'idle';
             creep.heap.actionIntent = ActionConstants.ACTION_IDLE;

@@ -47,6 +47,15 @@ class RoleCensusLimitUtility {
 
             if (roomState.storage && roomState.storage.my) {
                 limits.filler = 1;
+                limits.repairman = 1;
+            }
+
+            // Emergency Storage Protocol
+            if (rcl >= 4) {
+                if (!roomState.storage || !roomState.storage.my) {
+                    limits.upgrader = 1; // Slash upgraders to conserve energy
+                    limits.builder = 4;  // Boost builders to fast-track storage
+                }
             }
         }
 
@@ -64,6 +73,24 @@ class RoleCensusLimitUtility {
                 limits.remotehauler = remoteSources * 2; // 2 haulers per remote source
             }
         }
+
+        // Add dynamic scout limit
+        limits.scout = (global.State && global.State.scoutQueue && global.State.scoutQueue.length > 0) ? 1 : 0;
+
+        // Add dynamic defender limit
+        let hostilesFound = false;
+        if (roomState && roomState.hostiles && roomState.hostiles.length > 0) hostilesFound = true;
+        if (!hostilesFound && roomName && Memory.rooms && Memory.rooms[roomName] && Memory.rooms[roomName].outposts) {
+            const outposts = Memory.rooms[roomName].outposts;
+            for (let i = 0; i < outposts.length; i++) {
+                const outpostState = global.State?.rooms?.get(outposts[i]);
+                if (outpostState && outpostState.hostiles && outpostState.hostiles.length > 0) {
+                    hostilesFound = true;
+                    break;
+                }
+            }
+        }
+        limits.defender = hostilesFound ? 1 : 0;
 
         return limits;
     }

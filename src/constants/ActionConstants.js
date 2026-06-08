@@ -9,7 +9,8 @@ const ActionConstants = {
     ACTION_REPAIR: 'repair',
     ACTION_DROP: 'drop',
     ACTION_SCOUT: 'scout',
-    ACTION_MOVE_ROOM: 'move_room'
+    ACTION_MOVE_ROOM: 'move_room',
+    ACTION_ATTACK: 'attack'
 };
 
 module.exports = ActionConstants;

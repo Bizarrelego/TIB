@@ -25,11 +25,3 @@ You are building a brute-force, high-efficiency early game.
 * **Hauling:** Haulers use hashed assignments to target specific harvesters, preventing swarming. They sweep dropped energy and route strictly to the Spawn or Upgrader drop-pile.
 * **Upgrading:** Upgraders are stationary. Haulers drop energy on the upgrader's exact tile. Upgraders execute `pickup()` and `upgradeController()` on the same tick.
 * **Scavenging:** The `TaskAssignmentManager` must prioritize assigning `withdraw()` on `Ruin` and `Tombstone` objects over standard drop-piles.
-
-### 5. BANNED ARCHITECTURE (Do Not Implement)
-If you attempt to write code for any of the following, the request will be rejected. You are explicitly forbidden from generating:
-* CostMatrix generation, distance transforms, or dynamic pathing algorithms (use direct engine `moveTo` only).
-* Traffic Managers, deadlock resolution, or shoving algorithms.
-* Combat squads, quads, or healing logic.
-* Storage, Terminals, or Link routing.
-* Dynamic creep body calculations (use hardcoded arrays like `[WORK, CARRY, MOVE, MOVE]`).

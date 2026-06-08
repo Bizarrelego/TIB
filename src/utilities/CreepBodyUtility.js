@@ -15,6 +15,9 @@ class CreepBodyUtility {
             case 'filler': return this.generateHauler(energyCapacity);
             case 'remoteharvester': return this.generateHarvester(energyCapacity);
             case 'remotehauler': return this.generateHauler(energyCapacity);
+            case 'scout': return [MOVE];
+            case 'repairman': return [WORK, CARRY, MOVE, MOVE];
+            case 'defender': return [TOUGH, MOVE, ATTACK, MOVE];
             default: return [WORK, CARRY, MOVE];
         }
     }

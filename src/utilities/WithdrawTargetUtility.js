@@ -18,7 +18,7 @@ class WithdrawTargetUtility {
         if (roomState.ruins) {
             for (let i = 0; i < roomState.ruins.length; i++) {
                 const ruin = roomState.ruins[i];
-                if (ruin && ruin.store && ruin.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                if (ruin && ruin.store && ruin.store.getUsedCapacity() > 0) {
                     targets.push(ruin);
                 }
             }
@@ -27,7 +27,7 @@ class WithdrawTargetUtility {
         if (roomState.tombstones) {
             for (let i = 0; i < roomState.tombstones.length; i++) {
                 const tombstone = roomState.tombstones[i];
-                if (tombstone && tombstone.store && tombstone.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                if (tombstone && tombstone.store && tombstone.store.getUsedCapacity() > 0) {
                     targets.push(tombstone);
                 }
             }

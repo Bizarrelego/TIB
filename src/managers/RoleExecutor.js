@@ -9,6 +9,9 @@ roles['builder'] = require('../roles/Builder');
 roles['scavenger'] = require('../roles/Scavenger');
 roles['bootstrapper'] = require('../roles/Bootstrapper');
 roles['filler'] = require('../roles/Filler');
+roles['scout'] = require('../roles/Scout');
+roles['repairman'] = require('../roles/Repairman');
+roles['defender'] = require('../roles/Defender');
 
 /**
  * Top-Down Role Executor
@@ -40,7 +43,7 @@ class RoleExecutor {
 
             if (!actionIntent || actionIntent === ActionConstants.ACTION_IDLE) continue;
 
-            if (actionIntent === ActionConstants.ACTION_SCOUT || actionIntent === ActionConstants.ACTION_MOVE_ROOM) {
+            if (actionIntent === ActionConstants.ACTION_MOVE_ROOM) {
                 RoleExecutor.executeCrossRoomTask(creep);
                 continue;
             }
