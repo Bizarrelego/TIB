@@ -149,6 +149,7 @@ class TaskAssignmentManager {
         else if (role === 'hauler') TaskAssignmentManager.assignHauler(creep, roomState);
         else if (role === 'builder') TaskAssignmentManager.assignBuilder(creep, roomState);
         else if (role === 'bootstrapper') TaskAssignmentManager.assignBootstrapper(creep, roomState);
+        else if (role === 'upgrader') TaskAssignmentManager.assignUpgrader(creep, roomState);
     }
 
     static assignHarvester(creep, roomState) {
@@ -474,6 +475,12 @@ class TaskAssignmentManager {
                 creep.heap.actionIntent = ActionConstants.ACTION_UPGRADE;
             }
         }
+    }
+
+    static assignUpgrader(creep, roomState) {
+        if (!roomState.controller) return;
+        creep.heap.targetId = roomState.controller.id;
+        creep.heap.actionIntent = ActionConstants.ACTION_UPGRADE;
     }
 }
 
