@@ -33,8 +33,15 @@ class SpawnManager {
 
         const harvesterCount = getCount('harvester');
         const haulerCount = getCount('hauler');
+        const bootstrapperCount = getCount('bootstrapper');
 
-        // Emergency bootstrap: spawn minimal body when 0 harvesters exist
+        // Total wipe recovery: spawn an all-in-one bootstrapper if no harvesters, haulers, or bootstrappers exist
+        if (harvesterCount === 0 && haulerCount === 0 && bootstrapperCount === 0 && (limits['harvester'] || 0) > 0) {
+            CreepSpawnRequestUtility.requestCreep(roomName, 'bootstrapper', EMERGENCY_BODY);
+            return; 
+        }
+
+        // Emergency bootstrap: spawn minimal body harvester when 0 harvesters exist
         if (harvesterCount === 0 && (limits['harvester'] || 0) > 0) {
             const body = energyCapacity >= 300 ? CreepBodyUtility.getBody('harvester', energyCapacity) : EMERGENCY_BODY;
             CreepSpawnRequestUtility.requestCreep(roomName, 'harvester', body);

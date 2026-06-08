@@ -34,23 +34,36 @@ const Upgrader = {
                 }
             }
 
-            if (result === ERR_NOT_IN_RANGE) {
-                if (!movedToSecondary) creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });
-            } else if (result === ERR_NOT_ENOUGH_RESOURCES) {
-                // No energy anywhere. Route straight to the controller and cluster around it within range 2.
-                if (creep.pos.getRangeTo(target) > 2) {
-                    if (!movedToSecondary) creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });
-                    return;
-                }
+            const distToController = creep.pos.getRangeTo(target);
 
-                // If within range 2 of controller, stay there and wait for Hauler.
-                // DO NOT go idle. We want to keep intent = UPGRADE so it picks up and upgrades when energy arrives.
-            } else if (result === ERR_INVALID_TARGET) {
-                creep.heap.state = 'idle';
-                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
-                creep.heap.targetId = null;
+            // Out of range routing: move to controller if further than range 3
+            if (distToController > 3) {
+                if (!movedToSecondary) creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });
+            } 
+            // Clustering: if exactly at range 3 but empty, move closer to range 2 to tightly cluster for hauler drops
+            else if (distToController === 3 && creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+                if (!movedToSecondary) creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });
+            } else {
+                // Anti-spawn-block nudging: if stationary on a spawn/extension, nudge off it
+                const roomState = global.State?.rooms?.get(creep.room.name);
+                if (roomState && !movedToSecondary && creep.fatigue === 0) {
+                    let blocking = false;
+                    const checkBlock = (s) => {
+                        if (s.pos.x === creep.pos.x && s.pos.y === creep.pos.y) blocking = true;
+                    };
+                    roomState.spawns?.forEach(checkBlock);
+                    roomState.extensions?.forEach(checkBlock);
+
+                    if (blocking) {
+                        const dx = Math.floor(Math.random() * 3) - 1;
+                        const dy = Math.floor(Math.random() * 3) - 1;
+                        if (dx !== 0 || dy !== 0) {
+                            creep.moveTo(new RoomPosition(creep.pos.x + dx, creep.pos.y + dy, creep.room.name), { visualizePathStyle: { stroke: '#ff0000' } });
+                        }
+                    }
+                }
             }
-            // On OK: do nothing — keep upgrading next tick
+            // On OK or within range: do nothing — keep upgrading or sit idle waiting for energy next tick
 
         } else if (actionIntent === ActionConstants.ACTION_PICKUP) {
             const result = creep.pickup(target);

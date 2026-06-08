@@ -7,6 +7,7 @@ roles['hauler'] = require('../roles/Hauler');
 roles['upgrader'] = require('../roles/Upgrader');
 roles['builder'] = require('../roles/Builder');
 roles['scavenger'] = require('../roles/Scavenger');
+roles['bootstrapper'] = require('../roles/Bootstrapper');
 
 /**
  * Top-Down Role Executor

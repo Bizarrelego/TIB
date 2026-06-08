@@ -31,6 +31,7 @@ class TaskAssignmentManager {
         
         for (let i = 0; i < creeps.length; i++) {
             const creep = creeps[i];
+            if (creep.spawning) continue;
             
             const roomName = creep.memory.room || creep.memory.colony || creep.room.name;
             const roomState = global.State?.rooms?.get(roomName);
@@ -142,6 +143,7 @@ class TaskAssignmentManager {
         else if (role === 'hauler') TaskAssignmentManager.assignHauler(creep, roomState);
         else if (role === 'upgrader') TaskAssignmentManager.assignUpgrader(creep, roomState);
         else if (role === 'builder') TaskAssignmentManager.assignBuilder(creep, roomState);
+        else if (role === 'bootstrapper') TaskAssignmentManager.assignBootstrapper(creep, roomState);
     }
 
     static assignHarvester(creep, roomState) {
@@ -419,6 +421,67 @@ class TaskAssignmentManager {
             return { id: bestTarget.id, actionIntent: bestIntent };
         }
         return null;
+    }
+
+    static assignBootstrapper(creep, roomState) {
+        if (creep.heap.state === 'gather') {
+            // First try to scavenge dropped energy like a builder
+            const bestSource = TaskAssignmentManager.findClosestEnergy(creep, roomState);
+            if (bestSource) {
+                creep.heap.targetId = bestSource.id;
+                creep.heap.actionIntent = bestSource.actionIntent;
+                return;
+            }
+
+            // Fallback: Harvest directly from the nearest source
+            if (roomState.sources && roomState.sources.length > 0) {
+                let bestTarget = null;
+                let bestDist = Infinity;
+                for (let i = 0; i < roomState.sources.length; i++) {
+                    const source = roomState.sources[i];
+                    const dx = Math.abs(creep.pos.x - source.pos.x);
+                    const dy = Math.abs(creep.pos.y - source.pos.y);
+                    const dist = Math.max(dx, dy);
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        bestTarget = source;
+                    }
+                }
+                if (bestTarget) {
+                    creep.heap.targetId = bestTarget.id;
+                    creep.heap.actionIntent = ActionConstants.ACTION_HARVEST;
+                }
+            }
+        } else {
+            // Work phase: Fill Spawns/Extensions first to get real creeps spawning
+            if (TaskAssignmentManager.routeToStorage(creep, roomState)) return;
+
+            // Priority 2: Build critical structures (like containers)
+            if (roomState.constructionSites && roomState.constructionSites.length > 0) {
+                let bestSite = null;
+                let bestScore = -1;
+                for (let i = 0; i < roomState.constructionSites.length; i++) {
+                    const s = roomState.constructionSites[i];
+                    const dist = Math.max(Math.abs(creep.pos.x - s.pos.x), Math.abs(creep.pos.y - s.pos.y)) || 1;
+                    const score = 100 / dist;
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestSite = s;
+                    }
+                }
+                if (bestSite) {
+                    creep.heap.targetId = bestSite.id;
+                    creep.heap.actionIntent = ActionConstants.ACTION_BUILD;
+                    return;
+                }
+            }
+
+            // Fallback: Upgrade controller
+            if (roomState.controller) {
+                creep.heap.targetId = roomState.controller.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_UPGRADE;
+            }
+        }
     }
 }
 
