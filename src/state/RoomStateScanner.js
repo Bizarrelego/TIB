@@ -32,6 +32,8 @@ const createRoomStateTemplate = () => ({
     structureIds: [],
     repairTargets: [],
     creeps: [],
+    harvesters: [],
+    upgraders: [],
     creepCounts: {
         harvester: 0,
         hauler: 0,

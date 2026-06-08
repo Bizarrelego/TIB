@@ -12,6 +12,8 @@ function run() {
     // Clear creeps and creepCounts for all initialized rooms from the previous tick
     for (const roomState of global.State.rooms.values()) {
         roomState.creeps = [];
+        roomState.harvesters = [];
+        roomState.upgraders = [];
         for (const role in roomState.creepCounts) {
             roomState.creepCounts[role] = 0;
         }
@@ -30,6 +32,9 @@ function run() {
         }
 
         roomState.creeps.push(creep);
+        if (role === 'harvester') roomState.harvesters.push(creep);
+        if (role === 'upgrader') roomState.upgraders.push(creep);
+        
         if (role && roomState.creepCounts[role] !== undefined) {
             roomState.creepCounts[role]++;
         }

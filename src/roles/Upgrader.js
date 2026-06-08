@@ -20,37 +20,54 @@ const Upgrader = {
                 return;
             }
 
-            // Tigga-style efficiency: pickup from pile while upgrading
-            const secondaryTargetId = creep.heap.secondaryTargetId;
+            // 1. Enforce absolute stasis: Move to range 3, then lock forever.
+            const range = creep.pos.getRangeTo(target);
+            if (range > 3) {
+                creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
+                return; // Do nothing else while walking
+            }
+
+            // 2. We are in position. Fast scan for adjacent containers/drops if we need energy.
             let pickedUp = false;
-            
-            if (secondaryTargetId && creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                const drop = GameObjectUtility.getById(secondaryTargetId);
-                if (drop) {
-                    if (creep.pos.getRangeTo(drop) <= 1) {
-                        creep.pickup(drop);
-                        pickedUp = true;
-                    } else if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
-                        // Empty and pile is out of range, move to pile
-                        creep.moveTo(drop, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
-                        return;
+            if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                const roomState = global.State?.rooms?.get(creep.room.name);
+                if (roomState) {
+                    // Check containers first
+                    if (roomState.containers) {
+                        for (let i = 0; i < roomState.containers.length; i++) {
+                            const c = roomState.containers[i];
+                            if (c.store.getUsedCapacity(RESOURCE_ENERGY) > 0 && 
+                                Math.max(Math.abs(creep.pos.x - c.pos.x), Math.abs(creep.pos.y - c.pos.y)) <= 1) {
+                                creep.withdraw(c, RESOURCE_ENERGY);
+                                pickedUp = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Fallback to dropped energy
+                    if (!pickedUp && roomState.droppedEnergy) {
+                        const drops = roomState.droppedEnergy;
+                        for (let i = 0; i < drops.length; i++) {
+                            const d = drops[i];
+                            if (Math.max(Math.abs(creep.pos.x - d.pos.x), Math.abs(creep.pos.y - d.pos.y)) <= 1) {
+                                creep.pickup(d);
+                                pickedUp = true;
+                                break;
+                            }
+                        }
                     }
                 }
             }
 
-            // Upgrade if we have energy or just picked some up
+            // 3. Upgrade if we have energy or just picked some up
             if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0 || pickedUp) {
                 const result = creep.upgradeController(target);
-                if (result === ERR_NOT_IN_RANGE) {
-                    creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
-                } else if (result !== OK && result !== ERR_NOT_ENOUGH_RESOURCES) {
+                if (result !== OK && result !== ERR_NOT_ENOUGH_RESOURCES) {
                     creep.heap.state = 'idle';
                     creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
                     creep.heap.targetId = null;
                 }
-            } else if (!secondaryTargetId && creep.pos.getRangeTo(target) > 3) {
-                // Empty, no pile nearby, move to controller
-                creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
             }
         }
     }

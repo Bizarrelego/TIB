@@ -44,7 +44,7 @@ class RoleExecutor {
                 continue;
             }
 
-            const roleLogic = roles[creep.memory.role]; // Retrieve role logic
+            const roleLogic = roles[(creep.memory.role || '').toLowerCase()]; // Retrieve role logic
             if (roleLogic) {
                 roleLogic.run(creep); // Execute role logic
             } else {
