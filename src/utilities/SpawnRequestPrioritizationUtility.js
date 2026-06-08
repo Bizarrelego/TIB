@@ -15,6 +15,7 @@ class SpawnRequestPrioritizationUtility {
         }
 
         const rolePriorities = {
+            'bootstrapper': 0, // Fix: Explicitly defined as highest priority.
             'harvester': 1,
             'hauler': 2,
             'upgrader': 3,

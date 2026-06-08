@@ -3,7 +3,7 @@ const GameObjectUtility = require('../utilities/GameObjectUtility');
 
 const Upgrader = {
     run: function (creep) {
-        if (creep.fatigue > 0) return;
+        // Fix: Removed `if (creep.fatigue > 0) return;` which freezes the creep.
         if (!creep.heap) return;
 
         const targetId = creep.heap.targetId;
@@ -39,7 +39,7 @@ const Upgrader = {
             // Out of range routing: move to controller if further than range 3
             if (distToController > 3) {
                 if (!movedToSecondary) creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });
-            } 
+            }
             // Clustering: if exactly at range 3 but empty, move closer to range 2 to tightly cluster for hauler drops
             else if (distToController === 3 && creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
                 if (!movedToSecondary) creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });

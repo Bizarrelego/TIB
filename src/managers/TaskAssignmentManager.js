@@ -1,4 +1,3 @@
-
 const ActionConstants = require('../constants/ActionConstants');
 const CreepHeapUtility = require('../utilities/CreepHeapUtility');
 const WithdrawTargetUtility = require('../utilities/WithdrawTargetUtility');
@@ -26,13 +25,13 @@ function djb2Hash(str) {
 class TaskAssignmentManager {
     static run() {
         if (!global.creepHeap) global.creepHeap = new Map();
-        
+
         const creeps = Object.values(Game.creeps);
-        
+
         for (let i = 0; i < creeps.length; i++) {
             const creep = creeps[i];
             if (creep.spawning) continue;
-            
+
             const roomName = creep.memory.room || creep.memory.colony || creep.room.name;
             const roomState = global.State?.rooms?.get(roomName);
             if (!roomState) continue;
@@ -51,24 +50,29 @@ class TaskAssignmentManager {
 
             if (creep.heap.actionIntent !== ActionConstants.ACTION_IDLE && creep.heap.actionIntent !== null) {
                 TaskAssignmentManager.validateCurrentTask(creep);
-                
+
                 if (creep.heap.actionIntent !== ActionConstants.ACTION_IDLE) {
                     if (creep.heap.actionIntent === ActionConstants.ACTION_UPGRADE) {
                         let foundDrop = null;
                         if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
                             const drops = roomState.droppedEnergy || [];
-                            for (let j = 0; j < drops.length; j++) {
-                                const d = drops[j];
-                                if (Math.max(Math.abs(roomState.controller.pos.x - d.pos.x), Math.abs(roomState.controller.pos.y - d.pos.y)) <= 5) {
-                                    foundDrop = d;
-                                    break;
+                            // Fix: Ensure we have a valid position object to prevent silent crashes
+                            const controllerNode = GameObjectUtility.getById(roomState.controller?.id) || roomState.controller;
+
+                            if (controllerNode && controllerNode.pos) {
+                                for (let j = 0; j < drops.length; j++) {
+                                    const d = drops[j];
+                                    if (Math.max(Math.abs(controllerNode.pos.x - d.pos.x), Math.abs(controllerNode.pos.y - d.pos.y)) <= 5) {
+                                        foundDrop = d;
+                                        break;
+                                    }
                                 }
                             }
                         }
                         creep.heap.secondaryTargetId = foundDrop ? foundDrop.id : null;
                     }
                     TaskAssignmentManager.reregisterClaim(creep);
-                    continue; 
+                    continue;
                 }
             }
 
@@ -117,7 +121,7 @@ class TaskAssignmentManager {
             return;
         }
         const target = GameObjectUtility.getById(creep.heap.targetId);
-        
+
         if (!target) {
             creep.heap.targetId = null;
             creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
@@ -125,14 +129,14 @@ class TaskAssignmentManager {
         }
 
         if (creep.heap.state === 'gather') {
-            if ((target.amount !== undefined && target.amount < 50) || 
+            if ((target.amount !== undefined && target.amount < 50) ||
                 (target.store && target.store.getUsedCapacity(RESOURCE_ENERGY) < 50)) {
                 creep.heap.targetId = null;
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
             }
         } else if (creep.heap.state === 'work') {
-            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0 || 
-               (target.store && target.store.getFreeCapacity(RESOURCE_ENERGY) === 0)) {
+            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0 ||
+                (target.store && target.store.getFreeCapacity(RESOURCE_ENERGY) === 0)) {
                 creep.heap.targetId = null;
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
             }
@@ -231,7 +235,7 @@ class TaskAssignmentManager {
         } else {
             TaskAssignmentManager.assignHaulerWork(creep, roomState);
         }
-    } 
+    }
 
     static assignHaulerWork(creep, roomState) {
         // Priority 1: Fill spawn/extensions
@@ -353,8 +357,8 @@ class TaskAssignmentManager {
             const dy = creep.pos.y - target.pos.y;
             const distance = Math.max(Math.abs(dx), Math.abs(dy)) || 1;
             // Weight by remaining space so haulers prefer emptier targets
-            const score = remainingSpace * 100 / distance; 
-            
+            const score = remainingSpace * 100 / distance;
+
             if (score > bestScore) {
                 bestScore = score;
                 bestTarget = target;
@@ -374,11 +378,6 @@ class TaskAssignmentManager {
         return false;
     }
 
-    /**
-     * Finds the closest available energy source for a creep to gather from.
-     * Used by both upgrader and builder gather phases.
-     * Returns { id, actionIntent } or null if nothing available.
-     */
     static findClosestEnergy(creep, roomState) {
         let bestTarget = null;
         let bestDist = Infinity;

@@ -35,17 +35,19 @@ class SpawnManager {
         const haulerCount = getCount('hauler');
         const bootstrapperCount = getCount('bootstrapper');
 
-        // Total wipe recovery: spawn an all-in-one bootstrapper if no harvesters, haulers, or bootstrappers exist
-        if (harvesterCount === 0 && haulerCount === 0 && bootstrapperCount === 0 && (limits['harvester'] || 0) > 0) {
-            CreepSpawnRequestUtility.requestCreep(roomName, 'bootstrapper', EMERGENCY_BODY);
-            return; 
+        // Fix: Hard block economy queues until at least two bootstrappers exist
+        if (harvesterCount === 0 && haulerCount === 0 && (limits['harvester'] || 0) > 0) {
+            if (bootstrapperCount < 2) {
+                CreepSpawnRequestUtility.requestCreep(roomName, 'bootstrapper', EMERGENCY_BODY);
+                return; // Do not allow harvesters to queue
+            }
         }
 
         // Emergency bootstrap: spawn minimal body harvester when 0 harvesters exist
         if (harvesterCount === 0 && (limits['harvester'] || 0) > 0) {
             const body = energyCapacity >= 300 ? CreepBodyUtility.getBody('harvester', energyCapacity) : EMERGENCY_BODY;
             CreepSpawnRequestUtility.requestCreep(roomName, 'harvester', body);
-            return; 
+            return;
         }
         // Ensure at least 1 hauler before filling other roles
         if (harvesterCount >= 1 && haulerCount === 0 && (limits['hauler'] || 0) > 0) {
@@ -91,7 +93,7 @@ class SpawnManager {
             }
 
             const result = spawn.spawnCreep(request.bodyParts, name, { memory: plainMemory });
-            
+
             // Only remove from queue if the spawn successfully initiated
             if (result === OK) {
                 SpawnQueueUtility.remove(request);
