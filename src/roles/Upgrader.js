@@ -55,12 +55,7 @@ const Upgrader = {
             }
 
             if (result === ERR_NOT_IN_RANGE) {
-                const dropPos = DesignatedDropOffUtility.getUpgraderDropOffPosition(target.id);
-                if (dropPos && (creep.pos.x !== dropPos.x || creep.pos.y !== dropPos.y)) {
-                    if (!movedToSecondary) creep.moveTo(dropPos, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });
-                } else {
-                    if (!movedToSecondary) creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });
-                }
+                if (!movedToSecondary) creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });
             } else if (result === ERR_NOT_ENOUGH_RESOURCES) {
                 // Out of energy — check if container is also empty
                 if (creep.heap.sitTargetId) {
@@ -70,14 +65,13 @@ const Upgrader = {
                         return;
                     }
                 }
-                // No energy anywhere. Route to the drop-off area so we catch hauler deliveries.
-                const dropPos = DesignatedDropOffUtility.getUpgraderDropOffPosition(target.id);
-                if (dropPos && (creep.pos.x !== dropPos.x || creep.pos.y !== dropPos.y)) {
-                    if (!movedToSecondary) creep.moveTo(dropPos, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });
+                // No energy anywhere. Route straight to the controller and cluster around it within range 2.
+                if (creep.pos.getRangeTo(target) > 2) {
+                    if (!movedToSecondary) creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#33ff33' } });
                     return;
                 }
 
-                // If exactly on dropPos, stay there and wait for Hauler.
+                // If within range 2 of controller, stay there and wait for Hauler.
                 // DO NOT go idle. We want to keep intent = UPGRADE so it picks up and upgrades when energy arrives.
             } else if (result === ERR_INVALID_TARGET) {
                 creep.heap.state = 'idle';

@@ -1,6 +1,5 @@
 const ActionConstants = require('../constants/ActionConstants');
 const GameObjectUtility = require('../utilities/GameObjectUtility');
-const DesignatedDropOffUtility = require('../utilities/DesignatedDropOffUtility');
 
 const Hauler = {
     run: function (creep) {
@@ -37,9 +36,8 @@ const Hauler = {
                     return; 
                 }
             } else {
-                const dropPos = DesignatedDropOffUtility.getUpgraderDropOffPosition(targetId);
-                if (dropPos && creep.pos.getRangeTo(dropPos) > 1) {
-                    creep.moveTo(dropPos, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
+                if (creep.pos.getRangeTo(target) > 3) {
+                    creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
                     return; 
                 }
             }

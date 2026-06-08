@@ -53,8 +53,16 @@ class TaskAssignmentManager {
                 
                 if (creep.heap.actionIntent !== ActionConstants.ACTION_IDLE) {
                     if (creep.heap.actionIntent === ActionConstants.ACTION_UPGRADE) {
-                        const drop = roomState.droppedEnergy?.find(d => creep.pos.getRangeTo(d) <= 1);
-                        creep.heap.secondaryTargetId = drop ? drop.id : null;
+                        const drops = roomState.droppedEnergy || [];
+                        let foundDrop = null;
+                        for (let j = 0; j < drops.length; j++) {
+                            const d = drops[j];
+                            if (Math.max(Math.abs(creep.pos.x - d.pos.x), Math.abs(creep.pos.y - d.pos.y)) <= 1) {
+                                foundDrop = d;
+                                break;
+                            }
+                        }
+                        creep.heap.secondaryTargetId = foundDrop ? foundDrop.id : null;
                     }
                     TaskAssignmentManager.reregisterClaim(creep);
                     continue; 
@@ -144,18 +152,14 @@ class TaskAssignmentManager {
         const source = sources[djb2Hash(creep.name) % sources.length];
         creep.heap.targetId = source.id;
         creep.heap.actionIntent = ActionConstants.ACTION_HARVEST;
-
-        // Assign container-sit target if not already assigned
-        if (!creep.heap.sitTargetId && roomState.sourceContainers?.length) {
-            const container = roomState.sourceContainers.find(c => source.pos.inRangeTo(c, 2));
-            if (container) creep.heap.sitTargetId = container.id;
-        }
     }
 
     static assignHauler(creep, roomState) {
         if (creep.heap.state === 'gather') {
             // Priority 1: Scavenge from Ruins and Tombstones
             const scavengeTargets = WithdrawTargetUtility.getScavengeTargets(roomState);
+            let bestScavenge = null;
+            let bestScavengeScore = -1;
 
             for (let i = 0; i < scavengeTargets.length; i++) {
                 const target = scavengeTargets[i];
@@ -164,11 +168,20 @@ class TaskAssignmentManager {
                 const remaining = amount - claimed;
 
                 if (remaining >= Math.min(25, creep.store.getFreeCapacity(RESOURCE_ENERGY))) {
-                    target.__gatherClaimed = claimed + creep.store.getFreeCapacity(RESOURCE_ENERGY);
-                    creep.heap.targetId = target.id;
-                    creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
-                    return;
+                    const dist = Math.max(Math.abs(creep.pos.x - target.pos.x), Math.abs(creep.pos.y - target.pos.y)) || 1;
+                    const score = remaining / dist;
+                    if (score > bestScavengeScore) {
+                        bestScavengeScore = score;
+                        bestScavenge = target;
+                    }
                 }
+            }
+
+            if (bestScavenge) {
+                bestScavenge.__gatherClaimed = (bestScavenge.__gatherClaimed || 0) + creep.store.getFreeCapacity(RESOURCE_ENERGY);
+                creep.heap.targetId = bestScavenge.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
+                return;
             }
 
             // Priority 2: Hashed assignment to specific harvester's drop zone
@@ -177,32 +190,23 @@ class TaskAssignmentManager {
                 // djb2 hash for even distribution across harvesters
                 const targetHarvester = harvesters[djb2Hash(creep.name) % harvesters.length];
 
-                // Find dropped energy or container near this specific harvester
+                // Find dropped energy near this specific harvester using fast Chebyshev distance
                 // Pick highest-amount drop for efficiency
-                const drops = roomState.droppedEnergy?.filter(d => d.pos.getRangeTo(targetHarvester) <= 2) || [];
-                const containers = roomState.sourceContainers?.filter(c => c.pos.getRangeTo(targetHarvester) <= 2) || [];
-
                 let bestTarget = null;
                 let bestAmount = 0;
                 let intent = '';
+                const drops = roomState.droppedEnergy || [];
 
                 for (let i = 0; i < drops.length; i++) {
-                    const claimed = drops[i].__gatherClaimed || 0;
-                    const available = drops[i].amount - claimed;
-                    if (available > bestAmount) {
-                        bestAmount = available;
-                        bestTarget = drops[i];
-                        intent = ActionConstants.ACTION_PICKUP;
-                    }
-                }
-
-                for (let i = 0; i < containers.length; i++) {
-                    const claimed = containers[i].__gatherClaimed || 0;
-                    const available = containers[i].store.getUsedCapacity(RESOURCE_ENERGY) - claimed;
-                    if (available > bestAmount) {
-                        bestAmount = available;
-                        bestTarget = containers[i];
-                        intent = ActionConstants.ACTION_WITHDRAW;
+                    const d = drops[i];
+                    if (Math.max(Math.abs(d.pos.x - targetHarvester.pos.x), Math.abs(d.pos.y - targetHarvester.pos.y)) <= 2) {
+                        const claimed = d.__gatherClaimed || 0;
+                        const available = d.amount - claimed;
+                        if (available > bestAmount) {
+                            bestAmount = available;
+                            bestTarget = d;
+                            intent = ActionConstants.ACTION_PICKUP;
+                        }
                     }
                 }
 
@@ -229,21 +233,8 @@ class TaskAssignmentManager {
         // Priority 1: Fill spawn/extensions
         if (TaskAssignmentManager.routeToStorage(creep, roomState)) return;
 
-        // Priority 2: Fill controller container or drop at controller
+        // Priority 2: Drop at stationary upgrader or controller
         if (roomState.controller) {
-            if (roomState.controllerContainers?.length > 0) {
-                const target = roomState.controllerContainers[0];
-                const claimed = target.__deliveryClaimed || 0;
-                const remainingSpace = target.store.getFreeCapacity(RESOURCE_ENERGY) - claimed;
-                
-                if (remainingSpace > 0) {
-                    target.__deliveryClaimed = claimed + creep.store.getUsedCapacity(RESOURCE_ENERGY);
-                    creep.heap.targetId = target.id;
-                    creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
-                    return;
-                }
-            }
-
             // Find a stationary upgrader to drop energy for
             const upgraders = roomState.creeps?.filter(c => c.my && c.memory.role === 'upgrader') || [];
             if (upgraders.length > 0) {
@@ -260,13 +251,6 @@ class TaskAssignmentManager {
 
     static assignUpgrader(creep, roomState) {
         if (!roomState.controller) return;
-
-        // Assign container-sit if available
-        if (!creep.heap.sitTargetId && roomState.controllerContainers?.length > 0) {
-            // Spread upgraders across containers if multiple exist
-            const idx = djb2Hash(creep.name) % roomState.controllerContainers.length;
-            creep.heap.sitTargetId = roomState.controllerContainers[idx].id;
-        }
 
         // Upgraders are strictly stationary. They route to the controller and stay there.
         creep.heap.targetId = roomState.controller.id;
@@ -410,42 +394,6 @@ class TaskAssignmentManager {
                     bestDist = dist;
                     bestTarget = drop;
                     bestIntent = ActionConstants.ACTION_PICKUP;
-                }
-            }
-        }
-
-        // Check source containers
-        if (roomState.sourceContainers) {
-            for (let i = 0; i < roomState.sourceContainers.length; i++) {
-                const container = roomState.sourceContainers[i];
-                if (container.store.getUsedCapacity(RESOURCE_ENERGY) < 50) continue;
-                const claimed = container.__gatherClaimed || 0;
-                if (container.store.getUsedCapacity(RESOURCE_ENERGY) - claimed < 50) continue;
-                const dx = Math.abs(creep.pos.x - container.pos.x);
-                const dy = Math.abs(creep.pos.y - container.pos.y);
-                const dist = Math.max(dx, dy);
-                if (dist < bestDist) {
-                    bestDist = dist;
-                    bestTarget = container;
-                    bestIntent = ActionConstants.ACTION_WITHDRAW;
-                }
-            }
-        }
-
-        // Check controller containers
-        if (roomState.controllerContainers) {
-            for (let i = 0; i < roomState.controllerContainers.length; i++) {
-                const container = roomState.controllerContainers[i];
-                if (container.store.getUsedCapacity(RESOURCE_ENERGY) < 50) continue;
-                const claimed = container.__gatherClaimed || 0;
-                if (container.store.getUsedCapacity(RESOURCE_ENERGY) - claimed < 50) continue;
-                const dx = Math.abs(creep.pos.x - container.pos.x);
-                const dy = Math.abs(creep.pos.y - container.pos.y);
-                const dist = Math.max(dx, dy);
-                if (dist < bestDist) {
-                    bestDist = dist;
-                    bestTarget = container;
-                    bestIntent = ActionConstants.ACTION_WITHDRAW;
                 }
             }
         }
