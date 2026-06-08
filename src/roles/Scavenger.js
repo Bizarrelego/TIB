@@ -21,16 +21,13 @@ const Scavenger = {
 
         let result;
         if (actionIntent === ActionConstants.ACTION_WITHDRAW) {
-            const resourceType = (target.store && Object.keys(target.store)[0]) || RESOURCE_ENERGY;
-            result = creep.withdraw(target, resourceType);
+            result = creep.withdraw(target, RESOURCE_ENERGY);
         } else if (actionIntent === ActionConstants.ACTION_PICKUP) {
             result = creep.pickup(target);
         } else if (actionIntent === ActionConstants.ACTION_TRANSFER) {
-            const resourceType = (creep.store && Object.keys(creep.store)[0]) || RESOURCE_ENERGY;
-            result = creep.transfer(target, resourceType);
+            result = creep.transfer(target, RESOURCE_ENERGY);
         } else if (actionIntent === ActionConstants.ACTION_DROP) {
-            const resourceType = (creep.store && Object.keys(creep.store)[0]) || RESOURCE_ENERGY;
-            result = creep.drop(resourceType);
+            result = creep.drop(RESOURCE_ENERGY);
         } else {
             creep.heap.state = 'idle';
             creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
