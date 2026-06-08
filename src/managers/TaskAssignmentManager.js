@@ -93,14 +93,19 @@ class TaskAssignmentManager {
         if (creep.heap.state === 'gather' && free === 0) {
             creep.heap.state = 'work';
             creep.heap.targetId = null;
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
         } else if (creep.heap.state === 'work' && used === 0) {
             creep.heap.state = 'gather';
             creep.heap.targetId = null;
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
         }
     }
 
     static validateCurrentTask(creep) {
-        if (!creep.heap.targetId) return;
+        if (!creep.heap.targetId) {
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            return;
+        }
         const target = GameObjectUtility.getById(creep.heap.targetId);
         
         if (!target) {
