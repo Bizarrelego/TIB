@@ -45,21 +45,29 @@ class RoomPlanner {
         const blueprint = {
             anchor: anchor,
             containers: [],
-            roads: []
+            roads: [],
+            ramparts: [],
+            [STRUCTURE_SPAWN]: [],
+            [STRUCTURE_EXTENSION]: [],
+            [STRUCTURE_TOWER]: [],
+            [STRUCTURE_STORAGE]: [],
+            [STRUCTURE_TERMINAL]: [],
+            [STRUCTURE_FACTORY]: [],
+            [STRUCTURE_LAB]: [],
+            [STRUCTURE_OBSERVER]: [],
+            [STRUCTURE_NUKER]: [],
+            [STRUCTURE_POWER_SPAWN]: []
         };
 
-        // 1. Stamp core structures (spawn, extensions, towers, storage, etc.)
-        const stamp = this.applyStamp(anchor, terrain);
-        for (const type in stamp) {
-            blueprint[type] = stamp[type];
-        }
-
-        // 2. Plan containers at sources and controller
+        // 1. Plan containers at sources and controller
         if (state) {
             this.planContainers(blueprint, room, state, terrain);
         }
 
-        // 3. Plan road spines from anchor to key locations
+        // 2. Diamond Bunker Stamp (Core Hub + Lab Cluster + Checkerboard Extensions)
+        this.applyBunkerStamp(blueprint, room, state, terrain, anchor);
+
+        // 3. Plan MST road spines from anchor to key locations
         if (state) {
             this.planRoads(blueprint, room, state, anchor);
         }
@@ -127,92 +135,155 @@ class RoomPlanner {
     }
 
     /**
-     * Applies a full RCL 1-8 stamp centered on anchor.
-     * All positions are validated against terrain — walls are skipped.
-     * Returns an object keyed by structure type with arrays of {x, y}.
+     * Generates a top-tier Diamond Bunker.
+     * Features a stationary Core Linker hub, a tight Lab cluster, and BFS checkerboard extension branches.
      */
-    static applyStamp(anchor, terrain) {
+    static applyBunkerStamp(blueprint, room, state, terrain, anchor) {
         const ax = anchor.x;
         const ay = anchor.y;
 
-        // Full stamp layout — offsets from anchor
-        const layout = {
-            [STRUCTURE_SPAWN]: [
-                {dx: 0, dy: -1},
-                {dx: -3, dy: 0},
-                {dx: 3, dy: 0}
-            ],
-            [STRUCTURE_STORAGE]: [{dx: 0, dy: 1}],
-            [STRUCTURE_TOWER]: [
-                {dx: -1, dy: 0}, {dx: 1, dy: 0},
-                {dx: 0, dy: -2}, {dx: 0, dy: 2},
-                {dx: -2, dy: -2}, {dx: 2, dy: -2}
-            ],
-            [STRUCTURE_TERMINAL]: [{dx: -1, dy: 1}],
-            [STRUCTURE_FACTORY]: [{dx: 1, dy: 1}],
-            [STRUCTURE_EXTENSION]: [
-                // Inner ring (range 1-2) — 8 positions
-                {dx: -1, dy: -1}, {dx: 1, dy: -1},
-                {dx: -1, dy: -2}, {dx: 1, dy: -2},
-                {dx: -2, dy: 0}, {dx: 2, dy: 0},
-                {dx: -1, dy: 2}, {dx: 1, dy: 2},
-                // Middle ring (range 2-3) — 12 positions
-                {dx: -2, dy: -1}, {dx: 2, dy: -1},
-                {dx: -2, dy: 1}, {dx: 2, dy: 1},
-                {dx: -2, dy: -3}, {dx: 2, dy: -3},
-                {dx: -3, dy: -1}, {dx: 3, dy: -1},
-                {dx: -3, dy: 1}, {dx: 3, dy: 1},
-                {dx: -2, dy: 2}, {dx: 2, dy: 2},
-                // Outer ring (range 3-4) — 20 positions
-                {dx: -3, dy: -2}, {dx: 3, dy: -2},
-                {dx: -3, dy: 2}, {dx: 3, dy: 2},
-                {dx: -4, dy: -1}, {dx: 4, dy: -1},
-                {dx: -4, dy: 0}, {dx: 4, dy: 0},
-                {dx: -4, dy: 1}, {dx: 4, dy: 1},
-                {dx: -3, dy: -3}, {dx: 3, dy: -3},
-                {dx: -3, dy: 3}, {dx: 3, dy: 3},
-                {dx: -1, dy: 3}, {dx: 1, dy: 3},
-                {dx: -2, dy: 3}, {dx: 2, dy: 3},
-                {dx: 0, dy: 3}, {dx: 0, dy: -3},
-                // Far ring (range 4-5) — 20 positions
-                {dx: -4, dy: -2}, {dx: 4, dy: -2},
-                {dx: -4, dy: 2}, {dx: 4, dy: 2},
-                {dx: -4, dy: -3}, {dx: 4, dy: -3},
-                {dx: -4, dy: 3}, {dx: 4, dy: 3},
-                {dx: -5, dy: -1}, {dx: 5, dy: -1},
-                {dx: -5, dy: 0}, {dx: 5, dy: 0},
-                {dx: -5, dy: 1}, {dx: 5, dy: 1},
-                {dx: -1, dy: 4}, {dx: 1, dy: 4},
-                {dx: -2, dy: 4}, {dx: 2, dy: 4},
-                {dx: 0, dy: 4}, {dx: 0, dy: -4}
-            ],
-            [STRUCTURE_LAB]: [
-                {dx: -1, dy: -3}, {dx: 1, dy: -3},
-                {dx: -2, dy: -2}, {dx: 2, dy: -2},
-                {dx: -1, dy: -4}, {dx: 1, dy: -4},
-                {dx: -2, dy: -4}, {dx: 2, dy: -4},
-                {dx: 0, dy: -4}, {dx: 0, dy: -5}
-            ]
+        const needed = {
+            [STRUCTURE_SPAWN]: 3,
+            [STRUCTURE_STORAGE]: 1,
+            [STRUCTURE_TERMINAL]: 1,
+            [STRUCTURE_FACTORY]: 1,
+            [STRUCTURE_TOWER]: 6,
+            [STRUCTURE_LAB]: 10,
+            [STRUCTURE_OBSERVER]: 1,
+            [STRUCTURE_NUKER]: 1,
+            [STRUCTURE_POWER_SPAWN]: 1,
+            [STRUCTURE_EXTENSION]: 60
         };
 
-        const result = {};
-        for (const structureType in layout) {
-            const positions = [];
-            const offsets = layout[structureType];
-            for (let i = 0; i < offsets.length; i++) {
-                const x = ax + offsets[i].dx;
-                const y = ay + offsets[i].dy;
-                // Validate: in bounds, not on wall, not on border
-                if (x >= 2 && x <= 47 && y >= 2 && y <= 47) {
-                    if (terrain.get(x, y) !== TERRAIN_MASK_WALL) {
-                        positions.push({ x, y });
+        const visited = new Set();
+
+        // 1. Central Hub (3x3)
+        // The Hub Manager stands at (ax, ay)
+        const coreStructures = [
+            { type: 'roads', dx: 0, dy: 0 },
+            { type: STRUCTURE_STORAGE, dx: 0, dy: -1 },
+            { type: STRUCTURE_TERMINAL, dx: 0, dy: 1 },
+            { type: STRUCTURE_FACTORY, dx: -1, dy: 0 },
+            { type: STRUCTURE_SPAWN, dx: 1, dy: 0 },
+            { type: STRUCTURE_TOWER, dx: -1, dy: -1 },
+            { type: STRUCTURE_TOWER, dx: 1, dy: -1 },
+            { type: STRUCTURE_TOWER, dx: -1, dy: 1 },
+            { type: STRUCTURE_TOWER, dx: 1, dy: 1 }
+        ];
+
+        for (let i = 0; i < coreStructures.length; i++) {
+            const item = coreStructures[i];
+            const x = ax + item.dx;
+            const y = ay + item.dy;
+            if (terrain.get(x, y) !== TERRAIN_MASK_WALL) {
+                if (item.type === 'roads') blueprint.roads.push({x, y});
+                else {
+                    blueprint[item.type].push({x, y});
+                    needed[item.type]--;
+                }
+                visited.add(`${x},${y}`);
+            }
+        }
+
+        // 2. Lab Cluster (Bottom Right Quadrant)
+        const labOffsets = [
+            {dx: 2, dy: 2}, {dx: 3, dy: 2}, {dx: 4, dy: 2},
+            {dx: 2, dy: 3}, {dx: 3, dy: 3}, {dx: 4, dy: 3},
+            {dx: 2, dy: 4}, {dx: 3, dy: 4}, {dx: 4, dy: 4},
+            {dx: 3, dy: 5}
+        ];
+        
+        for (let i = 0; i < labOffsets.length; i++) {
+            const x = ax + labOffsets[i].dx;
+            const y = ay + labOffsets[i].dy;
+            if (terrain.get(x, y) !== TERRAIN_MASK_WALL) {
+                blueprint[STRUCTURE_LAB].push({x, y});
+                needed[STRUCTURE_LAB]--;
+                visited.add(`${x},${y}`);
+            }
+        }
+
+        // 3. Dynamic Checkerboard Expansion for remaining structures
+        const queue = [{x: ax, y: ay}];
+        
+        const priorityOrder = [
+            STRUCTURE_SPAWN,
+            STRUCTURE_TOWER,
+            STRUCTURE_POWER_SPAWN,
+            STRUCTURE_NUKER,
+            STRUCTURE_OBSERVER,
+            STRUCTURE_EXTENSION
+        ];
+
+        let currentTypeIndex = 0;
+        const structureParity = (ax + ay) % 2;
+
+        while (queue.length > 0 && currentTypeIndex < priorityOrder.length) {
+            queue.sort((a, b) => {
+                const distA = Math.max(Math.abs(a.x - ax), Math.abs(a.y - ay));
+                const distB = Math.max(Math.abs(b.x - ax), Math.abs(b.y - ay));
+                if (distA !== distB) return distA - distB;
+                const eucA = (a.x - ax)**2 + (a.y - ay)**2;
+                const eucB = (b.x - ax)**2 + (b.y - ay)**2;
+                return eucA - eucB;
+            });
+
+            const current = queue.shift();
+            
+            // Only place if it wasn't pre-filled by Core/Labs
+            const key = `${current.x},${current.y}`;
+            if (!visited.has(key)) {
+                visited.add(key);
+                const typeToPlace = priorityOrder[currentTypeIndex];
+                const parity = (current.x + current.y) % 2;
+
+                if (parity === structureParity) {
+                    blueprint[typeToPlace].push({x: current.x, y: current.y});
+                    needed[typeToPlace]--;
+
+                    if (needed[typeToPlace] <= 0) {
+                        currentTypeIndex++;
+                        // Fast forward to next needed structure
+                        while(currentTypeIndex < priorityOrder.length && needed[priorityOrder[currentTypeIndex]] <= 0) {
+                            currentTypeIndex++;
+                        }
+                    }
+                } else {
+                    blueprint.roads.push({x: current.x, y: current.y});
+                }
+            }
+
+            const neighbors = [
+                {x: current.x, y: current.y - 1}, {x: current.x + 1, y: current.y},
+                {x: current.x, y: current.y + 1}, {x: current.x - 1, y: current.y}
+            ];
+
+            for (let i = 0; i < neighbors.length; i++) {
+                const nx = neighbors[i].x;
+                const ny = neighbors[i].y;
+
+                if (nx >= 2 && nx <= 47 && ny >= 2 && ny <= 47) {
+                    const nKey = `${nx},${ny}`;
+                    if (!visited.has(nKey) && !queue.some(q => q.x === nx && q.y === ny)) {
+                        if (terrain.get(nx, ny) !== TERRAIN_MASK_WALL) {
+                            let tooClose = false;
+                            if (state) {
+                                if (state.sources) {
+                                    for (let s of state.sources) {
+                                        if (Math.max(Math.abs(nx - s.pos.x), Math.abs(ny - s.pos.y)) <= 2) tooClose = true;
+                                    }
+                                }
+                                if (state.controller && Math.max(Math.abs(nx - state.controller.pos.x), Math.abs(ny - state.controller.pos.y)) <= 2) tooClose = true;
+                                if (state.mineral && Math.max(Math.abs(nx - state.mineral.pos.x), Math.abs(ny - state.mineral.pos.y)) <= 2) tooClose = true;
+                            }
+                            if (!tooClose) {
+                                queue.push({x: nx, y: ny});
+                            }
+                        }
                     }
                 }
             }
-            result[structureType] = positions;
         }
-
-        return result;
     }
 
     // ─── Container Planning ─────────────────────────────────────────────
@@ -310,6 +381,12 @@ class RoomPlanner {
 
         // Persistent cost matrix for MST merging
         const costs = new PathFinder.CostMatrix();
+
+        // Seed the matrix with the base roads (cost 1) so the MST hooks into them
+        for (let i = 0; i < blueprint.roads.length; i++) {
+            const pos = blueprint.roads[i];
+            costs.set(pos.x, pos.y, 1);
+        }
 
         // Protect base structures (don't route roads through them)
         const structureTypes = [STRUCTURE_SPAWN, STRUCTURE_EXTENSION, STRUCTURE_TOWER, STRUCTURE_STORAGE, STRUCTURE_TERMINAL, STRUCTURE_FACTORY, STRUCTURE_LAB];
