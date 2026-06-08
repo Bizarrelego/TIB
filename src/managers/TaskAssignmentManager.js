@@ -111,13 +111,13 @@ class TaskAssignmentManager {
 
         if (creep.heap.state === 'gather') {
             if ((target.amount !== undefined && target.amount < 50) ||
-                (target.store && target.store.getUsedCapacity(RESOURCE_ENERGY) < 50)) {
+                (target.store && target.store.getUsedCapacity() < 50)) {
                 creep.heap.targetId = null;
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
             }
         } else if (creep.heap.state === 'work') {
-            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0 ||
-                (target.store && target.store.getFreeCapacity(RESOURCE_ENERGY) === 0)) {
+            if (creep.store.getUsedCapacity() === 0 ||
+                (target.store && target.store.getFreeCapacity() === 0)) {
                 creep.heap.targetId = null;
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
             }
@@ -126,6 +126,8 @@ class TaskAssignmentManager {
 
     static assignTask(creep, roomState) {
         const role = (creep.memory.role || '').toLowerCase();
+        // Military creeps are managed exclusively by MilitaryManager — skip to prevent heap overwrite
+        if (role === 'meleecreep' || role === 'rangercreep' || role === 'mediccreep') return;
         if (role === 'harvester') TaskAssignmentManager.assignHarvester(creep, roomState);
         else if (role === 'hauler') TaskAssignmentManager.assignHauler(creep, roomState);
         else if (role === 'builder') TaskAssignmentManager.assignBuilder(creep, roomState);
@@ -168,7 +170,11 @@ class TaskAssignmentManager {
             }
         }
 
-        // Priority 3: Idle
+        // Priority 3: Park near spawn when idle
+        if (homeState.spawns && homeState.spawns.length > 0) {
+            const spawn = homeState.spawns[0];
+            creep.heap.waypointPos = { x: spawn.pos.x + 4, y: spawn.pos.y, roomName: creep.memory.colony };
+        }
         creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
     }
 
@@ -248,6 +254,11 @@ class TaskAssignmentManager {
                     creep.heap.actionIntent = ActionConstants.ACTION_REPAIR;
                 }
             } else {
+                // No repair targets — park at a safe idle position near spawn
+                if (homeState.spawns && homeState.spawns.length > 0) {
+                    const spawn = homeState.spawns[0];
+                    creep.heap.waypointPos = { x: spawn.pos.x + 4, y: spawn.pos.y + 2, roomName: creep.memory.colony };
+                }
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
             }
         }
@@ -813,6 +824,32 @@ class TaskAssignmentManager {
 
     static assignUpgrader(creep, roomState) {
         if (!roomState.controller) return;
+
+        // If the upgrader needs energy, issue a gather intent first
+        if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+            // Priority 1: Withdraw from controller container
+            if (roomState.controllerContainers && roomState.controllerContainers.length > 0) {
+                const c = roomState.controllerContainers[0];
+                if (c.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    creep.heap.targetId = c.id;
+                    creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
+                    return;
+                }
+            }
+            // Priority 2: Pickup adjacent dropped energy
+            if (roomState.droppedEnergy && roomState.droppedEnergy.length > 0) {
+                for (let i = 0; i < roomState.droppedEnergy.length; i++) {
+                    const d = roomState.droppedEnergy[i];
+                    if (Math.max(Math.abs(creep.pos.x - d.pos.x), Math.abs(creep.pos.y - d.pos.y)) <= 3) {
+                        creep.heap.targetId = d.id;
+                        creep.heap.actionIntent = ActionConstants.ACTION_PICKUP;
+                        return;
+                    }
+                }
+            }
+        }
+
+        // Issue upgrade intent — Upgrader.js will handle movement
         creep.heap.targetId = roomState.controller.id;
         creep.heap.actionIntent = ActionConstants.ACTION_UPGRADE;
     }

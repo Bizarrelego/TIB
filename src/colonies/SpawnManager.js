@@ -36,9 +36,19 @@ class SpawnManager {
         const haulerCount = getCount('hauler');
         const bootstrapperCount = getCount('bootstrapper');
 
+        // Total colony collapse: use raw Game.creeps count (not ghost census) to prevent spawning too many
+        const rawBootstrapperCount = Object.values(Game.creeps).filter(c => c.memory.colony === roomName && c.memory.role === 'bootstrapper').length;
+
+        // Emergency Protocol: If ALL economy roles are gone, kickstart with minimal bootstrappers
+        if (harvesterCount === 0 && haulerCount === 0 && bootstrapperCount === 0 && rawBootstrapperCount === 0) {
+            CreepSpawnRequestUtility.requestCreep(roomName, 'bootstrapper', EMERGENCY_BODY);
+            return;
+        }
+
         // Fix: Hard block economy queues until at least two bootstrappers exist
         if (harvesterCount === 0 && haulerCount === 0 && (limits['harvester'] || 0) > 0) {
-            if (bootstrapperCount < 2) {
+            // Hard-cap at 2 using the RAW count to prevent TTL ghosting from over-spawning
+            if (rawBootstrapperCount < 2) {
                 CreepSpawnRequestUtility.requestCreep(roomName, 'bootstrapper', EMERGENCY_BODY);
                 return; // Do not allow harvesters to queue
             }

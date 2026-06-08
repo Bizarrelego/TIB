@@ -21,7 +21,13 @@ const Filler = {
         }
 
         let result;
-        if (actionIntent === ActionConstants.ACTION_WITHDRAW) {
+        if (actionIntent === ActionConstants.ACTION_MOVE_ROOM) {
+            const targetRoom = creep.memory.targetRoom;
+            if (targetRoom && creep.room.name !== targetRoom) {
+                creep.moveTo(new RoomPosition(25, 25, targetRoom), { reusePath: 20 });
+            }
+            return;
+        } else if (actionIntent === ActionConstants.ACTION_WITHDRAW) {
             const resourceType = (target.store && Object.keys(target.store)[0]) || RESOURCE_ENERGY;
             result = creep.withdraw(target, resourceType);
         } else if (actionIntent === ActionConstants.ACTION_TRANSFER) {

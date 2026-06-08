@@ -250,23 +250,30 @@ class MilitaryManager {
     // ─────────────────────────────────────────────────────────────────────────────
 
     static assignPatrol(creep, homeState, colony) {
-        // Ensure patrol waypoints exist in memory
-        if (!Memory.rooms[colony]) Memory.rooms[colony] = {};
-        if (!Memory.rooms[colony].patrolWaypoints || Memory.rooms[colony].patrolWaypoints.length === 0) {
-            // Default to 2 waypoints: near spawn and near controller
-            const spawn = homeState.spawns && homeState.spawns[0];
-            const controller = homeState.controller;
-            if (!spawn || !controller) {
-                creep.heap.state = 'idle';
-                return;
+        // Cache waypoints in global.State to avoid per-tick Memory reads/writes
+        if (!global.State.patrolWaypoints) global.State.patrolWaypoints = {};
+
+        if (!global.State.patrolWaypoints[colony]) {
+            // First: try to load from persistent Memory if user has set custom waypoints
+            const mem = Memory.rooms[colony];
+            if (mem && mem.patrolWaypoints && mem.patrolWaypoints.length > 0) {
+                global.State.patrolWaypoints[colony] = mem.patrolWaypoints;
+            } else {
+                // Default: 2 waypoints — near spawn and near controller
+                const spawn = homeState.spawns && homeState.spawns[0];
+                const controller = homeState.controller;
+                if (!spawn || !controller) {
+                    creep.heap.state = 'idle';
+                    return;
+                }
+                global.State.patrolWaypoints[colony] = [
+                    { x: spawn.pos.x, y: spawn.pos.y, roomName: colony },
+                    { x: controller.pos.x, y: controller.pos.y, roomName: colony }
+                ];
             }
-            Memory.rooms[colony].patrolWaypoints = [
-                { x: spawn.pos.x, y: spawn.pos.y, roomName: colony },
-                { x: controller.pos.x, y: controller.pos.y, roomName: colony }
-            ];
         }
 
-        const waypoints = Memory.rooms[colony].patrolWaypoints;
+        const waypoints = global.State.patrolWaypoints[colony];
         if (!creep.heap.waypointIndex) creep.heap.waypointIndex = 0;
 
         const wp = waypoints[creep.heap.waypointIndex % waypoints.length];

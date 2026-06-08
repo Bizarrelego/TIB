@@ -25,10 +25,10 @@ class TowerManager {
             const room = Game.rooms[roomName];
             if (!room) return;
 
-            // 2. Healing: Heal any damaged friendly creeps
-            const myCreeps = room.find(FIND_MY_CREEPS, { filter: c => c.hits < c.hitsMax });
-            if (myCreeps.length > 0) {
-                const target = myCreeps[0];
+            // 2. Healing: Heal any damaged friendly creeps (from global state, no room.find)
+            const damagedCreeps = roomState.creeps ? roomState.creeps.filter(c => c.my && c.hits < c.hitsMax) : [];
+            if (damagedCreeps.length > 0) {
+                const target = damagedCreeps[0];
                 for (let i = 0; i < towers.length; i++) {
                     towers[i].heal(target);
                 }
@@ -41,24 +41,11 @@ class TowerManager {
                 // Only repair if energy is > 50% to reserve for defense
                 if (tower.store.getUsedCapacity(RESOURCE_ENERGY) < 500) continue;
 
-                // Scale rampart repair target by RCL
-                const rcl = room.controller ? room.controller.level : 1;
-                const rampartTargetHits = rcl * 50000;
-
-                const structures = room.find(FIND_STRUCTURES, {
-                    filter: (s) => {
-                        if (s.structureType === STRUCTURE_RAMPART || s.structureType === STRUCTURE_WALL) {
-                            return s.hits < rampartTargetHits;
-                        }
-                        return s.hits < s.hitsMax * 0.5; // Repair other structures if below 50%
-                    }
-                });
-
-                if (structures.length > 0) {
-                    // Find lowest hit structure
-                    let target = structures[0];
-                    for(let j=1; j<structures.length; j++){
-                        if (structures[j].hits < target.hits) target = structures[j];
+                if (roomState.repairTargets && roomState.repairTargets.length > 0) {
+                    // Find lowest hit structure from pre-scanned repair targets
+                    let target = roomState.repairTargets[0];
+                    for (let j = 1; j < roomState.repairTargets.length; j++) {
+                        if (roomState.repairTargets[j].hits < target.hits) target = roomState.repairTargets[j];
                     }
                     tower.repair(target);
                 }

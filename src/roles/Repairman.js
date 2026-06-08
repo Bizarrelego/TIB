@@ -10,30 +10,12 @@ const Repairman = {
         const actionIntent = creep.heap.actionIntent;
 
         if (!targetId || !actionIntent || actionIntent === ActionConstants.ACTION_IDLE) {
-            // Smart Parking: Find an off-road spot away from spawn to avoid blocking
-            if (global.State && global.State.rooms && global.State.rooms.has(creep.room.name)) {
-                const roomState = global.State.rooms.get(creep.room.name);
-                if (roomState.spawns && roomState.spawns.length > 0) {
-                    const spawn = roomState.spawns[0];
-                    if (creep.pos.getRangeTo(spawn) < 4) {
-                        const result = PathFinder.search(creep.pos, { pos: spawn.pos, range: 4 }, {
-                            flee: true,
-                            roomCallback: function(roomName) {
-                                let costs = new PathFinder.CostMatrix;
-                                const blueprint = global.Cache?.blueprints?.[roomName];
-                                if (blueprint && blueprint.roads) {
-                                    // Make roads high cost to encourage stepping off them
-                                    for (let i = 0; i < blueprint.roads.length; i++) {
-                                        costs.set(blueprint.roads[i].x, blueprint.roads[i].y, 10);
-                                    }
-                                }
-                                return costs;
-                            }
-                        });
-                        if (result.path && result.path.length > 0) {
-                            creep.moveByPath(result.path);
-                        }
-                    }
+            // Parking: Brain writes waypointPos, we just moveTo it
+            const wp = creep.heap.waypointPos;
+            if (wp) {
+                const dest = new RoomPosition(wp.x, wp.y, wp.roomName);
+                if (creep.pos.getRangeTo(dest) > 1) {
+                    creep.moveTo(dest, { reusePath: 20, visualizePathStyle: { stroke: '#888888', opacity: 0.3 } });
                 }
             }
             return;
