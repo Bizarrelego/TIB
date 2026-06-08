@@ -58,6 +58,9 @@ module.exports.loop = function () {
     // 7. Intent Execution
     ErrorHandlingUtility.wrap(() => RoleExecutor.run(), 'RoleExecutor')();
 
+    // 8. Visualizer
+    ErrorHandlingUtility.wrap(() => RoomPlanner.visualize(), 'Visualizer')();
+
     // Profiler Reporting
     ProfilerUtility.report();
 

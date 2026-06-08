@@ -13,13 +13,13 @@ class RoleCensusLimitUtility {
     static get CENSUS_BY_RCL() {
         return {
             1: { harvester: 2, hauler: 4, upgrader: 3, builder: 0 },
-            2: { harvester: 2, hauler: 5, upgrader: 4, builder: 3 },
-            3: { harvester: 2, hauler: 6, upgrader: 5, builder: 3 },
-            4: { harvester: 2, hauler: 4, upgrader: 4, builder: 1 },
-            5: { harvester: 2, hauler: 4, upgrader: 4, builder: 1 },
-            6: { harvester: 2, hauler: 4, upgrader: 4, builder: 1 },
-            7: { harvester: 2, hauler: 4, upgrader: 4, builder: 1 },
-            8: { harvester: 2, hauler: 3, upgrader: 1, builder: 1 }
+            2: { harvester: 2, hauler: 4, upgrader: 4, builder: 3 },
+            3: { harvester: 2, hauler: 3, upgrader: 5, builder: 3 }, // Haulers are big now, need fewer
+            4: { harvester: 2, hauler: 2, upgrader: 4, builder: 2 }, // T4 bodies are massive
+            5: { harvester: 2, hauler: 2, upgrader: 4, builder: 2 },
+            6: { harvester: 2, hauler: 2, upgrader: 4, builder: 2 },
+            7: { harvester: 2, hauler: 2, upgrader: 3, builder: 1 },
+            8: { harvester: 2, hauler: 2, upgrader: 1, builder: 1 }  // RCL 8 only needs 1 upgrader (15 e/t max)
         };
     }
 

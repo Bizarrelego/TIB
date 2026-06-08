@@ -161,6 +161,17 @@ class TaskAssignmentManager {
 
         creep.heap.targetId = bestSource.id;
         creep.heap.actionIntent = ActionConstants.ACTION_HARVEST;
+
+        // Assign sitTargetId if a container exists for this source
+        if (roomState.sourceContainers) {
+            for (let i = 0; i < roomState.sourceContainers.length; i++) {
+                const c = roomState.sourceContainers[i];
+                if (c.pos.getRangeTo(bestSource) <= 2) {
+                    creep.heap.sitTargetId = c.id;
+                    break;
+                }
+            }
+        }
     }
 
     static assignHauler(creep, roomState) {

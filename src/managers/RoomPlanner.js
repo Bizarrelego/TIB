@@ -238,7 +238,7 @@ class RoomPlanner {
 
         // Controller container
         if (state.controller) {
-            const bestTile = this.findBestAdjacentTile(state.controller.pos, spawnPos, terrain, room.name, 3);
+            const bestTile = this.findBestAdjacentTile(state.controller.pos, spawnPos, terrain, room.name, 2);
             if (bestTile) {
                 blueprint.containers.push(bestTile);
             }
@@ -295,24 +295,59 @@ class RoomPlanner {
         if (state.controller && blueprint.containers.length <= (state.sources?.length || 0)) {
             targets.push({ x: state.controller.pos.x, y: state.controller.pos.y });
         }
+        
+        // Road to mineral
+        if (state.mineral) {
+            targets.push({ x: state.mineral.pos.x, y: state.mineral.pos.y });
+        }
+
+        // Sort targets by distance to anchor so we build the trunk first
+        targets.sort((a, b) => {
+            const distA = Math.max(Math.abs(a.x - anchor.x), Math.abs(a.y - anchor.y));
+            const distB = Math.max(Math.abs(b.x - anchor.x), Math.abs(b.y - anchor.y));
+            return distA - distB;
+        });
+
+        // Persistent cost matrix for MST merging
+        const costs = new PathFinder.CostMatrix();
+
+        // Protect base structures (don't route roads through them)
+        const structureTypes = [STRUCTURE_SPAWN, STRUCTURE_EXTENSION, STRUCTURE_TOWER, STRUCTURE_STORAGE, STRUCTURE_TERMINAL, STRUCTURE_FACTORY, STRUCTURE_LAB];
+        for (let i = 0; i < structureTypes.length; i++) {
+            const type = structureTypes[i];
+            if (blueprint[type]) {
+                for (let j = 0; j < blueprint[type].length; j++) {
+                    const pos = blueprint[type][j];
+                    costs.set(pos.x, pos.y, 255);
+                }
+            }
+        }
 
         for (let i = 0; i < targets.length; i++) {
             const targetPos = new RoomPosition(targets[i].x, targets[i].y, room.name);
-            const path = room.findPath(anchorPos, targetPos, {
-                ignoreCreeps: true,
-                ignoreDestructibleStructures: true,
-                swampCost: 2,
-                maxOps: 2000
-            });
+            
+            const ret = PathFinder.search(
+                anchorPos,
+                { pos: targetPos, range: 1 },
+                {
+                    plainCost: 2,
+                    swampCost: 3, // Prevent extreme detours, but prefer plains
+                    roomCallback: function(roomName) {
+                        if (roomName === room.name) return costs;
+                        return false;
+                    },
+                    maxOps: 4000
+                }
+            );
 
-            for (let j = 0; j < path.length; j++) {
-                const step = path[j];
+            for (let j = 0; j < ret.path.length; j++) {
+                const step = ret.path[j];
                 // Don't place roads on border tiles
                 if (step.x >= 2 && step.x <= 47 && step.y >= 2 && step.y <= 47) {
-                    // Avoid duplicates
-                    const exists = blueprint.roads.some(r => r.x === step.x && r.y === step.y);
-                    if (!exists) {
+                    // Only add if not already a road
+                    if (costs.get(step.x, step.y) !== 1) {
                         blueprint.roads.push({ x: step.x, y: step.y });
+                        costs.set(step.x, step.y, 1); // Set cost to 1 to attract future paths (MST)
                     }
                 }
             }
@@ -527,6 +562,64 @@ class RoomPlanner {
             }
         }
         return placed;
+    }
+
+    // ─── Blueprint Visualizer ───────────────────────────────────────────
+
+    /**
+     * Renders the cached blueprint for all rooms.
+     * Extremely lightweight; does zero pathfinding or state computation.
+     */
+    static visualize() {
+        if (!global.Cache || !global.Cache.blueprints) return;
+
+        for (const [roomName, blueprint] of global.Cache.blueprints.entries()) {
+            const visual = new RoomVisual(roomName);
+
+            // Draw Roads
+            if (blueprint.roads) {
+                for (let i = 0; i < blueprint.roads.length; i++) {
+                    const pos = blueprint.roads[i];
+                    visual.circle(pos.x, pos.y, { radius: 0.15, fill: '#aaaaaa', opacity: 0.5 });
+                }
+            }
+
+            // Draw Base Structures
+            const colors = {
+                [STRUCTURE_SPAWN]: '#ffaa00',
+                [STRUCTURE_EXTENSION]: '#ffff00',
+                [STRUCTURE_TOWER]: '#ff0000',
+                [STRUCTURE_STORAGE]: '#00ff00',
+                [STRUCTURE_TERMINAL]: '#00ffff',
+                [STRUCTURE_LAB]: '#ff00ff',
+                [STRUCTURE_FACTORY]: '#ff8800'
+            };
+
+            for (const type in colors) {
+                if (blueprint[type]) {
+                    for (let i = 0; i < blueprint[type].length; i++) {
+                        const pos = blueprint[type][i];
+                        visual.rect(pos.x - 0.35, pos.y - 0.35, 0.7, 0.7, { fill: colors[type], opacity: 0.4 });
+                    }
+                }
+            }
+
+            // Draw Containers
+            if (blueprint.containers) {
+                for (let i = 0; i < blueprint.containers.length; i++) {
+                    const pos = blueprint.containers[i];
+                    visual.rect(pos.x - 0.3, pos.y - 0.3, 0.6, 0.6, { fill: '#ffffff', opacity: 0.5 });
+                }
+            }
+
+            // Draw Ramparts
+            if (blueprint.ramparts) {
+                for (let i = 0; i < blueprint.ramparts.length; i++) {
+                    const pos = blueprint.ramparts[i];
+                    visual.rect(pos.x - 0.45, pos.y - 0.45, 0.9, 0.9, { fill: 'transparent', opacity: 0.3, stroke: '#00ff00', strokeWidth: 0.1 });
+                }
+            }
+        }
     }
 }
 

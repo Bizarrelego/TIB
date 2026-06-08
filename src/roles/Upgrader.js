@@ -20,23 +20,39 @@ const Upgrader = {
                 return;
             }
 
-            // 1. Enforce absolute stasis: Move to range 3, then lock forever.
-            const range = creep.pos.getRangeTo(target);
-            if (range > 3) {
-                creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
-                return; // Do nothing else while walking
+            const roomState = global.State?.rooms?.get(creep.room.name);
+            let container = null;
+            if (roomState && roomState.controllerContainers && roomState.controllerContainers.length > 0) {
+                container = roomState.controllerContainers[0];
+            }
+
+            // 1. Position around container if one exists, otherwise around controller
+            if (container) {
+                if (creep.pos.getRangeTo(container) > 1) {
+                    creep.moveTo(container, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
+                    return;
+                }
+            } else {
+                const range = creep.pos.getRangeTo(target);
+                if (range > 3) {
+                    creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
+                    return; // Do nothing else while walking
+                }
             }
 
             // 2. We are in position. Fast scan for adjacent containers/drops if we need energy.
             let pickedUp = false;
             if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                const roomState = global.State?.rooms?.get(creep.room.name);
-                if (roomState) {
-                    // Check containers first
+                if (container && container.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    creep.withdraw(container, RESOURCE_ENERGY);
+                    pickedUp = true;
+                } else if (roomState) {
+                    // Check other containers first (e.g. if multiple exist)
                     if (roomState.containers) {
                         for (let i = 0; i < roomState.containers.length; i++) {
                             const c = roomState.containers[i];
-                            if (c.store.getUsedCapacity(RESOURCE_ENERGY) > 0 && 
+                            if (c.id !== (container ? container.id : null) && 
+                                c.store.getUsedCapacity(RESOURCE_ENERGY) > 0 && 
                                 Math.max(Math.abs(creep.pos.x - c.pos.x), Math.abs(creep.pos.y - c.pos.y)) <= 1) {
                                 creep.withdraw(c, RESOURCE_ENERGY);
                                 pickedUp = true;
