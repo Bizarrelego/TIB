@@ -147,7 +147,6 @@ class TaskAssignmentManager {
         const role = creep.memory.role;
         if (role === 'harvester') TaskAssignmentManager.assignHarvester(creep, roomState);
         else if (role === 'hauler') TaskAssignmentManager.assignHauler(creep, roomState);
-        else if (role === 'upgrader') TaskAssignmentManager.assignUpgrader(creep, roomState);
         else if (role === 'builder') TaskAssignmentManager.assignBuilder(creep, roomState);
         else if (role === 'bootstrapper') TaskAssignmentManager.assignBootstrapper(creep, roomState);
     }
@@ -255,14 +254,6 @@ class TaskAssignmentManager {
             creep.heap.targetId = roomState.controller.id;
             creep.heap.actionIntent = ActionConstants.ACTION_DROP;
         }
-    }
-
-    static assignUpgrader(creep, roomState) {
-        if (!roomState.controller) return;
-
-        // Upgraders are strictly stationary. They route to the controller and stay there.
-        creep.heap.targetId = roomState.controller.id;
-        creep.heap.actionIntent = ActionConstants.ACTION_UPGRADE;
     }
 
     static assignBuilder(creep, roomState) {
