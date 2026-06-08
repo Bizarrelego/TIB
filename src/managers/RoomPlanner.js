@@ -71,11 +71,11 @@ class RoomPlanner {
         // Step 1: Anchor — must land on road parity (ax+ay)%2===0
         let anchor = this.findAnchor(room, terrain);
         if ((anchor.x + anchor.y) % 2 !== 0) {
-            const dirs = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
+            const dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
             for (let i = 0; i < dirs.length; i++) {
                 const nx = anchor.x + dirs[i].x, ny = anchor.y + dirs[i].y;
                 if (nx >= 3 && nx <= 46 && ny >= 3 && ny <= 46 && terrain.get(nx, ny) !== TERRAIN_MASK_WALL) {
-                    anchor = {x: nx, y: ny}; break;
+                    anchor = { x: nx, y: ny }; break;
                 }
             }
         }
@@ -107,6 +107,9 @@ class RoomPlanner {
         // Step 9: Outpost ramparts for external resources
         if (state) this.addOutpostRamparts(blueprint, terrain, state);
 
+        // Step 10: Rampart roads for defender mobility
+        this.addRampartRoads(blueprint);
+
         global.Cache.blueprints.set(room.name, blueprint);
     }
 
@@ -122,17 +125,17 @@ class RoomPlanner {
         for (let x = 1; x < 49; x++) {
             for (let y = 1; y < 49; y++) {
                 if (dt.get(x, y) > 0) {
-                    dt.set(x, y, Math.min(dt.get(x-1,y), dt.get(x,y-1), dt.get(x-1,y-1), dt.get(x+1,y-1)) + 1);
+                    dt.set(x, y, Math.min(dt.get(x - 1, y), dt.get(x, y - 1), dt.get(x - 1, y - 1), dt.get(x + 1, y - 1)) + 1);
                 }
             }
         }
-        let maxVal = 0, anchor = {x: 25, y: 25};
+        let maxVal = 0, anchor = { x: 25, y: 25 };
         for (let x = 48; x >= 1; x--) {
             for (let y = 48; y >= 1; y--) {
                 if (dt.get(x, y) > 0) {
-                    const val = Math.min(dt.get(x, y), Math.min(dt.get(x+1,y), dt.get(x,y+1), dt.get(x+1,y+1), dt.get(x-1,y+1)) + 1);
+                    const val = Math.min(dt.get(x, y), Math.min(dt.get(x + 1, y), dt.get(x, y + 1), dt.get(x + 1, y + 1), dt.get(x - 1, y + 1)) + 1);
                     dt.set(x, y, val);
-                    if (val > maxVal) { maxVal = val; anchor = {x, y}; }
+                    if (val > maxVal) { maxVal = val; anchor = { x, y }; }
                 }
             }
         }
@@ -150,26 +153,26 @@ class RoomPlanner {
         const ax = anchor.x, ay = anchor.y;
         const stamp = [
             // Roads (dx+dy even)
-            { type: 'road', dx:  0, dy:  0 },  // Hub Manager standing tile
-            { type: 'road', dx:  1, dy:  1 }, { type: 'road', dx: -1, dy:  1 },
-            { type: 'road', dx:  1, dy: -1 }, { type: 'road', dx: -1, dy: -1 },
-            { type: 'road', dx:  2, dy:  0 }, { type: 'road', dx: -2, dy:  0 },
-            { type: 'road', dx:  0, dy:  2 }, { type: 'road', dx:  0, dy: -2 },
-            { type: 'road', dx:  2, dy:  2 }, { type: 'road', dx: -2, dy:  2 },
-            { type: 'road', dx:  2, dy: -2 }, { type: 'road', dx: -2, dy: -2 },
+            { type: 'road', dx: 0, dy: 0 },  // Hub Manager standing tile
+            { type: 'road', dx: 1, dy: 1 }, { type: 'road', dx: -1, dy: 1 },
+            { type: 'road', dx: 1, dy: -1 }, { type: 'road', dx: -1, dy: -1 },
+            { type: 'road', dx: 2, dy: 0 }, { type: 'road', dx: -2, dy: 0 },
+            { type: 'road', dx: 0, dy: 2 }, { type: 'road', dx: 0, dy: -2 },
+            { type: 'road', dx: 2, dy: 2 }, { type: 'road', dx: -2, dy: 2 },
+            { type: 'road', dx: 2, dy: -2 }, { type: 'road', dx: -2, dy: -2 },
             // Structures (dx+dy odd)
-            { type: STRUCTURE_STORAGE,     dx:  1, dy:  0 },
-            { type: STRUCTURE_TERMINAL,    dx: -1, dy:  0 },
-            { type: STRUCTURE_FACTORY,     dx:  0, dy:  1 },
-            { type: STRUCTURE_SPAWN,       dx:  0, dy: -1 },   // Spawn 1 (primary)
-            { type: STRUCTURE_TOWER,       dx:  2, dy:  1 }, { type: STRUCTURE_TOWER, dx: -2, dy:  1 },
-            { type: STRUCTURE_TOWER,       dx:  2, dy: -1 }, { type: STRUCTURE_TOWER, dx: -2, dy: -1 },
-            { type: STRUCTURE_TOWER,       dx:  1, dy:  2 }, { type: STRUCTURE_TOWER, dx: -1, dy:  2 },
-            { type: STRUCTURE_SPAWN,       dx:  1, dy: -2 },   // Spawn 2
-            { type: STRUCTURE_SPAWN,       dx: -1, dy: -2 },   // Spawn 3
-            { type: STRUCTURE_POWER_SPAWN, dx:  3, dy:  0 },
-            { type: STRUCTURE_OBSERVER,    dx: -3, dy:  0 },
-            { type: STRUCTURE_NUKER,       dx:  0, dy:  3 },
+            { type: STRUCTURE_STORAGE, dx: 1, dy: 0 },
+            { type: STRUCTURE_TERMINAL, dx: -1, dy: 0 },
+            { type: STRUCTURE_FACTORY, dx: 0, dy: 1 },
+            { type: STRUCTURE_SPAWN, dx: 0, dy: -1 },   // Spawn 1 (primary)
+            { type: STRUCTURE_TOWER, dx: 2, dy: 1 }, { type: STRUCTURE_TOWER, dx: -2, dy: 1 },
+            { type: STRUCTURE_TOWER, dx: 2, dy: -1 }, { type: STRUCTURE_TOWER, dx: -2, dy: -1 },
+            { type: STRUCTURE_TOWER, dx: 1, dy: 2 }, { type: STRUCTURE_TOWER, dx: -1, dy: 2 },
+            { type: STRUCTURE_SPAWN, dx: 1, dy: -2 },   // Spawn 2
+            { type: STRUCTURE_SPAWN, dx: -1, dy: -2 },   // Spawn 3
+            { type: STRUCTURE_POWER_SPAWN, dx: 3, dy: 0 },
+            { type: STRUCTURE_OBSERVER, dx: -3, dy: 0 },
+            { type: STRUCTURE_NUKER, dx: 0, dy: 3 },
         ];
 
         for (let i = 0; i < stamp.length; i++) {
@@ -180,8 +183,8 @@ class RoomPlanner {
             const key = `${x},${y}`;
             if (visited.has(key)) continue;
             visited.add(key);
-            if (type === 'road') blueprint.roads.push({x, y});
-            else blueprint[type].push({x, y});
+            if (type === 'road') blueprint.roads.push({ x, y });
+            else blueprint[type].push({ x, y });
         }
     }
 
@@ -202,27 +205,27 @@ class RoomPlanner {
         const variants = [
             // RIGHT of core (dx 4–7)
             [
-                {dx:4,dy:-1,s:false},{dx:5,dy:-1,s:true},{dx:6,dy:-1,s:true},{dx:7,dy:-1,s:false},
-                {dx:4,dy: 0,s:false},{dx:5,dy: 0,s:false},{dx:6,dy: 0,s:false},{dx:7,dy: 0,s:false},
-                {dx:5,dy: 1,s:false},{dx:6,dy: 1,s:false},
+                { dx: 4, dy: -1, s: false }, { dx: 5, dy: -1, s: true }, { dx: 6, dy: -1, s: true }, { dx: 7, dy: -1, s: false },
+                { dx: 4, dy: 0, s: false }, { dx: 5, dy: 0, s: false }, { dx: 6, dy: 0, s: false }, { dx: 7, dy: 0, s: false },
+                { dx: 5, dy: 1, s: false }, { dx: 6, dy: 1, s: false },
             ],
             // LEFT of core (dx -4 to -7)
             [
-                {dx:-4,dy:-1,s:false},{dx:-5,dy:-1,s:true},{dx:-6,dy:-1,s:true},{dx:-7,dy:-1,s:false},
-                {dx:-4,dy: 0,s:false},{dx:-5,dy: 0,s:false},{dx:-6,dy: 0,s:false},{dx:-7,dy: 0,s:false},
-                {dx:-5,dy: 1,s:false},{dx:-6,dy: 1,s:false},
+                { dx: -4, dy: -1, s: false }, { dx: -5, dy: -1, s: true }, { dx: -6, dy: -1, s: true }, { dx: -7, dy: -1, s: false },
+                { dx: -4, dy: 0, s: false }, { dx: -5, dy: 0, s: false }, { dx: -6, dy: 0, s: false }, { dx: -7, dy: 0, s: false },
+                { dx: -5, dy: 1, s: false }, { dx: -6, dy: 1, s: false },
             ],
             // BELOW core (dy 4–7)
             [
-                {dx:-1,dy:4,s:false},{dx:-1,dy:5,s:true},{dx:-1,dy:6,s:true},{dx:-1,dy:7,s:false},
-                {dx: 0,dy:4,s:false},{dx: 0,dy:5,s:false},{dx: 0,dy:6,s:false},{dx: 0,dy:7,s:false},
-                {dx: 1,dy:5,s:false},{dx: 1,dy:6,s:false},
+                { dx: -1, dy: 4, s: false }, { dx: -1, dy: 5, s: true }, { dx: -1, dy: 6, s: true }, { dx: -1, dy: 7, s: false },
+                { dx: 0, dy: 4, s: false }, { dx: 0, dy: 5, s: false }, { dx: 0, dy: 6, s: false }, { dx: 0, dy: 7, s: false },
+                { dx: 1, dy: 5, s: false }, { dx: 1, dy: 6, s: false },
             ],
             // ABOVE core (dy -4 to -7)
             [
-                {dx:-1,dy:-4,s:false},{dx:-1,dy:-5,s:true},{dx:-1,dy:-6,s:true},{dx:-1,dy:-7,s:false},
-                {dx: 0,dy:-4,s:false},{dx: 0,dy:-5,s:false},{dx: 0,dy:-6,s:false},{dx: 0,dy:-7,s:false},
-                {dx: 1,dy:-5,s:false},{dx: 1,dy:-6,s:false},
+                { dx: -1, dy: -4, s: false }, { dx: -1, dy: -5, s: true }, { dx: -1, dy: -6, s: true }, { dx: -1, dy: -7, s: false },
+                { dx: 0, dy: -4, s: false }, { dx: 0, dy: -5, s: false }, { dx: 0, dy: -6, s: false }, { dx: 0, dy: -7, s: false },
+                { dx: 1, dy: -5, s: false }, { dx: 1, dy: -6, s: false },
             ]
         ];
 
@@ -247,8 +250,8 @@ class RoomPlanner {
             const key = `${x},${y}`;
             if (visited.has(key)) continue;
             visited.add(key);
-            blueprint[STRUCTURE_LAB].push({x, y});
-            if (s) blueprint.supplierLabs.push({x, y});
+            blueprint[STRUCTURE_LAB].push({ x, y });
+            if (s) blueprint.supplierLabs.push({ x, y });
         }
     }
 
@@ -281,13 +284,13 @@ class RoomPlanner {
         const anchorParity = (ax + ay) % 2;  // 0 = road parity (anchor is always road)
 
         // Standard 4-directional BFS gives Manhattan-distance ordering → true diamond shape
-        const queue = [{x: ax, y: ay}];
-        const seen  = new Set([`${ax},${ay}`]);
+        const queue = [{ x: ax, y: ay }];
+        const seen = new Set([`${ax},${ay}`]);
         let head = 0;
         let extensionsPlaced = blueprint[STRUCTURE_EXTENSION].length;
 
         while (head < queue.length && extensionsPlaced < 60) {
-            const {x, y} = queue[head++];
+            const { x, y } = queue[head++];
 
             if (x < 2 || x > 47 || y < 2 || y > 47) continue;
             if (terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
@@ -297,22 +300,22 @@ class RoomPlanner {
                 visited.add(key);
                 if ((x + y) % 2 === anchorParity) {
                     // Road parity — place road
-                    blueprint.roads.push({x, y});
+                    blueprint.roads.push({ x, y });
                 } else {
                     // Extension parity — place extension
-                    blueprint[STRUCTURE_EXTENSION].push({x, y});
+                    blueprint[STRUCTURE_EXTENSION].push({ x, y });
                     extensionsPlaced++;
                 }
             }
 
             // Enqueue 4 cardinal neighbors (BFS maintains Manhattan-distance order)
-            const dirs = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
+            const dirs = [{ dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 }];
             for (let d = 0; d < dirs.length; d++) {
                 const nx = x + dirs[d].dx, ny = y + dirs[d].dy;
                 const nkey = `${nx},${ny}`;
                 if (!seen.has(nkey)) {
                     seen.add(nkey);
-                    queue.push({x: nx, y: ny});
+                    queue.push({ x: nx, y: ny });
                 }
             }
         }
@@ -345,7 +348,7 @@ class RoomPlanner {
                 if (terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
                 if (range > 1 && Math.max(Math.abs(dx), Math.abs(dy)) > range) continue;
                 const dist = Math.abs(x - referencePos.x) + Math.abs(y - referencePos.y);
-                if (dist < bestDist) { bestDist = dist; best = {x, y}; }
+                if (dist < bestDist) { bestDist = dist; best = { x, y }; }
             }
         }
         return best;
@@ -368,11 +371,11 @@ class RoomPlanner {
         // Only external targets — spine handles internal routing
         const targets = [];
         for (let i = 0; i < blueprint.containers.length; i++) targets.push(blueprint.containers[i]);
-        if (state.mineral) targets.push({x: state.mineral.pos.x, y: state.mineral.pos.y});
+        if (state.mineral) targets.push({ x: state.mineral.pos.x, y: state.mineral.pos.y });
 
         targets.sort((a, b) => {
-            const dA = Math.max(Math.abs(a.x-anchor.x), Math.abs(a.y-anchor.y));
-            const dB = Math.max(Math.abs(b.x-anchor.x), Math.abs(b.y-anchor.y));
+            const dA = Math.max(Math.abs(a.x - anchor.x), Math.abs(a.y - anchor.y));
+            const dB = Math.max(Math.abs(b.x - anchor.x), Math.abs(b.y - anchor.y));
             return dA - dB;
         });
 
@@ -393,7 +396,7 @@ class RoomPlanner {
 
         for (let i = 0; i < targets.length; i++) {
             const targetPos = new RoomPosition(targets[i].x, targets[i].y, room.name);
-            const ret = PathFinder.search(anchorPos, {pos: targetPos, range: 1}, {
+            const ret = PathFinder.search(anchorPos, { pos: targetPos, range: 1 }, {
                 plainCost: 2,
                 swampCost: 5,  // Strongly penalize swamp — prefer extra plains tiles
                 roomCallback: (rn) => rn === room.name ? costs : false,
@@ -403,7 +406,7 @@ class RoomPlanner {
             for (let j = 0; j < ret.path.length; j++) {
                 const step = ret.path[j];
                 if (step.x >= 2 && step.x <= 47 && step.y >= 2 && step.y <= 47 && costs.get(step.x, step.y) !== 1) {
-                    blueprint.roads.push({x: step.x, y: step.y});
+                    blueprint.roads.push({ x: step.x, y: step.y });
                     costs.set(step.x, step.y, 1);
                 }
             }
@@ -429,21 +432,42 @@ class RoomPlanner {
             adj[v].push(eTo.length); eTo.push(u); eCap.push(0);
         }
 
+        // Dilate baseSet by 2 tiles for standoff distance against Ranged Attackers
+        const dilatedBaseSet = new Set();
+        for (let x = 0; x < 50; x++) {
+            for (let y = 0; y < 50; y++) {
+                if (baseSet.has(`${x},${y}`)) {
+                    for (let dx = -2; dx <= 2; dx++) {
+                        for (let dy = -2; dy <= 2; dy++) {
+                            const nx = x + dx, ny = y + dy;
+                            if (nx >= 0 && nx < 50 && ny >= 0 && ny < 50) {
+                                dilatedBaseSet.add(`${nx},${ny}`);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         for (let x = 0; x < 50; x++) {
             for (let y = 0; y < 50; y++) {
                 if (terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
-                const inNode = x*50+y, outNode = inNode+2500;
-                const isBase = baseSet.has(`${x},${y}`);
-                const isBorder = x <= 1 || x >= 48 || y <= 1 || y >= 48;
-                addEdge(inNode, outNode, isBase || isBorder ? INF : 1);
-                if (isBorder) addEdge(S, inNode, INF);
+                const inNode = x * 50 + y, outNode = inNode + 2500;
+                const isBase = dilatedBaseSet.has(`${x},${y}`);
+                const isExit = (x === 0 || x === 49 || y === 0 || y === 49);
+
+                addEdge(inNode, outNode, isBase || isExit ? INF : 1);
+                if (isExit) addEdge(S, inNode, INF);
                 if (isBase) addEdge(outNode, T, INF);
-                const dirs = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
+                const dirs = [
+                    { dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 },
+                    { dx: 1, dy: 1 }, { dx: -1, dy: -1 }, { dx: 1, dy: -1 }, { dx: -1, dy: 1 }
+                ];
                 for (let d = 0; d < dirs.length; d++) {
-                    const nx = x+dirs[d].dx, ny = y+dirs[d].dy;
+                    const nx = x + dirs[d].dx, ny = y + dirs[d].dy;
                     if (nx < 0 || nx >= 50 || ny < 0 || ny >= 50) continue;
                     if (terrain.get(nx, ny) === TERRAIN_MASK_WALL) continue;
-                    addEdge(outNode, nx*50+ny, INF);
+                    addEdge(outNode, nx * 50 + ny, INF);
                 }
             }
         }
@@ -457,7 +481,7 @@ class RoomPlanner {
                 const u = q[qi++];
                 for (let i = 0; i < adj[u].length; i++) {
                     const ei = adj[u][i];
-                    if (eCap[ei] > 0 && level[eTo[ei]] < 0) { level[eTo[ei]] = level[u]+1; q.push(eTo[ei]); }
+                    if (eCap[ei] > 0 && level[eTo[ei]] < 0) { level[eTo[ei]] = level[u] + 1; q.push(eTo[ei]); }
                 }
             }
             return level[T] >= 0;
@@ -469,9 +493,9 @@ class RoomPlanner {
             if (u === T) return pushed;
             for (; iter[u] < adj[u].length; iter[u]++) {
                 const ei = adj[u][iter[u]], v = eTo[ei];
-                if (eCap[ei] <= 0 || level[v] !== level[u]+1) continue;
+                if (eCap[ei] <= 0 || level[v] !== level[u] + 1) continue;
                 const d = dfs(v, Math.min(pushed, eCap[ei]));
-                if (d > 0) { eCap[ei] -= d; eCap[ei^1] += d; return d; }
+                if (d > 0) { eCap[ei] -= d; eCap[ei ^ 1] += d; return d; }
             }
             return 0;
         }
@@ -498,13 +522,16 @@ class RoomPlanner {
         // Only place ramparts on open-terrain tiles in the cut — these are the gaps
         // that actually need a structure to block passage.
         const ramparts = [];
-        for (let x = 2; x < 48; x++) {
-            for (let y = 2; y < 48; y++) {
+        for (let x = 1; x < 49; x++) {
+            for (let y = 1; y < 49; y++) {
                 if (terrain.get(x, y) === TERRAIN_MASK_WALL) continue;  // free perimeter tile
-                const id = x*50+y;
-                if (reachable[id] && !reachable[id+2500]) ramparts.push({x, y});
+                const id = x * 50 + y;
+                if (reachable[id] && !reachable[id + 2500]) {
+                    ramparts.push({ x, y });
+                }
             }
         }
+
         return ramparts;
     }
 
@@ -512,8 +539,8 @@ class RoomPlanner {
 
     /**
      * For every rampart that sits on a road (a "road exit"),
-     * traces 3 tiles inward toward anchor and also places ramparts.
-     * This creates a safe rampart corridor over every road exit.
+     * traces 2 tiles inward along the road to create a protected airlock.
+     * Uses a strict single-path trace to prevent clump fan-outs.
      */
     static addRoadRamparts(blueprint) {
         const roadSet = new Set(blueprint.roads.map(r => `${r.x},${r.y}`));
@@ -524,18 +551,54 @@ class RoomPlanner {
         for (let i = 0; i < blueprint.ramparts.length; i++) {
             const rp = blueprint.ramparts[i];
             if (!roadSet.has(`${rp.x},${rp.y}`)) continue;
-            let cx = rp.x, cy = rp.y;
+
+            let current = rp;
             for (let step = 0; step < 3; step++) {
-                const dx = ax - cx, dy = ay - cy;
-                let nx = cx, ny = cy;
-                if (Math.abs(dx) >= Math.abs(dy)) nx += (dx > 0 ? 1 : -1);
-                else ny += (dy > 0 ? 1 : -1);
-                const nkey = `${nx},${ny}`;
-                if (!rampartSet.has(nkey)) { rampartSet.add(nkey); newRamparts.push({x: nx, y: ny}); }
-                cx = nx; cy = ny;
+                let bestNext = null;
+                const cx = current.x, cy = current.y;
+                const cDist = Math.max(Math.abs(cx - ax), Math.abs(cy - ay));
+
+                const dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 1 }, { x: -1, y: -1 }, { x: 1, y: -1 }, { x: -1, y: 1 }];
+                for (let d = 0; d < dirs.length; d++) {
+                    const nx = cx + dirs[d].x, ny = cy + dirs[d].y;
+                    const nDist = Math.max(Math.abs(nx - ax), Math.abs(ny - ay));
+                    const nkey = `${nx},${ny}`;
+                    if (nDist < cDist && roadSet.has(nkey) && !rampartSet.has(nkey)) {
+                        bestNext = { x: nx, y: ny };
+                        break; // Take the first valid inward road tile
+                    }
+                }
+
+                if (bestNext) {
+                    rampartSet.add(`${bestNext.x},${bestNext.y}`);
+                    newRamparts.push(bestNext);
+                    current = bestNext;
+                } else {
+                    break;
+                }
             }
         }
         for (let i = 0; i < newRamparts.length; i++) blueprint.ramparts.push(newRamparts[i]);
+    }
+
+    // ─── Step 8.5: Rampart Roads ──────────────────────────────────────────
+
+    /**
+     * Overlays STRUCTURE_ROAD on every placed rampart tile to give defenders
+     * zero-fatigue mobility along the walls.
+     */
+    static addRampartRoads(blueprint) {
+        const roadSet = new Set(blueprint.roads.map(r => `${r.x},${r.y}`));
+        const newRoads = [];
+        for (let i = 0; i < blueprint.ramparts.length; i++) {
+            const rp = blueprint.ramparts[i];
+            const rkey = `${rp.x},${rp.y}`;
+            if (!roadSet.has(rkey)) {
+                newRoads.push({ x: rp.x, y: rp.y });
+                roadSet.add(rkey);
+            }
+        }
+        for (let i = 0; i < newRoads.length; i++) blueprint.roads.push(newRoads[i]);
     }
 
     // ─── Step 9: Outpost Ramparts ────────────────────────────────────────
@@ -551,17 +614,17 @@ class RoomPlanner {
         const inside = new Set();
         const start = blueprint.anchor;
         inside.add(`${start.x},${start.y}`);
-        const q = [{x: start.x, y: start.y}]; let qi = 0;
+        const q = [{ x: start.x, y: start.y }]; let qi = 0;
         while (qi < q.length) {
             const cur = q[qi++];
-            const dirs = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
+            const dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
             for (let i = 0; i < dirs.length; i++) {
                 const nx = cur.x + dirs[i].x, ny = cur.y + dirs[i].y;
                 if (nx < 0 || nx >= 50 || ny < 0 || ny >= 50) continue;
                 if (terrain.get(nx, ny) === TERRAIN_MASK_WALL) continue;
                 const key = `${nx},${ny}`;
                 if (inside.has(key) || rampartSet.has(key)) continue;
-                inside.add(key); q.push({x: nx, y: ny});
+                inside.add(key); q.push({ x: nx, y: ny });
             }
         }
 
@@ -586,7 +649,7 @@ class RoomPlanner {
                     const key = `${rx},${ry}`;
                     if (!rampartSet.has(key)) {
                         rampartSet.add(key);
-                        outpostRamparts.push({x: rx, y: ry});
+                        outpostRamparts.push({ x: rx, y: ry });
                     }
                 }
             }
@@ -749,38 +812,38 @@ class RoomPlanner {
             if (blueprint.roads) {
                 for (let i = 0; i < blueprint.roads.length; i++) {
                     const p = blueprint.roads[i];
-                    visual.circle(p.x, p.y, {radius: 0.15, fill: '#888888', opacity: 0.35});
+                    visual.circle(p.x, p.y, { radius: 0.15, fill: '#888888', opacity: 0.35 });
                 }
             }
 
             // Structures
             const structureColors = {
-                [STRUCTURE_SPAWN]:      '#ffaa00',
-                [STRUCTURE_EXTENSION]:  '#ffe066',
-                [STRUCTURE_TOWER]:      '#ff4444',
-                [STRUCTURE_STORAGE]:    '#44ff44',
-                [STRUCTURE_TERMINAL]:   '#44ffff',
-                [STRUCTURE_FACTORY]:    '#ff8800',
-                [STRUCTURE_POWER_SPAWN]:'#ff44ff',
-                [STRUCTURE_NUKER]:      '#884444',
-                [STRUCTURE_OBSERVER]:   '#4488ff',
+                [STRUCTURE_SPAWN]: '#ffaa00',
+                [STRUCTURE_EXTENSION]: '#ffe066',
+                [STRUCTURE_TOWER]: '#ff4444',
+                [STRUCTURE_STORAGE]: '#44ff44',
+                [STRUCTURE_TERMINAL]: '#44ffff',
+                [STRUCTURE_FACTORY]: '#ff8800',
+                [STRUCTURE_POWER_SPAWN]: '#ff44ff',
+                [STRUCTURE_NUKER]: '#884444',
+                [STRUCTURE_OBSERVER]: '#4488ff',
             };
             for (const type in structureColors) {
                 if (!blueprint[type]) continue;
                 for (let i = 0; i < blueprint[type].length; i++) {
                     const p = blueprint[type][i];
-                    visual.rect(p.x-0.35, p.y-0.35, 0.7, 0.7, {fill: structureColors[type], opacity: 0.45});
+                    visual.rect(p.x - 0.35, p.y - 0.35, 0.7, 0.7, { fill: structureColors[type], opacity: 0.45 });
                 }
             }
 
             // Labs (supplier = cyan + label, reactor = purple)
             if (blueprint[STRUCTURE_LAB]) {
-                const supplierSet = new Set((blueprint.supplierLabs || []).map(s=>`${s.x},${s.y}`));
+                const supplierSet = new Set((blueprint.supplierLabs || []).map(s => `${s.x},${s.y}`));
                 for (let i = 0; i < blueprint[STRUCTURE_LAB].length; i++) {
                     const p = blueprint[STRUCTURE_LAB][i];
                     const isSup = supplierSet.has(`${p.x},${p.y}`);
-                    visual.rect(p.x-0.35, p.y-0.35, 0.7, 0.7, {fill: isSup ? '#00ffff' : '#cc44ff', opacity: 0.6});
-                    if (isSup) visual.text('S', p.x, p.y+0.1, {color:'#000', font: 0.4});
+                    visual.rect(p.x - 0.35, p.y - 0.35, 0.7, 0.7, { fill: isSup ? '#00ffff' : '#cc44ff', opacity: 0.6 });
+                    if (isSup) visual.text('S', p.x, p.y + 0.1, { color: '#000', font: 0.4 });
                 }
             }
 
@@ -788,19 +851,19 @@ class RoomPlanner {
             if (blueprint.containers) {
                 for (let i = 0; i < blueprint.containers.length; i++) {
                     const p = blueprint.containers[i];
-                    visual.rect(p.x-0.3, p.y-0.3, 0.6, 0.6, {fill: '#ffffff', opacity: 0.5});
+                    visual.rect(p.x - 0.3, p.y - 0.3, 0.6, 0.6, { fill: '#ffffff', opacity: 0.5 });
                 }
             }
 
             // Ramparts
             if (blueprint.ramparts) {
-                const roadSet = new Set((blueprint.roads || []).map(r=>`${r.x},${r.y}`));
-                const outpostSet = new Set((blueprint.outpostRamparts || []).map(r=>`${r.x},${r.y}`));
+                const roadSet = new Set((blueprint.roads || []).map(r => `${r.x},${r.y}`));
+                const outpostSet = new Set((blueprint.outpostRamparts || []).map(r => `${r.x},${r.y}`));
                 for (let i = 0; i < blueprint.ramparts.length; i++) {
                     const p = blueprint.ramparts[i];
                     const isOutpost = outpostSet.has(`${p.x},${p.y}`);
                     const isRoadExit = !isOutpost && roadSet.has(`${p.x},${p.y}`);
-                    visual.rect(p.x-0.45, p.y-0.45, 0.9, 0.9, {
+                    visual.rect(p.x - 0.45, p.y - 0.45, 0.9, 0.9, {
                         fill: 'transparent',
                         stroke: isOutpost ? '#ff8800' : isRoadExit ? '#ffff00' : '#00ff00',
                         strokeWidth: isOutpost ? 0.14 : isRoadExit ? 0.12 : 0.07,
@@ -811,8 +874,8 @@ class RoomPlanner {
 
             // Anchor marker
             if (blueprint.anchor) {
-                visual.circle(blueprint.anchor.x, blueprint.anchor.y, {radius: 0.28, fill: '#ffffff', opacity: 0.9});
-                visual.text('⚙', blueprint.anchor.x, blueprint.anchor.y+0.1, {color:'#000000', font: 0.45});
+                visual.circle(blueprint.anchor.x, blueprint.anchor.y, { radius: 0.28, fill: '#ffffff', opacity: 0.9 });
+                visual.text('⚙', blueprint.anchor.x, blueprint.anchor.y + 0.1, { color: '#000000', font: 0.45 });
             }
         }
     }

@@ -12,6 +12,7 @@ const RoleExecutor = require('./managers/RoleExecutor');
 const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
 const IntelManager = require('./managers/IntelManager');
 const RoomPlanner = require('./managers/RoomPlanner');
+const TowerManager = require('./managers/TowerManager');
 
 // Utilities
 const ProfilerUtility = require('./utilities/ProfilerUtility');
@@ -58,7 +59,10 @@ module.exports.loop = function () {
     // 7. Intent Execution
     ErrorHandlingUtility.wrap(() => RoleExecutor.run(), 'RoleExecutor')();
 
-    // 8. Visualizer
+    // 8. Tower Defense & Support
+    ErrorHandlingUtility.wrap(() => TowerManager.run(), 'TowerManager')();
+
+    // 9. Visualizer
     ErrorHandlingUtility.wrap(() => RoomPlanner.visualize(), 'Visualizer')();
 
     // Profiler Reporting
