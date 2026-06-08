@@ -1,19 +1,28 @@
 const GameObjectUtility = require('../utilities/GameObjectUtility');
 
 /**
- * Production-Grade Room Planner v3
+ * Production-Grade Room Planner v5 — Diamond Bunker
  *
  * Pipeline:
- *  1. findAnchor          — Distance transform; anchor nudged to road parity.
- *  2. applyCoreStamp      — Hardcoded 5-tile Core Hub.
- *  3. applyLabStamp       — 2+8 lab cluster (4-quadrant, contiguous only).
- *  4. placeExtensionPods  — 8 dense 3×3 pods (1 road + 8 extensions each).
- *  5. planContainers      — Source + controller containers.
- *  6. planRoads           — MST spine: anchor → pods → resources.
- *  7. computeMinCut       — Dinic's max-flow for true min-cut ramparts.
- *  8. addRoadRamparts     — 3-deep road exit airlocks.
- *  9. addOutpostRamparts  — Tight rampart rings for external resources.
+ *  1. findAnchor        — Distance transform; anchor nudged to road parity.
+ *  2. applyCoreStamp    — Hardcoded Core Hub (storage, terminal, factory,
+ *                         3 spawns, 6 towers, power spawn, observer, nuker).
+ *  3. applyLabStamp     — 2+8 lab cluster (4-quadrant, contiguous only).
+ *  4. fillBaseDiamond   — BFS outward from anchor in Manhattan-distance order.
+ *                         Checkerboard parity rule: road-parity tiles → road,
+ *                         extension-parity tiles → extension. Stops at 60 exts.
+ *                         Produces a compact, dense diamond — identical in
+ *                         style to the classic Screeps bunker layout.
+ *  5. planContainers    — Source + controller containers.
+ *  6. planRoads         — Checkerboard is already the internal road grid;
+ *                         PathFinder only routes to external resources.
+ *  7. computeMinCut     — Dinic’s max-flow for true min-cut. Filters out
+ *                         natural terrain walls (free, permanent defense)
+ *                         so ramparts only cover open-terrain gaps.
+ *  8. addRoadRamparts   — 3-deep road exit airlocks.
+ *  9. addOutpostRamparts— Tight rampart rings for external resources.
  */
+
 class RoomPlanner {
 
     static run() {
@@ -47,7 +56,6 @@ class RoomPlanner {
             ramparts: [],
             outpostRamparts: [],
             supplierLabs: [],
-            podCenters: [],
             [STRUCTURE_SPAWN]: [],
             [STRUCTURE_EXTENSION]: [],
             [STRUCTURE_TOWER]: [],
@@ -81,13 +89,13 @@ class RoomPlanner {
         // Step 3: Lab cluster (best-fit quadrant, contiguous only)
         this.applyLabStamp(blueprint, terrain, anchor, visited);
 
-        // Step 4: Extension pods (8 dense 3×3 pods around core+lab)
-        this.placeExtensionPods(blueprint, terrain, anchor, visited);
+        // Step 4: Diamond checkerboard BFS fill (extensions + internal roads)
+        this.fillBaseDiamond(blueprint, terrain, anchor, visited);
 
         // Step 5: Source + controller containers
         if (state) this.planContainers(blueprint, room, state, terrain);
 
-        // Step 6: MST roads (pod spine + resource routes)
+        // Step 6: External road routes (containers + mineral only; diamond handles internal)
         if (state) this.planRoads(blueprint, room, state, anchor);
 
         // Step 7: Min-cut ramparts
@@ -244,86 +252,72 @@ class RoomPlanner {
         }
     }
 
-    // ─── Step 4: Extension Pods ──────────────────────────────────────────
+    // ─── Step 4: Diamond BFS Fill ───────────────────────────────────────────
 
     /**
-     * Places up to 8 dense 3×3 extension pods around the core+lab.
+     * Grows a compact diamond from the anchor outward using 4-directional BFS
+     * (Manhattan-distance order). Applies the checkerboard parity rule:
      *
-     * Pod layout:
-     *   [E][E][E]
-     *   [E][R][E]   ← Road at center. Filler creep stands here.
-     *   [E][E][E]       Transfer range 1 includes diagonals → fills all 8 in 1 tick.
+     *   (x+y) % 2 === anchorParity  →  road tile
+     *   (x+y) % 2 !== anchorParity  →  extension tile
      *
-     * Candidates: 12 symmetric positions around the core.
-     * Selection: scored by number of valid (non-wall, non-visited) tiles in 3×3 area.
-     * Top 8 are chosen. Total extensions capped at 60.
+     * This produces a layout identical to the classic Screeps bunker:
+     *
+     *       R           ← entry point (cardinal tip, always road parity)
+     *      E E
+     *     R E R         ← each R has 4 cardinal E neighbors (fills 4 in 1 tick)
+     *    E R E R        ← creeps traverse the R-grid diagonally
+     *   R E R E R
+     *    E R E R
+     *     R E R
+     *      E E
+     *       R           ← entry point
+     *
+     * Stops the moment 60 extensions are placed. Core/lab tiles are already
+     * claimed in `visited`, so they are naturally skipped.
      */
-    static placeExtensionPods(blueprint, terrain, anchor, visited) {
+    static fillBaseDiamond(blueprint, terrain, anchor, visited) {
         const ax = anchor.x, ay = anchor.y;
+        const anchorParity = (ax + ay) % 2;  // 0 = road parity (anchor is always road)
 
-        // 12 symmetric candidate pod center offsets from anchor
-        const candidates = [
-            {dx: -6, dy: -3}, {dx: -6, dy:  0}, {dx: -6, dy:  3},
-            {dx:  6, dy: -3}, {dx:  6, dy:  0}, {dx:  6, dy:  3},
-            {dx: -3, dy: -6}, {dx:  0, dy: -6}, {dx:  3, dy: -6},
-            {dx: -3, dy:  6}, {dx:  0, dy:  6}, {dx:  3, dy:  6},
-        ];
+        // Standard 4-directional BFS gives Manhattan-distance ordering → true diamond shape
+        const queue = [{x: ax, y: ay}];
+        const seen  = new Set([`${ax},${ay}`]);
+        let head = 0;
+        let extensionsPlaced = blueprint[STRUCTURE_EXTENSION].length;
 
-        // Score each candidate
-        const scored = candidates.map(c => {
-            const pcx = ax + c.dx, pcy = ay + c.dy;
-            if (pcx < 3 || pcx > 46 || pcy < 3 || pcy > 46) return {dx: c.dx, dy: c.dy, score: 0};
-            if (terrain.get(pcx, pcy) === TERRAIN_MASK_WALL || visited.has(`${pcx},${pcy}`)) return {dx: c.dx, dy: c.dy, score: 0};
-            let score = 0;
-            for (let dx = -1; dx <= 1; dx++) {
-                for (let dy = -1; dy <= 1; dy++) {
-                    const x = pcx + dx, y = pcy + dy;
-                    if (x >= 2 && x <= 47 && y >= 2 && y <= 47 &&
-                        terrain.get(x, y) !== TERRAIN_MASK_WALL && !visited.has(`${x},${y}`)) score++;
+        while (head < queue.length && extensionsPlaced < 60) {
+            const {x, y} = queue[head++];
+
+            if (x < 2 || x > 47 || y < 2 || y > 47) continue;
+            if (terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
+
+            const key = `${x},${y}`;
+            if (!visited.has(key)) {
+                visited.add(key);
+                if ((x + y) % 2 === anchorParity) {
+                    // Road parity — place road
+                    blueprint.roads.push({x, y});
+                } else {
+                    // Extension parity — place extension
+                    blueprint[STRUCTURE_EXTENSION].push({x, y});
+                    extensionsPlaced++;
                 }
             }
-            return {dx: c.dx, dy: c.dy, score};
-        });
 
-        // Pick top 8 by score
-        scored.sort((a, b) => b.score - a.score);
-        const topPods = scored.slice(0, 8);
-
-        let extensionsPlaced = blueprint[STRUCTURE_EXTENSION].length;
-        const extOffsets = [
-            {dx:-1,dy:-1},{dx:0,dy:-1},{dx:1,dy:-1},
-            {dx:-1,dy: 0},              {dx:1,dy: 0},
-            {dx:-1,dy: 1},{dx:0,dy: 1},{dx:1,dy: 1},
-        ];
-
-        for (let p = 0; p < topPods.length && extensionsPlaced < 60; p++) {
-            if (topPods[p].score === 0) continue;
-
-            const pcx = ax + topPods[p].dx;
-            const pcy = ay + topPods[p].dy;
-
-            // Place road at pod center
-            const ckey = `${pcx},${pcy}`;
-            if (!visited.has(ckey) && terrain.get(pcx, pcy) !== TERRAIN_MASK_WALL) {
-                visited.add(ckey);
-                blueprint.roads.push({x: pcx, y: pcy});
-                blueprint.podCenters.push({x: pcx, y: pcy});
-            }
-
-            // Place extensions in the 8 surrounding tiles
-            for (let e = 0; e < extOffsets.length && extensionsPlaced < 60; e++) {
-                const x = pcx + extOffsets[e].dx;
-                const y = pcy + extOffsets[e].dy;
-                if (x < 2 || x > 47 || y < 2 || y > 47) continue;
-                if (terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
-                const key = `${x},${y}`;
-                if (visited.has(key)) continue;
-                visited.add(key);
-                blueprint[STRUCTURE_EXTENSION].push({x, y});
-                extensionsPlaced++;
+            // Enqueue 4 cardinal neighbors (BFS maintains Manhattan-distance order)
+            const dirs = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
+            for (let d = 0; d < dirs.length; d++) {
+                const nx = x + dirs[d].dx, ny = y + dirs[d].dy;
+                const nkey = `${nx},${ny}`;
+                if (!seen.has(nkey)) {
+                    seen.add(nkey);
+                    queue.push({x: nx, y: ny});
+                }
             }
         }
     }
+
 
     // ─── Step 5: Container Planning ──────────────────────────────────────
 
@@ -357,23 +351,22 @@ class RoomPlanner {
         return best;
     }
 
-    // ─── Step 6: MST Road Spine ──────────────────────────────────────────
+    // ─── Step 6: External Road Routes ────────────────────────────────────
 
     /**
-     * Routes MST roads from anchor to:
-     *   - Each pod center (internal spine)
-     *   - Each source/controller container (hauler/upgrader routes)
+     * The checkerboard diamond is already the internal road grid.
+     * This step only uses PathFinder to route roads from anchor to:
+     *   - Source/controller containers (hauler + upgrader routes)
      *   - Mineral (future remote mining)
      *
-     * Roads merge naturally because pod roads are seeded in the CostMatrix at
-     * cost 1, causing PathFinder to route through them preferentially.
+     * Existing checkerboard roads are seeded at cost 1 so external paths
+     * merge onto them naturally rather than cutting parallel new roads.
      */
     static planRoads(blueprint, room, state, anchor) {
         const anchorPos = new RoomPosition(anchor.x, anchor.y, room.name);
 
-        // Build target list: pods first (short), then external resources
+        // Only external targets — spine handles internal routing
         const targets = [];
-        for (let i = 0; i < blueprint.podCenters.length; i++) targets.push(blueprint.podCenters[i]);
         for (let i = 0; i < blueprint.containers.length; i++) targets.push(blueprint.containers[i]);
         if (state.mineral) targets.push({x: state.mineral.pos.x, y: state.mineral.pos.y});
 
@@ -500,11 +493,14 @@ class RoomPlanner {
             }
         }
 
-        // Cut tiles: in-node reachable, out-node not reachable
+        // Cut tiles: in-node reachable, out-node NOT reachable from S.
+        // WALL-AWARE: natural terrain walls are already impassable (permanent, free).
+        // Only place ramparts on open-terrain tiles in the cut — these are the gaps
+        // that actually need a structure to block passage.
         const ramparts = [];
         for (let x = 2; x < 48; x++) {
             for (let y = 2; y < 48; y++) {
-                if (terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
+                if (terrain.get(x, y) === TERRAIN_MASK_WALL) continue;  // free perimeter tile
                 const id = x*50+y;
                 if (reachable[id] && !reachable[id+2500]) ramparts.push({x, y});
             }
@@ -732,16 +728,15 @@ class RoomPlanner {
     /**
      * Renders the full blueprint each tick.
      * Color legend:
-     *   Roads          — grey dots
-     *   Pod centers    — bright white dots (filler creep positions)
-     *   Extensions     — yellow squares
-     *   Spawns         — orange
-     *   Storage        — green  |  Terminal — cyan  |  Factory — amber
-     *   Towers         — red    |  Supplier labs — bright cyan + 'S'
-     *   Reactor labs   — purple |  PowerSpawn — magenta
+     *   Roads          — grey dots along the cardinal spine arms
+     *   Extensions     — yellow squares (teeth off the spine)
+     *   Spawns         — orange  |  Storage — green  |  Terminal — cyan
+     *   Factory        — amber   |  Towers  — red
+     *   Supplier labs  — bright cyan + 'S'  |  Reactor labs — purple
+     *   PowerSpawn     — magenta |  Nuker   — dark red
      *   Ramparts       — green outline
-     *   Road-exit ramp — yellow outline (thicker)
-     *   Outpost ramp   — orange outline (outpost protection)
+     *   Road-exit ramp — yellow outline (thicker, airlock corridors)
+     *   Outpost ramp   — orange outline (external resource protection)
      *   Anchor         — white circle + gear icon
      */
     static visualize() {
@@ -755,14 +750,6 @@ class RoomPlanner {
                 for (let i = 0; i < blueprint.roads.length; i++) {
                     const p = blueprint.roads[i];
                     visual.circle(p.x, p.y, {radius: 0.15, fill: '#888888', opacity: 0.35});
-                }
-            }
-
-            // Pod centers (filler positions)
-            if (blueprint.podCenters) {
-                for (let i = 0; i < blueprint.podCenters.length; i++) {
-                    const p = blueprint.podCenters[i];
-                    visual.circle(p.x, p.y, {radius: 0.22, fill: '#ffffff', opacity: 0.8, stroke: '#aaaaaa', strokeWidth: 0.04});
                 }
             }
 
