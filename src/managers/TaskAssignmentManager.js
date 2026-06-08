@@ -46,6 +46,8 @@ class TaskAssignmentManager {
             }
             creep.heap = heap;
 
+            if (Game.time < creep.heap.sleepUntil) continue;
+
             if (creep.heap.actionIntent !== ActionConstants.ACTION_IDLE && creep.heap.actionIntent !== null) {
                 TaskAssignmentManager.validateCurrentTask(creep);
                 
@@ -79,11 +81,8 @@ class TaskAssignmentManager {
     static updateCreepState(creep) {
         const role = creep.memory.role;
 
-        // Harvesters don't use gather/work states — they just harvest forever
-        if (role === 'harvester') return;
-
-        // Upgraders with a container don't need gather/work — they sit and withdraw
-        if (role === 'upgrader' && creep.heap.sitTargetId) return;
+        // Harvesters and Upgraders are stationary roles and do not use gather/work cycles
+        if (role === 'harvester' || role === 'upgrader') return;
 
         const used = creep.store.getUsedCapacity(RESOURCE_ENERGY);
         const free = creep.store.getFreeCapacity(RESOURCE_ENERGY);
@@ -164,7 +163,7 @@ class TaskAssignmentManager {
                 const claimed = target.__gatherClaimed || 0;
                 const remaining = amount - claimed;
 
-                if (remaining >= Math.min(50, creep.store.getFreeCapacity(RESOURCE_ENERGY))) {
+                if (remaining >= Math.min(25, creep.store.getFreeCapacity(RESOURCE_ENERGY))) {
                     target.__gatherClaimed = claimed + creep.store.getFreeCapacity(RESOURCE_ENERGY);
                     creep.heap.targetId = target.id;
                     creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
@@ -207,7 +206,7 @@ class TaskAssignmentManager {
                     }
                 }
 
-                if (bestTarget && bestAmount >= 50) {
+                if (bestTarget && bestAmount >= 25) {
                     bestTarget.__gatherClaimed = (bestTarget.__gatherClaimed || 0) + creep.store.getFreeCapacity(RESOURCE_ENERGY);
                     creep.heap.targetId = bestTarget.id;
                     creep.heap.actionIntent = intent;
@@ -269,38 +268,9 @@ class TaskAssignmentManager {
             creep.heap.sitTargetId = roomState.controllerContainers[idx].id;
         }
 
-        // If upgrader has a container, always assign upgrade — energy comes from container-sit
-        if (creep.heap.sitTargetId) {
-            creep.heap.targetId = roomState.controller.id;
-            creep.heap.actionIntent = ActionConstants.ACTION_UPGRADE;
-            return;
-        }
-
-        // No container — use gather/work state machine
-        if (creep.heap.state === 'gather') {
-            // Find closest energy source to pick up
-            const bestSource = TaskAssignmentManager.findClosestEnergy(creep, roomState);
-            if (bestSource) {
-                creep.heap.targetId = bestSource.id;
-                creep.heap.actionIntent = bestSource.actionIntent;
-                return;
-            }
-            // Nothing to gather but have some energy — go work
-            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                creep.heap.state = 'work';
-                creep.heap.targetId = roomState.controller.id;
-                creep.heap.actionIntent = ActionConstants.ACTION_UPGRADE;
-            } else {
-                // Starving, 0 energy, nothing to gather:
-                // Route to the designated drop-off tile so we are ready exactly where haulers drop it
-                creep.heap.targetId = roomState.controller.id;
-                creep.heap.actionIntent = ActionConstants.ACTION_UPGRADE;
-            }
-        } else {
-            // Work state — upgrade
-            creep.heap.targetId = roomState.controller.id;
-            creep.heap.actionIntent = ActionConstants.ACTION_UPGRADE;
-        }
+        // Upgraders are strictly stationary. They route to the controller and stay there.
+        creep.heap.targetId = roomState.controller.id;
+        creep.heap.actionIntent = ActionConstants.ACTION_UPGRADE;
     }
 
     static assignBuilder(creep, roomState) {
