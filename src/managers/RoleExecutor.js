@@ -35,12 +35,27 @@ class RoleExecutor {
 
             if (Game.time < creep.heap.sleepUntil) continue;
 
+            // Proxy pathing data: Restore volatile path from heap proxy to native Memory for execution
+            if (creep.heap.path) {
+                creep.memory._move = creep.heap.path;
+            }
+
             const actionIntent = creep.heap.actionIntent;
 
-            if (!actionIntent || actionIntent === ActionConstants.ACTION_IDLE) continue;
+            if (!actionIntent || actionIntent === ActionConstants.ACTION_IDLE) {
+                if (creep.memory._move) {
+                    creep.heap.path = creep.memory._move;
+                    delete creep.memory._move;
+                }
+                continue;
+            }
 
             if (actionIntent === ActionConstants.ACTION_SCOUT || actionIntent === ActionConstants.ACTION_MOVE_ROOM) {
                 RoleExecutor.executeCrossRoomTask(creep);
+                if (creep.memory._move) {
+                    creep.heap.path = creep.memory._move;
+                    delete creep.memory._move;
+                }
                 continue;
             }
 
@@ -50,6 +65,12 @@ class RoleExecutor {
             } else {
                 creep.heap.state = 'idle';
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            }
+
+            // Proxy pathing data: Save volatile path back to heap proxy and delete from Memory serialization
+            if (creep.memory._move) {
+                creep.heap.path = creep.memory._move;
+                delete creep.memory._move;
             }
         }
     }
