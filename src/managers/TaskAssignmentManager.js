@@ -1,21 +1,8 @@
 const ActionConstants = require('../constants/ActionConstants');
-const CreepHeapUtility = require('../utilities/CreepHeapUtility');
-const WithdrawTargetUtility = require('../utilities/WithdrawTargetUtility');
-const GameObjectUtility = require('../utilities/GameObjectUtility');
+const CacheLib = require('../lib/CacheLib');
+const MathLib = require('../lib/MathLib');
 
-/**
- * Hashes a string to a positive integer using djb2 algorithm.
- * Optimized to avoid string allocations for V8.
- * @param {string} str
- * @returns {number}
- */
-function djb2Hash(str) {
-    let hash = 5381;
-    for (let i = 0, len = str.length; i < len; i++) {
-        hash = (hash * 33) ^ str.charCodeAt(i);
-    }
-    return hash >>> 0;
-}
+
 
 /**
  * Top-Down, Heap-Driven Task Assignment Manager
@@ -37,7 +24,7 @@ class TaskAssignmentManager {
 
             let heap = global.creepHeap.get(creep.name);
             if (!heap) {
-                heap = CreepHeapUtility.getDefaultHeap();
+                heap = CacheLib.getDefaultHeap();
                 global.creepHeap.set(creep.name, heap);
             }
             creep.heap = heap;
@@ -60,7 +47,7 @@ class TaskAssignmentManager {
 
     static reregisterClaim(creep) {
         if (!creep.heap.targetId) return;
-        const target = GameObjectUtility.getById(creep.heap.targetId);
+        const target = CacheLib.getById(creep.heap.targetId);
         if (!target) return;
 
         if (creep.heap.state === 'gather') {
@@ -104,7 +91,7 @@ class TaskAssignmentManager {
             creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
             return;
         }
-        const target = GameObjectUtility.getById(creep.heap.targetId);
+        const target = CacheLib.getById(creep.heap.targetId);
 
         if (!target) {
             creep.heap.targetId = null;
@@ -438,7 +425,17 @@ class TaskAssignmentManager {
     static assignHauler(creep, roomState) {
         if (creep.heap.state === 'gather') {
             // Priority 1: Scavenge from Ruins and Tombstones
-            const scavengeTargets = WithdrawTargetUtility.getScavengeTargets(roomState);
+            const scavengeTargets = [];
+            if (roomState.ruins) {
+                for (let i = 0; i < roomState.ruins.length; i++) {
+                    if (roomState.ruins[i] && roomState.ruins[i].store && roomState.ruins[i].store.getUsedCapacity() > 0) scavengeTargets.push(roomState.ruins[i]);
+                }
+            }
+            if (roomState.tombstones) {
+                for (let i = 0; i < roomState.tombstones.length; i++) {
+                    if (roomState.tombstones[i] && roomState.tombstones[i].store && roomState.tombstones[i].store.getUsedCapacity() > 0) scavengeTargets.push(roomState.tombstones[i]);
+                }
+            }
             let bestScavenge = null;
             let bestScavengeScore = -1;
 
@@ -499,7 +496,7 @@ class TaskAssignmentManager {
             const harvesters = roomState.harvesters || [];
             if (harvesters.length > 0) {
                 // djb2 hash for even distribution across harvesters
-                const targetHarvester = harvesters[djb2Hash(creep.name) % harvesters.length];
+                const targetHarvester = harvesters[MathLib.djb2Hash(creep.name) % harvesters.length];
 
                 // Find dropped energy near this specific harvester using fast Chebyshev distance
                 // Pick highest-amount drop for efficiency

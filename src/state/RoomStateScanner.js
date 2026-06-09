@@ -1,7 +1,5 @@
-const RepairTargetUtility = require('../utilities/RepairTargetUtility');
-const EnergySourceUtility = require('../utilities/EnergySourceUtility');
-const DroppedResourceUtility = require('../utilities/DroppedResourceUtility');
-const GameObjectUtility = require('../utilities/GameObjectUtility');
+/* global STRUCTURE_INVADER_CORE */
+const CacheLib = require('../lib/CacheLib');
 
 const createRoomStateTemplate = () => ({
     controller: null,
@@ -118,8 +116,8 @@ class RoomStateScanner {
                 const mineral = room['find'](FIND_MINERALS)[0];
                 state.cache.mineralId = mineral ? mineral.id : null;
             }
-            state.sources = state.cache.sourceIds.map(id => GameObjectUtility.getById(id)).filter(Boolean);
-            state.mineral = state.cache.mineralId ? GameObjectUtility.getById(state.cache.mineralId) : null;
+            state.sources = state.cache.sourceIds.map(id => CacheLib.getById(id)).filter(Boolean);
+            state.mineral = state.cache.mineralId ? CacheLib.getById(state.cache.mineralId) : null;
 
             state.constructionSites = room['find'](FIND_MY_CONSTRUCTION_SITES);
             state.constructionSiteCount = state.constructionSites.length;
@@ -131,7 +129,7 @@ class RoomStateScanner {
                 state.cache.lastConstructionSiteCount = state.constructionSiteCount;
             }
 
-            const structures = state.cache.structureIds.map(id => GameObjectUtility.getById(id)).filter(Boolean);
+            const structures = state.cache.structureIds.map(id => CacheLib.getById(id)).filter(Boolean);
 
             for (let i = 0; i < structures.length; i++) {
                 const s = structures[i];
@@ -183,27 +181,60 @@ class RoomStateScanner {
             }
 
             // Must run after structures are scanned and added to state.structureIds
-            const rt = RepairTargetUtility.getRepairTargets(roomName, 0.8);
-            for (let i = 0; i < rt.length; i++) {
-                state.repairTargets[state.repairTargetCount++] = rt[i];
+            for (let i = 0; i < state.structureIdCount; i++) {
+                const s = CacheLib.getById(state.structureIds[i]);
+                if (!s) continue;
+                if (s.structureType === STRUCTURE_WALL || s.structureType === STRUCTURE_RAMPART) {
+                    if (s.hits < 100000) state.repairTargets[state.repairTargetCount++] = s;
+                } else if (s.hits < s.hitsMax * 0.8) {
+                    state.repairTargets[state.repairTargetCount++] = s;
+                }
             }
 
-            // Cache utility outputs for O(1) access by managers later in the tick
-            const vd = DroppedResourceUtility.getDroppedEnergy(roomName);
-            state.validDroppedEnergyCount = vd.length;
-            for(let i=0; i<vd.length; i++) state.validDroppedEnergy[i] = vd[i];
+            for (let i = 0; i < state.droppedEnergyCount; i++) {
+                if (state.droppedEnergy[i].amount > 0) {
+                    state.validDroppedEnergy[state.validDroppedEnergyCount++] = state.droppedEnergy[i];
+                }
+            }
 
-            const ad = EnergySourceUtility.findAvailableDroppedEnergy(roomName);
-            state.availableDroppedEnergyCount = ad.length;
-            for(let i=0; i<ad.length; i++) state.availableDroppedEnergy[i] = ad[i];
+            let dropOffPos = null;
+            if (state.controller) {
+                const link = state.links.find(l => l.pos.inRangeTo(state.controller, 3));
+                if (link) dropOffPos = link.pos;
+                else {
+                    const cont = state.controllerContainers[0];
+                    if (cont) dropOffPos = cont.pos;
+                }
+            }
 
-            const ert = EnergySourceUtility.findEnergyInRuinsAndTombstones(roomName);
-            state.energyInRuinsAndTombstonesCount = ert.length;
-            for(let i=0; i<ert.length; i++) state.energyInRuinsAndTombstones[i] = ert[i];
+            for (let i = 0; i < state.droppedEnergyCount; i++) {
+                const drop = state.droppedEnergy[i];
+                if (drop.amount <= 0 || drop.resourceType !== RESOURCE_ENERGY) continue;
+                if (dropOffPos && drop.pos.x === dropOffPos.x && drop.pos.y === dropOffPos.y) continue;
+                state.availableDroppedEnergy[state.availableDroppedEnergyCount++] = drop;
+            }
+            state.availableDroppedEnergy.length = state.availableDroppedEnergyCount;
+            state.availableDroppedEnergy.sort((a, b) => b.amount - a.amount);
 
-            const hs = EnergySourceUtility.findHarvestableSources(roomName);
-            state.harvestableSourceCount = hs.length;
-            for(let i=0; i<hs.length; i++) state.harvestableSources[i] = hs[i];
+            for (let i = 0; i < state.ruinCount; i++) {
+                if (state.ruins[i].store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    state.energyInRuinsAndTombstones[state.energyInRuinsAndTombstonesCount++] = state.ruins[i];
+                }
+            }
+            for (let i = 0; i < state.tombstoneCount; i++) {
+                if (state.tombstones[i].store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    state.energyInRuinsAndTombstones[state.energyInRuinsAndTombstonesCount++] = state.tombstones[i];
+                }
+            }
+            state.energyInRuinsAndTombstones.length = state.energyInRuinsAndTombstonesCount;
+            state.energyInRuinsAndTombstones.sort((a, b) => b.store.getUsedCapacity(RESOURCE_ENERGY) - a.store.getUsedCapacity(RESOURCE_ENERGY));
+
+            for (let i = 0; i < state.sources.length; i++) {
+                const s = state.sources[i];
+                if (s.energy > 0 || s.ticksToRegeneration > 0) {
+                    state.harvestableSources[state.harvestableSourceCount++] = s;
+                }
+            }
     }
 }
 

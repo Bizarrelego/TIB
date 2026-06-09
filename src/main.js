@@ -8,7 +8,7 @@ const GlobalStateScanner = require('./state/GlobalStateScanner'); // Ensure Glob
 const RoomStateScanner = require('./state/RoomStateScanner');
 const SpawnManager = require('./colonies/SpawnManager');
 const TaskAssignmentManager = require('./managers/TaskAssignmentManager');
-const RoleExecutor = require('./managers/RoleExecutor');
+const ActionExecutor = require('./managers/ActionExecutor');
 const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
 const IntelManager = require('./managers/IntelManager');
 const TrafficManager = require('./managers/TrafficManager');
@@ -16,11 +16,7 @@ const RoomPlanner = require('./managers/RoomPlanner');
 const ConstructionManager = require('./managers/ConstructionManager');
 const ScoutingManager = require('./managers/ScoutingManager');
 
-// Utilities
-const ProfilerUtility = require('./utilities/ProfilerUtility');
-const Logger = require('./utilities/Logger');
-const ErrorHandlingUtility = require('./utilities/ErrorHandlingUtility');
-const StressTestUtility = require('./utilities/StressTestUtility');
+const { ProfilerUtility, Logger, ErrorHandlingUtility, StressTestUtility } = require('./lib/SystemLib');
 
 module.exports.loop = function () {
     // Profiler Start
@@ -72,7 +68,7 @@ module.exports.loop = function () {
     }, 'SpawnManager')();
 
     // 6. Intent Execution
-    ErrorHandlingUtility.wrap(() => RoleExecutor.run(), 'RoleExecutor')();
+    ErrorHandlingUtility.wrap(() => ActionExecutor.run(), 'ActionExecutor')();
 
     // 7. Traffic Management (resolves collisions and executes bulk move API calls)
     ErrorHandlingUtility.wrap(() => TrafficManager.run(), 'TrafficManager')();

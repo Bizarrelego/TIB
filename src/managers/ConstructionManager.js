@@ -1,4 +1,4 @@
-const GameObjectUtility = require('../utilities/GameObjectUtility');
+const CacheLib = require('../lib/CacheLib');
 
 /**
  * Decouples blueprint generation from execution, ensuring high-priority structures 
@@ -49,7 +49,7 @@ class ConstructionManager {
         const existingPositions = new Set();
         if (state.structureIds) {
             for (let i = 0; i < state.structureIds.length; i++) {
-                const s = GameObjectUtility.getById(state.structureIds[i]);
+                const s = CacheLib.getById(state.structureIds[i]);
                 if (s) existingPositions.add(`${s.pos.x}_${s.pos.y}_${s.structureType}`);
             }
         }
@@ -84,7 +84,7 @@ class ConstructionManager {
             let count = 0;
             if (state.structureIds) {
                 for (let i = 0; i < state.structureIds.length; i++) {
-                    const s = GameObjectUtility.getById(state.structureIds[i]);
+                    const s = CacheLib.getById(state.structureIds[i]);
                     if (s && s.structureType === structureType) count++;
                 }
             }
