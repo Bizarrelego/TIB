@@ -51,6 +51,7 @@ const createRoomStateTemplate = () => ({
     energyInRuinsAndTombstonesCount: 0,
     harvestableSourceCount: 0,
     hostileCount: 0,
+    hasThreatEvent: false,
     invaderCoreCount: 0,
     structureIdCount: 0,
     repairTargetCount: 0,
@@ -204,6 +205,25 @@ class RoomStateScanner {
             const hs = EnergySourceUtility.findHarvestableSources(roomName);
             state.harvestableSourceCount = hs.length;
             for(let i=0; i<hs.length; i++) state.harvestableSources[i] = hs[i];
+
+            // EventLog Radar for Threat Detection (Brain/Muscle/Eyes split)
+            state.hasThreatEvent = false;
+            const events = room['getEventLog']();
+            for (let i = 0; i < events.length; i++) {
+                if (events[i].event === EVENT_ATTACK || events[i].event === EVENT_HEAL) {
+                    state.hasThreatEvent = true;
+                    break;
+                }
+            }
+
+            if (state.hasThreatEvent || state.hostileCount > 0 || Game.time % 13 === 0) {
+                const hostiles = room['find'](FIND_HOSTILE_CREEPS);
+                state.hostileCount = hostiles.length;
+                state.hostiles = hostiles;
+            } else {
+                state.hostileCount = 0;
+                state.hostiles = [];
+            }
     }
 }
 

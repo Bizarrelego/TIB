@@ -475,22 +475,8 @@ class TrafficManager {
         // Injects dynamic threat zones into the tick-cached matrix, forcing civilian creeps to naturally route around danger and allowing rangers to kite along the cost gradient.
         const room = Game.rooms[roomName];
         if (room) {
-            let hostiles = [];
             const roomState = global.State && global.State.rooms ? global.State.rooms.get(roomName) : null;
-            const knownHostileCount = roomState ? roomState.hostileCount : 0;
-
-            let hasThreatEvent = false;
-            const events = room.getEventLog();
-            for (let i = 0; i < events.length; i++) {
-                if (events[i].event === EVENT_ATTACK || events[i].event === EVENT_HEAL) {
-                    hasThreatEvent = true;
-                    break;
-                }
-            }
-
-            if (hasThreatEvent || knownHostileCount > 0 || Game.time % 13 === 0) {
-                hostiles = room.find(FIND_HOSTILE_CREEPS);
-            }
+            const hostiles = roomState ? roomState.hostiles : [];
 
             for (let i = 0; i < hostiles.length; i++) {
                 const hostile = hostiles[i];
