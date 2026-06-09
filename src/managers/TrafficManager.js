@@ -15,7 +15,9 @@ const ROLE_PRIORITY = {
 
 /**
  * Top-Down Traffic Manager
- * Centralized intent graph resolver and path cache.
+ * Per-room packed coordinate recursive DFS traffic resolution.
+ * Improves performance by replacing string concatenation with integer math.
+ * Resolves multi-creep deadlocks via recursive displacement.
  */
 class TrafficManager {
     static getPriority(creep) {
@@ -25,24 +27,22 @@ class TrafficManager {
     static run() {
         if (!global.creepHeap) return;
 
-        const intendedMoves = new Map(); // creepName -> { x, y, roomName }
-        const grid = new Map(); // `${x},${y},${roomName}` -> creepName
+        const creepsByRoom = new Map();
 
-        // Pass 1: Register all creeps on the grid (including fatigued)
+        // Pass 1: Global Path Generation & Collection
         for (const creepName in Game.creeps) {
             const creep = Game.creeps[creepName];
-            const currentKey = `${creep.pos.x},${creep.pos.y},${creep.room.name}`;
-            grid.set(currentKey, creep.name);
-        }
-
-        // Pass 2: Path Generation & Caching
-        for (const creepName in Game.creeps) {
-            const creep = Game.creeps[creepName];
-            if (creep.spawning || creep.fatigue > 0) continue;
+            if (creep.spawning) continue;
+            
+            if (creep.fatigue > 0) {
+                TrafficManager.addCreepToRoom(creepsByRoom, creep);
+                continue;
+            }
 
             const heap = creep.heap;
             if (!heap || !heap.destination) {
                 if (heap && heap.path) heap.path = null;
+                TrafficManager.addCreepToRoom(creepsByRoom, creep);
                 continue;
             }
 
@@ -55,6 +55,7 @@ class TrafficManager {
                 if (range <= destRange) {
                     heap.destination = null;
                     heap.path = null;
+                    TrafficManager.addCreepToRoom(creepsByRoom, creep);
                     continue;
                 }
             }
@@ -96,125 +97,193 @@ class TrafficManager {
                     heap.unreachableTargetId = heap.targetId;
                     heap.destination = null;
                     heap.path = null;
+                    TrafficManager.addCreepToRoom(creepsByRoom, creep);
                     continue;
                 }
 
-                // Serialize path to simple objects
                 heap.path = pathResult.path.map(p => ({ x: p.x, y: p.y, roomName: p.roomName }));
                 heap.pathDest = { x: dest.x, y: dest.y, roomName: dest.roomName };
             }
 
-            // Pop next step
-            if (heap.path && heap.path.length > 0) {
-                const nextStep = heap.path[0];
-                intendedMoves.set(creep.name, nextStep);
-            }
+            TrafficManager.addCreepToRoom(creepsByRoom, creep);
         }
 
-        // Pass 3: Issue Move Intents & Push Chains
-        const processed = new Set();
+        // Pass 2: Per-Room DFS Traffic Resolution
+        for (const [roomName, roomCreeps] of creepsByRoom) {
+            TrafficManager.resolveRoomTraffic(roomName, roomCreeps);
+        }
+    }
 
-        for (const [creepName, nextStep] of intendedMoves) {
-            if (processed.has(creepName)) continue;
+    static addCreepToRoom(map, creep) {
+        let list = map.get(creep.room.name);
+        if (!list) {
+            list = [];
+            map.set(creep.room.name, list);
+        }
+        list.push(creep);
+    }
 
-            const creep = Game.creeps[creepName];
-            const nextKey = `${nextStep.x},${nextStep.y},${nextStep.roomName}`;
-            const blockerName = grid.get(nextKey);
-
-            if (blockerName && blockerName !== creepName) {
-                const blocker = Game.creeps[blockerName];
-                const blockerNext = intendedMoves.get(blockerName);
-
-                const creepPriority = TrafficManager.getPriority(creep);
-                const blockerPriority = TrafficManager.getPriority(blocker);
-
-                if (!blockerNext) {
-                    // Blocker is idle
-                    if (creepPriority >= blockerPriority) {
-                        // High priority creep pushes idle lower priority blocker
-                        const emptyPos = TrafficManager.findEmptyAdjacent(blocker, grid);
-                        if (emptyPos) {
-                            const dirToEmpty = TrafficManager.getSafeDirection(blocker.pos, emptyPos);
-                            blocker.move(dirToEmpty);
-                            grid.set(`${emptyPos.x},${emptyPos.y},${emptyPos.roomName}`, blockerName);
-                        } else {
-                            // No empty tile, force a swap
-                            const dirToCreep = TrafficManager.getSafeDirection(blocker.pos, creep.pos);
-                            blocker.move(dirToCreep);
-                        }
-                        
-                        const dirToBlocker = TrafficManager.getSafeDirection(creep.pos, nextStep);
-                        creep.move(dirToBlocker);
-                        
-                        processed.add(blockerName);
-                    } else {
-                        // Creep is lower priority, it cannot move. It stalls.
-                    }
-                } else if (blockerNext.x === creep.pos.x && blockerNext.y === creep.pos.y && blockerNext.roomName === creep.room.name) {
-                    // Direct swap scenario (they want to move into each other)
-                    const dirToBlocker = TrafficManager.getSafeDirection(creep.pos, nextStep);
-                    const dirToCreep = TrafficManager.getSafeDirection(blocker.pos, creep.pos);
-                    
-                    creep.move(dirToBlocker);
-                    blocker.move(dirToCreep);
-                    
-                    processed.add(blockerName);
+    static resolveRoomTraffic(roomName, creeps) {
+        const grid = new Int32Array(2500);
+        grid.fill(-1);
+        
+        const creepList = [];
+        const nextSteps = new Int32Array(creeps.length);
+        const resolvedIntents = new Int32Array(creeps.length);
+        resolvedIntents.fill(-1);
+        
+        const priorityScore = new Int32Array(creeps.length);
+        
+        for (let i = 0; i < creeps.length; i++) {
+            const creep = creeps[i];
+            creepList.push(creep);
+            const packed = (creep.pos.y * 50) + creep.pos.x;
+            grid[packed] = i;
+            
+            priorityScore[i] = TrafficManager.getPriority(creep);
+            
+            if (creep.heap && creep.heap.path && creep.heap.path.length > 0 && creep.fatigue === 0) {
+                const step = creep.heap.path[0];
+                if (step.roomName === roomName) {
+                    nextSteps[i] = (step.y * 50) + step.x;
                 } else {
-                    // Blocker is moving somewhere else. Wait for the engine to resolve the train.
-                    const dirToNext = TrafficManager.getSafeDirection(creep.pos, nextStep);
-                    creep.move(dirToNext);
+                    nextSteps[i] = -2; // Special flag: leaving room
                 }
             } else {
-                // Tile is empty, just move
-                const dirToNext = TrafficManager.getSafeDirection(creep.pos, nextStep);
-                creep.move(dirToNext);
+                nextSteps[i] = -1; // Idle
             }
-            processed.add(creepName);
         }
+
+        const terrain = Game.map.getRoomTerrain(roomName);
+        const matrix = TrafficManager.getCostMatrix(roomName);
+        
+        // Sort indices by priority so high priority cascades first
+        const sortedIndices = [];
+        for (let i = 0; i < creeps.length; i++) sortedIndices.push(i);
+        sortedIndices.sort((a, b) => priorityScore[b] - priorityScore[a]);
+
+        const visited = new Uint8Array(creeps.length);
+
+        for (let k = 0; k < sortedIndices.length; k++) {
+            const i = sortedIndices[k];
+            if (nextSteps[i] === -1 || nextSteps[i] === -2) continue;
+            if (resolvedIntents[i] !== -1) continue; 
+            
+            const targetPacked = nextSteps[i];
+            if (targetPacked < 0 || targetPacked >= 2500) continue;
+            
+            visited.fill(0);
+            const success = TrafficManager.depthFirstSearch(i, targetPacked, priorityScore[i], terrain, matrix, grid, nextSteps, resolvedIntents, visited, creepList);
+            
+            if (success) {
+                resolvedIntents[i] = targetPacked;
+                const origPacked = (creepList[i].pos.y * 50) + creepList[i].pos.x;
+                if (grid[origPacked] === i) grid[origPacked] = -1;
+                grid[targetPacked] = i;
+            } else {
+                // Direct swap fallback if DFS fails but priorities allow
+                const blockerIdx = grid[targetPacked];
+                if (blockerIdx !== -1 && blockerIdx !== i) {
+                    if (priorityScore[i] >= priorityScore[blockerIdx]) {
+                        const origPacked = (creepList[i].pos.y * 50) + creepList[i].pos.x;
+                        resolvedIntents[i] = targetPacked;
+                        resolvedIntents[blockerIdx] = origPacked;
+                        grid[origPacked] = blockerIdx;
+                        grid[targetPacked] = i;
+                    }
+                }
+            }
+        }
+        
+        // Issue final intents
+        for (let i = 0; i < creeps.length; i++) {
+            const creep = creepList[i];
+            let dir = null;
+            
+            if (resolvedIntents[i] >= 0) {
+                const targetPacked = resolvedIntents[i];
+                const tx = targetPacked % 50;
+                const ty = Math.floor(targetPacked / 50);
+                dir = creep.pos.getDirectionTo(tx, ty);
+            } else if (resolvedIntents[i] === -2 || nextSteps[i] === -2) {
+                const step = creep.heap.path[0];
+                dir = TrafficManager.getSafeDirection(creep.pos, step);
+            }
+            
+            if (dir) creep.move(dir);
+        }
+    }
+
+    /**
+     * Recursive DFS logic to push chains of creeps efficiently.
+     * Replaces findEmptyAdjacent with multi-depth resolution.
+     */
+    static depthFirstSearch(creepIdx, targetPacked, minScore, terrain, matrix, grid, nextSteps, resolvedIntents, visited, creepList) {
+        const tx = targetPacked % 50;
+        const ty = Math.floor(targetPacked / 50);
+        
+        if (terrain.get(tx, ty) === TERRAIN_MASK_WALL || matrix.get(tx, ty) === 255) return false;
+
+        const blockerIdx = grid[targetPacked];
+        if (blockerIdx === -1) return true; // Target tile is completely empty
+
+        if (visited[blockerIdx]) return false; // Cycle detection
+        visited[blockerIdx] = 1;
+
+        const blockerScore = TrafficManager.getPriority(creepList[blockerIdx]);
+        if (minScore < blockerScore) return false; // Prevent low-priority creeps from displacing high-priority
+
+        // If the blocker is already leaving the room, we can just assume the tile opens up
+        if (nextSteps[blockerIdx] === -2) {
+            resolvedIntents[blockerIdx] = -2;
+            grid[targetPacked] = -1;
+            return true;
+        }
+
+        // Try blocker's intended move first (Chain continuation)
+        if (nextSteps[blockerIdx] >= 0 && nextSteps[blockerIdx] !== targetPacked) {
+            const bTarget = nextSteps[blockerIdx];
+            if (TrafficManager.depthFirstSearch(blockerIdx, bTarget, blockerScore, terrain, matrix, grid, nextSteps, resolvedIntents, visited, creepList)) {
+                resolvedIntents[blockerIdx] = bTarget;
+                grid[targetPacked] = -1;
+                grid[bTarget] = blockerIdx;
+                return true;
+            }
+        }
+
+        // Try pushing blocker to adjacent empty tiles
+        const bx = tx;
+        const by = ty;
+        const dirs = [-51, -50, -49, -1, 1, 49, 50, 51];
+        
+        for (let d = 0; d < 8; d++) {
+            const newPacked = targetPacked + dirs[d];
+            const nx = newPacked % 50;
+            const ny = Math.floor(newPacked / 50);
+            
+            if (Math.abs(nx - bx) > 1 || Math.abs(ny - by) > 1) continue;
+            if (nx <= 0 || nx >= 49 || ny <= 0 || ny >= 49) continue;
+            
+            // Pass minScore through to let the heavy pusher force the blocker's DFS
+            if (TrafficManager.depthFirstSearch(blockerIdx, newPacked, minScore, terrain, matrix, grid, nextSteps, resolvedIntents, visited, creepList)) {
+                resolvedIntents[blockerIdx] = newPacked;
+                grid[targetPacked] = -1;
+                grid[newPacked] = blockerIdx;
+                return true;
+            }
+        }
+
+        return false;
     }
 
     static getSafeDirection(fromPos, toPos) {
         if (fromPos.roomName !== toPos.roomName) {
-            // Handle cross-room properly to avoid edge bouncing
             if (fromPos.x === 0 && toPos.x === 49) return LEFT;
             if (fromPos.x === 49 && toPos.x === 0) return RIGHT;
             if (fromPos.y === 0 && toPos.y === 49) return TOP;
             if (fromPos.y === 49 && toPos.y === 0) return BOTTOM;
         }
         return fromPos.getDirectionTo(toPos.x, toPos.y);
-    }
-
-    static findEmptyAdjacent(creep, grid) {
-        const x = creep.pos.x;
-        const y = creep.pos.y;
-        const roomName = creep.room.name;
-        
-        const matrix = TrafficManager.getCostMatrix(roomName);
-        const terrain = Game.map.getRoomTerrain(roomName);
-
-        for (let dx = -1; dx <= 1; dx++) {
-            for (let dy = -1; dy <= 1; dy++) {
-                if (dx === 0 && dy === 0) continue;
-                const nx = x + dx;
-                const ny = y + dy;
-                
-                // Don't push into room exits
-                if (nx <= 0 || nx >= 49 || ny <= 0 || ny >= 49) continue;
-                
-                // Check terrain
-                if (terrain.get(nx, ny) === TERRAIN_MASK_WALL) continue;
-                
-                // Check structures
-                if (matrix.get(nx, ny) === 255) continue;
-                
-                // Check creeps
-                const key = `${nx},${ny},${roomName}`;
-                if (!grid.has(key)) {
-                    return { x: nx, y: ny, roomName: roomName };
-                }
-            }
-        }
-        return null;
     }
 
     static getCostMatrix(roomName) {
@@ -225,14 +294,11 @@ class TrafficManager {
         const currentStructCount = roomState ? roomState.structureIdCount : 0;
         
         const cached = global.Cache.costMatrices.get(roomName);
-        
-        // Invalidate if structure count changes
         if (cached && cached.structureCount === currentStructCount) {
             return cached.matrix;
         }
 
         const matrix = new PathFinder.CostMatrix();
-
         if (roomState && roomState.structureIds) {
             for (let i = 0; i < roomState.structureIdCount; i++) {
                 const s = Game.getObjectById(roomState.structureIds[i]);
