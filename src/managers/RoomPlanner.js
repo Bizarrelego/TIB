@@ -1,5 +1,3 @@
-const GameObjectUtility = require('../utilities/GameObjectUtility');
-
 /**
  * Production-Grade Room Planner v5 — Diamond Bunker
  *

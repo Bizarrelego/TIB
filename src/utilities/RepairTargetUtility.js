@@ -7,7 +7,7 @@ const GameObjectUtility = require('./GameObjectUtility');
 
 /**
  * Returns an array of Structure objects that are damaged and need repair.
- * Excludes walls and ramparts.
+ * Includes walls and ramparts up to a threshold.
  * @param {string} roomName - The name of the room to check.
  * @param {number} threshold - The maximum hits percentage (e.g., 0.8 for 80% health).
  * @returns {Structure[]} Array of structures needing repair.
@@ -15,11 +15,8 @@ const GameObjectUtility = require('./GameObjectUtility');
 function getRepairTargets(roomName, threshold) {
     let structureIds = null;
 
-    // Handle both the acceptance criteria's expected global.state.rooms[roomName]
-    // and the actual application's global.State.rooms.get(roomName)
-    if (global.state && global.state.rooms && global.state.rooms[roomName]) {
-        structureIds = global.state.rooms[roomName].structureIds;
-    } else if (global.State && global.State.rooms && typeof global.State.rooms.get === 'function') {
+    // Fetch the cached structure IDs from the global state using Map.get()
+    if (global.State && global.State.rooms && typeof global.State.rooms.get === 'function') {
         const roomState = global.State.rooms.get(roomName);
         if (roomState) {
             structureIds = roomState.structureIds;
@@ -35,6 +32,10 @@ function getRepairTargets(roomName, threshold) {
         if (!structure) continue;
 
         if (structure.structureType === STRUCTURE_WALL || structure.structureType === STRUCTURE_RAMPART) {
+            // Cap wall and rampart repair targets at 100,000 hits to avoid infinite repair loops
+            if (structure.hits < 100000) {
+                repairTargets.push(structure);
+            }
             continue;
         }
 
