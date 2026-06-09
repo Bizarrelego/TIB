@@ -84,6 +84,17 @@ class TrafficManager {
                 heap.stallCount = 0; // Reset after forcing recalculation
             }
 
+            if (!needsPath && heap.stallCount > 0 && heap.path && heap.path.length > 0) {
+                const nextStep = heap.path[0];
+                if (nextStep.roomName === creep.room.name) {
+                    const matrix = TrafficManager.getCostMatrix(creep.room.name);
+                    if (matrix.get(nextStep.x, nextStep.y) === 255) {
+                        needsPath = true;
+                        heap.stallCount = 0;
+                    }
+                }
+            }
+
             if (needsPath) {
                 const targetPos = new RoomPosition(dest.x, dest.y, dest.roomName);
                 const destRange = dest.range !== undefined ? dest.range : 1;
@@ -332,28 +343,53 @@ class TrafficManager {
         const currentStructCount = roomState ? roomState.structureIdCount : 0;
         
         const cached = global.Cache.costMatrices.get(roomName);
+        let baseMatrix;
         if (cached && cached.structureCount === currentStructCount) {
-            return cached.matrix;
+            baseMatrix = cached.matrix;
+        } else {
+            baseMatrix = new PathFinder.CostMatrix();
+            if (roomState && roomState.structureIds) {
+                for (let i = 0; i < roomState.structureIdCount; i++) {
+                    const s = Game.getObjectById(roomState.structureIds[i]);
+                    if (s && s.structureType !== STRUCTURE_ROAD && s.structureType !== STRUCTURE_CONTAINER && s.structureType !== STRUCTURE_RAMPART) {
+                        baseMatrix.set(s.pos.x, s.pos.y, 255);
+                    } else if (s && s.structureType === STRUCTURE_ROAD) {
+                        baseMatrix.set(s.pos.x, s.pos.y, 1);
+                    }
+                }
+            }
+            global.Cache.costMatrices.set(roomName, {
+                matrix: baseMatrix,
+                structureCount: currentStructCount
+            });
         }
 
-        const matrix = new PathFinder.CostMatrix();
-        if (roomState && roomState.structureIds) {
-            for (let i = 0; i < roomState.structureIdCount; i++) {
-                const s = Game.getObjectById(roomState.structureIds[i]);
-                if (s && s.structureType !== STRUCTURE_ROAD && s.structureType !== STRUCTURE_CONTAINER && s.structureType !== STRUCTURE_RAMPART) {
-                    matrix.set(s.pos.x, s.pos.y, 255);
-                } else if (s && s.structureType === STRUCTURE_ROAD) {
-                    matrix.set(s.pos.x, s.pos.y, 1);
+        if (!global.Cache.tickMatrices) global.Cache.tickMatrices = new Map();
+        if (global.Cache.tickMatricesTime !== Game.time) {
+            global.Cache.tickMatrices.clear();
+            global.Cache.tickMatricesTime = Game.time;
+        }
+
+        let tickMatrix = global.Cache.tickMatrices.get(roomName);
+        if (tickMatrix) return tickMatrix;
+
+        tickMatrix = baseMatrix.clone();
+        
+        // Fixes stationary creep deadlocks by injecting their positions as unwalkable (255) into a tick-cached cloned matrix, forcing PathFinder to route around them.
+        const room = Game.rooms[roomName];
+        if (room) {
+            const creeps = room.find(FIND_MY_CREEPS);
+            for (let i = 0; i < creeps.length; i++) {
+                const c = creeps[i];
+                const role = (c.memory.role || '').toLowerCase();
+                if (role === 'harvester' || role === 'upgrader' || (c.heap && c.heap.sitTargetId)) {
+                    tickMatrix.set(c.pos.x, c.pos.y, 255);
                 }
             }
         }
 
-        global.Cache.costMatrices.set(roomName, {
-            matrix: matrix,
-            structureCount: currentStructCount
-        });
-
-        return matrix;
+        global.Cache.tickMatrices.set(roomName, tickMatrix);
+        return tickMatrix;
     }
 }
 
