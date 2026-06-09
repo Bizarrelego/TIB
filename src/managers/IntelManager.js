@@ -94,12 +94,19 @@ class IntelManager {
         // 4. Hostile Threat Assessment
         const hostileCreeps = state.hostiles || [];
         const towers = state.towers || [];
-        const hostileTowers = towers.filter(s => !s.my && s.structureType === STRUCTURE_TOWER);
+        
+        let hostileTowerCount = 0;
+        for (let i = 0; i < towers.length; i++) {
+            if (!towers[i].my && towers[i].structureType === STRUCTURE_TOWER) {
+                hostileTowerCount++;
+            }
+        }
+        
         const invaderCores = state.invaderCores || [];
 
         const hostilesObj = mem.hostiles;
         hostilesObj.creeps = hostileCreeps.length;
-        hostilesObj.towers = hostileTowers.length;
+        hostilesObj.towers = hostileTowerCount;
         hostilesObj.invaderCore = invaderCores.length > 0;
 
         // 5. Scavenging Data
