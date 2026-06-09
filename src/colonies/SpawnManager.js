@@ -37,7 +37,13 @@ class SpawnManager {
         const bootstrapperCount = getCount('bootstrapper');
 
         // Total colony collapse: use raw Game.creeps count (not ghost census) to prevent spawning too many
-        const rawBootstrapperCount = Object.values(Game.creeps).filter(c => c.memory.colony === roomName && c.memory.role === 'bootstrapper').length;
+        let rawBootstrapperCount = 0;
+        for (const name in Game.creeps) {
+            const c = Game.creeps[name];
+            if (c.memory.colony === roomName && c.memory.role === 'bootstrapper') {
+                rawBootstrapperCount++;
+            }
+        }
 
         // Emergency Protocol: If ALL economy roles are gone, kickstart with minimal bootstrappers
         if (harvesterCount === 0 && haulerCount === 0 && bootstrapperCount === 0 && rawBootstrapperCount === 0) {
