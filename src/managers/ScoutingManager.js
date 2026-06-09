@@ -1,81 +1,96 @@
 const ActionConstants = require('../constants/ActionConstants');
 
-/**
- * Implements a self-sustaining, memory-driven map crawler that prioritizes stale intel 
- * without requiring expensive global pathfinding queues.
- */
 class ScoutingManager {
     static run() {
-        if (!Memory.rooms) Memory.rooms = {};
+        for (const name in Game.creeps) {
+            const creep = Game.creeps[name];
+            if (creep.memory.role !== 'scout' || creep.spawning) continue;
 
-        for (const creepName in Game.creeps) {
-            const creep = Game.creeps[creepName];
-            if (creep.memory.role !== 'scout') continue;
+            if (!creep.heap) creep.heap = {};
 
-            // If the scout is moving between rooms, skip it
+            // 1. Edge avoidance: if on an edge, pull into the room and wait
             if (creep.pos.x === 0 || creep.pos.x === 49 || creep.pos.y === 0 || creep.pos.y === 49) {
+                creep.heap.destination = { x: 25, y: 25, roomName: creep.room.name, range: 20 };
+                creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
                 continue;
             }
 
-            if (!creep.heap) creep.heap = {};
+            // 2. Intent Preservation: If it has ANY destination, it hasn't arrived yet. Let TrafficManager finish.
+            // Improves execution stability by preventing the scout from overwriting its own destination at x=1.
+            if (creep.heap.destination) {
+                creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+                continue;
+            }
+
+            // 3. Target Selection: Safe inside a room, needs a new room to scout
+            const exits = Game.map.describeExits(creep.room.name);
+            if (!exits) continue;
+
+            let oldestRoom = null;
+            let oldestTime = Infinity;
+
             if (!creep.heap.visitedRooms) creep.heap.visitedRooms = [];
 
-            // Add current room to visited log if it's new
-            const currentRoom = creep.room.name;
-            const lastVisited = creep.heap.visitedRooms.length > 0 ? creep.heap.visitedRooms[creep.heap.visitedRooms.length - 1] : null;
-            
-            if (currentRoom !== lastVisited) {
-                creep.heap.visitedRooms.push(currentRoom);
+            for (const dir in exits) {
+                const exitRoom = exits[dir];
+
+                // Avoid Source Keeper / Sector Center rooms to prevent instant death loops
+                if (ScoutingManager.isKeeperRoom(exitRoom)) continue;
+
+                // Avoid immediate backtracking
+                if (creep.heap.visitedRooms.includes(exitRoom) && Object.keys(exits).length > 1) {
+                    continue;
+                }
+
+                const scoutedAt = Memory.rooms[exitRoom]?.scoutedAt || 0;
+                if (scoutedAt < oldestTime) {
+                    oldestTime = scoutedAt;
+                    oldestRoom = exitRoom;
+                }
+            }
+
+            // Fallback: If all exits are visited or SK rooms, pick the oldest valid one anyway
+            if (!oldestRoom) {
+                for (const dir in exits) {
+                    const exitRoom = exits[dir];
+                    if (ScoutingManager.isKeeperRoom(exitRoom)) continue;
+
+                    const scoutedAt = Memory.rooms[exitRoom]?.scoutedAt || 0;
+                    if (scoutedAt < oldestTime) {
+                        oldestTime = scoutedAt;
+                        oldestRoom = exitRoom;
+                    }
+                }
+            }
+
+            if (oldestRoom) {
+                // Update visited rooms history without duplicating the current room erroneously
+                if (creep.heap.visitedRooms[creep.heap.visitedRooms.length - 1] !== creep.room.name) {
+                    creep.heap.visitedRooms.push(creep.room.name);
+                }
                 if (creep.heap.visitedRooms.length > 3) {
                     creep.heap.visitedRooms.shift();
                 }
-            }
 
-            if (!creep.memory.targetRoom || creep.room.name === creep.memory.targetRoom || creep.heap.actionIntent === ActionConstants.ACTION_IDLE) {
-                const exits = Game.map.describeExits(creep.room.name);
-                if (!exits) continue;
-
-                let bestExit = null;
-                let oldestTime = Infinity;
-                let fallbackExit = null;
-                let fallbackTime = Infinity;
-
-                const exitRooms = Object.values(exits);
-                for (let i = 0; i < exitRooms.length; i++) {
-                    const exitRoom = exitRooms[i];
-                    const scoutedAt = Memory.rooms[exitRoom] ? (Memory.rooms[exitRoom].scoutedAt || 0) : 0;
-
-                    if (scoutedAt < fallbackTime) {
-                        fallbackTime = scoutedAt;
-                        fallbackExit = exitRoom;
-                    }
-
-                    let recentlyVisited = false;
-                    for (let j = 0; j < creep.heap.visitedRooms.length; j++) {
-                        if (creep.heap.visitedRooms[j] === exitRoom) {
-                            recentlyVisited = true;
-                            break;
-                        }
-                    }
-
-                    if (recentlyVisited) continue;
-
-                    if (scoutedAt < oldestTime) {
-                        oldestTime = scoutedAt;
-                        bestExit = exitRoom;
-                    }
-                }
-
-                if (!bestExit) {
-                    bestExit = fallbackExit; 
-                }
-
-                if (bestExit) {
-                    creep.memory.targetRoom = bestExit;
-                    creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
-                }
+                creep.heap.destination = { x: 25, y: 25, roomName: oldestRoom, range: 20 };
+                creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
             }
         }
+    }
+
+    /**
+     * Determines if a room is a Source Keeper room or Sector Center based on coordinate math.
+     * Prevents scouts from wandering into instant-death zones.
+     */
+    static isKeeperRoom(roomName) {
+        const parsed = /^[WE]([0-9]+)[NS]([0-9]+)$/.exec(roomName);
+        if (!parsed) return false;
+
+        const x = parseInt(parsed[1]) % 10;
+        const y = parseInt(parsed[2]) % 10;
+
+        // Rooms ending in 4, 5, or 6 in both X and Y are SK rooms or the Sector Center
+        return (x >= 4 && x <= 6) && (y >= 4 && y <= 6);
     }
 }
 

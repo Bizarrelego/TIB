@@ -31,6 +31,25 @@ class TowerManager {
             const room = Game.rooms[roomName];
             if (!room) continue;
 
+            // 1.5 Emergency Maintenance: Repair critically damaged ramparts/walls (< 10,000 HP) immediately
+            let emergencyTarget = null;
+            if (roomState.repairTargets && roomState.repairTargets.length > 0) {
+                for (let i = 0; i < roomState.repairTargets.length; i++) {
+                    const t = roomState.repairTargets[i];
+                    if ((t.structureType === STRUCTURE_RAMPART || t.structureType === STRUCTURE_WALL) && t.hits < 10000) {
+                        if (!emergencyTarget || t.hits < emergencyTarget.hits) {
+                            emergencyTarget = t;
+                        }
+                    }
+                }
+            }
+            if (emergencyTarget) {
+                for (let i = 0; i < towers.length; i++) {
+                    towers[i].repair(emergencyTarget);
+                }
+                continue; // Towers are busy with emergency repair
+            }
+
             // 2. Healing: Heal any damaged friendly creeps (from global state, no room.find)
             let damagedTarget = null;
             if (roomState.creeps) {

@@ -170,7 +170,7 @@ class CensusCalculator {
             }
         }
 
-        limits.scout = (global.State && global.State.scoutQueue && global.State.scoutQueue.length > 0) ? 1 : 0;
+        limits.scout = (rcl >= 3) ? 1 : 0;
 
         let hostilesFound = false;
         if (roomState && roomState.hostiles && roomState.hostiles.length > 0) hostilesFound = true;
@@ -184,7 +184,9 @@ class CensusCalculator {
                 }
             }
         }
-        limits.defender = hostilesFound ? 1 : 0;
+        if (hostilesFound) {
+            limits.defender = 2; // Priority 0 during an active siege
+        }
 
         const hasOffensiveQueue = global.State && global.State.militaryQueue && global.State.militaryQueue.length > 0;
         if (hostilesFound) {
@@ -197,6 +199,20 @@ class CensusCalculator {
             limits.meleeCreep = Math.min(2, (limits.meleeCreep || 0) + 1);
             limits.rangerCreep = Math.min(2, (limits.rangerCreep || 0) + 1);
             limits.medicCreep = Math.min(2, (limits.medicCreep || 0) + 1);
+        }
+
+        // Link Transition Protocol
+        if (roomName && Memory.rooms && Memory.rooms[roomName] && Memory.rooms[roomName].sources) {
+            let linkedSources = 0;
+            const sourcesData = Memory.rooms[roomName].sources;
+            for (const id in sourcesData) {
+                if (sourcesData[id] && sourcesData[id].isLinked) {
+                    linkedSources++;
+                }
+            }
+            if (linkedSources > 0) {
+                limits.hauler = Math.max(0, (limits.hauler || 0) - linkedSources);
+            }
         }
 
         return limits;
@@ -265,9 +281,9 @@ class SpawnManager {
         }
 
         const spawnPriority = [
-            'filler', 'harvester', 'hauler', 'upgrader', 'builder', 
+            'defender', 'filler', 'harvester', 'hauler', 'upgrader', 'builder', 
             'repairman', 'remoteharvester', 'remotehauler', 
-            'defender', 'meleeCreep', 'rangerCreep', 'medicCreep', 'scout'
+            'meleeCreep', 'rangerCreep', 'medicCreep', 'scout'
         ];
 
         for (let i = 0; i < spawnPriority.length; i++) {

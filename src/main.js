@@ -15,6 +15,8 @@ const TrafficManager = require('./managers/TrafficManager');
 const RoomPlanner = require('./managers/RoomPlanner');
 const ConstructionManager = require('./managers/ConstructionManager');
 const ScoutingManager = require('./managers/ScoutingManager');
+const LinkManager = require('./managers/LinkManager');
+const InfrastructureManager = require('./managers/InfrastructureManager');
 
 const { ProfilerUtility, Logger, ErrorHandlingUtility, StressTestUtility } = require('./lib/SystemLib');
 
@@ -59,6 +61,12 @@ module.exports.loop = function () {
 
     // 4. Task Assignment
     ErrorHandlingUtility.wrap(() => TaskAssignmentManager.run(), 'TaskAssignmentManager')();
+
+    // 4.5 Link Management
+    ErrorHandlingUtility.wrap(() => LinkManager.run(), 'LinkManager')();
+
+    // 4.8 Infrastructure Transition
+    ErrorHandlingUtility.wrap(() => InfrastructureManager.run(), 'InfrastructureManager')();
 
     // 5. Spawning
     ErrorHandlingUtility.wrap(() => {

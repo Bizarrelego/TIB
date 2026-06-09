@@ -1,3 +1,4 @@
+/* global STRUCTURE_INVADER_CORE */
 const CacheLib = require('../lib/CacheLib');
 
 const createRoomStateTemplate = () => ({
@@ -163,6 +164,11 @@ class RoomStateScanner {
                 }
             }
 
+            const hostiles = room['find'](FIND_HOSTILE_CREEPS);
+            for (let i = 0; i < hostiles.length; i++) {
+                state.hostiles[state.hostileCount++] = hostiles[i];
+            }
+
             const drops = room['find'](FIND_DROPPED_RESOURCES);
             for (let i = 0; i < drops.length; i++) {
                 if (drops[i].resourceType === RESOURCE_ENERGY) {
@@ -185,11 +191,14 @@ class RoomStateScanner {
             }
 
             // Must run after structures are scanned and added to state.structureIds
+            const rcl = state.controller ? state.controller.level : 0;
+            const rampartTargetHits = [0, 10000, 10000, 10000, 100000, 500000, 1000000, 2000000, 3000000][rcl] || 10000;
+
             for (let i = 0; i < state.structureIdCount; i++) {
                 const s = CacheLib.getById(state.structureIds[i]);
                 if (!s) continue;
                 if (s.structureType === STRUCTURE_WALL || s.structureType === STRUCTURE_RAMPART) {
-                    if (s.hits < 100000) state.repairTargets[state.repairTargetCount++] = s;
+                    if (s.hits < rampartTargetHits) state.repairTargets[state.repairTargetCount++] = s;
                 } else if (s.hits < s.hitsMax * 0.8) {
                     state.repairTargets[state.repairTargetCount++] = s;
                 }

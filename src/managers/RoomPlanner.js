@@ -111,6 +111,12 @@ class RoomPlanner {
         // Step 10: Rampart roads for defender mobility
         this.addRampartRoads(blueprint);
 
+        // Step 11: Extractor
+        if (state && state.mineral) {
+            blueprint[STRUCTURE_EXTRACTOR] = blueprint[STRUCTURE_EXTRACTOR] || [];
+            blueprint[STRUCTURE_EXTRACTOR].push({ x: state.mineral.pos.x, y: state.mineral.pos.y });
+        }
+
         global.Cache.blueprints.set(room.name, blueprint);
     }
 
