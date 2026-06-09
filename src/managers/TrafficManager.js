@@ -138,6 +138,8 @@ class TrafficManager {
         for (const [roomName, roomCreeps] of creepsByRoom) {
             TrafficManager.resolveRoomTraffic(roomName, roomCreeps);
         }
+
+        if (Memory.debugTraffic) TrafficManager.visualize(creepsByRoom);
     }
 
     static addCreepToRoom(map, creep) {
@@ -218,6 +220,11 @@ class TrafficManager {
         // Issue final intents
         for (let i = 0; i < creeps.length; i++) {
             const creep = TrafficManager.creepList[i];
+            if (Memory.debugTraffic) {
+                creep.heap._debugResolved = TrafficManager.resolvedIntents[i];
+                creep.heap._debugNext = TrafficManager.nextSteps[i];
+            }
+            
             let dir = null;
             
             if (TrafficManager.resolvedIntents[i] >= 0) {
@@ -348,6 +355,81 @@ class TrafficManager {
             if (fromPos.y === 49 && toPos.y === 0) return BOTTOM;
         }
         return fromPos.getDirectionTo(toPos.x, toPos.y);
+    }
+
+    /**
+     * Adds zero-overhead visual debugging for DFS traffic resolution and dynamic cost matrices, gated by Memory.debugTraffic.
+     */
+    static visualize(creepsByRoom) {
+        for (const [roomName, roomCreeps] of creepsByRoom) {
+            const visual = new RoomVisual(roomName);
+            
+            // Draw Threat & Cost Matrix Visualization
+            const tickMatrix = global.Cache && global.Cache.tickMatrices ? global.Cache.tickMatrices.get(roomName) : null;
+            if (tickMatrix) {
+                for (let x = 0; x < 50; x++) {
+                    for (let y = 0; y < 50; y++) {
+                        if (tickMatrix.get(x, y) === 255) {
+                            visual.rect(x - 0.5, y - 0.5, 1, 1, { fill: '#ff0000', opacity: 0.2 });
+                        }
+                    }
+                }
+            }
+
+            // Draw Creep Intent Visualization
+            for (let i = 0; i < roomCreeps.length; i++) {
+                const creep = roomCreeps[i];
+                const heap = creep.heap;
+                if (!heap) continue;
+
+                // Fatigue & Stationary Markers
+                if (creep.fatigue > 0) {
+                    visual.circle(creep.pos, { fill: '#0000ff', radius: 0.3, opacity: 0.5 });
+                }
+                const role = (creep.memory.role || '').toLowerCase();
+                if (role === 'harvester' || role === 'upgrader' || heap.sitTargetId) {
+                    visual.text('X', creep.pos.x, creep.pos.y + 0.25, { color: '#ffffff', size: 0.7, font: 'bold' });
+                }
+
+                // Traffic Resolution Lines
+                const resolved = heap._debugResolved;
+                const nextStepPacked = heap._debugNext;
+                if (resolved !== undefined && resolved >= 0) {
+                    const tx = resolved % 50;
+                    const ty = Math.floor(resolved / 50);
+
+                    // Did it successfully move to its intended next step?
+                    if (resolved === nextStepPacked) {
+                        visual.line(creep.pos.x, creep.pos.y, tx, ty, { color: '#00ff00', width: 0.15, opacity: 0.8 });
+                    } else {
+                        // Is it a direct swap?
+                        let isSwap = false;
+                        for (let j = 0; j < roomCreeps.length; j++) {
+                            const other = roomCreeps[j];
+                            if (other.name !== creep.name && other.pos.x === tx && other.pos.y === ty) {
+                                if (other.heap && other.heap._debugResolved === (creep.pos.y * 50) + creep.pos.x) {
+                                    isSwap = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (isSwap) {
+                            visual.line(creep.pos.x, creep.pos.y, tx, ty, { color: '#ffa500', width: 0.15, opacity: 0.8 });
+                        } else {
+                            // It pushed someone or successfully moved somewhere that wasn't its primary nextStep
+                            visual.line(creep.pos.x, creep.pos.y, tx, ty, { color: '#00ff00', width: 0.15, opacity: 0.8 });
+                        }
+                    }
+                } else if (heap.path && heap.path.length > 0 && creep.fatigue === 0) {
+                    // It had a path, but its resolved intent is its own coordinate or -1
+                    const origPacked = (creep.pos.y * 50) + creep.pos.x;
+                    if (resolved === -1 || resolved === origPacked) {
+                        visual.circle(creep.pos, { stroke: '#ff0000', radius: 0.45, fill: 'transparent', strokeWidth: 0.1 });
+                    }
+                }
+            }
+        }
     }
 
     static getCostMatrix(roomName) {
