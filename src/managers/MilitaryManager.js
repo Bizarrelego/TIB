@@ -83,7 +83,6 @@ class MilitaryManager {
         const hostiles = homeState.hostiles;
         if (!hostiles || hostiles.length === 0) return;
 
-        // Pick the closest hostile to this creep
         let closestHostile = null;
         let closestDist = Infinity;
         for (let i = 0; i < hostiles.length; i++) {
@@ -104,29 +103,31 @@ class MilitaryManager {
             creep.heap.state = 'combat';
 
         } else if (role === 'rangerCreep') {
-            if (creep.heap.tooClose) {
-                // Calculate flee tile: step directly away from the hostile
-                const fx = Math.min(48, Math.max(1, creep.pos.x + (creep.pos.x - closestHostile.pos.x)));
-                const fy = Math.min(48, Math.max(1, creep.pos.y + (creep.pos.y - closestHostile.pos.y)));
-                creep.heap.fleePos = { x: fx, y: fy, roomName: creep.room.name };
-                creep.heap.tooClose = false;
-                creep.heap.actionIntent = ActionConstants.ACTION_FLEE;
-                creep.heap.state = 'combat';
+            // Replaces naive 1-tile math with native TrafficManager flee pathfinding, allowing rangers to kite flawlessly around terrain.
+            if (closestDist <= 2) {
+                creep.heap.fleeGoals = [{ pos: closestHostile.pos, range: 3 }];
             } else {
-                creep.heap.targetId = closestHostile.id;
-                creep.heap.actionIntent = ActionConstants.ACTION_RANGED_ATTACK;
-                creep.heap.state = 'combat';
+                creep.heap.fleeGoals = null;
+                creep.heap.destination = { x: closestHostile.pos.x, y: closestHostile.pos.y, roomName: closestHostile.pos.roomName, range: 3 };
             }
+            creep.heap.targetId = closestHostile.id;
+            creep.heap.actionIntent = ActionConstants.ACTION_RANGED_ATTACK;
+            creep.heap.state = 'combat';
 
         } else if (role === 'medicCreep') {
-            // Heal the most-damaged friendly combat creep in this room
+            // Adds survival instincts to medics via fleeGoals, preventing them from blindly following melee creeps into danger.
+            if (closestDist <= 2) {
+                creep.heap.fleeGoals = [{ pos: closestHostile.pos, range: 3 }];
+            } else {
+                creep.heap.fleeGoals = null;
+            }
+
             const healTarget = MilitaryManager.findMostDamagedAlly(colony, creep.room.name);
             if (healTarget) {
                 creep.heap.targetId = healTarget.id;
                 creep.heap.actionIntent = ActionConstants.ACTION_HEAL;
                 creep.heap.state = 'combat';
             } else {
-                // No injured allies — follow the melee creep
                 const melee = MilitaryManager.findAllyByRole(colony, 'meleeCreep', creep.room.name);
                 if (melee) {
                     creep.heap.targetId = melee.id;
@@ -151,21 +152,54 @@ class MilitaryManager {
             return;
         }
 
-        const hostile = oState.hostiles[0];
+        const hostiles = oState.hostiles;
+        let closestHostile = null;
+        let closestDist = Infinity;
+        for (let i = 0; i < hostiles.length; i++) {
+            const h = hostiles[i];
+            const d = Math.max(Math.abs(creep.pos.x - h.pos.x), Math.abs(creep.pos.y - h.pos.y));
+            if (d < closestDist) {
+                closestDist = d;
+                closestHostile = h;
+            }
+        }
+        if (!closestHostile) return;
+
         if (creep.memory.role === 'meleeCreep') {
-            creep.heap.targetId = hostile.id;
+            creep.heap.targetId = closestHostile.id;
             creep.heap.actionIntent = ActionConstants.ACTION_ATTACK;
             creep.heap.state = 'combat';
         } else if (creep.memory.role === 'rangerCreep') {
-            creep.heap.targetId = hostile.id;
+            // Replaces naive 1-tile math with native TrafficManager flee pathfinding, allowing rangers to kite flawlessly around terrain.
+            if (closestDist <= 2) {
+                creep.heap.fleeGoals = [{ pos: closestHostile.pos, range: 3 }];
+            } else {
+                creep.heap.fleeGoals = null;
+                creep.heap.destination = { x: closestHostile.pos.x, y: closestHostile.pos.y, roomName: closestHostile.pos.roomName, range: 3 };
+            }
+            creep.heap.targetId = closestHostile.id;
             creep.heap.actionIntent = ActionConstants.ACTION_RANGED_ATTACK;
             creep.heap.state = 'combat';
         } else if (creep.memory.role === 'medicCreep') {
+            // Adds survival instincts to medics via fleeGoals, preventing them from blindly following melee creeps into danger.
+            if (closestDist <= 2) {
+                creep.heap.fleeGoals = [{ pos: closestHostile.pos, range: 3 }];
+            } else {
+                creep.heap.fleeGoals = null;
+            }
+
             const healTarget = MilitaryManager.findMostDamagedAlly(creep.memory.colony, targetRoom);
             if (healTarget) {
                 creep.heap.targetId = healTarget.id;
                 creep.heap.actionIntent = ActionConstants.ACTION_HEAL;
                 creep.heap.state = 'combat';
+            } else {
+                const melee = MilitaryManager.findAllyByRole(creep.memory.colony, 'meleeCreep', targetRoom);
+                if (melee) {
+                    creep.heap.targetId = melee.id;
+                    creep.heap.actionIntent = ActionConstants.ACTION_HEAL;
+                    creep.heap.state = 'combat';
+                }
             }
         }
     }
@@ -175,7 +209,6 @@ class MilitaryManager {
     // ─────────────────────────────────────────────────────────────────────────────
 
     static assignOffensive(creep, targetRoom, colony) {
-        // Move to target room first
         if (creep.room.name !== targetRoom) {
             creep.memory.targetRoom = targetRoom;
             creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
@@ -183,18 +216,27 @@ class MilitaryManager {
             return;
         }
 
-        // In target room — engage any hostiles or structures
         const roomState = global.State.rooms.get(targetRoom);
         if (!roomState) return;
 
+        const hostiles = roomState.hostiles || [];
+        let closestHostile = null;
+        let closestDist = Infinity;
+        for (let i = 0; i < hostiles.length; i++) {
+            const h = hostiles[i];
+            const d = Math.max(Math.abs(creep.pos.x - h.pos.x), Math.abs(creep.pos.y - h.pos.y));
+            if (d < closestDist) {
+                closestDist = d;
+                closestHostile = h;
+            }
+        }
+
         if (creep.memory.role === 'meleeCreep') {
-            const hostile = roomState.hostiles && roomState.hostiles[0];
-            if (hostile) {
-                creep.heap.targetId = hostile.id;
+            if (closestHostile) {
+                creep.heap.targetId = closestHostile.id;
                 creep.heap.actionIntent = ActionConstants.ACTION_ATTACK;
                 creep.heap.state = 'combat';
             } else {
-                // No creeps — harass structures (invader cores, towers, spawns)
                 const structTarget = MilitaryManager.pickOffensiveStructure(roomState);
                 if (structTarget) {
                     creep.heap.targetId = structTarget.id;
@@ -204,20 +246,17 @@ class MilitaryManager {
             }
 
         } else if (creep.memory.role === 'rangerCreep') {
-            const hostile = roomState.hostiles && roomState.hostiles[0];
-            if (hostile) {
-                if (creep.heap.tooClose) {
-                    const fx = Math.min(48, Math.max(1, creep.pos.x + (creep.pos.x - hostile.pos.x)));
-                    const fy = Math.min(48, Math.max(1, creep.pos.y + (creep.pos.y - hostile.pos.y)));
-                    creep.heap.fleePos = { x: fx, y: fy, roomName: creep.room.name };
-                    creep.heap.tooClose = false;
-                    creep.heap.actionIntent = ActionConstants.ACTION_FLEE;
-                    creep.heap.state = 'combat';
+            if (closestHostile) {
+                // Replaces naive 1-tile math with native TrafficManager flee pathfinding, allowing rangers to kite flawlessly around terrain.
+                if (closestDist <= 2) {
+                    creep.heap.fleeGoals = [{ pos: closestHostile.pos, range: 3 }];
                 } else {
-                    creep.heap.targetId = hostile.id;
-                    creep.heap.actionIntent = ActionConstants.ACTION_RANGED_ATTACK;
-                    creep.heap.state = 'combat';
+                    creep.heap.fleeGoals = null;
+                    creep.heap.destination = { x: closestHostile.pos.x, y: closestHostile.pos.y, roomName: closestHostile.pos.roomName, range: 3 };
                 }
+                creep.heap.targetId = closestHostile.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_RANGED_ATTACK;
+                creep.heap.state = 'combat';
             } else {
                 const structTarget = MilitaryManager.pickOffensiveStructure(roomState);
                 if (structTarget) {
@@ -228,13 +267,19 @@ class MilitaryManager {
             }
 
         } else if (creep.memory.role === 'medicCreep') {
+            // Adds survival instincts to medics via fleeGoals, preventing them from blindly following melee creeps into danger.
+            if (closestHostile && closestDist <= 2) {
+                creep.heap.fleeGoals = [{ pos: closestHostile.pos, range: 3 }];
+            } else {
+                creep.heap.fleeGoals = null;
+            }
+
             const healTarget = MilitaryManager.findMostDamagedAlly(colony, targetRoom);
             if (healTarget) {
                 creep.heap.targetId = healTarget.id;
                 creep.heap.actionIntent = ActionConstants.ACTION_HEAL;
                 creep.heap.state = 'combat';
             } else {
-                // Follow melee if nothing to heal
                 const melee = MilitaryManager.findAllyByRole(colony, 'meleeCreep', targetRoom);
                 if (melee) {
                     creep.heap.targetId = melee.id;
@@ -250,16 +295,13 @@ class MilitaryManager {
     // ─────────────────────────────────────────────────────────────────────────────
 
     static assignPatrol(creep, homeState, colony) {
-        // Cache waypoints in global.State to avoid per-tick Memory reads/writes
         if (!global.State.patrolWaypoints) global.State.patrolWaypoints = {};
 
         if (!global.State.patrolWaypoints[colony]) {
-            // First: try to load from persistent Memory if user has set custom waypoints
             const mem = Memory.rooms[colony];
             if (mem && mem.patrolWaypoints && mem.patrolWaypoints.length > 0) {
                 global.State.patrolWaypoints[colony] = mem.patrolWaypoints;
             } else {
-                // Default: 2 waypoints — near spawn and near controller
                 const spawn = homeState.spawns && homeState.spawns[0];
                 const controller = homeState.controller;
                 if (!spawn || !controller) {
@@ -286,10 +328,6 @@ class MilitaryManager {
     // AGGRESSIVE ZONE TARGETING
     // ─────────────────────────────────────────────────────────────────────────────
 
-    /**
-     * Scores all rooms within 3 hops and writes top-3 targets to global.State.militaryQueue.
-     * Runs every 50 ticks from MilitaryManager.run().
-     */
     static buildAggressiveZoneQueue() {
         if (!global.State) return;
         if (!Memory.rooms) return;
@@ -297,7 +335,6 @@ class MilitaryManager {
         const visited = new Set();
         const scores = [];
 
-        // Breadth-first expansion up to 3 hops from any owned room
         const frontier = [];
         for (const roomName in Game.rooms) {
             const room = Game.rooms[roomName];
@@ -331,7 +368,6 @@ class MilitaryManager {
                     const staleness = Game.time - (intel.scoutedAt || 0);
                     if (staleness > 1000) score += 20;
                 } else {
-                    // No intel at all — moderate priority to scout it
                     score += 25;
                 }
 
@@ -341,7 +377,6 @@ class MilitaryManager {
             }
         }
 
-        // Sort descending by score, take top 3
         scores.sort((a, b) => b.score - a.score);
         global.State.militaryQueue = scores.slice(0, 3).map(s => s.roomName);
     }
@@ -378,7 +413,6 @@ class MilitaryManager {
     }
 
     static pickOffensiveStructure(roomState) {
-        // Priority: invader cores > towers > spawns
         if (roomState.invaderCores && roomState.invaderCores.length > 0) return roomState.invaderCores[0];
         if (roomState.towers && roomState.towers.length > 0) {
             for (let i = 0; i < roomState.towers.length; i++) {
