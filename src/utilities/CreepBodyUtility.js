@@ -114,7 +114,7 @@ class CreepBodyUtility {
         return this.buildArray(work, carry, move);
     }
 
-    static generateBootstrapper(energy) {
+    static generateBootstrapper(_energy) {
         return [WORK, CARRY, MOVE]; // Minimal emergency logic
     }
 

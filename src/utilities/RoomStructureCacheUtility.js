@@ -1,3 +1,4 @@
+/* global STRUCTURE_INVADER_CORE */
 /**
  * Utility for providing O(1) cached access to structures within a room.
  * This relies on the central state populated by GlobalStateScanner.

@@ -1,6 +1,7 @@
 const RepairTargetUtility = require('../utilities/RepairTargetUtility');
 const EnergySourceUtility = require('../utilities/EnergySourceUtility');
 const DroppedResourceUtility = require('../utilities/DroppedResourceUtility');
+/* global STRUCTURE_INVADER_CORE */
 const GameObjectUtility = require('../utilities/GameObjectUtility');
 
 const createRoomStateTemplate = () => ({

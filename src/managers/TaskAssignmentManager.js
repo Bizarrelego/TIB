@@ -278,7 +278,7 @@ class TaskAssignmentManager {
         creep.heap.actionIntent = ActionConstants.ACTION_SCOUT;
     }
 
-    static assignRemoteHarvester(creep, homeState) {
+    static assignRemoteHarvester(creep, _homeState) {
         if (!creep.memory.targetRoom) {
             const outposts = Memory.rooms[creep.memory.colony]?.outposts || [];
             if (outposts.length > 0) {

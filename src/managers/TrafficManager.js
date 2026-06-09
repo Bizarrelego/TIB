@@ -1,5 +1,3 @@
-const ActionConstants = require('../constants/ActionConstants');
-
 const ROLE_PRIORITY = {
     'meleecreep': 10,
     'rangercreep': 10,
@@ -53,7 +51,8 @@ class TrafficManager {
             // Check if arrived
             if (creep.room.name === dest.roomName) {
                 const range = Math.max(Math.abs(creep.pos.x - dest.x), Math.abs(creep.pos.y - dest.y));
-                if (range <= (dest.range || 1)) {
+                const destRange = dest.range !== undefined ? dest.range : 1;
+                if (range <= destRange) {
                     heap.destination = null;
                     heap.path = null;
                     continue;
@@ -68,6 +67,13 @@ class TrafficManager {
                 heap.lastPos = { x: creep.pos.x, y: creep.pos.y, roomName: creep.room.name };
             }
 
+            // Advance path if creep successfully moved to the first step
+            if (heap.path) {
+                while (heap.path.length > 0 && heap.path[0].x === creep.pos.x && heap.path[0].y === creep.pos.y && heap.path[0].roomName === creep.room.name) {
+                    heap.path.shift();
+                }
+            }
+
             // Path caching and invalidation
             let needsPath = false;
             if (!heap.path || heap.path.length === 0) needsPath = true;
@@ -79,7 +85,8 @@ class TrafficManager {
 
             if (needsPath) {
                 const targetPos = new RoomPosition(dest.x, dest.y, dest.roomName);
-                const pathResult = PathFinder.search(creep.pos, { pos: targetPos, range: dest.range || 1 }, {
+                const destRange = dest.range !== undefined ? dest.range : 1;
+                const pathResult = PathFinder.search(creep.pos, { pos: targetPos, range: destRange }, {
                     plainCost: 2,
                     swampCost: 10,
                     roomCallback: TrafficManager.getCostMatrix
@@ -139,7 +146,6 @@ class TrafficManager {
                         const dirToBlocker = TrafficManager.getSafeDirection(creep.pos, nextStep);
                         creep.move(dirToBlocker);
                         
-                        creep.heap.path.shift();
                         processed.add(blockerName);
                     } else {
                         // Creep is lower priority, it cannot move. It stalls.
@@ -152,21 +158,16 @@ class TrafficManager {
                     creep.move(dirToBlocker);
                     blocker.move(dirToCreep);
                     
-                    creep.heap.path.shift();
-                    if (blocker.heap && blocker.heap.path) blocker.heap.path.shift();
-                    
                     processed.add(blockerName);
                 } else {
                     // Blocker is moving somewhere else. Wait for the engine to resolve the train.
                     const dirToNext = TrafficManager.getSafeDirection(creep.pos, nextStep);
                     creep.move(dirToNext);
-                    creep.heap.path.shift();
                 }
             } else {
                 // Tile is empty, just move
                 const dirToNext = TrafficManager.getSafeDirection(creep.pos, nextStep);
                 creep.move(dirToNext);
-                creep.heap.path.shift();
             }
             processed.add(creepName);
         }
