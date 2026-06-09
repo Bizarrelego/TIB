@@ -1,6 +1,7 @@
 const ActionConstants = require('../constants/ActionConstants');
 const CacheLib = require('../lib/CacheLib');
 const MathLib = require('../lib/MathLib');
+const BuildAssignmentModule = require('./task_modules/BuildAssignmentModule');
 
 
 
@@ -624,11 +625,13 @@ class TaskAssignmentManager {
 
     static assignBuilderWork(creep, roomState) {
         // Priority 1: Build construction sites — prefer nearly-complete ones
-        if (roomState.constructionSites?.length > 0) {
+        const siteIds = BuildAssignmentModule.getConstructionSiteIds(roomState);
+        if (siteIds && siteIds.length > 0) {
             let bestSite = null;
             let bestScore = -1;
-            for (let i = 0; i < roomState.constructionSites.length; i++) {
-                const s = roomState.constructionSites[i];
+            for (let i = 0; i < siteIds.length; i++) {
+                const s = CacheLib.getById(siteIds[i]) || roomState.constructionSites[siteIds[i]];
+                if (!s) continue;
                 const dx = Math.abs(creep.pos.x - s.pos.x);
                 const dy = Math.abs(creep.pos.y - s.pos.y);
                 const dist = Math.max(dx, dy) || 1;
@@ -811,11 +814,13 @@ class TaskAssignmentManager {
             if (TaskAssignmentManager.routeToCoreStructures(creep, roomState)) return;
 
             // Priority 2: Build critical structures (like containers)
-            if (roomState.constructionSites && roomState.constructionSites.length > 0) {
+            const siteIds = BuildAssignmentModule.getConstructionSiteIds(roomState);
+            if (siteIds && siteIds.length > 0) {
                 let bestSite = null;
                 let bestScore = -1;
-                for (let i = 0; i < roomState.constructionSites.length; i++) {
-                    const s = roomState.constructionSites[i];
+                for (let i = 0; i < siteIds.length; i++) {
+                    const s = CacheLib.getById(siteIds[i]) || roomState.constructionSites[siteIds[i]];
+                    if (!s) continue;
                     const dist = Math.max(Math.abs(creep.pos.x - s.pos.x), Math.abs(creep.pos.y - s.pos.y)) || 1;
                     const score = 100 / dist;
                     if (score > bestScore) {
