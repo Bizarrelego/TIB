@@ -11,8 +11,15 @@ class FlagUtility {
         const regexStr = '^' + pattern.split('*').join('.*') + '$';
         const regex = new RegExp(regexStr);
 
-        const flags = Object.values(Game.flags || {});
-        return flags.filter(flag => regex.test(flag.name));
+        const matchingFlags = [];
+        if (Game.flags) {
+            for (const flagName in Game.flags) {
+                if (regex.test(flagName)) {
+                    matchingFlags.push(Game.flags[flagName]);
+                }
+            }
+        }
+        return matchingFlags;
     }
 
     /**
@@ -23,8 +30,16 @@ class FlagUtility {
     static getFlagsInRoom(roomName) {
         if (!roomName || typeof roomName !== 'string') return [];
 
-        const flags = Object.values(Game.flags || {});
-        return flags.filter(flag => flag.pos && flag.pos.roomName === roomName);
+        const matchingFlags = [];
+        if (Game.flags) {
+            for (const flagName in Game.flags) {
+                const flag = Game.flags[flagName];
+                if (flag.pos && flag.pos.roomName === roomName) {
+                    matchingFlags.push(flag);
+                }
+            }
+        }
+        return matchingFlags;
     }
 
     /**

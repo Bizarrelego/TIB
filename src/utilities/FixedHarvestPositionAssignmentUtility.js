@@ -14,17 +14,15 @@ class FixedHarvestPositionAssignmentUtility {
             return [];
         }
 
-        const occupiedPositions = new Set();
+        const occupiedPositions = new Uint8Array(2500);
 
         // Find all living harvesters and log their assigned positions
-        const creeps = Object.values(Game.creeps);
-        for (let i = 0; i < creeps.length; i++) {
-            const c = creeps[i];
+        for (const creepName in Game.creeps) {
+            const c = Game.creeps[creepName];
             if (c.memory && c.memory.role === 'harvester') {
                 const assignedPos = CreepHeapUtility.getCreepHarvestPosition(c);
                 if (assignedPos) {
-                    // Create a unique key for the position
-                    occupiedPositions.add(`${assignedPos.x},${assignedPos.y},${assignedPos.roomName}`);
+                    occupiedPositions[assignedPos.x * 50 + assignedPos.y] = 1;
                 }
             }
         }
@@ -32,8 +30,7 @@ class FixedHarvestPositionAssignmentUtility {
         const availablePositions = [];
         for (let i = 0; i < allPositions.length; i++) {
             const pos = allPositions[i];
-            const posKey = `${pos.x},${pos.y},${pos.roomName}`;
-            if (!occupiedPositions.has(posKey)) {
+            if (!occupiedPositions[pos.x * 50 + pos.y]) {
                 availablePositions.push(pos);
             }
         }
