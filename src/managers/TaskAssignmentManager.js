@@ -630,7 +630,7 @@ class TaskAssignmentManager {
             let bestSite = null;
             let bestScore = -1;
             for (let i = 0; i < siteIds.length; i++) {
-                const s = CacheLib.getById(siteIds[i]) || roomState.constructionSites.find(site => site.id === siteIds[i]);
+                const s = CacheLib.getById(siteIds[i]) || roomState.constructionSites[siteIds[i]];
                 if (!s) continue;
                 const dx = Math.abs(creep.pos.x - s.pos.x);
                 const dy = Math.abs(creep.pos.y - s.pos.y);
@@ -819,7 +819,7 @@ class TaskAssignmentManager {
                 let bestSite = null;
                 let bestScore = -1;
                 for (let i = 0; i < siteIds.length; i++) {
-                    const s = CacheLib.getById(siteIds[i]) || roomState.constructionSites.find(site => site.id === siteIds[i]);
+                    const s = CacheLib.getById(siteIds[i]) || roomState.constructionSites[siteIds[i]];
                     if (!s) continue;
                     const dist = Math.max(Math.abs(creep.pos.x - s.pos.x), Math.abs(creep.pos.y - s.pos.y)) || 1;
                     const score = 100 / dist;

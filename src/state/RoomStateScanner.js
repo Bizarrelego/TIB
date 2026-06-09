@@ -19,7 +19,7 @@ const createRoomStateTemplate = () => ({
     droppedEnergy: [],
     ruins: [],
     tombstones: [],
-    constructionSites: [],
+    constructionSites: Object.create(null),
     validDroppedEnergy: [],
     availableDroppedEnergy: [],
     energyInRuinsAndTombstones: [],
@@ -118,8 +118,13 @@ class RoomStateScanner {
             state.sources = state.cache.sourceIds.map(id => CacheLib.getById(id)).filter(Boolean);
             state.mineral = state.cache.mineralId ? CacheLib.getById(state.cache.mineralId) : null;
 
-            state.constructionSites = room['find'](FIND_MY_CONSTRUCTION_SITES);
-            state.constructionSiteCount = state.constructionSites.length;
+            const sites = room['find'](FIND_MY_CONSTRUCTION_SITES);
+            const sitesMap = Object.create(null);
+            for (let i = 0; i < sites.length; i++) {
+                sitesMap[sites[i].id] = sites[i];
+            }
+            state.constructionSites = sitesMap;
+            state.constructionSiteCount = sites.length;
 
             // Cache structures periodically or if a construction site finishes
             if (!state.cache.scannedAt || Game.time - state.cache.scannedAt > 13 || state.constructionSiteCount !== state.cache.lastConstructionSiteCount) {
