@@ -71,21 +71,28 @@ class TaskAssignmentManager {
     }
 
     static updateCreepState(creep) {
-        const role = creep.memory.role;
+        const role = creep.memory.role || '';
 
         // Harvesters and Upgraders are stationary roles and do not use gather/work cycles
-        if (role === 'harvester' || role === 'upgrader') return;
+        if (role === 'harvester' || role === 'upgrader' || role === 'remoteharvester') return;
 
-        const used = creep.store.getUsedCapacity(RESOURCE_ENERGY);
+        const totalUsed = creep.store.getUsedCapacity();
         const free = creep.store.getFreeCapacity(RESOURCE_ENERGY);
 
-        if (!creep.heap.state || creep.heap.state === 'idle') creep.heap.state = 'gather';
+        if (!creep.heap.state || creep.heap.state === 'idle') {
+            // Force haulers/fillers to completely empty before gathering again
+            if ((role === 'hauler' || role === 'filler' || role === 'remotehauler') && totalUsed > 0) {
+                creep.heap.state = 'work';
+            } else {
+                creep.heap.state = 'gather';
+            }
+        }
 
         if (creep.heap.state === 'gather' && free === 0) {
             creep.heap.state = 'work';
             creep.heap.targetId = null;
             creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
-        } else if (creep.heap.state === 'work' && used === 0) {
+        } else if (creep.heap.state === 'work' && totalUsed === 0) {
             creep.heap.state = 'gather';
             creep.heap.targetId = null;
             creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
