@@ -17,8 +17,10 @@ class ConstructionManager {
             if (!state) continue;
 
             let siteCount = 0;
-            if (state.constructionSites) {
-                siteCount = state.constructionSites.length;
+            if (state.constructionSiteCount !== undefined) {
+                siteCount = state.constructionSiteCount;
+            } else if (state.constructionSites) {
+                siteCount = Object.keys(state.constructionSites).length;
             }
             if (siteCount >= 3) continue;
 
@@ -54,8 +56,9 @@ class ConstructionManager {
             }
         }
         if (state.constructionSites) {
-            for (let i = 0; i < state.constructionSites.length; i++) {
-                const s = state.constructionSites[i];
+            const sites = Object.values(state.constructionSites);
+            for (let i = 0; i < sites.length; i++) {
+                const s = sites[i];
                 existingPositions.add(`${s.pos.x}_${s.pos.y}_${s.structureType}`);
             }
         }
@@ -89,8 +92,9 @@ class ConstructionManager {
                 }
             }
             if (state.constructionSites) {
-                for (let i = 0; i < state.constructionSites.length; i++) {
-                    if (state.constructionSites[i].structureType === structureType) count++;
+                const sites = Object.values(state.constructionSites);
+                for (let i = 0; i < sites.length; i++) {
+                    if (sites[i].structureType === structureType) count++;
                 }
             }
 

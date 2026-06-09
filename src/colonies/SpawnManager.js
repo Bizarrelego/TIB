@@ -15,6 +15,7 @@ class CreepBodyBuilder {
             case 'remoteharvester': return this.generateHarvester(energyCapacity);
             case 'remotehauler': return this.generateHauler(energyCapacity);
             case 'scout': return [MOVE];
+            case 'miner': return this.generateMiner(energyCapacity);
             case 'repairman': return [WORK, CARRY, MOVE, MOVE];
             case 'defender': return [TOUGH, MOVE, ATTACK, MOVE];
             case 'meleeCreep': return this.generateMelee(energyCapacity);
@@ -60,6 +61,13 @@ class CreepBodyBuilder {
         while (cost + 200 <= energy && (work + carry + move + 3) <= 50) { work++; carry++; move++; cost += 200; }
         while (cost + 50 <= energy && (work + carry + move + 1) <= 50) { carry++; cost += 50; }
         return this.buildArray(work, carry, move);
+    }
+
+    static generateMiner(energy) {
+        let work = 1, move = 1;
+        let cost = 150;
+        while (cost + 100 <= energy && work < 5) { work++; cost += 100; }
+        return this.buildArray(work, 0, move);
     }
 
     static generateMelee(energy) {
@@ -130,10 +138,14 @@ class CensusCalculator {
         if (roomState) {
             let looseEnergy = 0;
             if (roomState.droppedEnergy) {
-                for (let i = 0; i < roomState.droppedEnergyCount; i++) looseEnergy += roomState.droppedEnergy[i].amount;
+                for (let i = 0; i < roomState.droppedEnergyCount; i++) {
+                    try { looseEnergy += roomState.droppedEnergy[i].amount; } catch (e) { /* ignore */ }
+                }
             }
             if (roomState.sourceContainers) {
-                for (let i = 0; i < roomState.sourceContainerCount; i++) looseEnergy += roomState.sourceContainers[i].store.getUsedCapacity(RESOURCE_ENERGY);
+                for (let i = 0; i < roomState.sourceContainerCount; i++) {
+                    try { looseEnergy += roomState.sourceContainers[i].store.getUsedCapacity(RESOURCE_ENERGY); } catch (e) { /* ignore */ }
+                }
             }
 
             if (looseEnergy > 1500) {
@@ -144,6 +156,29 @@ class CensusCalculator {
             if (roomState.storage && roomState.storage.my) {
                 limits.filler = 1;
                 limits.repairman = 1;
+
+                const storageEnergy = roomState.storage.store.getUsedCapacity(RESOURCE_ENERGY);
+                if (storageEnergy < 50000) {
+                    limits.upgrader = Math.min(limits.upgrader, 1);
+                } else if (storageEnergy > 300000) {
+                    limits.upgrader += 3;
+                } else if (storageEnergy > 200000) {
+                    limits.upgrader += 2;
+                } else if (storageEnergy > 100000) {
+                    limits.upgrader += 1;
+                }
+            }
+
+            if (roomState.terminal && roomState.terminal.my) {
+                const terminalEnergy = roomState.terminal.store.getUsedCapacity(RESOURCE_ENERGY);
+                if (terminalEnergy > 50000) {
+                    limits.upgrader += 1;
+                    limits.builder += 1;
+                }
+            }
+
+            if (roomState.extractor && roomState.mineral && roomState.mineral.mineralAmount > 0) {
+                limits.miner = 1;
             }
 
             // Emergency Storage Protocol
@@ -262,6 +297,8 @@ class SpawnManager {
         
         // Throttle declarative census diffing to save CPU
         if (Game.time % 10 !== 0) return;
+
+        if (!spawn.room.controller || !spawn.room.controller.my) return;
 
         const roomName = spawn.room.name;
         const energyCapacity = spawn.room.energyCapacityAvailable;

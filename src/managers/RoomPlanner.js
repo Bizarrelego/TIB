@@ -69,29 +69,26 @@ class RoomPlanner {
             [STRUCTURE_POWER_SPAWN]: []
         };
 
-        // Step 1: Anchor — must land on road parity (ax+ay)%2===0
+        // Step 1: Anchor
         let anchor = this.findAnchor(room, terrain);
-        if ((anchor.x + anchor.y) % 2 !== 0) {
-            const dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
-            for (let i = 0; i < dirs.length; i++) {
-                const nx = anchor.x + dirs[i].x, ny = anchor.y + dirs[i].y;
-                if (nx >= 3 && nx <= 46 && ny >= 3 && ny <= 46 && terrain.get(nx, ny) !== TERRAIN_MASK_WALL) {
-                    anchor = { x: nx, y: ny }; break;
-                }
-            }
-        }
         blueprint.anchor = anchor;
 
         const visited = new Uint8Array(2500);
 
-        // Step 2: Core Hub stamp
+        // Step 2: Fast Filler Stamp
+        this.applyFastFillerStamp(blueprint, terrain, anchor, visited);
+
+        // Step 3: Core Hub Stamp
         this.applyCoreStamp(blueprint, terrain, anchor, visited);
 
-        // Step 3: Lab cluster (best-fit quadrant, contiguous only)
+        // Step 4: Tower Stamp
+        this.applyTowerStamp(blueprint, terrain, anchor, visited);
+
+        // Step 5: Lab cluster
         this.applyLabStamp(blueprint, terrain, anchor, visited);
 
-        // Step 4: Diamond checkerboard BFS fill (extensions + internal roads)
-        this.fillBaseDiamond(blueprint, terrain, anchor, visited);
+        // Step 6: Extension Clusters (Plus-sign grids)
+        this.applyExtensionClusters(blueprint, terrain, anchor, visited);
 
         // Step 5: Source + controller containers
         if (state) this.planContainers(blueprint, room, state, terrain);
@@ -149,187 +146,179 @@ class RoomPlanner {
         return anchor;
     }
 
-    // ─── Step 2: Core Hub Stamp ──────────────────────────────────────────
+    // ─── Tigga Modular Stamps ──────────────────────────────────────────
 
-    /**
-     * Hardcoded Core Hub stamp.
-     * Convention: (dx+dy)%2===0 → road, (dx+dy)%2===1 → structure.
-     * Anchor is always nudged to road parity before this runs.
-     */
-    static applyCoreStamp(blueprint, terrain, anchor, visited) {
+    static applyFastFillerStamp(blueprint, terrain, anchor, visited) {
         const ax = anchor.x, ay = anchor.y;
         const stamp = [
-            // Roads (dx+dy even)
-            { type: 'road', dx: 0, dy: 0 },  // Hub Manager standing tile
-            { type: 'road', dx: 1, dy: 1 }, { type: 'road', dx: -1, dy: 1 },
-            { type: 'road', dx: 1, dy: -1 }, { type: 'road', dx: -1, dy: -1 },
-            { type: 'road', dx: 2, dy: 0 }, { type: 'road', dx: -2, dy: 0 },
-            { type: 'road', dx: 0, dy: 2 }, { type: 'road', dx: 0, dy: -2 },
-            { type: 'road', dx: 2, dy: 2 }, { type: 'road', dx: -2, dy: 2 },
-            { type: 'road', dx: 2, dy: -2 }, { type: 'road', dx: -2, dy: -2 },
-            // Structures (dx+dy odd)
-            { type: STRUCTURE_STORAGE, dx: 1, dy: 0 },
-            { type: STRUCTURE_TERMINAL, dx: -1, dy: 0 },
-            { type: STRUCTURE_FACTORY, dx: 0, dy: 1 },
-            { type: STRUCTURE_SPAWN, dx: 0, dy: -1 },   // Spawn 1 (primary)
-            { type: STRUCTURE_TOWER, dx: 2, dy: 1 }, { type: STRUCTURE_TOWER, dx: -2, dy: 1 },
-            { type: STRUCTURE_TOWER, dx: 2, dy: -1 }, { type: STRUCTURE_TOWER, dx: -2, dy: -1 },
-            { type: STRUCTURE_TOWER, dx: 1, dy: 2 }, { type: STRUCTURE_TOWER, dx: -1, dy: 2 },
-            { type: STRUCTURE_SPAWN, dx: 1, dy: -2 },   // Spawn 2
-            { type: STRUCTURE_SPAWN, dx: -1, dy: -2 },   // Spawn 3
-            { type: STRUCTURE_POWER_SPAWN, dx: 3, dy: 0 },
-            { type: STRUCTURE_OBSERVER, dx: -3, dy: 0 },
-            { type: STRUCTURE_NUKER, dx: 0, dy: 3 },
+            { type: STRUCTURE_LINK, dx: 0, dy: 0 },
+            { type: STRUCTURE_SPAWN, dx: -1, dy: 0 },
+            { type: STRUCTURE_SPAWN, dx: 1, dy: 0 },
+            { type: STRUCTURE_SPAWN, dx: 0, dy: -2 },
+            { type: 'container', dx: 0, dy: -1 },
+            { type: 'container', dx: 0, dy: 1 },
+            { type: 'road', dx: -1, dy: -1 },
+            { type: 'road', dx: 1, dy: -1 },
+            { type: 'road', dx: -1, dy: 1 },
+            { type: 'road', dx: 1, dy: 1 },
+            { type: 'road', dx: 0, dy: -3 },
+            { type: 'road', dx: -2, dy: 0 },
+            { type: 'road', dx: 2, dy: 0 },
+            { type: 'road', dx: 0, dy: 2 }
         ];
 
         for (let i = 0; i < stamp.length; i++) {
             const { type, dx, dy } = stamp[i];
             const x = ax + dx, y = ay + dy;
-            if (x < 2 || x > 47 || y < 2 || y > 47) continue;
-            if (terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
+            if (x < 2 || x > 47 || y < 2 || y > 47 || terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
             
-            // Check flat array instead of Set string allocation
             const key = x * 50 + y;
             if (visited[key]) continue;
             visited[key] = 1;
             
             if (type === 'road') blueprint.roads.push({ x, y });
+            else if (type === 'container') blueprint.containers.push({ x, y });
             else blueprint[type].push({ x, y });
         }
     }
 
-    // ─── Step 3: Lab Stamp ───────────────────────────────────────────────
-
-    /**
-     * Places the 2-supplier + 8-reactor lab cluster as a guaranteed contiguous block.
-     * Tries 4 quadrant variants; picks the one with the most valid tiles.
-     * If a quadrant scores < 10, that variant is still chosen (partial placement
-     * is better than scattering), but labs are NEVER placed individually via BFS.
-     *
-     * Verified: both S1 and S2 are within Chebyshev range 2 of all 8 reactors.
-     * Layout: [R0][S1][S2][R1] / [R2][R3][R4][R5] / ····[R6][R7]
-     */
-    static applyLabStamp(blueprint, terrain, anchor, visited) {
-        const ax = anchor.x, ay = anchor.y;
-
+    static applyCoreStamp(blueprint, terrain, anchor, visited) {
         const variants = [
-            // RIGHT of core (dx 4–7)
-            [
-                { dx: 4, dy: -1, s: false }, { dx: 5, dy: -1, s: true }, { dx: 6, dy: -1, s: true }, { dx: 7, dy: -1, s: false },
-                { dx: 4, dy: 0, s: false }, { dx: 5, dy: 0, s: false }, { dx: 6, dy: 0, s: false }, { dx: 7, dy: 0, s: false },
-                { dx: 5, dy: 1, s: false }, { dx: 6, dy: 1, s: false },
-            ],
-            // LEFT of core (dx -4 to -7)
-            [
-                { dx: -4, dy: -1, s: false }, { dx: -5, dy: -1, s: true }, { dx: -6, dy: -1, s: true }, { dx: -7, dy: -1, s: false },
-                { dx: -4, dy: 0, s: false }, { dx: -5, dy: 0, s: false }, { dx: -6, dy: 0, s: false }, { dx: -7, dy: 0, s: false },
-                { dx: -5, dy: 1, s: false }, { dx: -6, dy: 1, s: false },
-            ],
-            // BELOW core (dy 4–7)
-            [
-                { dx: -1, dy: 4, s: false }, { dx: -1, dy: 5, s: true }, { dx: -1, dy: 6, s: true }, { dx: -1, dy: 7, s: false },
-                { dx: 0, dy: 4, s: false }, { dx: 0, dy: 5, s: false }, { dx: 0, dy: 6, s: false }, { dx: 0, dy: 7, s: false },
-                { dx: 1, dy: 5, s: false }, { dx: 1, dy: 6, s: false },
-            ],
-            // ABOVE core (dy -4 to -7)
-            [
-                { dx: -1, dy: -4, s: false }, { dx: -1, dy: -5, s: true }, { dx: -1, dy: -6, s: true }, { dx: -1, dy: -7, s: false },
-                { dx: 0, dy: -4, s: false }, { dx: 0, dy: -5, s: false }, { dx: 0, dy: -6, s: false }, { dx: 0, dy: -7, s: false },
-                { dx: 1, dy: -5, s: false }, { dx: 1, dy: -6, s: false },
-            ]
+            { cx: 5, cy: 0 }, { cx: -5, cy: 0 }, { cx: 0, cy: 5 }, { cx: 0, cy: -5 },
+            { cx: 4, cy: 4 }, { cx: -4, cy: -4 }, { cx: 4, cy: -4 }, { cx: -4, cy: 4 }
         ];
 
-        let bestScore = -1, bestVariant = null;
+        const stamp = [
+            { type: 'road', dx: 0, dy: 0 },
+            { type: STRUCTURE_STORAGE, dx: -1, dy: 0 },
+            { type: STRUCTURE_TERMINAL, dx: 1, dy: 0 },
+            { type: STRUCTURE_FACTORY, dx: 0, dy: -1 },
+            { type: STRUCTURE_LINK, dx: 0, dy: 1 },
+            { type: STRUCTURE_NUKER, dx: -1, dy: -1 },
+            { type: STRUCTURE_POWER_SPAWN, dx: 1, dy: -1 },
+            { type: STRUCTURE_OBSERVER, dx: 1, dy: 1 },
+            { type: 'road', dx: -2, dy: 0 }, { type: 'road', dx: 2, dy: 0 },
+            { type: 'road', dx: 0, dy: -2 }, { type: 'road', dx: 0, dy: 2 },
+            { type: 'road', dx: -1, dy: 1 }, { type: 'road', dx: -1, dy: -2 }, { type: 'road', dx: 1, dy: -2 }
+        ];
+
+        let bestVariant = null;
         for (let v = 0; v < variants.length; v++) {
-            let score = 0;
-            for (let j = 0; j < variants[v].length; j++) {
-                const x = ax + variants[v][j].dx, y = ay + variants[v][j].dy;
-                if (x >= 2 && x <= 47 && y >= 2 && y <= 47 &&
-                    terrain.get(x, y) !== TERRAIN_MASK_WALL && !visited[x * 50 + y]) score++;
+            const cx = anchor.x + variants[v].cx, cy = anchor.y + variants[v].cy;
+            let valid = true;
+            for (let i = 0; i < stamp.length; i++) {
+                const x = cx + stamp[i].dx, y = cy + stamp[i].dy;
+                if (x < 2 || x > 47 || y < 2 || y > 47 || terrain.get(x, y) === TERRAIN_MASK_WALL || visited[x * 50 + y]) {
+                    valid = false; break;
+                }
             }
-            if (score > bestScore) { bestScore = score; bestVariant = variants[v]; }
+            if (valid) { bestVariant = { cx, cy }; break; }
         }
 
-        if (!bestVariant || bestScore === 0) return;
-
-        for (let j = 0; j < bestVariant.length; j++) {
-            const { dx, dy, s } = bestVariant[j];
-            const x = ax + dx, y = ay + dy;
-            if (x < 2 || x > 47 || y < 2 || y > 47) continue;
-            if (terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
-            
-            const key = x * 50 + y;
-            if (visited[key]) continue;
-            visited[key] = 1;
-            
-            blueprint[STRUCTURE_LAB].push({ x, y });
-            if (s) blueprint.supplierLabs.push({ x, y });
+        if (bestVariant) {
+            const cx = bestVariant.cx, cy = bestVariant.cy;
+            for (let i = 0; i < stamp.length; i++) {
+                const { type, dx, dy } = stamp[i];
+                const x = cx + dx, y = cy + dy;
+                visited[x * 50 + y] = 1;
+                if (type === 'road') blueprint.roads.push({ x, y });
+                else blueprint[type].push({ x, y });
+            }
         }
     }
 
-    // ─── Step 4: Diamond BFS Fill ───────────────────────────────────────────
+    static applyTowerStamp(blueprint, terrain, anchor, visited) {
+        const variants = [
+            { cx: 3, cy: 3 }, { cx: -3, cy: -3 }, { cx: 3, cy: -3 }, { cx: -3, cy: 3 },
+            { cx: 0, cy: 3 }, { cx: 0, cy: -3 }, { cx: 3, cy: 0 }, { cx: -3, cy: 0 }
+        ];
+        const stamp = [
+            { type: STRUCTURE_TOWER, dx: 0, dy: 0 }, { type: STRUCTURE_TOWER, dx: 1, dy: 0 }, { type: STRUCTURE_TOWER, dx: -1, dy: 0 },
+            { type: STRUCTURE_TOWER, dx: 0, dy: 1 }, { type: STRUCTURE_TOWER, dx: 1, dy: 1 }, { type: STRUCTURE_TOWER, dx: -1, dy: 1 },
+            { type: 'road', dx: 0, dy: -1 }, { type: 'road', dx: 1, dy: -1 }, { type: 'road', dx: -1, dy: -1 },
+            { type: 'road', dx: 0, dy: 2 }, { type: 'road', dx: 1, dy: 2 }, { type: 'road', dx: -1, dy: 2 },
+            { type: 'road', dx: -2, dy: 0 }, { type: 'road', dx: -2, dy: 1 },
+            { type: 'road', dx: 2, dy: 0 }, { type: 'road', dx: 2, dy: 1 }
+        ];
 
-    /**
-     * Grows a compact diamond from the anchor outward using 4-directional BFS
-     * (Manhattan-distance order). Applies the checkerboard parity rule:
-     *
-     *   (x+y) % 2 === anchorParity  →  road tile
-     *   (x+y) % 2 !== anchorParity  →  extension tile
-     *
-     * This produces a layout identical to the classic Screeps bunker:
-     *
-     *       R           ← entry point (cardinal tip, always road parity)
-     *      E E
-     *     R E R         ← each R has 4 cardinal E neighbors (fills 4 in 1 tick)
-     *    E R E R        ← creeps traverse the R-grid diagonally
-     *   R E R E R
-     *    E R E R
-     *     R E R
-     *      E E
-     *       R           ← entry point
-     *
-     * Stops the moment 60 extensions are placed. Core/lab tiles are already
-     * claimed in `visited`, so they are naturally skipped.
-     */
-    static fillBaseDiamond(blueprint, terrain, anchor, visited) {
-        const ax = anchor.x, ay = anchor.y;
-        const anchorParity = (ax + ay) % 2;  // 0 = road parity (anchor is always road)
+        let bestVariant = null;
+        for (let v = 0; v < variants.length; v++) {
+            const cx = anchor.x + variants[v].cx, cy = anchor.y + variants[v].cy;
+            let valid = true;
+            for (let i = 0; i < stamp.length; i++) {
+                const x = cx + stamp[i].dx, y = cy + stamp[i].dy;
+                if (x < 2 || x > 47 || y < 2 || y > 47 || terrain.get(x, y) === TERRAIN_MASK_WALL || visited[x * 50 + y]) {
+                    valid = false; break;
+                }
+            }
+            if (valid) { bestVariant = { cx, cy }; break; }
+        }
 
-        // Standard 4-directional BFS gives Manhattan-distance ordering → true diamond shape
-        const queue = [{ x: ax, y: ay }];
+        if (bestVariant) {
+            const cx = bestVariant.cx, cy = bestVariant.cy;
+            for (let i = 0; i < stamp.length; i++) {
+                const { type, dx, dy } = stamp[i];
+                const x = cx + dx, y = cy + dy;
+                visited[x * 50 + y] = 1;
+                if (type === 'road') blueprint.roads.push({ x, y });
+                else blueprint[type].push({ x, y });
+            }
+        }
+    }
+
+    static applyExtensionClusters(blueprint, terrain, anchor, visited) {
+        const queue = [{ x: anchor.x, y: anchor.y }];
         const seen = new Uint8Array(2500);
-        seen[ax * 50 + ay] = 1;
+        seen[anchor.x * 50 + anchor.y] = 1;
         
         let head = 0;
         let extensionsPlaced = blueprint[STRUCTURE_EXTENSION].length;
 
+        const clusterOffsets = [
+            { dx: 0, dy: 0, type: STRUCTURE_EXTENSION },
+            { dx: 0, dy: -1, type: STRUCTURE_EXTENSION },
+            { dx: 0, dy: 1, type: STRUCTURE_EXTENSION },
+            { dx: -1, dy: 0, type: STRUCTURE_EXTENSION },
+            { dx: 1, dy: 0, type: STRUCTURE_EXTENSION },
+            { dx: -1, dy: -1, type: 'road' },
+            { dx: 1, dy: -1, type: 'road' },
+            { dx: -1, dy: 1, type: 'road' },
+            { dx: 1, dy: 1, type: 'road' }
+        ];
+
         while (head < queue.length && extensionsPlaced < 60) {
             const { x, y } = queue[head++];
 
-            if (x < 2 || x > 47 || y < 2 || y > 47) continue;
-            if (terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
-
-            const key = x * 50 + y;
-            if (!visited[key]) {
-                visited[key] = 1;
-                if ((x + y) % 2 === anchorParity) {
-                    // Road parity — place road
-                    blueprint.roads.push({ x, y });
-                } else {
-                    // Extension parity — place extension
-                    blueprint[STRUCTURE_EXTENSION].push({ x, y });
-                    extensionsPlaced++;
+            let validCluster = true;
+            for (let i = 0; i < clusterOffsets.length; i++) {
+                const nx = x + clusterOffsets[i].dx, ny = y + clusterOffsets[i].dy;
+                if (nx < 2 || nx > 47 || ny < 2 || ny > 47 || terrain.get(nx, ny) === TERRAIN_MASK_WALL || visited[nx * 50 + ny]) {
+                    validCluster = false; break;
                 }
             }
 
-            // Enqueue 4 cardinal neighbors (BFS maintains Manhattan-distance order)
-            const dirs = [{ dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 }];
+            if (validCluster) {
+                for (let i = 0; i < clusterOffsets.length; i++) {
+                    const nx = x + clusterOffsets[i].dx, ny = y + clusterOffsets[i].dy;
+                    visited[nx * 50 + ny] = 1;
+                    if (clusterOffsets[i].type === 'road') {
+                        blueprint.roads.push({ x: nx, y: ny });
+                    } else {
+                        blueprint[STRUCTURE_EXTENSION].push({ x: nx, y: ny });
+                    }
+                }
+                extensionsPlaced += 5;
+            }
+
+            const dirs = [{ dx: 3, dy: 0 }, { dx: -3, dy: 0 }, { dx: 0, dy: 3 }, { dx: 0, dy: -3 }];
             for (let d = 0; d < dirs.length; d++) {
                 const nx = x + dirs[d].dx, ny = y + dirs[d].dy;
-                const nkey = nx * 50 + ny;
-                if (!seen[nkey]) {
-                    seen[nkey] = 1;
-                    queue.push({ x: nx, y: ny });
+                if (nx >= 2 && nx <= 47 && ny >= 2 && ny <= 47) {
+                    const nkey = nx * 50 + ny;
+                    if (!seen[nkey]) {
+                        seen[nkey] = 1;
+                        queue.push({ x: nx, y: ny });
+                    }
                 }
             }
         }
@@ -348,6 +337,10 @@ class RoomPlanner {
         }
         if (state.controller) {
             const tile = this.findBestAdjacentTile(state.controller.pos, ref, terrain, room.name, 2);
+            if (tile) blueprint.containers.push(tile);
+        }
+        if (state.mineral) {
+            const tile = this.findBestAdjacentTile(state.mineral.pos, ref, terrain, room.name, 1);
             if (tile) blueprint.containers.push(tile);
         }
     }

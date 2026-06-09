@@ -55,6 +55,7 @@ module.exports.loop = function () {
                 RoomPlanner.manageRoom(room);
             }
         }
+        RoomPlanner.visualize();
     }, 'RoomPlanner')();
     ErrorHandlingUtility.wrap(() => ConstructionManager.run(), 'ConstructionManager')();
     ErrorHandlingUtility.wrap(() => ScoutingManager.run(), 'ScoutingManager')();

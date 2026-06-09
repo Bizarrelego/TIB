@@ -133,6 +133,46 @@ class TaskAssignmentManager {
         else if (role === 'repairman') TaskAssignmentManager.assignRepairman(creep, roomState);
         else if (role === 'defender') TaskAssignmentManager.assignDefender(creep, roomState);
         else if (role === 'hubcreep') TaskAssignmentManager.assignHubCreep(creep, roomState);
+        else if (role === 'miner') TaskAssignmentManager.assignMiner(creep, roomState);
+    }
+
+    static assignMiner(creep, roomState) {
+        if (!roomState.mineral || roomState.mineral.mineralAmount === 0) {
+            if (roomState.mineral && roomState.mineral.ticksToRegeneration) {
+                creep.heap.sleepUntil = Game.time + roomState.mineral.ticksToRegeneration;
+            }
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            return;
+        }
+
+        let minerContainer = null;
+        if (roomState.containers) {
+            for (let i = 0; i < roomState.containers.length; i++) {
+                const c = roomState.containers[i];
+                if (c.pos.getRangeTo(roomState.mineral) <= 1) {
+                    minerContainer = c;
+                    break;
+                }
+            }
+        }
+
+        if (minerContainer) {
+            if (creep.pos.x !== minerContainer.pos.x || creep.pos.y !== minerContainer.pos.y) {
+                creep.heap.destination = { x: minerContainer.pos.x, y: minerContainer.pos.y, roomName: creep.room.name, range: 0 };
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            } else {
+                creep.heap.targetId = roomState.mineral.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_HARVEST;
+            }
+        } else {
+            if (creep.pos.getRangeTo(roomState.mineral) > 1) {
+                creep.heap.destination = { x: roomState.mineral.pos.x, y: roomState.mineral.pos.y, roomName: creep.room.name, range: 1 };
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            } else {
+                creep.heap.targetId = roomState.mineral.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_HARVEST;
+            }
+        }
     }
 
     static assignHubCreep(creep, roomState) {
