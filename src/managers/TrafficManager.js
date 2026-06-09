@@ -14,11 +14,9 @@ class TrafficManager {
         const intendedMoves = new Map(); // creepName -> { x, y, roomName, range }
         const grid = new Map(); // `${x},${y},${roomName}` -> creepName
 
-        const creeps = Object.values(Game.creeps);
-
         // Pass 1: Collect destinations and execute pathfinder
-        for (let i = 0; i < creeps.length; i++) {
-            const creep = creeps[i];
+        for (const creepName in Game.creeps) {
+            const creep = Game.creeps[creepName];
             if (creep.spawning || creep.fatigue > 0) continue;
 
             const heap = creep.heap;
