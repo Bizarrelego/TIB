@@ -115,7 +115,7 @@ class ActionExecutor {
 
             heap.destination = { x: target.pos.x, y: target.pos.y, roomName: target.pos.roomName, range };
         } else if (result === OK || result === ERR_NOT_ENOUGH_RESOURCES || result === ERR_FULL || result === ERR_INVALID_TARGET) {
-            if (intent !== ActionConstants.ACTION_HARVEST && intent !== ActionConstants.ACTION_UPGRADE) {
+            if (intent !== ActionConstants.ACTION_HARVEST) {
                 heap.state = 'idle';
                 heap.actionIntent = ActionConstants.ACTION_IDLE;
                 heap.targetId = null;

@@ -16,10 +16,8 @@ class TaskAssignmentManager {
     static run() {
         if (!global.creepHeap) global.creepHeap = new Map();
 
-        const creeps = Object.values(Game.creeps);
-
-        for (let i = 0; i < creeps.length; i++) {
-            const creep = creeps[i];
+        for (const creepName in Game.creeps) {
+            const creep = Game.creeps[creepName];
             if (creep.spawning) continue;
 
             const roomName = creep.memory.room || creep.memory.colony || creep.room.name;
@@ -105,13 +103,15 @@ class TaskAssignmentManager {
 
         if (creep.heap.state === 'gather') {
             if ((target.amount !== undefined && target.amount < 50) ||
-                (target.store && target.store.getUsedCapacity() < 50)) {
+                (target.store && target.store.getUsedCapacity(RESOURCE_ENERGY) < 50) ||
+                (target.energy !== undefined && target.energy === 0)) {
                 creep.heap.targetId = null;
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
             }
         } else if (creep.heap.state === 'work') {
             if (creep.store.getUsedCapacity() === 0 ||
-                (target.store && target.store.getFreeCapacity() === 0)) {
+                (target.store && target.store.getFreeCapacity() === 0) ||
+                (creep.heap.actionIntent === ActionConstants.ACTION_UPGRADE && creep.memory.role !== 'upgrader')) {
                 creep.heap.targetId = null;
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
             }
@@ -149,7 +149,7 @@ class TaskAssignmentManager {
         if (roomState.containers) {
             for (let i = 0; i < roomState.containers.length; i++) {
                 const c = roomState.containers[i];
-                if (c.pos.getRangeTo(roomState.mineral) <= 1) {
+                if (Math.max(Math.abs(c.pos.x - roomState.mineral.pos.x), Math.abs(c.pos.y - roomState.mineral.pos.y)) <= 1) {
                     minerContainer = c;
                     break;
                 }
@@ -165,7 +165,7 @@ class TaskAssignmentManager {
                 creep.heap.actionIntent = ActionConstants.ACTION_HARVEST;
             }
         } else {
-            if (creep.pos.getRangeTo(roomState.mineral) > 1) {
+            if (Math.max(Math.abs(creep.pos.x - roomState.mineral.pos.x), Math.abs(creep.pos.y - roomState.mineral.pos.y)) > 1) {
                 creep.heap.destination = { x: roomState.mineral.pos.x, y: roomState.mineral.pos.y, roomName: creep.room.name, range: 1 };
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
             } else {
@@ -655,7 +655,7 @@ class TaskAssignmentManager {
             if (roomState.containers) {
                 for (let i = 0; i < roomState.containers.length; i++) {
                     const c = roomState.containers[i];
-                    if (c.pos.getRangeTo(roomState.controller) <= 3) {
+                    if (Math.max(Math.abs(c.pos.x - roomState.controller.pos.x), Math.abs(c.pos.y - roomState.controller.pos.y)) <= 3) {
                         controllerContainer = c;
                         break;
                     }
@@ -754,8 +754,8 @@ class TaskAssignmentManager {
         if (siteIds && siteIds.length > 0) {
             let bestSite = null;
             let bestScore = -1;
-            for (let i = 0; i < siteIds.length; i++) {
-                const s = CacheLib.getById(siteIds[i]) || roomState.constructionSites[siteIds[i]];
+            for (const siteId in roomState.constructionSites) {
+                const s = CacheLib.getById(siteId) || roomState.constructionSites[siteId];
                 if (!s) continue;
                 const dx = Math.abs(creep.pos.x - s.pos.x);
                 const dy = Math.abs(creep.pos.y - s.pos.y);
@@ -848,8 +848,8 @@ class TaskAssignmentManager {
             if (siteIds && siteIds.length > 0) {
                 let bestSite = null;
                 let bestScore = -1;
-                for (let i = 0; i < siteIds.length; i++) {
-                    const s = CacheLib.getById(siteIds[i]) || roomState.constructionSites[siteIds[i]];
+                for (const siteId in roomState.constructionSites) {
+                    const s = CacheLib.getById(siteId) || roomState.constructionSites[siteId];
                     if (!s) continue;
                     const dist = Math.max(Math.abs(creep.pos.x - s.pos.x), Math.abs(creep.pos.y - s.pos.y)) || 1;
                     const score = 100 / dist;
