@@ -15,9 +15,7 @@ function getRepairTarget(creep) {
     let repairTargets = null;
 
     // Fetch the repair targets populated by RoomStateScanner via RepairTargetUtility
-    if (global.state && global.state.rooms && global.state.rooms[roomName]) {
-        repairTargets = global.state.rooms[roomName].repairTargets;
-    } else if (global.State && global.State.rooms && typeof global.State.rooms.get === 'function') {
+    if (global.State && global.State.rooms && typeof global.State.rooms.get === 'function') {
         const roomState = global.State.rooms.get(roomName);
         if (roomState) {
             repairTargets = roomState.repairTargets;

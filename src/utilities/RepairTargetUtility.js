@@ -15,11 +15,8 @@ const GameObjectUtility = require('./GameObjectUtility');
 function getRepairTargets(roomName, threshold) {
     let structureIds = null;
 
-    // Handle both the acceptance criteria's expected global.state.rooms[roomName]
-    // and the actual application's global.State.rooms.get(roomName)
-    if (global.state && global.state.rooms && global.state.rooms[roomName]) {
-        structureIds = global.state.rooms[roomName].structureIds;
-    } else if (global.State && global.State.rooms && typeof global.State.rooms.get === 'function') {
+    // Fetch the cached structure IDs from the global state using Map.get()
+    if (global.State && global.State.rooms && typeof global.State.rooms.get === 'function') {
         const roomState = global.State.rooms.get(roomName);
         if (roomState) {
             structureIds = roomState.structureIds;
