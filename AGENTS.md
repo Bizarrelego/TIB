@@ -1,9 +1,8 @@
-# AGENTS.md (Jules AI System Injection)
+# AGENTS.md (AI System Injection)
 
 ### 1. AI Behavioral Directives
 * **Single Responsibility:** Write exactly the module or function requested. Do not anticipate future requirements. 
 * **Zero Placeholders:** Never use `// TODO`, `// Implementation placeholder`, or partial logic. Write complete, functional code blocks.
-* **No Ghost Features:** Do not include logic for links, containers, towers, or roads. The current architecture strictly prohibits them.
 * **Pure Utility Functions:** Utility functions must return data. They must never mutate `Memory`, `global`, or `creep.heap` directly unless explicitly commanded.
 
 ### 2. Core Execution Constraints
@@ -13,15 +12,8 @@
 * **CPU Sleep:** If a target source is empty, calculate `Game.time + source.ticksToRegeneration`, store it in the creep's heap, and halt execution until that tick.
 
 ### 3. Skeleton Top-Down Architecture Constraints
-The architecture must scale, but the current logic must remain primitive. Enforce this strict Brain/Muscle split:
+The architecture must scale. Enforce this strict Brain/Muscle split:
 * **The Muscle (Roles):** Creep role files MUST NOT contain logic, `find()`, or targeting decisions. Roles only read `creep.heap.targetId` and `creep.heap.actionIntent` and execute the native API call. If an action fails or completes, the creep sets `creep.heap.state = 'idle'`.
 * **The Brain (`TaskAssignmentManager`):** This manager iterates over idle creeps, evaluates the central state, and writes the `targetId` and `actionIntent` to the creep's heap.
 * **The Eyes (`GlobalStateScanner`):** Runs at the start of the tick. Parses structures, sources, and drops into O(1) arrays/dictionaries. Managers pull data exclusively from here.
 * **The Heart (`SpawnManager`):** Spawns creeps based on a hardcoded integer census limit. Do not use dynamic math for limits in this phase.
-
-### 4. Active Phase: RCL 1-2 Bootstrapping
-You are building a brute-force, high-efficiency early game. 
-* **Logistics:** Implement strict Drop-Mining. Harvesters move to an optimal coordinate, lock their position, and execute `harvest()`. They do not path again. They let the engine drop excess energy.
-* **Hauling:** Haulers use hashed assignments to target specific harvesters, preventing swarming. They sweep dropped energy and route strictly to the Spawn or Upgrader drop-pile.
-* **Upgrading:** Upgraders are stationary. Haulers drop energy on the upgrader's exact tile. Upgraders execute `pickup()` and `upgradeController()` on the same tick.
-* **Scavenging:** The `TaskAssignmentManager` must prioritize assigning `withdraw()` on `Ruin` and `Tombstone` objects over standard drop-piles.
