@@ -12,11 +12,15 @@ const RoleExecutor = require('./managers/RoleExecutor');
 const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
 const IntelManager = require('./managers/IntelManager');
 const TrafficManager = require('./managers/TrafficManager');
+const RoomPlanner = require('./managers/RoomPlanner');
+const ConstructionManager = require('./managers/ConstructionManager');
+const ScoutingManager = require('./managers/ScoutingManager');
 
 // Utilities
 const ProfilerUtility = require('./utilities/ProfilerUtility');
 const Logger = require('./utilities/Logger');
 const ErrorHandlingUtility = require('./utilities/ErrorHandlingUtility');
+const StressTestUtility = require('./utilities/StressTestUtility');
 
 module.exports.loop = function () {
     // Profiler Start
@@ -41,6 +45,21 @@ module.exports.loop = function () {
 
     // 3. Intel Gathering (serializes visible room data to Memory)
     ErrorHandlingUtility.wrap(() => IntelManager.run(), 'IntelManager')();
+
+    // 3.5 Stress Test Injection
+    ErrorHandlingUtility.wrap(() => StressTestUtility.run(), 'StressTestUtility')();
+
+    // 3.8 Planning & Scouting
+    ErrorHandlingUtility.wrap(() => {
+        for (const roomName in Game.rooms) {
+            const room = Game.rooms[roomName];
+            if (room.controller && room.controller.my) {
+                RoomPlanner.manageRoom(room);
+            }
+        }
+    }, 'RoomPlanner')();
+    ErrorHandlingUtility.wrap(() => ConstructionManager.run(), 'ConstructionManager')();
+    ErrorHandlingUtility.wrap(() => ScoutingManager.run(), 'ScoutingManager')();
 
     // 4. Task Assignment
     ErrorHandlingUtility.wrap(() => TaskAssignmentManager.run(), 'TaskAssignmentManager')();

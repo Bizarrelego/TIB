@@ -37,10 +37,13 @@ class RoomPlanner {
     }
 
     static manageRoom(room) {
-        if (!global.Cache.blueprints.has(room.name)) this.generateBlueprint(room);
-        if (Game.time % 13 !== 0) return;
-        if (Object.keys(Game.constructionSites).length > 50) return;
-        this.executeBlueprint(room);
+        if (!global.Cache) global.Cache = { blueprints: new Map() };
+        if (!(global.Cache.blueprints instanceof Map)) global.Cache.blueprints = new Map();
+
+        if (!global.Cache.blueprints.has(room.name) || room.memory.plannedRcl !== room.controller.level) {
+            this.generateBlueprint(room);
+            room.memory.plannedRcl = room.controller.level;
+        }
     }
 
     // ─── Pipeline ────────────────────────────────────────────────────────
@@ -673,134 +676,6 @@ class RoomPlanner {
         blueprint.outpostRamparts = outpostRamparts;
         for (let i = 0; i < outpostRamparts.length; i++) blueprint.ramparts.push(outpostRamparts[i]);
     }
-
-    // ─── Blueprint Execution ─────────────────────────────────────────────
-
-    static executeBlueprint(room) {
-        const blueprint = global.Cache.blueprints.get(room.name);
-        if (!blueprint) return;
-        const rcl = room.controller.level;
-        const state = global.State?.rooms?.get(room.name);
-        if (!state) return;
-
-        let sitesPlaced = 0;
-        const maxSitesPerTick = 3;
-
-        const existingPositions = new Set();
-        if (state.structureIds) {
-            for (let i = 0; i < state.structureIds.length; i++) {
-                const s = GameObjectUtility.getById(state.structureIds[i]);
-                if (s) existingPositions.add(s.pos.x + '_' + s.pos.y + '_' + s.structureType);
-            }
-        }
-        if (state.constructionSites) {
-            for (let i = 0; i < state.constructionSites.length; i++) {
-                const s = state.constructionSites[i];
-                existingPositions.add(s.pos.x + '_' + s.pos.y + '_' + s.structureType);
-            }
-        }
-
-        // Containers first — critical for early progression
-        if (blueprint.containers && rcl >= 1) {
-            const maxContainers = CONTROLLER_STRUCTURES[STRUCTURE_CONTAINER][rcl];
-            let containerCount = state.containers ? state.containers.length : 0;
-            if (state.constructionSites) {
-                for (let i = 0; i < state.constructionSites.length; i++) {
-                    if (state.constructionSites[i].structureType === STRUCTURE_CONTAINER) containerCount++;
-                }
-            }
-            for (let i = 0; i < blueprint.containers.length && sitesPlaced < maxSitesPerTick; i++) {
-                if (containerCount >= maxContainers) break;
-                const pos = blueprint.containers[i];
-                const key = pos.x + '_' + pos.y + '_' + STRUCTURE_CONTAINER;
-                if (existingPositions.has(key)) continue;
-                if (room.createConstructionSite(pos.x, pos.y, STRUCTURE_CONTAINER) === OK) {
-                    sitesPlaced++; containerCount++; existingPositions.add(key);
-                }
-            }
-        }
-
-        sitesPlaced += this.placeStructureType(room, blueprint, STRUCTURE_SPAWN, rcl, existingPositions, state, maxSitesPerTick - sitesPlaced);
-        sitesPlaced += this.placeStructureType(room, blueprint, STRUCTURE_TOWER, rcl, existingPositions, state, maxSitesPerTick - sitesPlaced);
-        sitesPlaced += this.placeStructureType(room, blueprint, STRUCTURE_STORAGE, rcl, existingPositions, state, maxSitesPerTick - sitesPlaced);
-        sitesPlaced += this.placeStructureType(room, blueprint, STRUCTURE_EXTENSION, rcl, existingPositions, state, maxSitesPerTick - sitesPlaced);
-        sitesPlaced += this.placeStructureType(room, blueprint, STRUCTURE_TERMINAL, rcl, existingPositions, state, maxSitesPerTick - sitesPlaced);
-        sitesPlaced += this.placeStructureType(room, blueprint, STRUCTURE_FACTORY, rcl, existingPositions, state, maxSitesPerTick - sitesPlaced);
-        sitesPlaced += this.placeStructureType(room, blueprint, STRUCTURE_LAB, rcl, existingPositions, state, maxSitesPerTick - sitesPlaced);
-        sitesPlaced += this.placeStructureType(room, blueprint, STRUCTURE_OBSERVER, rcl, existingPositions, state, maxSitesPerTick - sitesPlaced);
-        sitesPlaced += this.placeStructureType(room, blueprint, STRUCTURE_NUKER, rcl, existingPositions, state, maxSitesPerTick - sitesPlaced);
-        sitesPlaced += this.placeStructureType(room, blueprint, STRUCTURE_POWER_SPAWN, rcl, existingPositions, state, maxSitesPerTick - sitesPlaced);
-
-        // Roads (RCL 2+)
-        if (blueprint.roads && rcl >= 2 && sitesPlaced < maxSitesPerTick) {
-            let roadCount = 0;
-            if (state.structureIds) {
-                for (let i = 0; i < state.structureIds.length; i++) {
-                    const s = GameObjectUtility.getById(state.structureIds[i]);
-                    if (s && s.structureType === STRUCTURE_ROAD) roadCount++;
-                }
-            }
-            if (state.constructionSites) {
-                for (let i = 0; i < state.constructionSites.length; i++) {
-                    if (state.constructionSites[i].structureType === STRUCTURE_ROAD) roadCount++;
-                }
-            }
-            const maxRoads = CONTROLLER_STRUCTURES[STRUCTURE_ROAD][rcl];
-            for (let i = 0; i < blueprint.roads.length && sitesPlaced < maxSitesPerTick; i++) {
-                if (roadCount >= maxRoads) break;
-                const pos = blueprint.roads[i];
-                const key = pos.x + '_' + pos.y + '_' + STRUCTURE_ROAD;
-                if (existingPositions.has(key)) continue;
-                if (room.createConstructionSite(pos.x, pos.y, STRUCTURE_ROAD) === OK) {
-                    sitesPlaced++; roadCount++; existingPositions.add(key);
-                }
-            }
-        }
-
-        // Ramparts (RCL 4+)
-        if (rcl >= 4 && blueprint.ramparts && sitesPlaced < maxSitesPerTick) {
-            for (let i = 0; i < blueprint.ramparts.length && sitesPlaced < maxSitesPerTick; i++) {
-                const pos = blueprint.ramparts[i];
-                const key = pos.x + '_' + pos.y + '_' + STRUCTURE_RAMPART;
-                if (existingPositions.has(key)) continue;
-                if (room.createConstructionSite(pos.x, pos.y, STRUCTURE_RAMPART) === OK) {
-                    sitesPlaced++; existingPositions.add(key);
-                }
-            }
-        }
-    }
-
-    static placeStructureType(room, blueprint, structureType, rcl, existingPositions, state, maxToPlace) {
-        if (maxToPlace <= 0) return 0;
-        const positions = blueprint[structureType];
-        if (!positions || positions.length === 0) return 0;
-        const maxAllowed = CONTROLLER_STRUCTURES[structureType][rcl];
-        if (maxAllowed === 0) return 0;
-        let count = 0;
-        if (state.structureIds) {
-            for (let i = 0; i < state.structureIds.length; i++) {
-                const s = GameObjectUtility.getById(state.structureIds[i]);
-                if (s && s.structureType === structureType) count++;
-            }
-        }
-        if (state.constructionSites) {
-            for (let i = 0; i < state.constructionSites.length; i++) {
-                if (state.constructionSites[i].structureType === structureType) count++;
-            }
-        }
-        let placed = 0;
-        for (let i = 0; i < positions.length && placed < maxToPlace; i++) {
-            if (count >= maxAllowed) break;
-            const pos = positions[i];
-            const key = pos.x + '_' + pos.y + '_' + structureType;
-            if (existingPositions.has(key)) continue;
-            if (room.createConstructionSite(pos.x, pos.y, structureType) === OK) {
-                placed++; count++; existingPositions.add(key);
-            }
-        }
-        return placed;
-    }
-
     // ─── Visualizer ──────────────────────────────────────────────────────
 
     /**

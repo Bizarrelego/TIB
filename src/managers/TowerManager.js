@@ -36,7 +36,7 @@ class TowerManager {
             if (roomState.creeps) {
                 for (let i = 0; i < roomState.creeps.length; i++) {
                     const c = roomState.creeps[i];
-                    if (c.my && c.hits < c.hitsMax) {
+                    if (c.my && c.hits < c.hitsMax - 100) {
                         damagedTarget = c;
                         break;
                     }

@@ -132,7 +132,6 @@ class TaskAssignmentManager {
         else if (role === 'filler') TaskAssignmentManager.assignFiller(creep, roomState);
         else if (role === 'remoteharvester') TaskAssignmentManager.assignRemoteHarvester(creep, roomState);
         else if (role === 'remotehauler') TaskAssignmentManager.assignRemoteHauler(creep, roomState);
-        else if (role === 'scout') TaskAssignmentManager.assignScout(creep, roomState);
         else if (role === 'repairman') TaskAssignmentManager.assignRepairman(creep, roomState);
         else if (role === 'defender') TaskAssignmentManager.assignDefender(creep, roomState);
     }
@@ -259,30 +258,28 @@ class TaskAssignmentManager {
             }
         }
     }
-
-    static assignScout(creep, homeState) {
-        if (!global.State.scoutQueue || global.State.scoutQueue.length === 0) {
-            creep.heap.targetRoom = null;
-            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
-            // Park near spawn to avoid blocking roads
-            if (creep.room.name === creep.memory.colony && homeState && homeState.spawns && homeState.spawns.length > 0) {
-                if (creep.pos.getRangeTo(homeState.spawns[0]) > 3) {
-                    creep.heap.destination = { x: homeState.spawns[0].pos.x, y: homeState.spawns[0].pos.y, roomName: homeState.spawns[0].pos.roomName, range: 3 };
-                }
-            }
-            return;
-        }
-
-        // Assign the first room in the queue
-        creep.heap.targetRoom = global.State.scoutQueue[0];
-        creep.heap.actionIntent = ActionConstants.ACTION_SCOUT;
-    }
-
     static assignRemoteHarvester(creep, _homeState) {
         if (!creep.memory.targetRoom) {
             const outposts = Memory.rooms[creep.memory.colony]?.outposts || [];
             if (outposts.length > 0) {
-                creep.memory.targetRoom = outposts[djb2Hash(creep.name) % outposts.length];
+                const counts = new Map();
+                for (const name in Game.creeps) {
+                    const c = Game.creeps[name];
+                    if (c.memory.role === 'remoteHarvester' && c.memory.colony === creep.memory.colony && c.memory.targetRoom) {
+                        counts.set(c.memory.targetRoom, (counts.get(c.memory.targetRoom) || 0) + 1);
+                    }
+                }
+
+                let bestRoom = outposts[0];
+                let minCount = Infinity;
+                for (let i = 0; i < outposts.length; i++) {
+                    const count = counts.get(outposts[i]) || 0;
+                    if (count < minCount) {
+                        minCount = count;
+                        bestRoom = outposts[i];
+                    }
+                }
+                creep.memory.targetRoom = bestRoom;
             } else {
                 return;
             }
@@ -304,7 +301,24 @@ class TaskAssignmentManager {
             if (!creep.memory.targetRoom) {
                 const outposts = Memory.rooms[creep.memory.colony]?.outposts || [];
                 if (outposts.length > 0) {
-                    creep.memory.targetRoom = outposts[djb2Hash(creep.name) % outposts.length];
+                    const counts = new Map();
+                    for (const name in Game.creeps) {
+                        const c = Game.creeps[name];
+                        if (c.memory.role === 'remoteHauler' && c.memory.colony === creep.memory.colony && c.memory.targetRoom) {
+                            counts.set(c.memory.targetRoom, (counts.get(c.memory.targetRoom) || 0) + 1);
+                        }
+                    }
+
+                    let bestRoom = outposts[0];
+                    let minCount = Infinity;
+                    for (let i = 0; i < outposts.length; i++) {
+                        const count = counts.get(outposts[i]) || 0;
+                        if (count < minCount) {
+                            minCount = count;
+                            bestRoom = outposts[i];
+                        }
+                    }
+                    creep.memory.targetRoom = bestRoom;
                 } else {
                     return;
                 }
@@ -375,36 +389,38 @@ class TaskAssignmentManager {
         const sources = roomState.sources;
         if (!sources || sources.length === 0) return;
 
-        // Balance assignment dynamically based on current heap assignments
-        const counts = new Map();
-        if (roomState.harvesters) {
-            for (let i = 0; i < roomState.harvesters.length; i++) {
-                const h = roomState.harvesters[i];
-                if (h.heap && h.heap.targetId) {
-                    counts.set(h.heap.targetId, (counts.get(h.heap.targetId) || 0) + 1);
+        // Lock source permanently to prevent target thrashing
+        if (!creep.memory.targetId) {
+            const counts = new Map();
+            for (const name in Game.creeps) {
+                const c = Game.creeps[name];
+                if (c.memory.role === 'harvester' && c.memory.colony === creep.memory.colony && c.memory.targetId) {
+                    counts.set(c.memory.targetId, (counts.get(c.memory.targetId) || 0) + 1);
                 }
             }
-        }
 
-        let bestSource = sources[0];
-        let minCount = Infinity;
-
-        for (let i = 0; i < sources.length; i++) {
-            const count = counts.get(sources[i].id) || 0;
-            if (count < minCount) {
-                minCount = count;
-                bestSource = sources[i];
+            let bestSource = sources[0];
+            let minCount = Infinity;
+            for (let i = 0; i < sources.length; i++) {
+                const count = counts.get(sources[i].id) || 0;
+                if (count < minCount) {
+                    minCount = count;
+                    bestSource = sources[i];
+                }
             }
+            creep.memory.targetId = bestSource.id;
         }
 
-        creep.heap.targetId = bestSource.id;
+        creep.heap.targetId = creep.memory.targetId;
         creep.heap.actionIntent = ActionConstants.ACTION_HARVEST;
 
-        // Assign sitTargetId if a container exists for this source
+        const source = Game.getObjectById(creep.memory.targetId);
+        if (!source) return;
+
         if (roomState.sourceContainers) {
             for (let i = 0; i < roomState.sourceContainers.length; i++) {
                 const c = roomState.sourceContainers[i];
-                if (c.pos.getRangeTo(bestSource) <= 2) {
+                if (c.pos.getRangeTo(source) <= 2) {
                     creep.heap.sitTargetId = c.id;
                     break;
                 }

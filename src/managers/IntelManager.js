@@ -14,15 +14,28 @@ const createRoomMemoryTemplate = () => ({
 
 class IntelManager {
     static run() {
-        if (Game.cpu.bucket <= 500) return;
-        // Run every 10 ticks to save CPU
-        if (Game.time % 10 !== 0) return;
-        
         if (!Memory.rooms) {
             Memory.rooms = {};
         }
 
         const visibleRooms = Object.keys(Game.rooms);
+        
+        // Update threat and energy levels for all visible rooms EVERY TICK
+        for (let i = 0; i < visibleRooms.length; i++) {
+            const room = Game.rooms[visibleRooms[i]];
+            IntelManager.updateThreatAndEnergy(room);
+            
+            // Passive Scraping: instantly grab data if unscouted or stale
+            const mem = Memory.rooms[room.name];
+            if (!mem || !mem.scoutedAt || (Game.time - mem.scoutedAt > 500)) {
+                IntelManager.scanAndSave(room);
+            }
+        }
+
+        if (Game.cpu.bucket <= 500) return;
+        // Run every 10 ticks to save CPU
+        if (Game.time % 10 !== 0) return;
+        
         for (let i = 0; i < visibleRooms.length; i++) {
             const room = Game.rooms[visibleRooms[i]];
             IntelManager.scanAndSave(room);
@@ -32,6 +45,38 @@ class IntelManager {
         }
 
         global.State.scoutQueue = IntelManager.buildScoutQueue(visibleRooms);
+    }
+
+    static updateThreatAndEnergy(room) {
+        if (!Memory.rooms) Memory.rooms = {};
+        let mem = Memory.rooms[room.name];
+        if (!mem) return;
+        
+        const state = global.State.rooms.get(room.name);
+        if (!state) return;
+
+        if (!mem.hostiles) mem.hostiles = { creeps: 0, towers: 0, invaderCore: false };
+
+        const hostileCreeps = state.hostiles || [];
+        const towers = state.towers || [];
+        let hostileTowerCount = 0;
+        for (let i = 0; i < towers.length; i++) {
+            if (!towers[i].my && towers[i].structureType === STRUCTURE_TOWER) {
+                hostileTowerCount++;
+            }
+        }
+        const invaderCores = state.invaderCores || [];
+
+        mem.hostiles.creeps = hostileCreeps.length;
+        mem.hostiles.towers = hostileTowerCount;
+        mem.hostiles.invaderCore = invaderCores.length > 0;
+
+        const drops = state.droppedEnergy || [];
+        let totalDrops = 0;
+        for (let i = 0; i < drops.length; i++) {
+            totalDrops += drops[i].amount;
+        }
+        mem.droppedEnergy = totalDrops;
     }
 
     static scanAndSave(room) {
