@@ -45,6 +45,13 @@ class ActionExecutor {
     static executeIntent(creep, heap, intent, target) {
         let result = ERR_INVALID_TARGET;
 
+        if (heap.secondaryIntent) {
+            const secTarget = heap.secondaryTargetId ? CacheLib.getById(heap.secondaryTargetId) : null;
+            if (heap.secondaryIntent === ActionConstants.ACTION_PICKUP && secTarget) {
+                creep.pickup(secTarget);
+            }
+        }
+
         if (intent === ActionConstants.ACTION_HARVEST) {
             result = creep.harvest(target);
         } else if (intent === ActionConstants.ACTION_WITHDRAW) {

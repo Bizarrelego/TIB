@@ -25,7 +25,7 @@ class RoomPlanner {
 
     static run() {
         if (Game.cpu.bucket <= 500) return;
-        if (Game.time % 50 !== 0) return;
+        // if (Game.time % 50 !== 0) return; // Temporarily disabled for debugging
         if (!global.Cache) global.Cache = { blueprints: new Map() };
         if (!(global.Cache.blueprints instanceof Map)) global.Cache.blueprints = new Map();
         for (const roomName in Game.rooms) {
@@ -66,7 +66,8 @@ class RoomPlanner {
             [STRUCTURE_LAB]: [],
             [STRUCTURE_OBSERVER]: [],
             [STRUCTURE_NUKER]: [],
-            [STRUCTURE_POWER_SPAWN]: []
+            [STRUCTURE_POWER_SPAWN]: [],
+            [STRUCTURE_LINK]: []
         };
 
         // Step 1: Anchor
@@ -74,27 +75,46 @@ class RoomPlanner {
         blueprint.anchor = anchor;
 
         const visited = new Uint8Array(2500);
+        const fragmentCenters = [];
+
+        console.log(`[RoomPlanner] Generating new blueprint for room ${room.name}...`);
 
         // Step 2: Fast Filler Stamp
         this.applyFastFillerStamp(blueprint, terrain, anchor, visited);
+        fragmentCenters.push({ x: anchor.x, y: anchor.y });
+        console.log(`[RoomPlanner] Fast Filler packed at anchor: ${anchor.x}, ${anchor.y}`);
 
         // Step 3: Core Hub Stamp
-        this.applyCoreStamp(blueprint, terrain, anchor, visited);
+        const coreCenter = this.applyCoreStamp(blueprint, terrain, anchor, visited);
+        if (coreCenter) {
+            fragmentCenters.push(coreCenter);
+            console.log(`[RoomPlanner] Core Hub packed at: ${coreCenter.x}, ${coreCenter.y}`);
+        } else console.log(`[RoomPlanner] WARNING: Failed to find space for Core Hub!`);
 
         // Step 4: Tower Stamp
-        this.applyTowerStamp(blueprint, terrain, anchor, visited);
+        const towerCenter = this.applyTowerStamp(blueprint, terrain, anchor, visited);
+        if (towerCenter) {
+            fragmentCenters.push(towerCenter);
+            console.log(`[RoomPlanner] Tower Array packed at: ${towerCenter.x}, ${towerCenter.y}`);
+        } else console.log(`[RoomPlanner] WARNING: Failed to find space for Tower Array!`);
 
         // Step 5: Lab cluster
-        this.applyLabStamp(blueprint, terrain, anchor, visited);
+        const labCenter = this.applyLabStamp(blueprint, terrain, anchor, visited);
+        if (labCenter) {
+            fragmentCenters.push(labCenter);
+            console.log(`[RoomPlanner] Lab Cluster packed at: ${labCenter.x}, ${labCenter.y}`);
+        } else console.log(`[RoomPlanner] WARNING: Failed to find space for Lab Cluster!`);
 
         // Step 6: Extension Clusters (Plus-sign grids)
-        this.applyExtensionClusters(blueprint, terrain, anchor, visited);
+        const extensionCenters = this.applyExtensionClusters(blueprint, terrain, anchor, visited);
+        for (let i = 0; i < extensionCenters.length; i++) fragmentCenters.push(extensionCenters[i]);
+        console.log(`[RoomPlanner] Packed ${extensionCenters.length} extension clusters.`);
 
         // Step 5: Source + controller containers
         if (state) this.planContainers(blueprint, room, state, terrain);
 
-        // Step 6: External road routes (containers + mineral only; diamond handles internal)
-        if (state) this.planRoads(blueprint, room, state, anchor);
+        // Step 6: External road routes and fragment connections
+        if (state) this.planRoads(blueprint, room, state, anchor, fragmentCenters);
 
         // Step 7: Min-Cut Ramparts
         blueprint.ramparts = this.computeMinCut(terrain, visited);
@@ -114,7 +134,21 @@ class RoomPlanner {
             blueprint[STRUCTURE_EXTRACTOR].push({ x: state.mineral.pos.x, y: state.mineral.pos.y });
         }
 
+        // Step 12: Precompile Sets for Visualizer
+        const supplierSet = new Uint8Array(2500);
+        for (let i = 0; i < blueprint.supplierLabs.length; i++) supplierSet[blueprint.supplierLabs[i].x * 50 + blueprint.supplierLabs[i].y] = 1;
+        blueprint.supplierSet = supplierSet;
+
+        const roadSet = new Uint8Array(2500);
+        for (let i = 0; i < blueprint.roads.length; i++) roadSet[blueprint.roads[i].x * 50 + blueprint.roads[i].y] = 1;
+        blueprint.roadSet = roadSet;
+
+        const outpostSet = new Uint8Array(2500);
+        for (let i = 0; i < blueprint.outpostRamparts.length; i++) outpostSet[blueprint.outpostRamparts[i].x * 50 + blueprint.outpostRamparts[i].y] = 1;
+        blueprint.outpostSet = outpostSet;
+
         global.Cache.blueprints.set(room.name, blueprint);
+        console.log(`[RoomPlanner] Successfully generated and cached blueprint for ${room.name}!`);
     }
 
     // ─── Step 1: Anchor Finding ──────────────────────────────────────────
@@ -182,12 +216,44 @@ class RoomPlanner {
         }
     }
 
-    static applyCoreStamp(blueprint, terrain, anchor, visited) {
-        const variants = [
-            { cx: 5, cy: 0 }, { cx: -5, cy: 0 }, { cx: 0, cy: 5 }, { cx: 0, cy: -5 },
-            { cx: 4, cy: 4 }, { cx: -4, cy: -4 }, { cx: 4, cy: -4 }, { cx: -4, cy: 4 }
-        ];
+    static findCompactPlacement(stampRotations, terrain, anchor, visited) {
+        const variants = Array.isArray(stampRotations[0]) ? stampRotations : [stampRotations];
+        const queue = [{ x: anchor.x, y: anchor.y }];
+        const seen = new Uint8Array(2500);
+        seen[anchor.x * 50 + anchor.y] = 1;
+        let head = 0;
+        
+        while (head < queue.length) {
+            const { x, y } = queue[head++];
+            
+            for (let v = 0; v < variants.length; v++) {
+                const stamp = variants[v];
+                let valid = true;
+                for (let j = 0; j < stamp.length; j++) {
+                    const nx = x + stamp[j].dx, ny = y + stamp[j].dy;
+                    if (nx < 2 || nx > 47 || ny < 2 || ny > 47 || terrain.get(nx, ny) === TERRAIN_MASK_WALL || visited[nx * 50 + ny]) {
+                        valid = false; break;
+                    }
+                }
+                if (valid) return { cx: x, cy: y, stamp };
+            }
+            
+            const dirs = [{dx:0,dy:-1}, {dx:0,dy:1}, {dx:-1,dy:0}, {dx:1,dy:0}];
+            for (let d = 0; d < dirs.length; d++) {
+                const nx = x + dirs[d].dx, ny = y + dirs[d].dy;
+                if (nx >= 2 && nx <= 47 && ny >= 2 && ny <= 47) {
+                    const key = nx * 50 + ny;
+                    if (!seen[key]) {
+                        seen[key] = 1;
+                        queue.push({ x: nx, y: ny });
+                    }
+                }
+            }
+        }
+        return null;
+    }
 
+    static applyCoreStamp(blueprint, terrain, anchor, visited) {
         const stamp = [
             { type: 'road', dx: 0, dy: 0 },
             { type: STRUCTURE_STORAGE, dx: -1, dy: 0 },
@@ -202,36 +268,22 @@ class RoomPlanner {
             { type: 'road', dx: -1, dy: 1 }, { type: 'road', dx: -1, dy: -2 }, { type: 'road', dx: 1, dy: -2 }
         ];
 
-        let bestVariant = null;
-        for (let v = 0; v < variants.length; v++) {
-            const cx = anchor.x + variants[v].cx, cy = anchor.y + variants[v].cy;
-            let valid = true;
-            for (let i = 0; i < stamp.length; i++) {
-                const x = cx + stamp[i].dx, y = cy + stamp[i].dy;
-                if (x < 2 || x > 47 || y < 2 || y > 47 || terrain.get(x, y) === TERRAIN_MASK_WALL || visited[x * 50 + y]) {
-                    valid = false; break;
-                }
-            }
-            if (valid) { bestVariant = { cx, cy }; break; }
-        }
-
-        if (bestVariant) {
-            const cx = bestVariant.cx, cy = bestVariant.cy;
-            for (let i = 0; i < stamp.length; i++) {
-                const { type, dx, dy } = stamp[i];
+        const placement = this.findCompactPlacement(stamp, terrain, anchor, visited);
+        if (placement) {
+            const { cx, cy, stamp: chosenStamp } = placement;
+            for (let i = 0; i < chosenStamp.length; i++) {
+                const { type, dx, dy } = chosenStamp[i];
                 const x = cx + dx, y = cy + dy;
                 visited[x * 50 + y] = 1;
                 if (type === 'road') blueprint.roads.push({ x, y });
                 else blueprint[type].push({ x, y });
             }
+            return { x: cx, y: cy };
         }
+        return null;
     }
 
     static applyTowerStamp(blueprint, terrain, anchor, visited) {
-        const variants = [
-            { cx: 3, cy: 3 }, { cx: -3, cy: -3 }, { cx: 3, cy: -3 }, { cx: -3, cy: 3 },
-            { cx: 0, cy: 3 }, { cx: 0, cy: -3 }, { cx: 3, cy: 0 }, { cx: -3, cy: 0 }
-        ];
         const stamp = [
             { type: STRUCTURE_TOWER, dx: 0, dy: 0 }, { type: STRUCTURE_TOWER, dx: 1, dy: 0 }, { type: STRUCTURE_TOWER, dx: -1, dy: 0 },
             { type: STRUCTURE_TOWER, dx: 0, dy: 1 }, { type: STRUCTURE_TOWER, dx: 1, dy: 1 }, { type: STRUCTURE_TOWER, dx: -1, dy: 1 },
@@ -241,29 +293,58 @@ class RoomPlanner {
             { type: 'road', dx: 2, dy: 0 }, { type: 'road', dx: 2, dy: 1 }
         ];
 
-        let bestVariant = null;
-        for (let v = 0; v < variants.length; v++) {
-            const cx = anchor.x + variants[v].cx, cy = anchor.y + variants[v].cy;
-            let valid = true;
-            for (let i = 0; i < stamp.length; i++) {
-                const x = cx + stamp[i].dx, y = cy + stamp[i].dy;
-                if (x < 2 || x > 47 || y < 2 || y > 47 || terrain.get(x, y) === TERRAIN_MASK_WALL || visited[x * 50 + y]) {
-                    valid = false; break;
-                }
-            }
-            if (valid) { bestVariant = { cx, cy }; break; }
-        }
-
-        if (bestVariant) {
-            const cx = bestVariant.cx, cy = bestVariant.cy;
-            for (let i = 0; i < stamp.length; i++) {
-                const { type, dx, dy } = stamp[i];
+        const placement = this.findCompactPlacement(stamp, terrain, anchor, visited);
+        if (placement) {
+            const { cx, cy, stamp: chosenStamp } = placement;
+            for (let i = 0; i < chosenStamp.length; i++) {
+                const { type, dx, dy } = chosenStamp[i];
                 const x = cx + dx, y = cy + dy;
                 visited[x * 50 + y] = 1;
                 if (type === 'road') blueprint.roads.push({ x, y });
                 else blueprint[type].push({ x, y });
             }
+            return { x: cx, y: cy };
         }
+        return null;
+    }
+
+    static applyLabStamp(blueprint, terrain, anchor, visited) {
+        const variants = [
+            [
+                { dx: -1, dy: -1, s: false, type: STRUCTURE_LAB }, { dx: 0, dy: -1, s: true, type: STRUCTURE_LAB }, { dx: 1, dy: -1, s: true, type: STRUCTURE_LAB }, { dx: 2, dy: -1, s: false, type: STRUCTURE_LAB },
+                { dx: -1, dy: 0, s: false, type: STRUCTURE_LAB }, { dx: 0, dy: 0, s: false, type: STRUCTURE_LAB }, { dx: 1, dy: 0, s: false, type: STRUCTURE_LAB }, { dx: 2, dy: 0, s: false, type: STRUCTURE_LAB },
+                { dx: 0, dy: 1, s: false, type: STRUCTURE_LAB }, { dx: 1, dy: 1, s: false, type: STRUCTURE_LAB },
+            ],
+            [
+                { dx: -1, dy: 1, s: false, type: STRUCTURE_LAB }, { dx: 0, dy: 1, s: true, type: STRUCTURE_LAB }, { dx: 1, dy: 1, s: true, type: STRUCTURE_LAB }, { dx: 2, dy: 1, s: false, type: STRUCTURE_LAB },
+                { dx: -1, dy: 0, s: false, type: STRUCTURE_LAB }, { dx: 0, dy: 0, s: false, type: STRUCTURE_LAB }, { dx: 1, dy: 0, s: false, type: STRUCTURE_LAB }, { dx: 2, dy: 0, s: false, type: STRUCTURE_LAB },
+                { dx: 0, dy: -1, s: false, type: STRUCTURE_LAB }, { dx: 1, dy: -1, s: false, type: STRUCTURE_LAB },
+            ],
+            [
+                { dx: 1, dy: -1, s: false, type: STRUCTURE_LAB }, { dx: 1, dy: 0, s: true, type: STRUCTURE_LAB }, { dx: 1, dy: 1, s: true, type: STRUCTURE_LAB }, { dx: 1, dy: 2, s: false, type: STRUCTURE_LAB },
+                { dx: 0, dy: -1, s: false, type: STRUCTURE_LAB }, { dx: 0, dy: 0, s: false, type: STRUCTURE_LAB }, { dx: 0, dy: 1, s: false, type: STRUCTURE_LAB }, { dx: 0, dy: 2, s: false, type: STRUCTURE_LAB },
+                { dx: -1, dy: 0, s: false, type: STRUCTURE_LAB }, { dx: -1, dy: 1, s: false, type: STRUCTURE_LAB },
+            ],
+            [
+                { dx: -1, dy: -1, s: false, type: STRUCTURE_LAB }, { dx: -1, dy: 0, s: true, type: STRUCTURE_LAB }, { dx: -1, dy: 1, s: true, type: STRUCTURE_LAB }, { dx: -1, dy: 2, s: false, type: STRUCTURE_LAB },
+                { dx: 0, dy: -1, s: false, type: STRUCTURE_LAB }, { dx: 0, dy: 0, s: false, type: STRUCTURE_LAB }, { dx: 0, dy: 1, s: false, type: STRUCTURE_LAB }, { dx: 0, dy: 2, s: false, type: STRUCTURE_LAB },
+                { dx: 1, dy: 0, s: false, type: STRUCTURE_LAB }, { dx: 1, dy: 1, s: false, type: STRUCTURE_LAB },
+            ]
+        ];
+
+        const placement = this.findCompactPlacement(variants, terrain, anchor, visited);
+        if (placement) {
+            const { cx, cy, stamp: chosenStamp } = placement;
+            for (let i = 0; i < chosenStamp.length; i++) {
+                const { dx, dy, s } = chosenStamp[i];
+                const x = cx + dx, y = cy + dy;
+                visited[x * 50 + y] = 1;
+                blueprint[STRUCTURE_LAB].push({ x, y });
+                if (s) blueprint.supplierLabs.push({ x, y });
+            }
+            return { x: cx, y: cy };
+        }
+        return null;
     }
 
     static applyExtensionClusters(blueprint, terrain, anchor, visited) {
@@ -273,6 +354,7 @@ class RoomPlanner {
         
         let head = 0;
         let extensionsPlaced = blueprint[STRUCTURE_EXTENSION].length;
+        const centers = [];
 
         const clusterOffsets = [
             { dx: 0, dy: 0, type: STRUCTURE_EXTENSION },
@@ -308,6 +390,7 @@ class RoomPlanner {
                     }
                 }
                 extensionsPlaced += 5;
+                centers.push({ x, y });
             }
 
             const dirs = [{ dx: 3, dy: 0 }, { dx: -3, dy: 0 }, { dx: 0, dy: 3 }, { dx: 0, dy: -3 }];
@@ -322,6 +405,7 @@ class RoomPlanner {
                 }
             }
         }
+        return centers;
     }
 
 
@@ -372,13 +456,15 @@ class RoomPlanner {
      * Existing checkerboard roads are seeded at cost 1 so external paths
      * merge onto them naturally rather than cutting parallel new roads.
      */
-    static planRoads(blueprint, room, state, anchor) {
+    static planRoads(blueprint, room, state, anchor, fragmentCenters) {
         const anchorPos = new RoomPosition(anchor.x, anchor.y, room.name);
 
-        // Only external targets — spine handles internal routing
         const targets = [];
         for (let i = 0; i < blueprint.containers.length; i++) targets.push(blueprint.containers[i]);
         if (state.mineral) targets.push({ x: state.mineral.pos.x, y: state.mineral.pos.y });
+        if (fragmentCenters) {
+            for (let i = 0; i < fragmentCenters.length; i++) targets.push(fragmentCenters[i]);
+        }
 
         targets.sort((a, b) => {
             const dA = Math.max(Math.abs(a.x - anchor.x), Math.abs(a.y - anchor.y));
@@ -430,13 +516,16 @@ class RoomPlanner {
      */
     static computeMinCut(terrain, baseSetArray) {
         const N = 5002, S = 5000, T = 5001, INF = 999999;
-        const adj = new Array(N);
-        for (let i = 0; i < N; i++) adj[i] = [];
-        const eTo = [], eCap = [];
+        const maxEdges = 100000;
+        const head = new Int32Array(N).fill(-1);
+        const next = new Int32Array(maxEdges);
+        const eTo = new Int32Array(maxEdges);
+        const eCap = new Int32Array(maxEdges);
+        let edgeCount = 0;
 
         function addEdge(u, v, c) {
-            adj[u].push(eTo.length); eTo.push(v); eCap.push(c);
-            adj[v].push(eTo.length); eTo.push(u); eCap.push(0);
+            eTo[edgeCount] = v; eCap[edgeCount] = c; next[edgeCount] = head[u]; head[u] = edgeCount++;
+            eTo[edgeCount] = u; eCap[edgeCount] = 0; next[edgeCount] = head[v]; head[v] = edgeCount++;
         }
 
         // Dilate baseSet by 2 tiles for standoff distance against Ranged Attackers
@@ -486,8 +575,7 @@ class RoomPlanner {
             const q = [S]; let qi = 0;
             while (qi < q.length) {
                 const u = q[qi++];
-                for (let i = 0; i < adj[u].length; i++) {
-                    const ei = adj[u][i];
+                for (let ei = head[u]; ei !== -1; ei = next[ei]) {
                     if (eCap[ei] > 0 && level[eTo[ei]] < 0) { level[eTo[ei]] = level[u] + 1; q.push(eTo[ei]); }
                 }
             }
@@ -498,8 +586,8 @@ class RoomPlanner {
         const iter = new Int32Array(N);
         function dfs(u, pushed) {
             if (u === T) return pushed;
-            for (; iter[u] < adj[u].length; iter[u]++) {
-                const ei = adj[u][iter[u]], v = eTo[ei];
+            for (; iter[u] !== -1; iter[u] = next[iter[u]]) {
+                const ei = iter[u], v = eTo[ei];
                 if (eCap[ei] <= 0 || level[v] !== level[u] + 1) continue;
                 const d = dfs(v, Math.min(pushed, eCap[ei]));
                 if (d > 0) { eCap[ei] -= d; eCap[ei ^ 1] += d; return d; }
@@ -508,7 +596,7 @@ class RoomPlanner {
         }
 
         while (bfs()) {
-            iter.fill(0);
+            for (let i = 0; i < N; i++) iter[i] = head[i];
             let f;
             do { f = dfs(S, INF); } while (f > 0);
         }
@@ -518,8 +606,7 @@ class RoomPlanner {
         const q2 = [S]; reachable[S] = 1; let qi2 = 0;
         while (qi2 < q2.length) {
             const u = q2[qi2++];
-            for (let i = 0; i < adj[u].length; i++) {
-                const ei = adj[u][i];
+            for (let ei = head[u]; ei !== -1; ei = next[ei]) {
                 if (eCap[ei] > 0 && !reachable[eTo[ei]]) { reachable[eTo[ei]] = 1; q2.push(eTo[ei]); }
             }
         }
@@ -725,10 +812,9 @@ class RoomPlanner {
 
             // Labs (supplier = cyan + label, reactor = purple)
             if (blueprint[STRUCTURE_LAB]) {
-                const supplierSet = new Set((blueprint.supplierLabs || []).map(s => `${s.x},${s.y}`));
                 for (let i = 0; i < blueprint[STRUCTURE_LAB].length; i++) {
                     const p = blueprint[STRUCTURE_LAB][i];
-                    const isSup = supplierSet.has(`${p.x},${p.y}`);
+                    const isSup = blueprint.supplierSet ? blueprint.supplierSet[p.x * 50 + p.y] : false;
                     visual.rect(p.x - 0.35, p.y - 0.35, 0.7, 0.7, { fill: isSup ? '#00ffff' : '#cc44ff', opacity: 0.6 });
                     if (isSup) visual.text('S', p.x, p.y + 0.1, { color: '#000', font: 0.4 });
                 }
@@ -744,12 +830,11 @@ class RoomPlanner {
 
             // Ramparts
             if (blueprint.ramparts) {
-                const roadSet = new Set((blueprint.roads || []).map(r => `${r.x},${r.y}`));
-                const outpostSet = new Set((blueprint.outpostRamparts || []).map(r => `${r.x},${r.y}`));
                 for (let i = 0; i < blueprint.ramparts.length; i++) {
                     const p = blueprint.ramparts[i];
-                    const isOutpost = outpostSet.has(`${p.x},${p.y}`);
-                    const isRoadExit = !isOutpost && roadSet.has(`${p.x},${p.y}`);
+                    const key = p.x * 50 + p.y;
+                    const isOutpost = blueprint.outpostSet ? blueprint.outpostSet[key] : false;
+                    const isRoadExit = !isOutpost && blueprint.roadSet ? blueprint.roadSet[key] : false;
                     visual.rect(p.x - 0.45, p.y - 0.45, 0.9, 0.9, {
                         fill: 'transparent',
                         stroke: isOutpost ? '#ff8800' : isRoadExit ? '#ffff00' : '#00ff00',

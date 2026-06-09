@@ -71,8 +71,8 @@ class TaskAssignmentManager {
         const free = creep.store.getFreeCapacity(RESOURCE_ENERGY);
 
         if (!creep.heap.state || creep.heap.state === 'idle') {
-            // Force haulers/fillers to completely empty before gathering again
-            if ((role === 'hauler' || role === 'filler' || role === 'remotehauler') && totalUsed > 0) {
+            // Force all worker creeps to completely empty before gathering again
+            if (totalUsed > 0 && (role === 'hauler' || role === 'filler' || role === 'remotehauler' || role === 'builder' || role === 'repairman' || role === 'bootstrapper')) {
                 creep.heap.state = 'work';
             } else {
                 creep.heap.state = 'gather';
@@ -574,6 +574,9 @@ class TaskAssignmentManager {
 
                 for (let i = 0; i < drops.length; i++) {
                     const d = drops[i];
+                    // Skip drops near the controller (these are for upgraders/bootstrappers!)
+                    if (roomState.controller && d.pos.getRangeTo(roomState.controller) <= 3) continue;
+
                     if (Math.max(Math.abs(d.pos.x - targetHarvester.pos.x), Math.abs(d.pos.y - targetHarvester.pos.y)) <= 2) {
                         const claimed = d.__gatherClaimed || 0;
                         const available = d.amount - claimed;
@@ -663,8 +666,41 @@ class TaskAssignmentManager {
                 creep.heap.targetId = controllerContainer.id;
                 creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
             } else {
-                creep.heap.targetId = roomState.controller.id;
-                creep.heap.actionIntent = ActionConstants.ACTION_DROP;
+                // Find planned container
+                const blueprint = global.Cache?.blueprints?.get(creep.room.name);
+                let plannedContainerTile = null;
+                if (blueprint && blueprint.containers) {
+                    for (let i = 0; i < blueprint.containers.length; i++) {
+                        const tile = blueprint.containers[i];
+                        if (Math.abs(tile.x - roomState.controller.pos.x) <= 3 && Math.abs(tile.y - roomState.controller.pos.y) <= 3) {
+                            plannedContainerTile = tile;
+                            break;
+                        }
+                    }
+                }
+
+                if (plannedContainerTile) {
+                    const distToTile = Math.max(Math.abs(creep.pos.x - plannedContainerTile.x), Math.abs(creep.pos.y - plannedContainerTile.y));
+                    if (distToTile > 1) { // Walk to adjacent at least!
+                        creep.heap.destination = { x: plannedContainerTile.x, y: plannedContainerTile.y, roomName: creep.room.name, range: 1 };
+                        creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+                        return;
+                    } else {
+                        // We are within range 1 of the exact tile! Drop it!
+                        creep.heap.targetId = roomState.controller.id; // Fallback target ID for execution validator
+                        creep.heap.actionIntent = ActionConstants.ACTION_DROP;
+                        return;
+                    }
+                } else {
+                    // Absolute fallback if blueprint is completely broken
+                    if (creep.pos.getRangeTo(roomState.controller) > 3) {
+                        creep.heap.destination = { x: roomState.controller.pos.x, y: roomState.controller.pos.y, roomName: creep.room.name, range: 3 };
+                        creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+                    } else {
+                        creep.heap.targetId = roomState.controller.id;
+                        creep.heap.actionIntent = ActionConstants.ACTION_DROP;
+                    }
+                }
             }
         }
     }
@@ -796,24 +832,12 @@ class TaskAssignmentManager {
                 return;
             }
 
-            // Fallback: Harvest directly from the nearest source
+            // Fallback: Harvest directly from assigned source
             if (roomState.sources && roomState.sources.length > 0) {
-                let bestTarget = null;
-                let bestDist = Infinity;
-                for (let i = 0; i < roomState.sources.length; i++) {
-                    const source = roomState.sources[i];
-                    const dx = Math.abs(creep.pos.x - source.pos.x);
-                    const dy = Math.abs(creep.pos.y - source.pos.y);
-                    const dist = Math.max(dx, dy);
-                    if (dist < bestDist) {
-                        bestDist = dist;
-                        bestTarget = source;
-                    }
-                }
-                if (bestTarget) {
-                    creep.heap.targetId = bestTarget.id;
-                    creep.heap.actionIntent = ActionConstants.ACTION_HARVEST;
-                }
+                const targetSource = roomState.sources[MathLib.djb2Hash(creep.name) % roomState.sources.length];
+                creep.heap.targetId = targetSource.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_HARVEST;
+                return;
             }
         } else {
             // Work phase: Fill Spawns/Extensions first to get real creeps spawning
