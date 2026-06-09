@@ -4,17 +4,14 @@
  */
 
 // Core Managers
-const GlobalStateScanner = require('./state/GlobalStateScanner');
+const GlobalStateScanner = require('./state/GlobalStateScanner'); // Ensure GlobalStateScanner is imported
 const RoomStateScanner = require('./state/RoomStateScanner');
 const SpawnManager = require('./colonies/SpawnManager');
 const TaskAssignmentManager = require('./managers/TaskAssignmentManager');
 const RoleExecutor = require('./managers/RoleExecutor');
 const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
-const TrafficManager = require('./managers/TrafficManager');
 const IntelManager = require('./managers/IntelManager');
-const RoomPlanner = require('./managers/RoomPlanner');
-const TowerManager = require('./managers/TowerManager');
-const MilitaryManager = require('./managers/MilitaryManager');
+const TrafficManager = require('./managers/TrafficManager');
 
 // Utilities
 const ProfilerUtility = require('./utilities/ProfilerUtility');
@@ -29,7 +26,7 @@ module.exports.loop = function () {
     ErrorHandlingUtility.wrap(() => MemoryCleanupManager.run(), 'MemoryCleanupManager')();
 
     // 1. Global State Scanning
-    ErrorHandlingUtility.wrap(() => GlobalStateScanner.run(), 'GlobalStateScanner')();
+    ErrorHandlingUtility.wrap(() => GlobalStateScanner.run(), 'GlobalStateScanner')(); // Ensure scanner runs first
 
     // 2. Room State Scanning for Owned Rooms
     ErrorHandlingUtility.wrap(() => {
@@ -45,8 +42,8 @@ module.exports.loop = function () {
     // 3. Intel Gathering (serializes visible room data to Memory)
     ErrorHandlingUtility.wrap(() => IntelManager.run(), 'IntelManager')();
 
-    // 4. Room Planning (generates and executes blueprints)
-    ErrorHandlingUtility.wrap(() => RoomPlanner.run(), 'RoomPlanner')();
+    // 4. Task Assignment
+    ErrorHandlingUtility.wrap(() => TaskAssignmentManager.run(), 'TaskAssignmentManager')();
 
     // 5. Spawning
     ErrorHandlingUtility.wrap(() => {
@@ -55,23 +52,11 @@ module.exports.loop = function () {
         }
     }, 'SpawnManager')();
 
-    // 6. Task Assignment
-    ErrorHandlingUtility.wrap(() => TaskAssignmentManager.run(), 'TaskAssignmentManager')();
-
-    // 7. Intent Execution
+    // 6. Intent Execution
     ErrorHandlingUtility.wrap(() => RoleExecutor.run(), 'RoleExecutor')();
 
-    // 8. Traffic Management (resolves collisions and executes bulk move API calls)
+    // 7. Traffic Management (resolves collisions and executes bulk move API calls)
     ErrorHandlingUtility.wrap(() => TrafficManager.run(), 'TrafficManager')();
-
-    // 9. Tower Defense & Support
-    ErrorHandlingUtility.wrap(() => TowerManager.run(), 'TowerManager')();
-
-    // 9. Military Command
-    ErrorHandlingUtility.wrap(() => MilitaryManager.run(), 'MilitaryManager')();
-
-    // 10. Visualizer
-    ErrorHandlingUtility.wrap(() => RoomPlanner.visualize(), 'Visualizer')();
 
     // Profiler Reporting
     ProfilerUtility.report();
