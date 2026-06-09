@@ -6,11 +6,17 @@ class TowerManager {
     static run() {
         if (!global.State || !global.State.rooms) return;
 
-        global.State.rooms.forEach((roomState, roomName) => {
-            if (!roomState.towers || roomState.towers.length === 0) return;
+        for (const [roomName, roomState] of global.State.rooms) {
+            if (!roomState.towers || roomState.towers.length === 0) continue;
 
-            const towers = roomState.towers.filter(t => t.my && t.store.getUsedCapacity(RESOURCE_ENERGY) >= 10);
-            if (towers.length === 0) return;
+            const towers = [];
+            for (let i = 0; i < roomState.towers.length; i++) {
+                const t = roomState.towers[i];
+                if (t.my && t.store.getUsedCapacity(RESOURCE_ENERGY) >= 10) {
+                    towers.push(t);
+                }
+            }
+            if (towers.length === 0) continue;
 
             // 1. Defense: Attack hostiles
             if (roomState.hostiles && roomState.hostiles.length > 0) {
@@ -19,20 +25,28 @@ class TowerManager {
                 for (let i = 0; i < towers.length; i++) {
                     towers[i].attack(target);
                 }
-                return; // Towers are busy defending
+                continue; // Towers are busy defending
             }
 
             const room = Game.rooms[roomName];
-            if (!room) return;
+            if (!room) continue;
 
             // 2. Healing: Heal any damaged friendly creeps (from global state, no room.find)
-            const damagedCreeps = roomState.creeps ? roomState.creeps.filter(c => c.my && c.hits < c.hitsMax) : [];
-            if (damagedCreeps.length > 0) {
-                const target = damagedCreeps[0];
-                for (let i = 0; i < towers.length; i++) {
-                    towers[i].heal(target);
+            let damagedTarget = null;
+            if (roomState.creeps) {
+                for (let i = 0; i < roomState.creeps.length; i++) {
+                    const c = roomState.creeps[i];
+                    if (c.my && c.hits < c.hitsMax) {
+                        damagedTarget = c;
+                        break;
+                    }
                 }
-                return; // Towers are busy healing
+            }
+            if (damagedTarget) {
+                for (let i = 0; i < towers.length; i++) {
+                    towers[i].heal(damagedTarget);
+                }
+                continue; // Towers are busy healing
             }
 
             // 3. Maintenance: Repair critical structures and ramparts
@@ -50,7 +64,7 @@ class TowerManager {
                     tower.repair(target);
                 }
             }
-        });
+        }
     }
 }
 
