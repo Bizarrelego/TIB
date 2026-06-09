@@ -81,7 +81,7 @@ class RoomPlanner {
         }
         blueprint.anchor = anchor;
 
-        const visited = new Set();
+        const visited = new Uint8Array(2500);
 
         // Step 2: Core Hub stamp
         this.applyCoreStamp(blueprint, terrain, anchor, visited);
@@ -98,8 +98,8 @@ class RoomPlanner {
         // Step 6: External road routes (containers + mineral only; diamond handles internal)
         if (state) this.planRoads(blueprint, room, state, anchor);
 
-        // Step 7: Min-cut ramparts
-        blueprint.ramparts = this.computeMinCut(terrain, visited, anchor);
+        // Step 7: Min-Cut Ramparts
+        blueprint.ramparts = this.computeMinCut(terrain, visited);
 
         // Step 8: Road exit airlocks (3-deep)
         this.addRoadRamparts(blueprint);
@@ -180,9 +180,12 @@ class RoomPlanner {
             const x = ax + dx, y = ay + dy;
             if (x < 2 || x > 47 || y < 2 || y > 47) continue;
             if (terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
-            const key = `${x},${y}`;
-            if (visited.has(key)) continue;
-            visited.add(key);
+            
+            // Check flat array instead of Set string allocation
+            const key = x * 50 + y;
+            if (visited[key]) continue;
+            visited[key] = 1;
+            
             if (type === 'road') blueprint.roads.push({ x, y });
             else blueprint[type].push({ x, y });
         }
@@ -235,7 +238,7 @@ class RoomPlanner {
             for (let j = 0; j < variants[v].length; j++) {
                 const x = ax + variants[v][j].dx, y = ay + variants[v][j].dy;
                 if (x >= 2 && x <= 47 && y >= 2 && y <= 47 &&
-                    terrain.get(x, y) !== TERRAIN_MASK_WALL && !visited.has(`${x},${y}`)) score++;
+                    terrain.get(x, y) !== TERRAIN_MASK_WALL && !visited[x * 50 + y]) score++;
             }
             if (score > bestScore) { bestScore = score; bestVariant = variants[v]; }
         }
@@ -247,9 +250,11 @@ class RoomPlanner {
             const x = ax + dx, y = ay + dy;
             if (x < 2 || x > 47 || y < 2 || y > 47) continue;
             if (terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
-            const key = `${x},${y}`;
-            if (visited.has(key)) continue;
-            visited.add(key);
+            
+            const key = x * 50 + y;
+            if (visited[key]) continue;
+            visited[key] = 1;
+            
             blueprint[STRUCTURE_LAB].push({ x, y });
             if (s) blueprint.supplierLabs.push({ x, y });
         }
@@ -285,7 +290,9 @@ class RoomPlanner {
 
         // Standard 4-directional BFS gives Manhattan-distance ordering → true diamond shape
         const queue = [{ x: ax, y: ay }];
-        const seen = new Set([`${ax},${ay}`]);
+        const seen = new Uint8Array(2500);
+        seen[ax * 50 + ay] = 1;
+        
         let head = 0;
         let extensionsPlaced = blueprint[STRUCTURE_EXTENSION].length;
 
@@ -295,9 +302,9 @@ class RoomPlanner {
             if (x < 2 || x > 47 || y < 2 || y > 47) continue;
             if (terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
 
-            const key = `${x},${y}`;
-            if (!visited.has(key)) {
-                visited.add(key);
+            const key = x * 50 + y;
+            if (!visited[key]) {
+                visited[key] = 1;
                 if ((x + y) % 2 === anchorParity) {
                     // Road parity — place road
                     blueprint.roads.push({ x, y });
@@ -312,9 +319,9 @@ class RoomPlanner {
             const dirs = [{ dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 }];
             for (let d = 0; d < dirs.length; d++) {
                 const nx = x + dirs[d].dx, ny = y + dirs[d].dy;
-                const nkey = `${nx},${ny}`;
-                if (!seen.has(nkey)) {
-                    seen.add(nkey);
+                const nkey = nx * 50 + ny;
+                if (!seen[nkey]) {
+                    seen[nkey] = 1;
                     queue.push({ x: nx, y: ny });
                 }
             }
@@ -421,7 +428,7 @@ class RoomPlanner {
      * Base tiles get INF capacity (cannot be cut).
      * The cut identifies the minimum rampart positions.
      */
-    static computeMinCut(terrain, baseSet, anchor) {
+    static computeMinCut(terrain, baseSetArray) {
         const N = 5002, S = 5000, T = 5001, INF = 999999;
         const adj = new Array(N);
         for (let i = 0; i < N; i++) adj[i] = [];
@@ -433,15 +440,15 @@ class RoomPlanner {
         }
 
         // Dilate baseSet by 2 tiles for standoff distance against Ranged Attackers
-        const dilatedBaseSet = new Set();
+        const dilatedBaseSet = new Uint8Array(2500);
         for (let x = 0; x < 50; x++) {
             for (let y = 0; y < 50; y++) {
-                if (baseSet.has(`${x},${y}`)) {
+                if (baseSetArray[x * 50 + y]) {
                     for (let dx = -2; dx <= 2; dx++) {
                         for (let dy = -2; dy <= 2; dy++) {
                             const nx = x + dx, ny = y + dy;
                             if (nx >= 0 && nx < 50 && ny >= 0 && ny < 50) {
-                                dilatedBaseSet.add(`${nx},${ny}`);
+                                dilatedBaseSet[nx * 50 + ny] = 1;
                             }
                         }
                     }
@@ -453,7 +460,7 @@ class RoomPlanner {
             for (let y = 0; y < 50; y++) {
                 if (terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
                 const inNode = x * 50 + y, outNode = inNode + 2500;
-                const isBase = dilatedBaseSet.has(`${x},${y}`);
+                const isBase = dilatedBaseSet[inNode];
                 const isExit = (x === 0 || x === 49 || y === 0 || y === 49);
 
                 addEdge(inNode, outNode, isBase || isExit ? INF : 1);
@@ -543,14 +550,18 @@ class RoomPlanner {
      * Uses a strict single-path trace to prevent clump fan-outs.
      */
     static addRoadRamparts(blueprint) {
-        const roadSet = new Set(blueprint.roads.map(r => `${r.x},${r.y}`));
-        const rampartSet = new Set(blueprint.ramparts.map(r => `${r.x},${r.y}`));
+        const roadSet = new Uint8Array(2500);
+        for (let i = 0; i < blueprint.roads.length; i++) roadSet[blueprint.roads[i].x * 50 + blueprint.roads[i].y] = 1;
+        
+        const rampartSet = new Uint8Array(2500);
+        for (let i = 0; i < blueprint.ramparts.length; i++) rampartSet[blueprint.ramparts[i].x * 50 + blueprint.ramparts[i].y] = 1;
+        
         const ax = blueprint.anchor.x, ay = blueprint.anchor.y;
         const newRamparts = [];
 
         for (let i = 0; i < blueprint.ramparts.length; i++) {
             const rp = blueprint.ramparts[i];
-            if (!roadSet.has(`${rp.x},${rp.y}`)) continue;
+            if (!roadSet[rp.x * 50 + rp.y]) continue;
 
             let current = rp;
             for (let step = 0; step < 3; step++) {
@@ -562,15 +573,15 @@ class RoomPlanner {
                 for (let d = 0; d < dirs.length; d++) {
                     const nx = cx + dirs[d].x, ny = cy + dirs[d].y;
                     const nDist = Math.max(Math.abs(nx - ax), Math.abs(ny - ay));
-                    const nkey = `${nx},${ny}`;
-                    if (nDist < cDist && roadSet.has(nkey) && !rampartSet.has(nkey)) {
+                    const nkey = nx * 50 + ny;
+                    if (nDist < cDist && roadSet[nkey] && !rampartSet[nkey]) {
                         bestNext = { x: nx, y: ny };
                         break; // Take the first valid inward road tile
                     }
                 }
 
                 if (bestNext) {
-                    rampartSet.add(`${bestNext.x},${bestNext.y}`);
+                    rampartSet[bestNext.x * 50 + bestNext.y] = 1;
                     newRamparts.push(bestNext);
                     current = bestNext;
                 } else {
@@ -588,14 +599,16 @@ class RoomPlanner {
      * zero-fatigue mobility along the walls.
      */
     static addRampartRoads(blueprint) {
-        const roadSet = new Set(blueprint.roads.map(r => `${r.x},${r.y}`));
+        const roadSet = new Uint8Array(2500);
+        for (let i = 0; i < blueprint.roads.length; i++) roadSet[blueprint.roads[i].x * 50 + blueprint.roads[i].y] = 1;
+        
         const newRoads = [];
         for (let i = 0; i < blueprint.ramparts.length; i++) {
             const rp = blueprint.ramparts[i];
-            const rkey = `${rp.x},${rp.y}`;
-            if (!roadSet.has(rkey)) {
+            const rkey = rp.x * 50 + rp.y;
+            if (!roadSet[rkey]) {
                 newRoads.push({ x: rp.x, y: rp.y });
-                roadSet.add(rkey);
+                roadSet[rkey] = 1;
             }
         }
         for (let i = 0; i < newRoads.length; i++) blueprint.roads.push(newRoads[i]);
@@ -610,10 +623,12 @@ class RoomPlanner {
      */
     static addOutpostRamparts(blueprint, terrain, state) {
         // BFS from anchor, ramparts act as walls
-        const rampartSet = new Set(blueprint.ramparts.map(r => `${r.x},${r.y}`));
-        const inside = new Set();
+        const rampartSet = new Uint8Array(2500);
+        for (let i = 0; i < blueprint.ramparts.length; i++) rampartSet[blueprint.ramparts[i].x * 50 + blueprint.ramparts[i].y] = 1;
+        
+        const inside = new Uint8Array(2500);
         const start = blueprint.anchor;
-        inside.add(`${start.x},${start.y}`);
+        inside[start.x * 50 + start.y] = 1;
         const q = [{ x: start.x, y: start.y }]; let qi = 0;
         while (qi < q.length) {
             const cur = q[qi++];
@@ -622,9 +637,9 @@ class RoomPlanner {
                 const nx = cur.x + dirs[i].x, ny = cur.y + dirs[i].y;
                 if (nx < 0 || nx >= 50 || ny < 0 || ny >= 50) continue;
                 if (terrain.get(nx, ny) === TERRAIN_MASK_WALL) continue;
-                const key = `${nx},${ny}`;
-                if (inside.has(key) || rampartSet.has(key)) continue;
-                inside.add(key); q.push({ x: nx, y: ny });
+                const key = nx * 50 + ny;
+                if (inside[key] || rampartSet[key]) continue;
+                inside[key] = 1; q.push({ x: nx, y: ny });
             }
         }
 
@@ -637,7 +652,7 @@ class RoomPlanner {
         const outpostRamparts = [];
         for (let r = 0; r < resourcePositions.length; r++) {
             const pos = resourcePositions[r];
-            if (inside.has(`${pos.x},${pos.y}`)) continue;  // Already inside main perimeter
+            if (inside[pos.x * 50 + pos.y]) continue;  // Already inside main perimeter
 
             // Place tight rampart ring (range 1) around external resource
             for (let dx = -1; dx <= 1; dx++) {
@@ -646,9 +661,9 @@ class RoomPlanner {
                     const rx = pos.x + dx, ry = pos.y + dy;
                     if (rx < 2 || rx > 47 || ry < 2 || ry > 47) continue;
                     if (terrain.get(rx, ry) === TERRAIN_MASK_WALL) continue;
-                    const key = `${rx},${ry}`;
-                    if (!rampartSet.has(key)) {
-                        rampartSet.add(key);
+                    const key = rx * 50 + ry;
+                    if (!rampartSet[key]) {
+                        rampartSet[key] = 1;
                         outpostRamparts.push({ x: rx, y: ry });
                     }
                 }
