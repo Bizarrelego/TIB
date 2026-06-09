@@ -4,15 +4,15 @@
  */
 
 // Core Managers
-const GlobalStateScanner = require('./state/GlobalStateScanner');
+const GlobalStateScanner = require('./state/GlobalStateScanner'); // Ensure GlobalStateScanner is imported
 const RoomStateScanner = require('./state/RoomStateScanner');
 const SpawnManager = require('./colonies/SpawnManager');
 const TaskAssignmentManager = require('./managers/TaskAssignmentManager');
 const RoleExecutor = require('./managers/RoleExecutor');
 const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
-const TrafficManager = require('./managers/TrafficManager');
 const IntelManager = require('./managers/IntelManager');
 const RoomPlanner = require('./managers/RoomPlanner');
+const TrafficManager = require('./managers/TrafficManager');
 const TowerManager = require('./managers/TowerManager');
 const MilitaryManager = require('./managers/MilitaryManager');
 
@@ -29,7 +29,7 @@ module.exports.loop = function () {
     ErrorHandlingUtility.wrap(() => MemoryCleanupManager.run(), 'MemoryCleanupManager')();
 
     // 1. Global State Scanning
-    ErrorHandlingUtility.wrap(() => GlobalStateScanner.run(), 'GlobalStateScanner')();
+    ErrorHandlingUtility.wrap(() => GlobalStateScanner.run(), 'GlobalStateScanner')(); // Ensure scanner runs first
 
     // 2. Room State Scanning for Owned Rooms
     ErrorHandlingUtility.wrap(() => {
@@ -48,15 +48,15 @@ module.exports.loop = function () {
     // 4. Room Planning (generates and executes blueprints)
     ErrorHandlingUtility.wrap(() => RoomPlanner.run(), 'RoomPlanner')();
 
-    // 5. Spawning
+    // 5. Task Assignment
+    ErrorHandlingUtility.wrap(() => TaskAssignmentManager.run(), 'TaskAssignmentManager')();
+
+    // 6. Spawning
     ErrorHandlingUtility.wrap(() => {
         for (const spawnName in Game.spawns) {
             SpawnManager.run(Game.spawns[spawnName]);
         }
     }, 'SpawnManager')();
-
-    // 6. Task Assignment
-    ErrorHandlingUtility.wrap(() => TaskAssignmentManager.run(), 'TaskAssignmentManager')();
 
     // 7. Intent Execution
     ErrorHandlingUtility.wrap(() => RoleExecutor.run(), 'RoleExecutor')();
@@ -67,10 +67,10 @@ module.exports.loop = function () {
     // 9. Tower Defense & Support
     ErrorHandlingUtility.wrap(() => TowerManager.run(), 'TowerManager')();
 
-    // 9. Military Command
+    // 10. Military Command
     ErrorHandlingUtility.wrap(() => MilitaryManager.run(), 'MilitaryManager')();
 
-    // 10. Visualizer
+    // 11. Visualizer
     ErrorHandlingUtility.wrap(() => RoomPlanner.visualize(), 'Visualizer')();
 
     // Profiler Reporting
