@@ -24,7 +24,7 @@ const Filler = {
         if (actionIntent === ActionConstants.ACTION_MOVE_ROOM) {
             const targetRoom = creep.memory.targetRoom;
             if (targetRoom && creep.room.name !== targetRoom) {
-                creep.moveTo(new RoomPosition(25, 25, targetRoom), { reusePath: 20 });
+                creep.heap.destination = { x: 25, y: 25, roomName: targetRoom, range: 20 };
             }
             return;
         } else if (actionIntent === ActionConstants.ACTION_WITHDRAW) {
@@ -41,7 +41,7 @@ const Filler = {
         }
 
         if (result === ERR_NOT_IN_RANGE) {
-            creep.moveTo(target, { reusePath: 5, visualizePathStyle: { stroke: '#ffff00' } });
+            creep.heap.destination = { x: target.pos.x, y: target.pos.y, roomName: target.pos.roomName, range: 1 };
         } else if (result === OK ||
             result === ERR_NOT_ENOUGH_RESOURCES ||
             result === ERR_FULL ||

@@ -36,7 +36,7 @@ const Scavenger = {
         }
 
         if (result === ERR_NOT_IN_RANGE) {
-            creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
+            creep.heap.destination = { x: target.pos.x, y: target.pos.y, roomName: target.pos.roomName, range: 1 };
         } else if (result === OK ||
             result === ERR_NOT_ENOUGH_RESOURCES ||
             result === ERR_FULL ||

@@ -37,12 +37,12 @@ const Bootstrapper = {
             result = creep.upgradeController(target);
             // Dynamic clustering logic for controllers (max range 3)
             if (result === ERR_NOT_IN_RANGE) {
-                creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffaa00' } });
+                creep.heap.destination = { x: target.pos.x, y: target.pos.y, roomName: target.pos.roomName, range: 3 };
                 return;
             } else if (result === OK || result === ERR_NOT_ENOUGH_RESOURCES) {
                 const distToController = creep.pos.getRangeTo(target);
                 if (distToController > 3 || (distToController === 3 && creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0)) {
-                    creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffaa00' } });
+                    creep.heap.destination = { x: target.pos.x, y: target.pos.y, roomName: target.pos.roomName, range: 3 };
                 }
             }
         } else {
@@ -55,7 +55,8 @@ const Bootstrapper = {
         // Standard distance routing for all intents (except upgrade which has special clustering)
         if (actionIntent !== ActionConstants.ACTION_UPGRADE) {
             if (result === ERR_NOT_IN_RANGE) {
-                creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffaa00' } });
+                const range = (actionIntent === ActionConstants.ACTION_BUILD) ? 3 : 1;
+                creep.heap.destination = { x: target.pos.x, y: target.pos.y, roomName: target.pos.roomName, range: range };
             } else if (result === OK ||
                 result === ERR_NOT_ENOUGH_RESOURCES ||
                 result === ERR_FULL ||

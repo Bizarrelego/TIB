@@ -1,17 +1,35 @@
 const ActionConstants = require('../constants/ActionConstants');
 
+/**
+ * V8 Optimized Monomorphic Creep Heap
+ * Defines all possible properties upfront to ensure hidden class stability.
+ */
+class CreepHeap {
+    constructor() {
+        this.state = 'idle';
+        this.targetId = null;
+        this.actionIntent = ActionConstants.ACTION_IDLE;
+        this.harvestPosition = null;
+        this.sleepUntil = 0;
+        this.sitTargetId = null;
+        this.secondaryTargetId = null;
+        this.waypointPos = null;
+        this.waypointIndex = 0;
+        this.destination = null; // TrafficManager destination {x, y, roomName, range}
+        this.fleePos = null;
+        this.tooClose = false;
+        this.targetRoom = null;
+        this.unreachableTargetId = null; // Bugfix for infinite pathing loops
+    }
+}
+
 class CreepHeapUtility {
     /**
      * Gets the default heap structure for a creep.
-     * @returns {Object}
+     * @returns {CreepHeap}
      */
     static getDefaultHeap() {
-        return {
-            state: 'idle',
-            targetId: null,
-            actionIntent: ActionConstants.ACTION_IDLE,
-            harvestPosition: null
-        };
+        return new CreepHeap();
     }
 
     /**

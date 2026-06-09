@@ -10,12 +10,12 @@ const Defender = {
         const actionIntent = creep.heap.actionIntent;
 
         if (!targetId || !actionIntent || actionIntent === ActionConstants.ACTION_IDLE) {
-            // Parking: Brain writes waypointPos, we just moveTo it
+            // Parking: Brain writes waypointPos, we just write destination
             const wp = creep.heap.waypointPos;
             if (wp) {
                 const dest = new RoomPosition(wp.x, wp.y, wp.roomName);
                 if (creep.pos.getRangeTo(dest) > 1) {
-                    creep.moveTo(dest, { reusePath: 20, visualizePathStyle: { stroke: '#888888', opacity: 0.3 } });
+                    creep.heap.destination = { x: dest.x, y: dest.y, roomName: dest.roomName, range: 1 };
                 }
             }
             return;
@@ -30,7 +30,7 @@ const Defender = {
 
         if (actionIntent === ActionConstants.ACTION_ATTACK) {
             if (creep.attack(target) === ERR_NOT_IN_RANGE) {
-                creep.moveTo(target, { visualizePathStyle: { stroke: '#ff0000' } });
+                creep.heap.destination = { x: target.pos.x, y: target.pos.y, roomName: target.pos.roomName, range: 1 };
             }
         }
     }

@@ -35,7 +35,6 @@ class RoleExecutor {
             let heap = global.creepHeap.get(creep.name);
             if (!heap) {
                 heap = CreepHeapUtility.getDefaultHeap();
-                heap.sleepUntil = 0;
                 global.creepHeap.set(creep.name, heap);
             }
             creep.heap = heap;
@@ -69,20 +68,10 @@ class RoleExecutor {
         }
 
         if (creep.room.name !== targetRoom) {
-            const moveResult = creep.moveTo(new RoomPosition(25, 25, targetRoom), { 
-                range: 20, 
-                reusePath: 50, 
-                maxOps: 1000,
-                visualizePathStyle: { stroke: '#00ff00' } 
-            });
-
-            if (moveResult === ERR_NO_PATH) {
-                creep.memory.targetRoom = null;
-                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
-            }
+            creep.heap.destination = { x: 25, y: 25, roomName: targetRoom, range: 20 };
         } else {
-            if (creep.pos.x === 0 || creep.pos.x === 49 || creep.pos.y === 0 || creep.pos.y === 49) {
-                creep.moveTo(new RoomPosition(25, 25, creep.room.name), { reusePath: 10, ignoreCreeps: true });
+            if (creep.pos.x <= 0 || creep.pos.x >= 49 || creep.pos.y <= 0 || creep.pos.y >= 49) {
+                creep.heap.destination = { x: 25, y: 25, roomName: creep.room.name, range: 20 };
             } else {
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
             }

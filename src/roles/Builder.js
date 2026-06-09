@@ -53,7 +53,8 @@ const Builder = {
         }
 
         if (result === ERR_NOT_IN_RANGE) {
-            creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
+            const range = (actionIntent === ActionConstants.ACTION_BUILD || actionIntent === ActionConstants.ACTION_REPAIR || actionIntent === ActionConstants.ACTION_UPGRADE) ? 3 : 1;
+            creep.heap.destination = { x: target.pos.x, y: target.pos.y, roomName: target.pos.roomName, range: range };
         } else if (result === ERR_FULL || result === ERR_INVALID_TARGET || result === ERR_NOT_ENOUGH_RESOURCES) {
             creep.heap.state = 'idle';
             creep.heap.actionIntent = ActionConstants.ACTION_IDLE;

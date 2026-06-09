@@ -10,12 +10,12 @@ const Repairman = {
         const actionIntent = creep.heap.actionIntent;
 
         if (!targetId || !actionIntent || actionIntent === ActionConstants.ACTION_IDLE) {
-            // Parking: Brain writes waypointPos, we just moveTo it
+            // Parking: Brain writes waypointPos, we just write destination
             const wp = creep.heap.waypointPos;
             if (wp) {
                 const dest = new RoomPosition(wp.x, wp.y, wp.roomName);
                 if (creep.pos.getRangeTo(dest) > 1) {
-                    creep.moveTo(dest, { reusePath: 20, visualizePathStyle: { stroke: '#888888', opacity: 0.3 } });
+                    creep.heap.destination = { x: dest.x, y: dest.y, roomName: dest.roomName, range: 1 };
                 }
             }
             return;
@@ -47,7 +47,8 @@ const Repairman = {
         }
 
         if (result === ERR_NOT_IN_RANGE) {
-            creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffaa00' } });
+            const range = actionIntent === ActionConstants.ACTION_REPAIR ? 3 : 1;
+            creep.heap.destination = { x: target.pos.x, y: target.pos.y, roomName: target.pos.roomName, range: range };
         } else if (result === ERR_FULL || result === ERR_INVALID_TARGET || result === ERR_NOT_ENOUGH_RESOURCES) {
             creep.heap.state = 'idle'; // Reset state logic will catch it
             creep.heap.actionIntent = ActionConstants.ACTION_IDLE;

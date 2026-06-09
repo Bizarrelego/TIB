@@ -5,17 +5,16 @@ const GameObjectUtility = require('../utilities/GameObjectUtility');
 
 /**
  * Hashes a string to a positive integer using djb2 algorithm.
- * Used to distribute creeps evenly across targets without collisions.
+ * Optimized to avoid string allocations for V8.
  * @param {string} str
  * @returns {number}
  */
 function djb2Hash(str) {
     let hash = 5381;
-    for (let i = 0; i < str.length; i++) {
-        hash = ((hash << 5) + hash) + str.charCodeAt(i);
-        hash = hash & hash; // Convert to 32-bit integer
+    for (let i = 0, len = str.length; i < len; i++) {
+        hash = (hash * 33) ^ str.charCodeAt(i);
     }
-    return Math.abs(hash);
+    return hash >>> 0;
 }
 
 /**
@@ -39,9 +38,6 @@ class TaskAssignmentManager {
             let heap = global.creepHeap.get(creep.name);
             if (!heap) {
                 heap = CreepHeapUtility.getDefaultHeap();
-                heap.secondaryTargetId = null;
-                heap.sitTargetId = null;
-                heap.sleepUntil = 0;
                 global.creepHeap.set(creep.name, heap);
             }
             creep.heap = heap;
@@ -271,7 +267,7 @@ class TaskAssignmentManager {
             // Park near spawn to avoid blocking roads
             if (creep.room.name === creep.memory.colony && homeState && homeState.spawns && homeState.spawns.length > 0) {
                 if (creep.pos.getRangeTo(homeState.spawns[0]) > 3) {
-                    creep.moveTo(homeState.spawns[0], { range: 3 });
+                    creep.heap.destination = { x: homeState.spawns[0].pos.x, y: homeState.spawns[0].pos.y, roomName: homeState.spawns[0].pos.roomName, range: 3 };
                 }
             }
             return;

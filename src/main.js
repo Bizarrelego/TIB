@@ -10,6 +10,7 @@ const SpawnManager = require('./colonies/SpawnManager');
 const TaskAssignmentManager = require('./managers/TaskAssignmentManager');
 const RoleExecutor = require('./managers/RoleExecutor');
 const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
+const TrafficManager = require('./managers/TrafficManager');
 const IntelManager = require('./managers/IntelManager');
 const RoomPlanner = require('./managers/RoomPlanner');
 const TowerManager = require('./managers/TowerManager');
@@ -60,7 +61,10 @@ module.exports.loop = function () {
     // 7. Intent Execution
     ErrorHandlingUtility.wrap(() => RoleExecutor.run(), 'RoleExecutor')();
 
-    // 8. Tower Defense & Support
+    // 8. Traffic Management (resolves collisions and executes bulk move API calls)
+    ErrorHandlingUtility.wrap(() => TrafficManager.run(), 'TrafficManager')();
+
+    // 9. Tower Defense & Support
     ErrorHandlingUtility.wrap(() => TowerManager.run(), 'TowerManager')();
 
     // 9. Military Command

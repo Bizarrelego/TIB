@@ -25,7 +25,7 @@ const Harvester = {
             if (creep.heap.sitTargetId) {
                 const container = GameObjectUtility.getById(creep.heap.sitTargetId);
                 if (container && (creep.pos.x !== container.pos.x || creep.pos.y !== container.pos.y)) {
-                    creep.moveTo(container, { reusePath: 10, visualizePathStyle: { stroke: '#ffaa00' } });
+                    creep.heap.destination = { x: container.pos.x, y: container.pos.y, roomName: container.pos.roomName, range: 0 };
                     // Still try to harvest if in range of source while walking
                     if (creep.pos.getRangeTo(target) <= 1) {
                         creep.harvest(target);
@@ -36,8 +36,7 @@ const Harvester = {
                 // If no container, enforce strict harvest position lock-in
                 const assignedPosObj = CreepHeapUtility.getCreepHarvestPosition(creep);
                 if (assignedPosObj && (creep.pos.x !== assignedPosObj.x || creep.pos.y !== assignedPosObj.y)) {
-                    const assignedPos = new RoomPosition(assignedPosObj.x, assignedPosObj.y, assignedPosObj.roomName);
-                    creep.moveTo(assignedPos, { reusePath: 10, visualizePathStyle: { stroke: '#ffaa00' } });
+                    creep.heap.destination = { x: assignedPosObj.x, y: assignedPosObj.y, roomName: assignedPosObj.roomName, range: 0 };
                     if (creep.pos.getRangeTo(target) <= 1) {
                         creep.harvest(target);
                     }
@@ -48,7 +47,7 @@ const Harvester = {
             const result = creep.harvest(target);
             
             if (result === ERR_NOT_IN_RANGE) {
-                creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffaa00' } });
+                creep.heap.destination = { x: target.pos.x, y: target.pos.y, roomName: target.pos.roomName, range: 1 };
             } else if (result === ERR_NOT_ENOUGH_RESOURCES && target.ticksToRegeneration) {
                 creep.heap.sleepUntil = Game.time + target.ticksToRegeneration;
                 creep.heap.state = 'idle';

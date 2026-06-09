@@ -19,10 +19,7 @@ const RangerCreep = {
         if (actionIntent === ActionConstants.ACTION_MOVE_ROOM) {
             const targetRoom = creep.memory.targetRoom;
             if (targetRoom && creep.room.name !== targetRoom) {
-                creep.moveTo(new RoomPosition(25, 25, targetRoom), {
-                    reusePath: 20,
-                    visualizePathStyle: { stroke: '#ff4444', opacity: 0.4, lineStyle: 'dashed' }
-                });
+                creep.heap.destination = { x: 25, y: 25, roomName: targetRoom, range: 20 };
             }
             return;
         }
@@ -32,7 +29,7 @@ const RangerCreep = {
             if (wp) {
                 const dest = new RoomPosition(wp.x, wp.y, wp.roomName);
                 if (creep.pos.getRangeTo(dest) > 1) {
-                    creep.moveTo(dest, { reusePath: 10, visualizePathStyle: { stroke: '#ffaa00', opacity: 0.3 } });
+                    creep.heap.destination = { x: wp.x, y: wp.y, roomName: wp.roomName, range: 1 };
                 } else {
                     creep.heap.state = 'idle';
                 }
@@ -44,10 +41,7 @@ const RangerCreep = {
         if (actionIntent === ActionConstants.ACTION_FLEE) {
             const fp = creep.heap.fleePos;
             if (fp) {
-                creep.moveTo(new RoomPosition(fp.x, fp.y, fp.roomName), {
-                    reusePath: 3,
-                    visualizePathStyle: { stroke: '#00aaff', opacity: 0.6 }
-                });
+                creep.heap.destination = { x: fp.x, y: fp.y, roomName: fp.roomName, range: 0 };
             }
             return;
         }
@@ -74,10 +68,7 @@ const RangerCreep = {
             const result = creep.rangedAttack(target);
             if (result === ERR_NOT_IN_RANGE) {
                 // Move in to get within range 3
-                creep.moveTo(target, {
-                    reusePath: 3,
-                    visualizePathStyle: { stroke: '#ff6600', opacity: 0.6 }
-                });
+                creep.heap.destination = { x: target.pos.x, y: target.pos.y, roomName: target.pos.roomName, range: 3 };
             } else if (result === OK || result === ERR_INVALID_TARGET) {
                 creep.heap.state = 'idle';
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;

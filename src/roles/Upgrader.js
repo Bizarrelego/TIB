@@ -29,7 +29,7 @@ const Upgrader = {
         if (actionIntent === ActionConstants.ACTION_UPGRADE) {
             result = creep.upgradeController(target);
             if (result === ERR_NOT_IN_RANGE) {
-                creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
+                creep.heap.destination = { x: target.pos.x, y: target.pos.y, roomName: target.pos.roomName, range: 3 };
             } else if (result === ERR_NOT_ENOUGH_RESOURCES || result === ERR_INVALID_TARGET) {
                 creep.heap.state = 'idle';
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
@@ -39,7 +39,7 @@ const Upgrader = {
         } else if (actionIntent === ActionConstants.ACTION_WITHDRAW) {
             result = creep.withdraw(target, RESOURCE_ENERGY);
             if (result === ERR_NOT_IN_RANGE) {
-                creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffaa00' } });
+                creep.heap.destination = { x: target.pos.x, y: target.pos.y, roomName: target.pos.roomName, range: 1 };
             } else if (result === OK || result === ERR_FULL || result === ERR_NOT_ENOUGH_RESOURCES || result === ERR_INVALID_TARGET) {
                 creep.heap.state = 'idle';
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
@@ -49,7 +49,7 @@ const Upgrader = {
         } else if (actionIntent === ActionConstants.ACTION_PICKUP) {
             result = creep.pickup(target);
             if (result === ERR_NOT_IN_RANGE) {
-                creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffaa00' } });
+                creep.heap.destination = { x: target.pos.x, y: target.pos.y, roomName: target.pos.roomName, range: 1 };
             } else if (result === OK || result === ERR_FULL || result === ERR_INVALID_TARGET) {
                 creep.heap.state = 'idle';
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
