@@ -40,7 +40,7 @@ class TrafficManager {
             }
 
             const heap = creep.heap;
-            if (!heap || !heap.destination) {
+            if (!heap || (!heap.destination && (!heap.fleeGoals || heap.fleeGoals.length === 0))) {
                 if (heap && heap.path) heap.path = null;
                 TrafficManager.addCreepToRoom(creepsByRoom, creep);
                 continue;
@@ -49,7 +49,7 @@ class TrafficManager {
             const dest = heap.destination;
             
             // Check if arrived
-            if (creep.room.name === dest.roomName) {
+            if (dest && creep.room.name === dest.roomName) {
                 const range = Math.max(Math.abs(creep.pos.x - dest.x), Math.abs(creep.pos.y - dest.y));
                 const destRange = dest.range !== undefined ? dest.range : 1;
                 if (range <= destRange) {
@@ -78,7 +78,8 @@ class TrafficManager {
             // Path caching and invalidation
             let needsPath = false;
             if (!heap.path || heap.path.length === 0) needsPath = true;
-            if (heap.pathDest && (heap.pathDest.x !== dest.x || heap.pathDest.y !== dest.y || heap.pathDest.roomName !== dest.roomName)) needsPath = true;
+            if (dest && heap.pathDest && (heap.pathDest.x !== dest.x || heap.pathDest.y !== dest.y || heap.pathDest.roomName !== dest.roomName)) needsPath = true;
+            if (heap.fleeGoals && heap.pathDest) needsPath = true; // Invalidate if transitioning to flee logic
             if (heap.stallCount > 2) {
                 needsPath = true;
                 heap.stallCount = 0; // Reset after forcing recalculation
@@ -96,24 +97,38 @@ class TrafficManager {
             }
 
             if (needsPath) {
-                const targetPos = new RoomPosition(dest.x, dest.y, dest.roomName);
-                const destRange = dest.range !== undefined ? dest.range : 1;
-                const pathResult = PathFinder.search(creep.pos, { pos: targetPos, range: destRange }, {
-                    plainCost: 2,
-                    swampCost: 10,
-                    roomCallback: TrafficManager.getCostMatrix
-                });
+                let pathResult;
+                
+                if (heap.fleeGoals && heap.fleeGoals.length > 0) {
+                    // Adds native support for multi-target fleeing intents, decoupling tactical evasion logic from low-level path caching.
+                    pathResult = PathFinder.search(creep.pos, heap.fleeGoals, {
+                        flee: true,
+                        plainCost: 2,
+                        swampCost: 10,
+                        roomCallback: TrafficManager.getCostMatrix
+                    });
+                    heap.pathDest = null;
+                } else {
+                    const targetPos = new RoomPosition(dest.x, dest.y, dest.roomName);
+                    const destRange = dest.range !== undefined ? dest.range : 1;
+                    pathResult = PathFinder.search(creep.pos, { pos: targetPos, range: destRange }, {
+                        plainCost: 2,
+                        swampCost: 10,
+                        roomCallback: TrafficManager.getCostMatrix
+                    });
+                    heap.pathDest = { x: dest.x, y: dest.y, roomName: dest.roomName };
+                }
 
                 if (pathResult.incomplete && pathResult.path.length === 0) {
                     heap.unreachableTargetId = heap.targetId;
                     heap.destination = null;
                     heap.path = null;
+                    if (heap.fleeGoals) heap.fleeGoals = null;
                     TrafficManager.addCreepToRoom(creepsByRoom, creep);
                     continue;
                 }
 
                 heap.path = pathResult.path.map(p => ({ x: p.x, y: p.y, roomName: p.roomName }));
-                heap.pathDest = { x: dest.x, y: dest.y, roomName: dest.roomName };
             }
 
             TrafficManager.addCreepToRoom(creepsByRoom, creep);
@@ -375,9 +390,47 @@ class TrafficManager {
 
         tickMatrix = baseMatrix.clone();
         
-        // Fixes stationary creep deadlocks by injecting their positions as unwalkable (255) into a tick-cached cloned matrix, forcing PathFinder to route around them.
+        // Injects dynamic threat zones into the tick-cached matrix, forcing civilian creeps to naturally route around danger and allowing rangers to kite along the cost gradient.
         const room = Game.rooms[roomName];
         if (room) {
+            const hostiles = room.find(FIND_HOSTILE_CREEPS);
+            for (let i = 0; i < hostiles.length; i++) {
+                const hostile = hostiles[i];
+                let isMelee = false;
+                let isRanged = false;
+                
+                for (let j = 0; j < hostile.body.length; j++) {
+                    const type = hostile.body[j].type;
+                    if (type === ATTACK) isMelee = true;
+                    if (type === RANGED_ATTACK) isRanged = true;
+                }
+
+                if (isMelee) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        for (let dy = -1; dy <= 1; dy++) {
+                            const x = hostile.pos.x + dx;
+                            const y = hostile.pos.y + dy;
+                            if (x >= 0 && x <= 49 && y >= 0 && y <= 49) {
+                                tickMatrix.set(x, y, Math.min(255, tickMatrix.get(x, y) + 50));
+                            }
+                        }
+                    }
+                }
+                
+                if (isRanged) {
+                    for (let dx = -3; dx <= 3; dx++) {
+                        for (let dy = -3; dy <= 3; dy++) {
+                            const x = hostile.pos.x + dx;
+                            const y = hostile.pos.y + dy;
+                            if (x >= 0 && x <= 49 && y >= 0 && y <= 49) {
+                                tickMatrix.set(x, y, Math.min(255, tickMatrix.get(x, y) + 50));
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Fixes stationary creep deadlocks by injecting their positions as unwalkable (255) into a tick-cached cloned matrix, forcing PathFinder to route around them.
             const creeps = room.find(FIND_MY_CREEPS);
             for (let i = 0; i < creeps.length; i++) {
                 const c = creeps[i];
