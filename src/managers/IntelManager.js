@@ -19,12 +19,12 @@ class IntelManager {
         }
 
         const visibleRooms = Object.keys(Game.rooms);
-        
+
         // Update threat and energy levels for all visible rooms EVERY TICK
         for (let i = 0; i < visibleRooms.length; i++) {
             const room = Game.rooms[visibleRooms[i]];
             IntelManager.updateThreatAndEnergy(room);
-            
+
             // Passive Scraping: instantly grab data if unscouted or stale
             const mem = Memory.rooms[room.name];
             if (!mem || !mem.scoutedAt || (Game.time - mem.scoutedAt > 500)) {
@@ -35,7 +35,7 @@ class IntelManager {
         if (Game.cpu.bucket <= 500) return;
         // Run every 10 ticks to save CPU
         if (Game.time % 10 !== 0) return;
-        
+
         for (let i = 0; i < visibleRooms.length; i++) {
             const room = Game.rooms[visibleRooms[i]];
             IntelManager.scanAndSave(room);
@@ -51,7 +51,7 @@ class IntelManager {
         if (!Memory.rooms) Memory.rooms = {};
         let mem = Memory.rooms[room.name];
         if (!mem) return;
-        
+
         const state = global.State.rooms.get(room.name);
         if (!state) return;
 
@@ -91,14 +91,14 @@ class IntelManager {
         }
 
         mem.scoutedAt = Game.time;
-        
+
         // Ensure nested objects exist in case of schema updates on existing memory
         if (!mem.controller) mem.controller = { owner: null, level: 0, safeMode: 0, x: 0, y: 0 };
         if (!mem.hostiles) mem.hostiles = { creeps: 0, towers: 0, invaderCore: false };
 
         const state = global.State.rooms.get(room.name);
         if (!state) return;
-        
+
         // 1. Detailed Source Intelligence
         const sources = state.sources || [];
         const memSources = [];
@@ -110,7 +110,7 @@ class IntelManager {
             });
         }
         mem.sources = memSources;
-        
+
         // 2. Controller Intelligence
         const controllerObj = mem.controller;
         if (room.controller) {
@@ -139,14 +139,14 @@ class IntelManager {
         // 4. Hostile Threat Assessment
         const hostileCreeps = state.hostiles || [];
         const towers = state.towers || [];
-        
+
         let hostileTowerCount = 0;
         for (let i = 0; i < towers.length; i++) {
             if (!towers[i].my && towers[i].structureType === STRUCTURE_TOWER) {
                 hostileTowerCount++;
             }
         }
-        
+
         const invaderCores = state.invaderCores || [];
 
         const hostilesObj = mem.hostiles;
@@ -190,14 +190,14 @@ class IntelManager {
 
     static evaluateOutposts(room) {
         if (!Memory.outposts) Memory.outposts = {};
-        
+
         const exits = Game.map.describeExits(room.name);
         const outposts = [];
         for (const dir in exits) {
             const adjRoom = exits[dir];
             const intel = Memory.rooms[adjRoom];
             if (!intel) continue;
-            
+
             // Check if suitable for remote mining
             if (intel.controller && intel.controller.owner) continue; // Owned by someone
             if (intel.hostiles && (intel.hostiles.towers > 0 || intel.hostiles.invaderCore)) continue; // Hostile structures
@@ -207,7 +207,7 @@ class IntelManager {
                 Memory.outposts[adjRoom] = { sourceRoom: room.name, sources: intel.sources.length };
             }
         }
-        
+
         // Save to our room's memory
         room.memory.outposts = outposts;
     }

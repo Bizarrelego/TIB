@@ -130,10 +130,10 @@ class CensusCalculator {
         if (roomState) {
             let looseEnergy = 0;
             if (roomState.droppedEnergy) {
-                for (let i = 0; i < roomState.droppedEnergy.length; i++) looseEnergy += roomState.droppedEnergy[i].amount;
+                for (let i = 0; i < roomState.droppedEnergyCount; i++) looseEnergy += roomState.droppedEnergy[i].amount;
             }
             if (roomState.sourceContainers) {
-                for (let i = 0; i < roomState.sourceContainers.length; i++) looseEnergy += roomState.sourceContainers[i].store.getUsedCapacity(RESOURCE_ENERGY);
+                for (let i = 0; i < roomState.sourceContainerCount; i++) looseEnergy += roomState.sourceContainers[i].store.getUsedCapacity(RESOURCE_ENERGY);
             }
 
             if (looseEnergy > 1500) {
@@ -170,15 +170,52 @@ class CensusCalculator {
             }
         }
 
-        limits.scout = (rcl >= 3) ? 1 : 0;
+        let needsScout = false;
+        if (rcl >= 3 && roomName) {
+            const queue = [{name: roomName, depth: 0}];
+            const visited = new Set([roomName]);
+            const threshold = 10000;
+
+            while (queue.length > 0) {
+                const current = queue.shift();
+                
+                const mem = Memory.rooms && Memory.rooms[current.name];
+                if (!mem || !mem.scoutedAt || (Game.time - mem.scoutedAt) > threshold) {
+                    needsScout = true;
+                    break;
+                }
+
+                if (current.depth < 2) {
+                    const exits = Game.map.describeExits(current.name);
+                    if (exits) {
+                        for (const dir in exits) {
+                            const adjRoom = exits[dir];
+                            // Skip SK rooms and Sector Centers
+                            const parsed = /^[WE]([0-9]+)[NS]([0-9]+)$/.exec(adjRoom);
+                            if (parsed) {
+                                const x = parseInt(parsed[1]) % 10;
+                                const y = parseInt(parsed[2]) % 10;
+                                if ((x >= 4 && x <= 6) && (y >= 4 && y <= 6)) continue;
+                            }
+                            
+                            if (!visited.has(adjRoom)) {
+                                visited.add(adjRoom);
+                                queue.push({name: adjRoom, depth: current.depth + 1});
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        limits.scout = needsScout ? 1 : 0;
 
         let hostilesFound = false;
-        if (roomState && roomState.hostiles && roomState.hostiles.length > 0) hostilesFound = true;
+        if (roomState && roomState.hostiles && roomState.hostileCount > 0) hostilesFound = true;
         if (!hostilesFound && roomName && Memory.rooms && Memory.rooms[roomName] && Memory.rooms[roomName].outposts) {
             const outposts = Memory.rooms[roomName].outposts;
             for (let i = 0; i < outposts.length; i++) {
                 const outpostState = global.State?.rooms?.get(outposts[i]);
-                if (outpostState && outpostState.hostiles && outpostState.hostiles.length > 0) {
+                if (outpostState && outpostState.hostiles && outpostState.hostileCount > 0) {
                     hostilesFound = true;
                     break;
                 }
@@ -281,9 +318,9 @@ class SpawnManager {
         }
 
         const spawnPriority = [
-            'defender', 'filler', 'harvester', 'hauler', 'upgrader', 'builder', 
+            'defender', 'filler', 'scout', 'harvester', 'hauler', 'upgrader', 'builder', 
             'repairman', 'remoteharvester', 'remotehauler', 
-            'meleeCreep', 'rangerCreep', 'medicCreep', 'scout'
+            'meleeCreep', 'rangerCreep', 'medicCreep'
         ];
 
         for (let i = 0; i < spawnPriority.length; i++) {
