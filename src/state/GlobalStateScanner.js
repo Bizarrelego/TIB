@@ -19,9 +19,8 @@ function run() {
         }
     }
 
-    const creepNames = Object.keys(Game.creeps);
-    for (let i = 0; i < creepNames.length; i++) {
-        const creep = Game.creeps[creepNames[i]];
+    for (const creepName in Game.creeps) {
+        const creep = Game.creeps[creepName];
         const roomName = creep.memory.room || creep.room.name;
         const role = creep.memory.role;
 
