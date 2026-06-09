@@ -7,7 +7,7 @@ const GameObjectUtility = require('./GameObjectUtility');
 
 /**
  * Returns an array of Structure objects that are damaged and need repair.
- * Excludes walls and ramparts.
+ * Includes walls and ramparts up to a threshold.
  * @param {string} roomName - The name of the room to check.
  * @param {number} threshold - The maximum hits percentage (e.g., 0.8 for 80% health).
  * @returns {Structure[]} Array of structures needing repair.
@@ -35,6 +35,10 @@ function getRepairTargets(roomName, threshold) {
         if (!structure) continue;
 
         if (structure.structureType === STRUCTURE_WALL || structure.structureType === STRUCTURE_RAMPART) {
+            // Cap wall and rampart repair targets at 100,000 hits to avoid infinite repair loops
+            if (structure.hits < 100000) {
+                repairTargets.push(structure);
+            }
             continue;
         }
 
