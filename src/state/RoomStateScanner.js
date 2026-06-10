@@ -66,7 +66,8 @@ const createRoomStateTemplate = () => ({
         mineralId: null,
         sourceIds: [],
         structureIds: [],
-        lastConstructionSiteCount: 0
+        lastConstructionSiteCount: 0,
+        hostilesPresent: false
     }
 });
 
@@ -102,6 +103,7 @@ class RoomStateScanner {
         state.availableDroppedEnergyCount = 0;
         state.energyInRuinsAndTombstonesCount = 0;
         state.harvestableSourceCount = 0;
+        state.hostileCount = 0;
         state.storage = null;
         state.terminal = null;
         state.factory = null;
@@ -164,9 +166,25 @@ class RoomStateScanner {
                 }
             }
 
-            const hostiles = room['find'](FIND_HOSTILE_CREEPS);
-            for (let i = 0; i < hostiles.length; i++) {
-                state.hostiles[state.hostileCount++] = hostiles[i];
+            let needsHostileScan = false;
+            if (Game.time % 13 === 0 || state.cache.hostilesPresent) {
+                needsHostileScan = true;
+            } else {
+                const events = room.getEventLog();
+                for (let i = 0; i < events.length; i++) {
+                    if (events[i].event === EVENT_ATTACK || events[i].event === EVENT_HEAL) {
+                        needsHostileScan = true;
+                        break;
+                    }
+                }
+            }
+
+            if (needsHostileScan) {
+                const hostiles = room['find'](FIND_HOSTILE_CREEPS);
+                state.cache.hostilesPresent = hostiles.length > 0;
+                for (let i = 0; i < hostiles.length; i++) {
+                    state.hostiles[state.hostileCount++] = hostiles[i];
+                }
             }
 
             const drops = room['find'](FIND_DROPPED_RESOURCES);
