@@ -71,49 +71,59 @@ class CreepBodyBuilder {
     }
 
     static generateMelee(energy) {
-        const body = [];
-        let cost = 0;
         const blockCost = BODYPART_COST[TOUGH] * 2 + BODYPART_COST[ATTACK] * 2 + BODYPART_COST[MOVE] * 2;
-        body.push(TOUGH, TOUGH, ATTACK, ATTACK, MOVE, MOVE);
-        cost += blockCost;
-        while (cost + blockCost <= energy && body.length + 6 <= 50) {
-            body.push(TOUGH, TOUGH, ATTACK, ATTACK, MOVE, MOVE);
-            cost += blockCost;
+        let blocks = Math.floor(energy / blockCost);
+        if (blocks > Math.floor(50 / 6)) blocks = Math.floor(50 / 6);
+        if (blocks < 1) blocks = 1;
+
+        const body = new Array(blocks * 6);
+        let idx = 0;
+        for (let i = 0; i < blocks; i++) {
+            body[idx++] = TOUGH; body[idx++] = TOUGH;
+            body[idx++] = ATTACK; body[idx++] = ATTACK;
+            body[idx++] = MOVE; body[idx++] = MOVE;
         }
         return body;
     }
 
     static generateRanger(energy) {
-        const body = [];
-        let cost = 0;
         const blockCost = BODYPART_COST[TOUGH] + BODYPART_COST[RANGED_ATTACK] + BODYPART_COST[MOVE];
-        body.push(TOUGH, RANGED_ATTACK, MOVE);
-        cost += blockCost;
-        while (cost + blockCost <= energy && body.length + 3 <= 50) {
-            body.push(TOUGH, RANGED_ATTACK, MOVE);
-            cost += blockCost;
+        let blocks = Math.floor(energy / blockCost);
+        if (blocks > Math.floor(50 / 3)) blocks = Math.floor(50 / 3);
+        if (blocks < 1) blocks = 1;
+
+        const body = new Array(blocks * 3);
+        let idx = 0;
+        for (let i = 0; i < blocks; i++) {
+            body[idx++] = TOUGH;
+            body[idx++] = RANGED_ATTACK;
+            body[idx++] = MOVE;
         }
         return body;
     }
 
     static generateMedic(energy) {
-        const body = [];
-        let cost = 0;
         const blockCost = BODYPART_COST[MOVE] + BODYPART_COST[HEAL];
-        body.push(MOVE, HEAL);
-        cost += blockCost;
-        while (cost + blockCost <= energy && body.length + 2 <= 50) {
-            body.push(MOVE, HEAL);
-            cost += blockCost;
+        let blocks = Math.floor(energy / blockCost);
+        if (blocks > 25) blocks = 25;
+        if (blocks < 1) blocks = 1;
+
+        const body = new Array(blocks * 2);
+        let idx = 0;
+        for (let i = 0; i < blocks; i++) {
+            body[idx++] = MOVE;
+            body[idx++] = HEAL;
         }
         return body;
     }
 
     static buildArray(work, carry, move) {
-        const body = [];
-        for (let i = 0; i < work; i++) body.push(WORK);
-        for (let i = 0; i < carry; i++) body.push(CARRY);
-        for (let i = 0; i < move; i++) body.push(MOVE);
+        const len = work + carry + move;
+        const body = new Array(len);
+        let idx = 0;
+        for (let i = 0; i < work; i++) body[idx++] = WORK;
+        for (let i = 0; i < carry; i++) body[idx++] = CARRY;
+        for (let i = 0; i < move; i++) body[idx++] = MOVE;
         return body;
     }
 }
@@ -139,12 +149,14 @@ class CensusCalculator {
             let looseEnergy = 0;
             if (roomState.droppedEnergy) {
                 for (let i = 0; i < roomState.droppedEnergyCount; i++) {
-                    try { looseEnergy += roomState.droppedEnergy[i].amount; } catch (e) { /* ignore */ }
+                    const drop = roomState.droppedEnergy[i];
+                    if (drop && drop.amount) looseEnergy += drop.amount;
                 }
             }
             if (roomState.sourceContainers) {
                 for (let i = 0; i < roomState.sourceContainerCount; i++) {
-                    try { looseEnergy += roomState.sourceContainers[i].store.getUsedCapacity(RESOURCE_ENERGY); } catch (e) { /* ignore */ }
+                    const container = roomState.sourceContainers[i];
+                    if (container && container.store) looseEnergy += container.store.getUsedCapacity(RESOURCE_ENERGY);
                 }
             }
 
@@ -208,11 +220,12 @@ class CensusCalculator {
         let needsScout = false;
         if (rcl >= 3 && roomName) {
             const queue = [{name: roomName, depth: 0}];
+            let qIdx = 0;
             const visited = new Set([roomName]);
             const threshold = 10000;
 
-            while (queue.length > 0) {
-                const current = queue.shift();
+            while (qIdx < queue.length) {
+                const current = queue[qIdx++];
                 
                 const mem = Memory.rooms && Memory.rooms[current.name];
                 if (!mem || !mem.scoutedAt || (Game.time - mem.scoutedAt) > threshold) {
@@ -225,13 +238,19 @@ class CensusCalculator {
                     if (exits) {
                         for (const dir in exits) {
                             const adjRoom = exits[dir];
-                            // Skip SK rooms and Sector Centers
-                            const parsed = /^[WE]([0-9]+)[NS]([0-9]+)$/.exec(adjRoom);
-                            if (parsed) {
-                                const x = parseInt(parsed[1]) % 10;
-                                const y = parseInt(parsed[2]) % 10;
-                                if ((x >= 4 && x <= 6) && (y >= 4 && y <= 6)) continue;
+                            // Skip SK rooms and Sector Centers via fast string parsing (e.g. W4N5)
+                            // Sector centers are coordinates containing 4,5,6
+                            const strLen = adjRoom.length;
+                            let xStr = "", yStr = "";
+                            let parsingX = true;
+                            for (let i = 1; i < strLen; i++) {
+                                const char = adjRoom[i];
+                                if (char === 'N' || char === 'S') { parsingX = false; continue; }
+                                if (parsingX) xStr += char; else yStr += char;
                             }
+                            const x = parseInt(xStr, 10) % 10;
+                            const y = parseInt(yStr, 10) % 10;
+                            if ((x >= 4 && x <= 6) && (y >= 4 && y <= 6)) continue;
                             
                             if (!visited.has(adjRoom)) {
                                 visited.add(adjRoom);
@@ -305,24 +324,44 @@ class SpawnManager {
         const rcl = spawn.room.controller ? spawn.room.controller.level : 1;
         const roomState = global.State?.rooms?.get(roomName);
 
-        const targetCensus = CensusCalculator.getAllLimits(rcl, roomState, roomName);
-
-        const currentCensus = {};
-        let rawBootstrapperCount = 0;
-        for (const name in Game.creeps) {
-            const c = Game.creeps[name];
-            if (c.memory.colony === roomName || c.memory.room === roomName) {
-                const role = c.memory.role;
-                
-                // Pre-emptive spawning logic based on TTL
-                if (!c.spawning && c.ticksToLive !== undefined && c.ticksToLive < 50) {
-                    continue;
-                }
-
-                currentCensus[role] = (currentCensus[role] || 0) + 1;
-                if (role === 'bootstrapper') rawBootstrapperCount++;
-            }
+        if (!global.Cache) global.Cache = {};
+        if (!global.Cache.tickCensus) global.Cache.tickCensus = new Map();
+        if (!global.Cache.tickTargetCensus) global.Cache.tickTargetCensus = new Map();
+        if (global.Cache.tickCensusTime !== Game.time) {
+            global.Cache.tickCensus.clear();
+            global.Cache.tickTargetCensus.clear();
+            global.Cache.tickCensusTime = Game.time;
         }
+
+        let targetCensus = global.Cache.tickTargetCensus.get(roomName);
+        if (!targetCensus) {
+            targetCensus = CensusCalculator.getAllLimits(rcl, roomState, roomName);
+            global.Cache.tickTargetCensus.set(roomName, targetCensus);
+        }
+
+        let censusData = global.Cache.tickCensus.get(roomName);
+        if (!censusData) {
+            const currentCensus = {};
+            let rawBootstrapperCount = 0;
+            for (const name in Game.creeps) {
+                const c = Game.creeps[name];
+                if (c.memory.colony === roomName || c.memory.room === roomName) {
+                    const role = c.memory.role;
+                    
+                    // Pre-emptive spawning logic based on TTL
+                    if (!c.spawning && c.ticksToLive !== undefined && c.ticksToLive < 50) {
+                        continue;
+                    }
+
+                    currentCensus[role] = (currentCensus[role] || 0) + 1;
+                    if (role === 'bootstrapper') rawBootstrapperCount++;
+                }
+            }
+            censusData = { currentCensus, rawBootstrapperCount };
+            global.Cache.tickCensus.set(roomName, censusData);
+        }
+
+        const { currentCensus, rawBootstrapperCount } = censusData;
 
         const getCount = (role) => currentCensus[role] || 0;
 
@@ -369,7 +408,10 @@ class SpawnManager {
                 const bodyParts = CreepBodyBuilder.getBody(role, energyCapacity);
                 if (!bodyParts || bodyParts.length === 0) continue;
                 
-                const cost = bodyParts.reduce((total, part) => total + BODYPART_COST[part], 0);
+                let cost = 0;
+                for (let j = 0; j < bodyParts.length; j++) {
+                    cost += BODYPART_COST[bodyParts[j]];
+                }
 
                 if (spawn.room.energyAvailable >= cost) {
                     this.executeSpawn(spawn, role, bodyParts);

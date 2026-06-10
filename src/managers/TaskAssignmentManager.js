@@ -214,16 +214,16 @@ class TaskAssignmentManager {
                 return;
             }
 
-            // Priority 2: Terminal overflow -> Storage
-            if (terminal && terminal.store.getUsedCapacity(RESOURCE_ENERGY) > 100000) {
-                creep.heap.targetId = terminal.id;
+            // Priority 2: Storage -> Terminal if storage is overflowing (> 500k)
+            if (terminal && storage.store.getUsedCapacity(RESOURCE_ENERGY) > 500000 && terminal.store.getFreeCapacity() > 0) {
+                creep.heap.targetId = storage.id;
                 creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
                 return;
             }
 
-            // Priority 3: Storage -> Terminal if storage is overflowing (> 500k)
-            if (terminal && storage.store.getUsedCapacity(RESOURCE_ENERGY) > 500000 && terminal.store.getFreeCapacity() > 0) {
-                creep.heap.targetId = storage.id;
+            // Priority 3: Terminal overflow -> Storage
+            if (terminal && terminal.store.getUsedCapacity(RESOURCE_ENERGY) > 100000 && storage.store.getFreeCapacity() > 0) {
+                creep.heap.targetId = terminal.id;
                 creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
                 return;
             }

@@ -81,6 +81,19 @@ function assignUpgrader(creep, roomState) {
                 }
             }
         }
+
+        // Priority 3: Fallback to Storage/Terminal if RCL 4 (no links/containers)
+        if (roomState.storage && roomState.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+            creep.heap.targetId = roomState.storage.id;
+            creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
+            return;
+        }
+
+        if (roomState.terminal && roomState.terminal.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+            creep.heap.targetId = roomState.terminal.id;
+            creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
+            return;
+        }
     }
 
     // Issue upgrade intent — Upgrader.js will handle movement

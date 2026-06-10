@@ -137,6 +137,7 @@ class RoomStateScanner {
 
             for (let i = 0; i < structures.length; i++) {
                 const s = structures[i];
+                if (s.isActive !== undefined && !s.isActive()) continue;
                 state.structureIds[state.structureIdCount++] = s.id;
                 switch (s.structureType) {
                     case STRUCTURE_SPAWN: state.spawns[state.spawnCount++] = s; break;

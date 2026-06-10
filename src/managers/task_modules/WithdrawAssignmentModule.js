@@ -39,6 +39,30 @@ function findClosestEnergy(creep, roomState) {
         }
     }
 
+    // Check Storage
+    if (roomState.storage && roomState.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+        const dx = Math.abs(creep.pos.x - roomState.storage.pos.x);
+        const dy = Math.abs(creep.pos.y - roomState.storage.pos.y);
+        const dist = Math.max(dx, dy);
+        if (dist < bestDist) {
+            bestDist = dist;
+            bestTarget = roomState.storage;
+            bestIntent = ActionConstants.ACTION_WITHDRAW;
+        }
+    }
+
+    // Check Terminal
+    if (roomState.terminal && roomState.terminal.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+        const dx = Math.abs(creep.pos.x - roomState.terminal.pos.x);
+        const dy = Math.abs(creep.pos.y - roomState.terminal.pos.y);
+        const dist = Math.max(dx, dy);
+        if (dist < bestDist) {
+            bestDist = dist;
+            bestTarget = roomState.terminal;
+            bestIntent = ActionConstants.ACTION_WITHDRAW;
+        }
+    }
+
     if (bestTarget) {
         bestTarget.__gatherClaimed = (bestTarget.__gatherClaimed || 0) + creep.store.getFreeCapacity(RESOURCE_ENERGY);
         return { id: bestTarget.id, actionIntent: bestIntent };
