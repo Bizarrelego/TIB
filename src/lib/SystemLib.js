@@ -10,8 +10,8 @@ class Logger {
 
 class ErrorHandlingUtility {
     static wrap(fn, context) {
-        return function(...args) {
-            try { return fn.apply(this, args); } 
+        return function (...args) {
+            try { return fn.apply(this, args); }
             catch (error) {
                 const errorMessage = `Error in ${context}: ${error.message}\nStack: ${error.stack}`;
                 Logger.error(errorMessage);
@@ -23,12 +23,12 @@ class ErrorHandlingUtility {
 const ProfilerUtility = {
     enabled: false,
     metrics: new Map(),
-    start: function() { if (this.enabled) this.metrics.clear(); },
-    end: function() { if (this.enabled) { Logger.debug(`Total CPU used this tick: ${Game.cpu.getUsed().toFixed(3)}`); } },
-    setEnabled: function(state) { this.enabled = state; },
-    wrap: function(fn, name) {
+    start: function () { if (this.enabled) this.metrics.clear(); },
+    end: function () { if (this.enabled) { Logger.debug(`Total CPU used this tick: ${Game.cpu.getUsed().toFixed(3)}`); } },
+    setEnabled: function (state) { this.enabled = state; },
+    wrap: function (fn, name) {
         const profiler = this;
-        return function(...args) {
+        return function (...args) {
             if (!profiler.enabled) return fn.apply(this, args);
             const start = Game.cpu.getUsed();
             const result = fn.apply(this, args);
@@ -39,11 +39,11 @@ const ProfilerUtility = {
             return result;
         };
     },
-    report: function() {
+    report: function () {
         if (!this.enabled || this.metrics.size === 0) return;
         Logger.info('--- Profiler Report ---');
         for (const [name, data] of this.metrics.entries()) {
-            Logger.info(`${name}: ${data.calls} calls, ${data.totalCpu.toFixed(3)} CPU total, ${(data.totalCpu/data.calls).toFixed(3)} CPU avg`);
+            Logger.info(`${name}: ${data.calls} calls, ${data.totalCpu.toFixed(3)} CPU total, ${(data.totalCpu / data.calls).toFixed(3)} CPU avg`);
         }
         Logger.info('-----------------------');
         this.metrics.clear();
@@ -67,7 +67,7 @@ class StressTestUtility {
             for (let i = 0; i < 3; i++) {
                 roomState.hostiles.push({
                     id: `mock_hostile_${i}`,
-                    pos: { x: spawn.pos.x + 3 + i, y: spawn.pos.y + 3 + i, roomName: mainRoom, getRangeTo: function(pos) { return Math.max(Math.abs(this.x - pos.x), Math.abs(this.y - pos.y)); } },
+                    pos: { x: spawn.pos.x + 3 + i, y: spawn.pos.y + 3 + i, roomName: mainRoom, getRangeTo: function (pos) { return Math.max(Math.abs(this.x - pos.x), Math.abs(this.y - pos.y)); } },
                     body: [{ type: 'attack', hits: 100 }, { type: 'ranged_attack', hits: 100 }],
                     hits: 1000, hitsMax: 1000, my: false, owner: { username: 'Invader' }
                 });
