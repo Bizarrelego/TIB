@@ -28,7 +28,8 @@ class ScoutingManager {
                 const exitRoom = exits[dir];
 
                 // Prevents fatal pathing deadlocks by utilizing the Game.map API to filter out walled-off beginner sectors and closed map areas.
-                const status = Game.map.getRoomStatus(exitRoom);
+                // Safeguarded against older local server API versions where getRoomStatus is undefined.
+                const status = typeof Game.map.getRoomStatus === 'function' ? Game.map.getRoomStatus(exitRoom) : null;
                 if (status && (status.status === 'closed' || status.status === 'novice' || status.status === 'respawn')) {
                     continue;
                 }
@@ -53,7 +54,7 @@ class ScoutingManager {
                 for (const dir in exits) {
                     const exitRoom = exits[dir];
                     
-                    const status = Game.map.getRoomStatus(exitRoom);
+                    const status = typeof Game.map.getRoomStatus === 'function' ? Game.map.getRoomStatus(exitRoom) : null;
                     if (status && (status.status === 'closed' || status.status === 'novice' || status.status === 'respawn')) {
                         continue;
                     }

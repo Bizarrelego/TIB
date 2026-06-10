@@ -22,7 +22,8 @@ class TaskAssignmentManager {
             if (creep.spawning) continue;
             
             // Scouts are managed exclusively by ScoutingManager — skip to prevent heap overwrite
-            if (creep.memory.role === 'scout') continue;
+            const rawRole = creep.memory.role || '';
+            if (rawRole.toLowerCase() === 'scout') continue;
 
             const roomName = creep.memory.room || creep.memory.colony || creep.room.name;
             const roomState = global.State?.rooms?.get(roomName);
