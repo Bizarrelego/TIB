@@ -8,15 +8,8 @@ class ScoutingManager {
 
             if (!creep.heap) creep.heap = {};
 
-            // 1. Edge avoidance: if on an edge, pull into the room and wait
-            if (creep.pos.x === 0 || creep.pos.x === 49 || creep.pos.y === 0 || creep.pos.y === 49) {
-                creep.heap.destination = { x: 25, y: 25, roomName: creep.room.name, range: 20 };
-                creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
-                continue;
-            }
-
-            // 2. Intent Preservation: If it has ANY destination, it hasn't arrived yet. Let TrafficManager finish.
-            // Improves execution stability by preventing the scout from overwriting its own destination at x=1.
+            // 1. Intent Preservation: If it has ANY destination, it hasn't arrived yet. Let TrafficManager finish.
+            // Improves execution stability by preventing the scout from overwriting its own destination.
             if (creep.heap.destination) {
                 creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
                 continue;
