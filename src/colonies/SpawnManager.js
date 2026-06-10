@@ -360,8 +360,9 @@ class SpawnManager {
                 if (c.memory.colony === roomName || c.memory.room === roomName) {
                     const role = c.memory.role;
 
-                    // Pre-emptive spawning logic based on TTL
-                    if (!c.spawning && c.ticksToLive !== undefined && c.ticksToLive < 50) {
+                    // Fixes Generation Die-offs by triggering replacement spawns before the current workforce expires, ensuring zero downtime on critical infrastructure.
+                    const spawnTime = c.body ? c.body.length * 3 : 50;
+                    if (!c.spawning && c.ticksToLive !== undefined && c.ticksToLive < spawnTime) {
                         continue;
                     }
 
@@ -407,8 +408,8 @@ class SpawnManager {
 
         // Prevents economic stalling by ensuring early-game scouts yield the spawn queue to critical energy-generating roles.
         const spawnPriority = [
-            'defender', 'filler', 'fastfiller', 'harvester', 'hauler', 'upgrader', 'scout', 'builder',
-            'repairman', 'remoteharvester', 'remotehauler',
+            'bootstrapper', 'harvester', 'filler', 'fastfiller', 'hauler', 'defender', 'upgrader', 'builder',
+            'scout', 'repairman', 'remoteharvester', 'remotehauler',
             'meleeCreep', 'rangerCreep', 'medicCreep'
         ];
 
@@ -418,6 +419,13 @@ class SpawnManager {
             const current = getCount(role);
 
             if (current < limit) {
+                // Prevents economic cannibalism by completely halting all energy sinks (upgraders/builders) until the energy-gathering workforce is at 100% capacity.
+                if (role === 'builder' || role === 'upgrader' || role === 'scout') {
+                    if (harvesterCount < (targetCensus['harvester'] || 0) || haulerCount < (targetCensus['hauler'] || 0)) {
+                        break;
+                    }
+                }
+
                 const bodyParts = CreepBodyBuilder.getBody(role, energyCapacity);
                 if (!bodyParts || bodyParts.length === 0) continue;
 
@@ -428,8 +436,11 @@ class SpawnManager {
 
                 if (spawn.room.energyAvailable >= cost) {
                     this.executeSpawn(spawn, role, bodyParts);
+                    return;
+                } else {
+                    // Strict abort: Do not skip to lower priority roles if we are missing a higher priority one but just lack energy.
+                    return;
                 }
-                return; // Stop processing further limits until this high-priority creep is spawned
             }
         }
     }
