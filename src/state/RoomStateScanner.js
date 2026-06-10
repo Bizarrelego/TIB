@@ -248,6 +248,26 @@ class RoomStateScanner {
                     state.harvestableSources[state.harvestableSourceCount++] = s;
                 }
             }
+
+            // V8 Object Pooling Fix: Truncate all pooled arrays to their dynamic counts
+            // Prevents iteration over stale, dead objects from previous ticks downstream
+            state.spawns.length = state.spawnCount;
+            state.extensions.length = state.extensionCount;
+            state.towers.length = state.towerCount;
+            state.links.length = state.linkCount;
+            state.labs.length = state.labCount;
+            state.containers.length = state.containerCount;
+            state.sourceContainers.length = state.sourceContainerCount;
+            state.controllerContainers.length = state.controllerContainerCount;
+            state.droppedEnergy.length = state.droppedEnergyCount;
+            state.ruins.length = state.ruinCount;
+            state.tombstones.length = state.tombstoneCount;
+            state.hostiles.length = state.hostileCount;
+            state.invaderCores.length = state.invaderCoreCount;
+            state.structureIds.length = state.structureIdCount;
+            state.repairTargets.length = state.repairTargetCount;
+            state.validDroppedEnergy.length = state.validDroppedEnergyCount;
+            state.harvestableSources.length = state.harvestableSourceCount;
     }
 }
 
