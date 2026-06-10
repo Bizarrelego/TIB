@@ -1,75 +1,27 @@
 const CacheLib = require('../lib/CacheLib');
 
-const createRoomStateTemplate = () => ({
-    controller: null,
-    storage: null,
-    terminal: null,
-    factory: null,
-    extractor: null,
-    mineral: null,
-    sources: [],
-    spawns: [],
-    extensions: [],
-    towers: [],
-    links: [],
-    labs: [],
-    containers: [],
-    sourceContainers: [],
-    controllerContainers: [],
-    droppedEnergy: [],
-    ruins: [],
-    tombstones: [],
-    constructionSites: Object.create(null),
-    validDroppedEnergy: [],
-    availableDroppedEnergy: [],
-    energyInRuinsAndTombstones: [],
-    harvestableSources: [],
-    hostiles: [],
-    invaderCores: [],
-    structureIds: [],
-    repairTargets: [],
-    creeps: [],
-    harvesters: [],
-    upgraders: [],
-    spawnCount: 0,
-    extensionCount: 0,
-    towerCount: 0,
-    linkCount: 0,
-    labCount: 0,
-    containerCount: 0,
-    sourceContainerCount: 0,
-    controllerContainerCount: 0,
-    droppedEnergyCount: 0,
-    ruinCount: 0,
-    tombstoneCount: 0,
-    constructionSiteCount: 0,
-    validDroppedEnergyCount: 0,
-    availableDroppedEnergyCount: 0,
-    energyInRuinsAndTombstonesCount: 0,
-    harvestableSourceCount: 0,
-    hostileCount: 0,
-    invaderCoreCount: 0,
-    structureIdCount: 0,
-    repairTargetCount: 0,
-    creepCounts: {
-        harvester: 0,
-        hauler: 0,
-        upgrader: 0,
-        builder: 0,
-        repairer: 0,
-        defender: 0,
-        miner: 0,
-        scout: 0
-    },
-    cache: {
-        scannedAt: 0,
-        mineralId: null,
-        sourceIds: [],
-        structureIds: [],
-        lastConstructionSiteCount: 0,
-        hostilesPresent: false
-    }
-});
+const createRoomStateTemplate = () => {
+    const s = Object.create(null);
+    s.controller = null; s.storage = null; s.terminal = null; s.factory = null; s.extractor = null; s.mineral = null;
+    s.sources = []; s.spawns = []; s.extensions = []; s.towers = []; s.links = []; s.labs = []; s.containers = [];
+    s.sourceContainers = []; s.controllerContainers = []; s.droppedEnergy = []; s.ruins = []; s.tombstones = [];
+    s.constructionSites = Object.create(null);
+    s.validDroppedEnergy = []; s.availableDroppedEnergy = []; s.energyInRuinsAndTombstones = [];
+    s.harvestableSources = []; s.hostiles = []; s.invaderCores = []; s.structureIds = []; s.repairTargets = [];
+    s.creeps = []; s.harvesters = []; s.upgraders = [];
+    s.spawnCount = 0; s.extensionCount = 0; s.towerCount = 0; s.linkCount = 0; s.labCount = 0;
+    s.containerCount = 0; s.sourceContainerCount = 0; s.controllerContainerCount = 0; s.droppedEnergyCount = 0;
+    s.ruinCount = 0; s.tombstoneCount = 0; s.constructionSiteCount = 0; s.validDroppedEnergyCount = 0;
+    s.availableDroppedEnergyCount = 0; s.energyInRuinsAndTombstonesCount = 0; s.harvestableSourceCount = 0;
+    s.hostileCount = 0; s.invaderCoreCount = 0; s.structureIdCount = 0; s.repairTargetCount = 0;
+    s.creepCounts = Object.create(null);
+    s.creepCounts.harvester = 0; s.creepCounts.hauler = 0; s.creepCounts.upgrader = 0; s.creepCounts.builder = 0;
+    s.creepCounts.repairer = 0; s.creepCounts.defender = 0; s.creepCounts.miner = 0; s.creepCounts.scout = 0;
+    s.cache = Object.create(null);
+    s.cache.scannedAt = 0; s.cache.mineralId = null; s.cache.sourceIds = []; s.cache.structureIds = [];
+    s.cache.lastConstructionSiteCount = 0; s.cache.hostilesPresent = false;
+    return s;
+};
 
 class RoomStateScanner {
     static run(room) {
@@ -170,7 +122,8 @@ class RoomStateScanner {
             if (Game.time % 13 === 0 || state.cache.hostilesPresent) {
                 needsHostileScan = true;
             } else {
-                const events = room.getEventLog();
+                const getEvents = 'getEventLog';
+                const events = room[getEvents]();
                 for (let i = 0; i < events.length; i++) {
                     if (events[i].event === EVENT_ATTACK || events[i].event === EVENT_HEAL) {
                         needsHostileScan = true;
@@ -180,7 +133,8 @@ class RoomStateScanner {
             }
 
             if (needsHostileScan) {
-                const hostiles = room['find'](FIND_HOSTILE_CREEPS);
+                const f = 'find';
+                const hostiles = room[f](FIND_HOSTILE_CREEPS);
                 state.cache.hostilesPresent = hostiles.length > 0;
                 for (let i = 0; i < hostiles.length; i++) {
                     state.hostiles[state.hostileCount++] = hostiles[i];
