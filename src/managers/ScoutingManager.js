@@ -4,9 +4,7 @@ class ScoutingManager {
     static run() {
         for (const name in Game.creeps) {
             const creep = Game.creeps[name];
-            if (creep.memory.role !== 'scout' || creep.spawning) continue;
-
-            if (!creep.heap) creep.heap = {};
+            if ((creep.memory.role || '').toLowerCase() !== 'scout' || creep.spawning) continue;
 
             // 1. Intent Preservation: If it has ANY destination, it hasn't arrived yet. Let TrafficManager finish.
             // Improves execution stability by preventing the scout from overwriting its own destination.
