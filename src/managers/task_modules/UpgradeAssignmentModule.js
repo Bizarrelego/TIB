@@ -96,6 +96,18 @@ function assignUpgrader(creep, roomState) {
         }
     }
 
+    // Emergency Base Relocation Protocol: If there are no spawns, but a spawn construction site exists, Upgraders become Builders
+    if ((!roomState.spawns || roomState.spawns.length === 0) && roomState.constructionSites) {
+        const sites = Object.values(roomState.constructionSites);
+        for (let i = 0; i < sites.length; i++) {
+            if (sites[i].structureType === STRUCTURE_SPAWN) {
+                creep.heap.targetId = sites[i].id;
+                creep.heap.actionIntent = ActionConstants.ACTION_BUILD;
+                return;
+            }
+        }
+    }
+
     // Issue upgrade intent — Upgrader.js will handle movement
     creep.heap.targetId = roomState.controller.id;
     creep.heap.actionIntent = ActionConstants.ACTION_UPGRADE;

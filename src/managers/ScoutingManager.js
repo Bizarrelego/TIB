@@ -2,6 +2,7 @@ const ActionConstants = require('../constants/ActionConstants');
 
 class ScoutingManager {
     static run() {
+        if (Game.time % 20 !== 0) return;
         for (const name in Game.creeps) {
             const creep = Game.creeps[name];
             if ((creep.memory.role || '').toLowerCase() !== 'scout' || creep.spawning) continue;

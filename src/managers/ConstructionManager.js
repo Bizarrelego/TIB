@@ -6,7 +6,7 @@ const CacheLib = require('../lib/CacheLib');
  */
 class ConstructionManager {
     static run() {
-        if (Game.time % 13 !== 0) return;
+        if (Game.time % 51 !== 0) return;
         if (Object.keys(Game.constructionSites).length >= 100) return;
 
         for (const roomName in Game.rooms) {
@@ -22,12 +22,12 @@ class ConstructionManager {
             } else if (state.constructionSites) {
                 siteCount = Object.keys(state.constructionSites).length;
             }
-            if (siteCount >= 3) continue;
+            if (siteCount >= 5) continue;
 
             const blueprint = global.Cache?.blueprints?.get(roomName);
             if (!blueprint) continue;
 
-            ConstructionManager.executeRoomBlueprint(room, blueprint, state, 3 - siteCount);
+            ConstructionManager.executeRoomBlueprint(room, blueprint, state, 5 - siteCount);
         }
     }
 

@@ -25,6 +25,21 @@ class TrafficManager {
         return ROLE_PRIORITY[(creep.memory.role || '').toLowerCase()] || 0;
     }
 
+    static isCreepStationaryLocked(creep) {
+        const role = (creep.memory.role || '').toLowerCase();
+        if (role === 'harvester' || role === 'upgrader' || role === 'fastfiller') {
+            if (creep.heap && creep.heap.sitTargetId) {
+                const sitTarget = Game.getObjectById(creep.heap.sitTargetId);
+                if (sitTarget && creep.pos.isEqualTo(sitTarget)) return true;
+            }
+            if (creep.heap && creep.heap.targetId) {
+                const workTarget = Game.getObjectById(creep.heap.targetId);
+                if (workTarget && creep.pos.isNearTo(workTarget)) return true;
+            }
+        }
+        return false;
+    }
+
     static run() {
         if (!global.creepHeap) return;
 
@@ -234,11 +249,14 @@ class TrafficManager {
                 const blockerIdx = TrafficManager.grid[targetPacked];
                 if (blockerIdx !== -1 && blockerIdx !== i) {
                     if (TrafficManager.priorityScore[i] >= TrafficManager.priorityScore[blockerIdx]) {
-                        const origPacked = (TrafficManager.creepList[i].pos.y * 50) + TrafficManager.creepList[i].pos.x;
-                        TrafficManager.resolvedIntents[i] = targetPacked;
-                        TrafficManager.resolvedIntents[blockerIdx] = origPacked;
-                        TrafficManager.grid[origPacked] = blockerIdx;
-                        TrafficManager.grid[targetPacked] = i;
+                        const blocker = TrafficManager.creepList[blockerIdx];
+                        if (blocker.fatigue === 0 && !TrafficManager.isCreepStationaryLocked(blocker)) {
+                            const origPacked = (TrafficManager.creepList[i].pos.y * 50) + TrafficManager.creepList[i].pos.x;
+                            TrafficManager.resolvedIntents[i] = targetPacked;
+                            TrafficManager.resolvedIntents[blockerIdx] = origPacked;
+                            TrafficManager.grid[origPacked] = blockerIdx;
+                            TrafficManager.grid[targetPacked] = i;
+                        }
                     }
                 }
             }
@@ -277,10 +295,14 @@ class TrafficManager {
         const tx = targetPacked % 50;
         const ty = Math.floor(targetPacked / 50);
         
-        if (terrain.get(tx, ty) === TERRAIN_MASK_WALL || matrix.get(tx, ty) === 255) return false;
+        if (terrain.get(tx, ty) === TERRAIN_MASK_WALL) return false;
 
         const blockerIdx = TrafficManager.grid[targetPacked];
-        if (blockerIdx === -1) return true; // Target tile is completely empty
+        if (blockerIdx === -1) {
+            // Target tile is completely empty. Ensure it's walkable according to the tickMatrix (avoids threat zones).
+            if (matrix.get(tx, ty) === 255) return false;
+            return true;
+        }
 
         if (TrafficManager.visited[blockerIdx]) return false; // Cycle detection
         TrafficManager.visited[blockerIdx] = 1;
@@ -294,17 +316,7 @@ class TrafficManager {
         if (minScore < blockerScore) return false; // Prevent low-priority creeps from displacing high-priority
 
         // Prevents economic collapse by anchoring stationary creeps against high-priority displacement.
-        const blockerRole = (blocker.memory.role || '').toLowerCase();
-        if (blockerRole === 'harvester' || blockerRole === 'upgrader' || blockerRole === 'fastfiller') {
-            if (blocker.heap && blocker.heap.sitTargetId) {
-                const sitTarget = Game.getObjectById(blocker.heap.sitTargetId);
-                if (sitTarget && blocker.pos.isEqualTo(sitTarget)) return false;
-            }
-            if (blocker.heap && blocker.heap.targetId) {
-                const workTarget = Game.getObjectById(blocker.heap.targetId);
-                if (workTarget && blocker.pos.isNearTo(workTarget)) return false;
-            }
-        }
+        if (TrafficManager.isCreepStationaryLocked(blocker)) return false;
 
         // If the blocker is already leaving the room, we can just assume the tile opens up
         if (TrafficManager.nextSteps[blockerIdx] === -2) {

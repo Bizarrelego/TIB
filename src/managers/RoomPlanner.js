@@ -1049,6 +1049,7 @@ class RoomPlanner {
      *   Anchor         — white circle + gear icon
      */
     static visualize() {
+        if (!Memory.debugPlanner) return;
         if (!global.Cache || !global.Cache.blueprints) return;
 
         for (const [roomName, blueprint] of global.Cache.blueprints.entries()) {
