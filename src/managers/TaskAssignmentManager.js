@@ -21,34 +21,38 @@ class TaskAssignmentManager {
             const creep = Game.creeps[creepName];
             if (creep.spawning) continue;
             
-            // Scouts are managed exclusively by ScoutingManager — skip to prevent heap overwrite
-            const rawRole = creep.memory.role || '';
-            if (rawRole.toLowerCase() === 'scout') continue;
+            try {
+                // Scouts are managed exclusively by ScoutingManager — skip to prevent heap overwrite
+                const rawRole = creep.memory.role || '';
+                if (rawRole.toLowerCase() === 'scout') continue;
 
-            const roomName = creep.memory.room || creep.memory.colony || creep.room.name;
-            const roomState = global.State?.rooms?.get(roomName);
-            if (!roomState) continue;
+                const roomName = creep.memory.room || creep.memory.colony || creep.room.name;
+                const roomState = global.State?.rooms?.get(roomName);
+                if (!roomState) continue;
 
-            let heap = global.creepHeap.get(creep.name);
-            if (!heap) {
-                heap = CacheLib.getDefaultHeap();
-                global.creepHeap.set(creep.name, heap);
-            }
-            creep.heap = heap;
-
-            if (Game.time < creep.heap.sleepUntil) continue;
-
-            if (creep.heap.actionIntent !== ActionConstants.ACTION_IDLE && creep.heap.actionIntent !== null) {
-                TaskAssignmentManager.validateCurrentTask(creep);
-
-                if (creep.heap.actionIntent !== ActionConstants.ACTION_IDLE) {
-                    TaskAssignmentManager.reregisterClaim(creep);
-                    continue;
+                let heap = global.creepHeap.get(creep.name);
+                if (!heap) {
+                    heap = CacheLib.getDefaultHeap();
+                    global.creepHeap.set(creep.name, heap);
                 }
-            }
+                creep.heap = heap;
 
-            TaskAssignmentManager.updateCreepState(creep);
-            TaskAssignmentManager.assignTask(creep, roomState);
+                if (Game.time < creep.heap.sleepUntil) continue;
+
+                if (creep.heap.actionIntent !== ActionConstants.ACTION_IDLE && creep.heap.actionIntent !== null) {
+                    TaskAssignmentManager.validateCurrentTask(creep);
+
+                    if (creep.heap.actionIntent !== ActionConstants.ACTION_IDLE) {
+                        TaskAssignmentManager.reregisterClaim(creep);
+                        continue;
+                    }
+                }
+
+                TaskAssignmentManager.updateCreepState(creep);
+                TaskAssignmentManager.assignTask(creep, roomState);
+            } catch (err) {
+                console.log(`[ERROR] TaskAssignmentManager crashed for creep ${creepName}: ${err.message}\n${err.stack}`);
+            }
         }
     }
 

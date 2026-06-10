@@ -27,6 +27,11 @@ class RoomPlanner {
         if (Game.cpu.bucket <= 500) return;
         // if (Game.time % 50 !== 0) return; // Temporarily disabled for debugging
         if (!global.Cache) global.Cache = { blueprints: new Map() };
+        if (global.Cache.blueprintVersion !== 3) {
+            global.Cache.blueprints.clear();
+            global.Cache.blueprintVersion = 3;
+            for (const name in Game.rooms) delete Game.rooms[name].memory.plannedRcl;
+        }
         if (!(global.Cache.blueprints instanceof Map)) global.Cache.blueprints = new Map();
         for (const roomName in Game.rooms) {
             const room = Game.rooms[roomName];
@@ -277,7 +282,7 @@ class RoomPlanner {
             visited[key] = 1;
             
             if (type === 'road') blueprint.roads.push({ x, y });
-            else if (type === 'container') blueprint.containers.push({ x, y });
+            else if (type === 'container') blueprint.containers.push({ x, y, intent: 'core' });
             else blueprint[type].push({ x, y });
         }
         return { x: ax, y: ay };
@@ -528,15 +533,15 @@ class RoomPlanner {
         const sources = state.sources || [];
         for (let i = 0; i < sources.length; i++) {
             const tile = this.findBestAdjacentTile(sources[i].pos, ref, terrain, room.name, 1, distanceMap);
-            if (tile) { blueprint.containers.push(tile); visited[tile.x * 50 + tile.y] = 1; }
+            if (tile) { tile.intent = 'source'; blueprint.containers.push(tile); visited[tile.x * 50 + tile.y] = 1; }
         }
         if (state.controller) {
             const tile = this.findBestAdjacentTile(state.controller.pos, ref, terrain, room.name, 2, distanceMap);
-            if (tile) { blueprint.containers.push(tile); visited[tile.x * 50 + tile.y] = 1; }
+            if (tile) { tile.intent = 'controller'; blueprint.containers.push(tile); visited[tile.x * 50 + tile.y] = 1; }
         }
         if (state.mineral) {
             const tile = this.findBestAdjacentTile(state.mineral.pos, ref, terrain, room.name, 1, distanceMap);
-            if (tile) { blueprint.containers.push(tile); visited[tile.x * 50 + tile.y] = 1; }
+            if (tile) { tile.intent = 'mineral'; blueprint.containers.push(tile); visited[tile.x * 50 + tile.y] = 1; }
         }
     }
 
@@ -746,6 +751,11 @@ class RoomPlanner {
             rampartSet[blueprint.ramparts[i].x * 50 + blueprint.ramparts[i].y] = 1;
         }
 
+        const roadSet = new Uint8Array(2500);
+        for (let i = 0; i < blueprint.roads.length; i++) {
+            roadSet[blueprint.roads[i].x * 50 + blueprint.roads[i].y] = 1;
+        }
+
         const inside = new Uint8Array(2500);
         inside[anchor.x * 50 + anchor.y] = 1;
         let q = [{ x: anchor.x, y: anchor.y }];
@@ -792,8 +802,23 @@ class RoomPlanner {
             for (let y = 3; y <= 46; y++) {
                 const key = x * 50 + y;
                 // Decentralizes tower placement to maximize perimeter defensive coverage
-                if (inside[key] && !visited[key] && distFromEdge[key] > 0 && distFromEdge[key] < 9999) {
-                    candidates.push({ x, y, dist: distFromEdge[key] });
+                if (inside[key] && !visited[key] && !roadSet[key] && distFromEdge[key] > 0 && distFromEdge[key] < 9999) {
+                    // Ensure the tower is physically accessible by requiring it to be adjacent to a road
+                    let adjRoad = false;
+                    for (let dx = -1; dx <= 1; dx++) {
+                        for (let dy = -1; dy <= 1; dy++) {
+                            if (dx === 0 && dy === 0) continue;
+                            const nx = x + dx, ny = y + dy;
+                            if (nx >= 0 && nx < 50 && ny >= 0 && ny < 50 && roadSet[nx * 50 + ny]) {
+                                adjRoad = true;
+                                break;
+                            }
+                        }
+                        if (adjRoad) break;
+                    }
+                    if (adjRoad) {
+                        candidates.push({ x, y, dist: distFromEdge[key] });
+                    }
                 }
             }
         }

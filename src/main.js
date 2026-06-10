@@ -17,6 +17,7 @@ const ConstructionManager = require('./managers/ConstructionManager');
 const ScoutingManager = require('./managers/ScoutingManager');
 const LinkManager = require('./managers/LinkManager');
 const InfrastructureManager = require('./managers/InfrastructureManager');
+const TowerManager = require('./managers/TowerManager');
 
 const { ProfilerUtility, Logger, ErrorHandlingUtility, StressTestUtility } = require('./lib/SystemLib');
 
@@ -81,6 +82,9 @@ module.exports.loop = function () {
 
     // 7. Traffic Management (resolves collisions and executes bulk move API calls)
     ErrorHandlingUtility.wrap(() => TrafficManager.run(), 'TrafficManager')();
+
+    // 8. Tower Management (Defense, Healing, and Repair)
+    ErrorHandlingUtility.wrap(() => TowerManager.run(), 'TowerManager')();
 
     // Profiler Reporting
     ProfilerUtility.report();

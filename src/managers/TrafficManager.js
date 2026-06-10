@@ -48,123 +48,131 @@ class TrafficManager {
         // Pass 1: Global Path Generation & Collection
         for (const creepName in Game.creeps) {
             const creep = Game.creeps[creepName];
-            if (creep.spawning) continue;
-            
-            if (creep.fatigue > 0) {
-                TrafficManager.addCreepToRoom(creepsByRoom, creep);
-                continue;
-            }
-
-            const heap = creep.heap;
-            if (!heap || (!heap.destination && (!heap.fleeGoals || heap.fleeGoals.length === 0))) {
-                if (heap && heap.path) heap.path = null;
-                TrafficManager.addCreepToRoom(creepsByRoom, creep);
-                continue;
-            }
-
-            const dest = heap.destination;
-            
-            // Check if arrived
-            if (dest && creep.room.name === dest.roomName) {
-                const range = Math.max(Math.abs(creep.pos.x - dest.x), Math.abs(creep.pos.y - dest.y));
-                const destRange = dest.range !== undefined ? dest.range : 1;
-                if (range <= destRange) {
-                    heap.destination = null;
-                    heap.path = null;
-                    TrafficManager.addCreepToRoom(creepsByRoom, creep);
-                    continue;
-                }
-            }
-
-            // Stall detection
-            if (!heap.lastPos) heap.lastPos = { x: -1, y: -1, roomName: '' };
-            if (heap.lastPos.x === creep.pos.x && heap.lastPos.y === creep.pos.y && heap.lastPos.roomName === creep.room.name) {
-                heap.stallCount = (heap.stallCount || 0) + 1;
-            } else {
-                heap.stallCount = 0;
-                heap.lastPos.x = creep.pos.x;
-                heap.lastPos.y = creep.pos.y;
-                heap.lastPos.roomName = creep.room.name;
-            }
-
-            // Advance path if creep successfully moved to the first step
-            if (heap.path) {
-                if (heap.pathIndex === undefined) heap.pathIndex = 0;
-                while (heap.pathIndex < heap.path.length) {
-                    const step = heap.path[heap.pathIndex];
-                    if (step.x === creep.pos.x && step.y === creep.pos.y && step.roomName === creep.room.name) {
-                        heap.pathIndex++;
-                    } else {
-                        break;
-                    }
-                }
-            }
-
-            // Path caching and invalidation
-            let needsPath = false;
-            if (!heap.path || heap.pathIndex >= heap.path.length) needsPath = true;
-            if (dest && heap.pathDest && (heap.pathDest.x !== dest.x || heap.pathDest.y !== dest.y || heap.pathDest.roomName !== dest.roomName)) needsPath = true;
-            if (heap.fleeGoals && heap.pathDest) needsPath = true; // Invalidate if transitioning to flee logic
-            if (heap.stallCount > 2) {
-                needsPath = true;
-                heap.stallCount = 0; // Reset after forcing recalculation
-            }
-
-            if (!needsPath && heap.stallCount > 0 && heap.path && heap.pathIndex < heap.path.length) {
-                const nextStep = heap.path[heap.pathIndex];
-                if (nextStep.roomName === creep.room.name) {
-                    const matrix = TrafficManager.getCostMatrix(creep.room.name);
-                    if (matrix.get(nextStep.x, nextStep.y) === 255) {
-                        needsPath = true;
-                        heap.stallCount = 0;
-                    }
-                }
-            }
-
-            if (needsPath) {
-                let pathResult;
+            try {
+                if (creep.spawning) continue;
                 
-                if (heap.fleeGoals && heap.fleeGoals.length > 0) {
-                    // Adds native support for multi-target fleeing intents, decoupling tactical evasion logic from low-level path caching.
-                    pathResult = PathFinder.search(creep.pos, heap.fleeGoals, {
-                        flee: true,
-                        plainCost: 2,
-                        swampCost: 10,
-                        roomCallback: TrafficManager.getCostMatrix
-                    });
-                    heap.pathDest = null;
-                } else {
-                    const targetPos = new RoomPosition(dest.x, dest.y, dest.roomName);
-                    const destRange = dest.range !== undefined ? dest.range : 1;
-                    pathResult = PathFinder.search(creep.pos, { pos: targetPos, range: destRange }, {
-                        plainCost: 2,
-                        swampCost: 10,
-                        roomCallback: TrafficManager.getCostMatrix
-                    });
-                    heap.pathDest = { x: dest.x, y: dest.y, roomName: dest.roomName };
-                }
-
-                if (pathResult.incomplete && pathResult.path.length === 0) {
-                    heap.unreachableTargetId = heap.targetId;
-                    heap.targetId = null;
-                    heap.actionIntent = 'idle';
-                    heap.destination = null;
-                    heap.path = null;
-                    if (heap.fleeGoals) heap.fleeGoals = null;
+                if (creep.fatigue > 0) {
                     TrafficManager.addCreepToRoom(creepsByRoom, creep);
                     continue;
                 }
 
-                heap.path = pathResult.path.map(p => ({ x: p.x, y: p.y, roomName: p.roomName }));
-                heap.pathIndex = 0;
-            }
+                const heap = creep.heap;
+                if (!heap || (!heap.destination && (!heap.fleeGoals || heap.fleeGoals.length === 0))) {
+                    if (heap && heap.path) heap.path = null;
+                    TrafficManager.addCreepToRoom(creepsByRoom, creep);
+                    continue;
+                }
 
-            TrafficManager.addCreepToRoom(creepsByRoom, creep);
+                const dest = heap.destination;
+                
+                // Check if arrived
+                if (dest && creep.room.name === dest.roomName) {
+                    const range = Math.max(Math.abs(creep.pos.x - dest.x), Math.abs(creep.pos.y - dest.y));
+                    const destRange = dest.range !== undefined ? dest.range : 1;
+                    if (range <= destRange) {
+                        heap.destination = null;
+                        heap.path = null;
+                        TrafficManager.addCreepToRoom(creepsByRoom, creep);
+                        continue;
+                    }
+                }
+
+                // Stall detection
+                if (!heap.lastPos) heap.lastPos = { x: -1, y: -1, roomName: '' };
+                if (heap.lastPos.x === creep.pos.x && heap.lastPos.y === creep.pos.y && heap.lastPos.roomName === creep.room.name) {
+                    heap.stallCount = (heap.stallCount || 0) + 1;
+                } else {
+                    heap.stallCount = 0;
+                    heap.lastPos.x = creep.pos.x;
+                    heap.lastPos.y = creep.pos.y;
+                    heap.lastPos.roomName = creep.room.name;
+                }
+
+                // Advance path if creep successfully moved to the first step
+                if (heap.path) {
+                    if (heap.pathIndex === undefined) heap.pathIndex = 0;
+                    while (heap.pathIndex < heap.path.length) {
+                        const step = heap.path[heap.pathIndex];
+                        if (step.x === creep.pos.x && step.y === creep.pos.y && step.roomName === creep.room.name) {
+                            heap.pathIndex++;
+                        } else {
+                            break;
+                        }
+                    }
+                }
+
+                // Path caching and invalidation
+                let needsPath = false;
+                if (!heap.path || heap.pathIndex >= heap.path.length) needsPath = true;
+                if (dest && heap.pathDest && (heap.pathDest.x !== dest.x || heap.pathDest.y !== dest.y || heap.pathDest.roomName !== dest.roomName)) needsPath = true;
+                if (heap.fleeGoals && heap.pathDest) needsPath = true; // Invalidate if transitioning to flee logic
+                if (heap.stallCount > 2) {
+                    needsPath = true;
+                    heap.stallCount = 0; // Reset after forcing recalculation
+                }
+
+                if (!needsPath && heap.stallCount > 0 && heap.path && heap.pathIndex < heap.path.length) {
+                    const nextStep = heap.path[heap.pathIndex];
+                    if (nextStep.roomName === creep.room.name) {
+                        const matrix = TrafficManager.getCostMatrix(creep.room.name);
+                        if (matrix.get(nextStep.x, nextStep.y) === 255) {
+                            needsPath = true;
+                            heap.stallCount = 0;
+                        }
+                    }
+                }
+
+                if (needsPath) {
+                    let pathResult;
+                    
+                    if (heap.fleeGoals && heap.fleeGoals.length > 0) {
+                        // Adds native support for multi-target fleeing intents, decoupling tactical evasion logic from low-level path caching.
+                        pathResult = PathFinder.search(creep.pos, heap.fleeGoals, {
+                            flee: true,
+                            plainCost: 2,
+                            swampCost: 10,
+                            roomCallback: TrafficManager.getCostMatrix
+                        });
+                        heap.pathDest = null;
+                    } else {
+                        const targetPos = new RoomPosition(dest.x, dest.y, dest.roomName);
+                        const destRange = dest.range !== undefined ? dest.range : 1;
+                        pathResult = PathFinder.search(creep.pos, { pos: targetPos, range: destRange }, {
+                            plainCost: 2,
+                            swampCost: 10,
+                            roomCallback: TrafficManager.getCostMatrix
+                        });
+                        heap.pathDest = { x: dest.x, y: dest.y, roomName: dest.roomName };
+                    }
+
+                    if (pathResult.incomplete && pathResult.path.length === 0) {
+                        heap.unreachableTargetId = heap.targetId;
+                        heap.targetId = null;
+                        heap.actionIntent = 'idle';
+                        heap.destination = null;
+                        heap.path = null;
+                        if (heap.fleeGoals) heap.fleeGoals = null;
+                        TrafficManager.addCreepToRoom(creepsByRoom, creep);
+                        continue;
+                    }
+
+                    heap.path = pathResult.path.map(p => ({ x: p.x, y: p.y, roomName: p.roomName }));
+                    heap.pathIndex = 0;
+                }
+
+                TrafficManager.addCreepToRoom(creepsByRoom, creep);
+            } catch (err) {
+                console.log(`[ERROR] TrafficManager Pass 1 crashed for creep ${creepName}: ${err.message}\n${err.stack}`);
+            }
         }
 
         // Pass 2: Per-Room DFS Traffic Resolution
         for (const [roomName, roomCreeps] of creepsByRoom) {
-            TrafficManager.resolveRoomTraffic(roomName, roomCreeps);
+            try {
+                TrafficManager.resolveRoomTraffic(roomName, roomCreeps);
+            } catch (err) {
+                console.log(`[ERROR] TrafficManager Pass 2 crashed for room ${roomName}: ${err.message}\n${err.stack}`);
+            }
         }
 
         if (Memory.debugTraffic) TrafficManager.visualize(creepsByRoom);

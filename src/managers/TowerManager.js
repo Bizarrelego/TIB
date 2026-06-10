@@ -31,6 +31,8 @@ class TowerManager {
             const room = Game.rooms[roomName];
             if (!room) continue;
 
+            let towersAvailable = [...towers];
+
             // 1.5 Emergency Maintenance: Repair critically damaged ramparts/walls (< 10,000 HP) immediately
             let emergencyTarget = null;
             if (roomState.repairTargets && roomState.repairTargets.length > 0) {
@@ -44,8 +46,8 @@ class TowerManager {
                 }
             }
             if (emergencyTarget) {
-                for (let i = 0; i < towers.length; i++) {
-                    towers[i].repair(emergencyTarget);
+                for (let i = 0; i < towersAvailable.length; i++) {
+                    towersAvailable[i].repair(emergencyTarget);
                 }
                 continue; // Towers are busy with emergency repair
             }
@@ -61,26 +63,36 @@ class TowerManager {
                     }
                 }
             }
-            if (damagedTarget) {
-                for (let i = 0; i < towers.length; i++) {
-                    towers[i].heal(damagedTarget);
-                }
-                continue; // Towers are busy healing
+            
+            if (damagedTarget && towersAvailable.length > 0) {
+                // One tower is usually enough to heal a creep unless it's under heavy fire, prevents energy drain overkill
+                const healer = towersAvailable.shift();
+                healer.heal(damagedTarget);
             }
 
-            // 3. Maintenance: Repair critical structures and ramparts
-            for (let i = 0; i < towers.length; i++) {
-                const tower = towers[i];
-                // Only repair if energy is > 50% to reserve for defense
-                if (tower.store.getUsedCapacity(RESOURCE_ENERGY) < 500) continue;
+            if (towersAvailable.length === 0) continue;
 
-                if (roomState.repairTargets && roomState.repairTargets.length > 0) {
-                    // Find lowest hit structure from pre-scanned repair targets
-                    let target = roomState.repairTargets[0];
-                    for (let j = 1; j < roomState.repairTargets.length; j++) {
-                        if (roomState.repairTargets[j].hits < target.hits) target = roomState.repairTargets[j];
-                    }
+            // 3. Maintenance: Repair critical structures and ramparts
+            if (roomState.repairTargets && roomState.repairTargets.length > 0) {
+                // Sort by lowest health
+                roomState.repairTargets.sort((a, b) => a.hits - b.hits);
+                let targetIdx = 0;
+
+                for (let i = 0; i < towersAvailable.length; i++) {
+                    const tower = towersAvailable[i];
+                    // Only repair if energy is > 50% to reserve for defense
+                    if (tower.store.getUsedCapacity(RESOURCE_ENERGY) < 500) continue;
+
+                    const target = roomState.repairTargets[targetIdx];
+                    if (!target) break;
+
                     tower.repair(target);
+                    
+                    // Optimization: If target is a wall/rampart, keep hitting it with multiple towers.
+                    // If it's a road/container, assign 1 tower per target to prevent massive energy overkill.
+                    if (target.structureType !== STRUCTURE_WALL && target.structureType !== STRUCTURE_RAMPART) {
+                        targetIdx++;
+                    }
                 }
             }
         }

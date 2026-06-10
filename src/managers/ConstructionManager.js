@@ -70,7 +70,18 @@ class ConstructionManager {
             let positions = [];
 
             if (structureType === STRUCTURE_CONTAINER) {
-                positions = blueprint.containers || [];
+                const rawPositions = blueprint.containers || [];
+                positions = [];
+                for (let i = 0; i < rawPositions.length; i++) {
+                    const pos = rawPositions[i];
+                    // Core (fast filler) containers are gated until RCL 4
+                    if (pos.intent === 'core' && rcl < 4) continue;
+                    // Source containers are gated until RCL 3
+                    if (pos.intent === 'source' && rcl < 3) continue;
+                    // Mineral containers are gated until RCL 6
+                    if (pos.intent === 'mineral' && rcl < 6) continue;
+                    positions.push(pos);
+                }
             } else if (structureType === STRUCTURE_ROAD) {
                 positions = blueprint.roads || [];
             } else if (structureType === STRUCTURE_RAMPART) {
@@ -82,7 +93,8 @@ class ConstructionManager {
             if (!positions || positions.length === 0) continue;
 
             const maxAllowed = CONTROLLER_STRUCTURES[structureType] ? CONTROLLER_STRUCTURES[structureType][rcl] : 0;
-            if (maxAllowed === 0) continue;
+            // Note: maxAllowed for containers is always 5 (even at RCL 1) in the engine, but we want our custom RCL logic to govern them
+            if (maxAllowed === 0 && structureType !== STRUCTURE_CONTAINER) continue;
 
             let count = 0;
             if (state.structureIds) {
