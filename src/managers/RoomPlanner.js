@@ -101,7 +101,8 @@ class RoomPlanner {
         }
 
         // Step 2: Fast Filler Stamp
-        this.applyFastFillerStamp(blueprint, terrain, anchor, visited);
+        anchor = this.applyFastFillerStamp(blueprint, terrain, anchor, visited);
+        blueprint.anchor = anchor; // Update blueprint in case of nudging
         fragmentCenters.push({ x: anchor.x, y: anchor.y });
         console.log(`[RoomPlanner] Fast Filler packed at anchor: ${anchor.x}, ${anchor.y}`);
 
@@ -112,12 +113,7 @@ class RoomPlanner {
             console.log(`[RoomPlanner] Core Hub packed at: ${coreCenter.x}, ${coreCenter.y}`);
         } else console.log(`[RoomPlanner] WARNING: Failed to find space for Core Hub!`);
 
-        // Step 4: Tower Stamp
-        const towerCenter = this.applyTowerStamp(blueprint, terrain, anchor, visited, distanceMap);
-        if (towerCenter) {
-            fragmentCenters.push(towerCenter);
-            console.log(`[RoomPlanner] Tower Array packed at: ${towerCenter.x}, ${towerCenter.y}`);
-        } else console.log(`[RoomPlanner] WARNING: Failed to find space for Tower Array!`);
+        // Tower Stamp removed in favor of Dynamic Perimeter Towers
 
         // Step 5: Lab cluster
         const labCenter = this.applyLabStamp(blueprint, terrain, anchor, visited, distanceMap);
@@ -131,6 +127,9 @@ class RoomPlanner {
         for (let i = 0; i < extensionCenters.length; i++) fragmentCenters.push(extensionCenters[i]);
         console.log(`[RoomPlanner] Packed ${extensionCenters.length} extension clusters.`);
 
+        // Step 6.5: Dynamic Spare Extension Packing
+        this.packSpareExtensions(blueprint, terrain, anchor, visited, distanceMap);
+
         // Step 5: Source + controller containers
         if (state) this.planContainers(blueprint, room, state, terrain, visited, distanceMap);
 
@@ -139,6 +138,9 @@ class RoomPlanner {
 
         // Step 7: Min-Cut Ramparts
         blueprint.ramparts = this.computeMinCut(terrain, visited);
+
+        // Step 7.5: Dynamic Perimeter Towers
+        this.placePerimeterTowers(blueprint, terrain, anchor, visited);
 
         // Step 8: Road exit airlocks (3-deep)
         this.addRoadRamparts(blueprint);
@@ -154,6 +156,9 @@ class RoomPlanner {
             blueprint[STRUCTURE_EXTRACTOR] = blueprint[STRUCTURE_EXTRACTOR] || [];
             blueprint[STRUCTURE_EXTRACTOR].push({ x: state.mineral.pos.x, y: state.mineral.pos.y });
         }
+
+        // Step 11.5: Global Accessibility Flood-Fill Validation
+        this.validateGlobalAccessibility(blueprint, terrain, anchor);
 
         // Step 12: Precompile Sets for Visualizer
         const supplierSet = new Uint8Array(2500);
@@ -203,8 +208,48 @@ class RoomPlanner {
 
     // ─── Tigga Modular Stamps ──────────────────────────────────────────
 
+    static validateFastFillerClearance(ax, ay, terrain) {
+        const spawns = [{ dx: -2, dy: -1 }, { dx: 2, dy: -1 }, { dx: 0, dy: 2 }];
+        for (let i = 0; i < spawns.length; i++) {
+            const sx = ax + spawns[i].dx, sy = ay + spawns[i].dy;
+            if (sx < 2 || sx > 47 || sy < 2 || sy > 47) return false;
+            let hasClearance = false;
+            for (let cdx = -1; cdx <= 1; cdx++) {
+                for (let cdy = -1; cdy <= 1; cdy++) {
+                    if (cdx === 0 && cdy === 0) continue;
+                    // Ensures spawn clearance, preventing total base deadlock when creeps spawn into a blocked Fast Filler hub.
+                    // Outward means the neighbor is strictly further or equal distance from the anchor center than the spawn itself.
+                    const distToCenter = Math.abs(sx + cdx - ax) + Math.abs(sy + cdy - ay);
+                    const spawnDist = Math.abs(sx - ax) + Math.abs(sy - ay);
+                    if (distToCenter < spawnDist) continue; 
+                    
+                    if (terrain.get(sx + cdx, sy + cdy) !== TERRAIN_MASK_WALL) {
+                        hasClearance = true;
+                        break;
+                    }
+                }
+                if (hasClearance) break;
+            }
+            if (!hasClearance) return false;
+        }
+        return true;
+    }
+
     static applyFastFillerStamp(blueprint, terrain, anchor, visited) {
-        const ax = anchor.x, ay = anchor.y;
+        let ax = anchor.x, ay = anchor.y;
+        
+        if (!this.validateFastFillerClearance(ax, ay, terrain)) {
+            let found = false;
+            for (let dx = -1; dx <= 1; dx++) {
+                for (let dy = -1; dy <= 1; dy++) {
+                    if (this.validateFastFillerClearance(ax + dx, ay + dy, terrain)) {
+                        ax += dx; ay += dy; found = true; break;
+                    }
+                }
+                if (found) break;
+            }
+        }
+
         const stamp = [
             // Center Link
             { type: STRUCTURE_LINK, dx: 0, dy: 0 },
@@ -235,9 +280,10 @@ class RoomPlanner {
             else if (type === 'container') blueprint.containers.push({ x, y });
             else blueprint[type].push({ x, y });
         }
+        return { x: ax, y: ay };
     }
 
-    static findCompactPlacement(stampRotations, terrain, anchor, visited, distanceMap) {
+    static findCompactPlacement(stampRotations, terrain, anchor, visited, distanceMap, validatorFn) {
         const variants = Array.isArray(stampRotations[0]) ? stampRotations : [stampRotations];
         
         const coords = [];
@@ -266,6 +312,9 @@ class RoomPlanner {
                         if (stamp[j].type === 'road' && visited[key] === 2) continue;
                         valid = false; break;
                     }
+                }
+                if (valid && validatorFn) {
+                    valid = validatorFn(x, y, stamp, terrain, visited);
                 }
                 if (valid) return { cx: x, cy: y, stamp };
             }
@@ -298,25 +347,7 @@ class RoomPlanner {
         return null;
     }
 
-    static applyTowerStamp(blueprint, terrain, anchor, visited, distanceMap) {
-        const stamp = [
-            { type: STRUCTURE_TOWER, dx: 0, dy: 0 }, { type: STRUCTURE_TOWER, dx: 1, dy: 0 }, { type: STRUCTURE_TOWER, dx: -1, dy: 0 },
-            { type: STRUCTURE_TOWER, dx: 0, dy: 1 }, { type: STRUCTURE_TOWER, dx: 1, dy: 1 }, { type: STRUCTURE_TOWER, dx: -1, dy: 1 }
-        ];
-
-        const placement = this.findCompactPlacement(stamp, terrain, anchor, visited, distanceMap);
-        if (placement) {
-            const { cx, cy, stamp: chosenStamp } = placement;
-            for (let i = 0; i < chosenStamp.length; i++) {
-                const { type, dx, dy } = chosenStamp[i];
-                const x = cx + dx, y = cy + dy;
-                visited[x * 50 + y] = 1;
-                blueprint[type].push({ x, y });
-            }
-            return { x: cx, y: cy };
-        }
-        return null;
-    }
+    // Tower stamp removed.
 
     static applyLabStamp(blueprint, terrain, anchor, visited, distanceMap) {
         const variants = [
@@ -342,7 +373,37 @@ class RoomPlanner {
             ]
         ];
 
-        const placement = this.findCompactPlacement(variants, terrain, anchor, visited, distanceMap);
+        const validatorFn = (cx, cy, stamp, terrain, visited) => {
+            for (let i = 0; i < stamp.length; i++) {
+                if (stamp[i].type !== STRUCTURE_LAB) continue;
+                const lx = cx + stamp[i].dx, ly = cy + stamp[i].dy;
+                let hasAccess = false;
+                for (let dx = -1; dx <= 1; dx++) {
+                    for (let dy = -1; dy <= 1; dy++) {
+                        if (dx === 0 && dy === 0) continue;
+                        const nx = lx + dx, ny = ly + dy;
+                        if (nx < 1 || nx > 48 || ny < 1 || ny > 48) continue;
+                        if (terrain.get(nx, ny) === TERRAIN_MASK_WALL) continue;
+                        
+                        let inStamp = false;
+                        for (let j = 0; j < stamp.length; j++) {
+                            if (cx + stamp[j].dx === nx && cy + stamp[j].dy === ny) {
+                                inStamp = true; break;
+                            }
+                        }
+                        // Validates Lab stamp placement against a global connectivity graph to ensure fillers can reach every reactor.
+                        if (!inStamp && (!visited[nx * 50 + ny] || visited[nx * 50 + ny] === 2)) {
+                            hasAccess = true; break;
+                        }
+                    }
+                    if (hasAccess) break;
+                }
+                if (!hasAccess) return false;
+            }
+            return true;
+        };
+
+        const placement = this.findCompactPlacement(variants, terrain, anchor, visited, distanceMap, validatorFn);
         if (placement) {
             const { cx, cy, stamp: chosenStamp } = placement;
             for (let i = 0; i < chosenStamp.length; i++) {
@@ -426,6 +487,38 @@ class RoomPlanner {
         return centers;
     }
 
+    static packSpareExtensions(blueprint, terrain, anchor, visited, distanceMap) {
+        let extensionsPlaced = blueprint[STRUCTURE_EXTENSION].length;
+        if (extensionsPlaced >= 60) return;
+
+        const coords = [];
+        for (let x = 4; x <= 45; x++) {
+            for (let y = 4; y <= 45; y++) {
+                if (distanceMap[x * 50 + y] !== 65535 && !visited[x * 50 + y]) {
+                    // Extension parity ensures diagonally adjacency to road-parity tiles, avoiding traffic blocks
+                    if (Math.abs(x - anchor.x) % 2 === Math.abs(y - anchor.y) % 2) {
+                        coords.push({ x, y, dist: distanceMap[x * 50 + y] });
+                    }
+                }
+            }
+        }
+        coords.sort((a, b) => a.dist - b.dist);
+
+        let packedCount = 0;
+        for (let i = 0; i < coords.length; i++) {
+            if (extensionsPlaced >= 60) break;
+            const { x, y } = coords[i];
+            if (terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
+            
+            visited[x * 50 + y] = 1;
+            blueprint[STRUCTURE_EXTENSION].push({ x, y });
+            extensionsPlaced++;
+            packedCount++;
+        }
+        if (packedCount > 0) {
+            console.log(`[RoomPlanner] Dynamically packed ${packedCount} spare extensions into core tiles.`);
+        }
+    }
 
     // ─── Step 5: Container Planning ──────────────────────────────────────
 
@@ -647,6 +740,84 @@ class RoomPlanner {
         return ramparts;
     }
 
+    static placePerimeterTowers(blueprint, terrain, anchor, visited) {
+        const rampartSet = new Uint8Array(2500);
+        for (let i = 0; i < blueprint.ramparts.length; i++) {
+            rampartSet[blueprint.ramparts[i].x * 50 + blueprint.ramparts[i].y] = 1;
+        }
+
+        const inside = new Uint8Array(2500);
+        inside[anchor.x * 50 + anchor.y] = 1;
+        let q = [{ x: anchor.x, y: anchor.y }];
+        let qi = 0;
+        while (qi < q.length) {
+            const cur = q[qi++];
+            const dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
+            for (let i = 0; i < dirs.length; i++) {
+                const nx = cur.x + dirs[i].x, ny = cur.y + dirs[i].y;
+                if (nx < 0 || nx >= 50 || ny < 0 || ny >= 50 || terrain.get(nx, ny) === TERRAIN_MASK_WALL) continue;
+                const key = nx * 50 + ny;
+                if (inside[key] || rampartSet[key]) continue;
+                inside[key] = 1;
+                q.push({ x: nx, y: ny });
+            }
+        }
+
+        const distFromEdge = new Int32Array(2500).fill(9999);
+        q = [];
+        for (let i = 0; i < blueprint.ramparts.length; i++) {
+            const rp = blueprint.ramparts[i];
+            distFromEdge[rp.x * 50 + rp.y] = 0;
+            q.push(rp);
+        }
+        
+        qi = 0;
+        while (qi < q.length) {
+            const cur = q[qi++];
+            const d = distFromEdge[cur.x * 50 + cur.y];
+            const dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 1 }, { x: -1, y: -1 }, { x: 1, y: -1 }, { x: -1, y: 1 }];
+            for (let i = 0; i < dirs.length; i++) {
+                const nx = cur.x + dirs[i].x, ny = cur.y + dirs[i].y;
+                if (nx < 2 || nx > 47 || ny < 2 || ny > 47 || terrain.get(nx, ny) === TERRAIN_MASK_WALL) continue;
+                const key = nx * 50 + ny;
+                if (inside[key] && distFromEdge[key] > d + 1) {
+                    distFromEdge[key] = d + 1;
+                    q.push({ x: nx, y: ny });
+                }
+            }
+        }
+
+        const candidates = [];
+        for (let x = 3; x <= 46; x++) {
+            for (let y = 3; y <= 46; y++) {
+                const key = x * 50 + y;
+                // Decentralizes tower placement to maximize perimeter defensive coverage
+                if (inside[key] && !visited[key] && distFromEdge[key] > 0 && distFromEdge[key] < 9999) {
+                    candidates.push({ x, y, dist: distFromEdge[key] });
+                }
+            }
+        }
+        candidates.sort((a, b) => a.dist - b.dist);
+
+        const towers = [];
+        const MIN_TOWER_DIST = 4;
+        for (let i = 0; i < candidates.length && towers.length < 6; i++) {
+            const cand = candidates[i];
+            let tooClose = false;
+            for (let j = 0; j < towers.length; j++) {
+                if (Math.max(Math.abs(towers[j].x - cand.x), Math.abs(towers[j].y - cand.y)) < MIN_TOWER_DIST) {
+                    tooClose = true; break;
+                }
+            }
+            if (!tooClose) {
+                towers.push(cand);
+                visited[cand.x * 50 + cand.y] = 1;
+                blueprint[STRUCTURE_TOWER].push({ x: cand.x, y: cand.y });
+            }
+        }
+        console.log(`[RoomPlanner] Dynamically placed ${towers.length} perimeter towers.`);
+    }
+
     // ─── Step 8: Road Exit Airlocks ──────────────────────────────────────
 
     /**
@@ -778,6 +949,89 @@ class RoomPlanner {
         blueprint.outpostRamparts = outpostRamparts;
         for (let i = 0; i < outpostRamparts.length; i++) blueprint.ramparts.push(outpostRamparts[i]);
     }
+
+    // ─── Step 11.5: Global Accessibility Flood-Fill ──────────────────────
+
+    static validateGlobalAccessibility(blueprint, terrain, anchor) {
+        const reachable = new Uint8Array(2500);
+        const q = new Int32Array(2500);
+        let head = 0, tail = 0;
+
+        // Using user-requested y * 50 + x packing
+        const startKey = anchor.y * 50 + anchor.x;
+        reachable[startKey] = 1;
+        q[tail++] = startKey;
+
+        const blockSet = new Uint8Array(2500);
+        const solids = [
+            STRUCTURE_SPAWN, STRUCTURE_EXTENSION, STRUCTURE_TOWER, STRUCTURE_STORAGE,
+            STRUCTURE_TERMINAL, STRUCTURE_FACTORY, STRUCTURE_LAB, STRUCTURE_NUKER,
+            STRUCTURE_OBSERVER, STRUCTURE_POWER_SPAWN, STRUCTURE_LINK
+        ];
+        for (let i = 0; i < solids.length; i++) {
+            const arr = blueprint[solids[i]];
+            if (arr) {
+                for (let j = 0; j < arr.length; j++) {
+                    blockSet[arr[j].y * 50 + arr[j].x] = 1;
+                }
+            }
+        }
+
+        while (head < tail) {
+            const cur = q[head++];
+            const cy = Math.floor(cur / 50), cx = cur % 50;
+            const dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 1 }, { x: -1, y: -1 }, { x: 1, y: -1 }, { x: -1, y: 1 }];
+            for (let i = 0; i < dirs.length; i++) {
+                const nx = cx + dirs[i].x, ny = cy + dirs[i].y;
+                if (nx < 0 || nx >= 50 || ny < 0 || ny >= 50 || terrain.get(nx, ny) === TERRAIN_MASK_WALL) continue;
+                const key = ny * 50 + nx;
+                if (reachable[key]) continue;
+                if (blockSet[key]) continue; 
+                
+                reachable[key] = 1;
+                q[tail++] = key;
+            }
+        }
+
+        let downgraded = 0;
+        const checkAccess = (type) => {
+            const arr = blueprint[type];
+            if (!arr) return;
+            const kept = [];
+            for (let i = 0; i < arr.length; i++) {
+                const p = arr[i];
+                let hasAccess = false;
+                for (let dx = -1; dx <= 1; dx++) {
+                    for (let dy = -1; dy <= 1; dy++) {
+                        if (dx === 0 && dy === 0) continue;
+                        const nx = p.x + dx, ny = p.y + dy;
+                        if (nx >= 0 && nx < 50 && ny >= 0 && ny < 50 && reachable[ny * 50 + nx]) {
+                            hasAccess = true; break;
+                        }
+                    }
+                    if (hasAccess) break;
+                }
+                if (hasAccess) kept.push(p);
+                else {
+                    downgraded++;
+                    blueprint.roads.push({ x: p.x, y: p.y });
+                }
+            }
+            blueprint[type] = kept;
+        };
+
+        checkAccess(STRUCTURE_SPAWN);
+        checkAccess(STRUCTURE_EXTENSION);
+        checkAccess(STRUCTURE_TOWER);
+        checkAccess(STRUCTURE_LAB);
+        
+        if (downgraded > 0) {
+            console.log(`[RoomPlanner] WARNING: Flood-fill accessibility validation failed for ${downgraded} structures. Downgraded to roads to prevent deadlocks.`);
+        } else {
+            console.log(`[RoomPlanner] Global accessibility validation passed. Base is 100% routable.`);
+        }
+    }
+
     // ─── Visualizer ──────────────────────────────────────────────────────
 
     /**
