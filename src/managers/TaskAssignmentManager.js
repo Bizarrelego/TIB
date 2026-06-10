@@ -134,6 +134,7 @@ class TaskAssignmentManager {
         else if (role === 'bootstrapper') TaskAssignmentManager.assignBootstrapper(creep, roomState);
         else if (role === 'upgrader') UpgradeAssignmentModule.assignUpgrader(creep, roomState);
         else if (role === 'filler') TaskAssignmentManager.assignFiller(creep, roomState);
+        else if (role === 'fastfiller') TaskAssignmentManager.assignFastFiller(creep, roomState);
         else if (role === 'remoteharvester') TaskAssignmentManager.assignRemoteHarvester(creep, roomState);
         else if (role === 'remotehauler') TaskAssignmentManager.assignRemoteHauler(creep, roomState);
         else if (role === 'repairman') TaskAssignmentManager.assignRepairman(creep, roomState);
@@ -486,6 +487,106 @@ class TaskAssignmentManager {
                 return;
             }
             TaskAssignmentManager.assignHaulerWork(creep, homeState);
+        }
+    }
+
+    static assignFastFiller(creep, roomState) {
+        const blueprint = global.Cache?.blueprints?.get(creep.room.name);
+        if (!blueprint || !blueprint.anchor) {
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            return;
+        }
+
+        const ax = blueprint.anchor.x;
+        const ay = blueprint.anchor.y;
+
+        const stands = [
+            { x: ax - 1, y: ay - 1 },
+            { x: ax + 1, y: ay - 1 },
+            { x: ax - 1, y: ay + 1 },
+            { x: ax + 1, y: ay + 1 }
+        ];
+
+        if (!creep.heap.sitTargetId) {
+            let bestStand = null;
+            for (let i = 0; i < stands.length; i++) {
+                const s = stands[i];
+                let occupied = false;
+                for (const name in Game.creeps) {
+                    const other = Game.creeps[name];
+                    if (other.id === creep.id) continue;
+                    if (other.memory.role === 'fastfiller' && other.heap && other.heap.sitPos) {
+                        if (other.heap.sitPos.x === s.x && other.heap.sitPos.y === s.y) occupied = true;
+                    }
+                }
+                if (!occupied) {
+                    bestStand = s;
+                    break;
+                }
+            }
+            if (bestStand) {
+                creep.heap.sitPos = bestStand;
+                creep.heap.sitTargetId = 'stand_' + bestStand.x + '_' + bestStand.y;
+            }
+        }
+
+        if (creep.heap.sitPos) {
+            if (creep.pos.x !== creep.heap.sitPos.x || creep.pos.y !== creep.heap.sitPos.y) {
+                creep.heap.destination = { x: creep.heap.sitPos.x, y: creep.heap.sitPos.y, roomName: creep.room.name, range: 0 };
+                creep.heap.actionIntent = ActionConstants.ACTION_MOVE;
+                return;
+            }
+        }
+
+        if (creep.heap.state === 'gather') {
+            let energySource = null;
+            if (roomState.links) {
+                for (let i = 0; i < roomState.linkCount; i++) {
+                    const l = roomState.links[i];
+                    if (l.pos.x === ax && l.pos.y === ay && l.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                        energySource = l; break;
+                    }
+                }
+            }
+            if (!energySource && roomState.containers) {
+                for (let i = 0; i < roomState.containerCount; i++) {
+                    const c = roomState.containers[i];
+                    if ((c.pos.x === ax - 2 || c.pos.x === ax + 2) && c.pos.y === ay && c.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                        energySource = c; break;
+                    }
+                }
+            }
+            if (energySource) {
+                creep.heap.targetId = energySource.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
+            } else {
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            }
+        } else {
+            let target = null;
+            if (roomState.spawns) {
+                for (let i = 0; i < roomState.spawnCount; i++) {
+                    const s = roomState.spawns[i];
+                    if (s.store.getFreeCapacity(RESOURCE_ENERGY) > 0 && creep.pos.isNearTo(s)) {
+                        target = s; break;
+                    }
+                }
+            }
+            if (!target && roomState.extensions) {
+                for (let i = 0; i < roomState.extensionCount; i++) {
+                    const e = roomState.extensions[i];
+                    if (e.store.getFreeCapacity(RESOURCE_ENERGY) > 0 && creep.pos.isNearTo(e)) {
+                        target = e; break;
+                    }
+                }
+            }
+            
+            if (target) {
+                creep.heap.targetId = target.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
+            } else {
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            }
         }
     }
 

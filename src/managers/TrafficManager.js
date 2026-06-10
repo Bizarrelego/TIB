@@ -5,6 +5,7 @@ const ROLE_PRIORITY = {
     'defender': 10,
     'harvester': 8,
     'upgrader': 8,
+    'fastfiller': 7,
     'bootstrapper': 6,
     'filler': 6,
     'hauler': 5,
@@ -294,7 +295,7 @@ class TrafficManager {
 
         // Prevents economic collapse by anchoring stationary creeps against high-priority displacement.
         const blockerRole = (blocker.memory.role || '').toLowerCase();
-        if (blockerRole === 'harvester' || blockerRole === 'upgrader') {
+        if (blockerRole === 'harvester' || blockerRole === 'upgrader' || blockerRole === 'fastfiller') {
             if (blocker.heap && blocker.heap.sitTargetId) {
                 const sitTarget = Game.getObjectById(blocker.heap.sitTargetId);
                 if (sitTarget && blocker.pos.isEqualTo(sitTarget)) return false;

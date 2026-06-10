@@ -4,13 +4,19 @@ const EMERGENCY_BODY = [WORK, CARRY, MOVE];
 class CreepBodyBuilder {
     static getBody(role, energyCapacity) {
         energyCapacity = energyCapacity || 300;
-        
+
         switch (role) {
             case 'harvester': return this.generateHarvester(energyCapacity);
             case 'hauler': return this.generateHauler(energyCapacity);
             case 'upgrader': return this.generateUpgrader(energyCapacity);
             case 'builder': return this.generateBuilder(energyCapacity);
             case 'bootstrapper': return [WORK, CARRY, MOVE];
+            case 'fastfiller': {
+                let carry = 1;
+                let cost = 100;
+                while (cost + 50 <= energyCapacity && carry < 4) { carry++; cost += 50; }
+                return this.buildArray(0, carry, 1);
+            }
             case 'filler': return this.generateHauler(energyCapacity);
             case 'remoteharvester': return this.generateHarvester(energyCapacity);
             case 'remotehauler': return this.generateHauler(energyCapacity);
@@ -134,7 +140,7 @@ class CensusCalculator {
         return {
             1: { harvester: 2, hauler: 4, upgrader: 3, builder: 0 },
             2: { harvester: 2, hauler: 4, upgrader: 4, builder: 3 },
-            3: { harvester: 2, hauler: 3, upgrader: 5, builder: 3 },
+            3: { harvester: 2, hauler: 3, upgrader: 4, builder: 3 },
             4: { harvester: 2, hauler: 2, upgrader: 4, builder: 2 },
             5: { harvester: 2, hauler: 2, upgrader: 4, builder: 2 },
             6: { harvester: 2, hauler: 2, upgrader: 4, builder: 2 },
@@ -169,6 +175,10 @@ class CensusCalculator {
             if (roomState.storage && roomState.storage.my) {
                 limits.filler = 1;
                 limits.repairman = 1;
+
+                if (roomState.extensionsCount && roomState.extensionsCount >= 5) {
+                    limits.fastfiller = Math.min(4, Math.floor(roomState.extensionsCount / 5));
+                }
 
                 const storageEnergy = roomState.storage.store.getUsedCapacity(RESOURCE_ENERGY);
                 if (storageEnergy < 50000) {
@@ -221,14 +231,14 @@ class CensusCalculator {
         let needsScout = false;
         // Initiates passive intel ingestion at RCL 2 to prepare for early remote expansion.
         if (rcl >= 2 && roomName) {
-            const queue = [{name: roomName, depth: 0}];
+            const queue = [{ name: roomName, depth: 0 }];
             let qIdx = 0;
             const visited = new Set([roomName]);
             const threshold = 10000;
 
             while (qIdx < queue.length) {
                 const current = queue[qIdx++];
-                
+
                 const mem = Memory.rooms && Memory.rooms[current.name];
                 if (!mem || !mem.scoutedAt || (Game.time - mem.scoutedAt) > threshold) {
                     needsScout = true;
@@ -253,10 +263,10 @@ class CensusCalculator {
                             const x = parseInt(xStr, 10) % 10;
                             const y = parseInt(yStr, 10) % 10;
                             if ((x >= 4 && x <= 6) && (y >= 4 && y <= 6)) continue;
-                            
+
                             if (!visited.has(adjRoom)) {
                                 visited.add(adjRoom);
-                                queue.push({name: adjRoom, depth: current.depth + 1});
+                                queue.push({ name: adjRoom, depth: current.depth + 1 });
                             }
                         }
                     }
@@ -315,7 +325,7 @@ class CensusCalculator {
 class SpawnManager {
     static run(spawn) {
         if (spawn.spawning) return;
-        
+
         // Throttle declarative census diffing to save CPU
         if (Game.time % 10 !== 0) return;
 
@@ -349,7 +359,7 @@ class SpawnManager {
                 const c = Game.creeps[name];
                 if (c.memory.colony === roomName || c.memory.room === roomName) {
                     const role = c.memory.role;
-                    
+
                     // Pre-emptive spawning logic based on TTL
                     if (!c.spawning && c.ticksToLive !== undefined && c.ticksToLive < 50) {
                         continue;
@@ -397,8 +407,8 @@ class SpawnManager {
 
         // Prevents economic stalling by ensuring early-game scouts yield the spawn queue to critical energy-generating roles.
         const spawnPriority = [
-            'defender', 'filler', 'harvester', 'hauler', 'upgrader', 'scout', 'builder', 
-            'repairman', 'remoteharvester', 'remotehauler', 
+            'defender', 'filler', 'fastfiller', 'harvester', 'hauler', 'upgrader', 'scout', 'builder',
+            'repairman', 'remoteharvester', 'remotehauler',
             'meleeCreep', 'rangerCreep', 'medicCreep'
         ];
 
@@ -410,7 +420,7 @@ class SpawnManager {
             if (current < limit) {
                 const bodyParts = CreepBodyBuilder.getBody(role, energyCapacity);
                 if (!bodyParts || bodyParts.length === 0) continue;
-                
+
                 let cost = 0;
                 for (let j = 0; j < bodyParts.length; j++) {
                     cost += BODYPART_COST[bodyParts[j]];
