@@ -185,20 +185,20 @@ class RoomPlanner {
     static applyFastFillerStamp(blueprint, terrain, anchor, visited) {
         const ax = anchor.x, ay = anchor.y;
         const stamp = [
+            // Center Link
             { type: STRUCTURE_LINK, dx: 0, dy: 0 },
-            { type: STRUCTURE_SPAWN, dx: -1, dy: 0 },
-            { type: STRUCTURE_SPAWN, dx: 1, dy: 0 },
-            { type: STRUCTURE_SPAWN, dx: 0, dy: -2 },
-            { type: 'container', dx: 0, dy: -1 },
-            { type: 'container', dx: 0, dy: 1 },
-            { type: 'road', dx: -1, dy: -1 },
-            { type: 'road', dx: 1, dy: -1 },
-            { type: 'road', dx: -1, dy: 1 },
-            { type: 'road', dx: 1, dy: 1 },
-            { type: 'road', dx: 0, dy: -3 },
-            { type: 'road', dx: -2, dy: 0 },
-            { type: 'road', dx: 2, dy: 0 },
-            { type: 'road', dx: 0, dy: 2 }
+            // Containers
+            { type: 'container', dx: -2, dy: 0 }, { type: 'container', dx: 2, dy: 0 },
+            // Spawns
+            { type: STRUCTURE_SPAWN, dx: -2, dy: -1 }, { type: STRUCTURE_SPAWN, dx: 2, dy: -1 }, { type: STRUCTURE_SPAWN, dx: 0, dy: 2 },
+            // Fast Filler Creep Stands (Roads to keep them walkable)
+            { type: 'road', dx: -1, dy: -1 }, { type: 'road', dx: 1, dy: -1 }, { type: 'road', dx: -1, dy: 1 }, { type: 'road', dx: 1, dy: 1 },
+            // Extensions
+            { type: STRUCTURE_EXTENSION, dx: -2, dy: -2 }, { type: STRUCTURE_EXTENSION, dx: -1, dy: -2 }, { type: STRUCTURE_EXTENSION, dx: 0, dy: -2 }, { type: STRUCTURE_EXTENSION, dx: 1, dy: -2 }, { type: STRUCTURE_EXTENSION, dx: 2, dy: -2 },
+            { type: STRUCTURE_EXTENSION, dx: 0, dy: -1 },
+            { type: STRUCTURE_EXTENSION, dx: -1, dy: 0 }, { type: STRUCTURE_EXTENSION, dx: 1, dy: 0 },
+            { type: STRUCTURE_EXTENSION, dx: -2, dy: 1 }, { type: STRUCTURE_EXTENSION, dx: 0, dy: 1 }, { type: STRUCTURE_EXTENSION, dx: 2, dy: 1 },
+            { type: STRUCTURE_EXTENSION, dx: -2, dy: 2 }, { type: STRUCTURE_EXTENSION, dx: -1, dy: 2 }, { type: STRUCTURE_EXTENSION, dx: 1, dy: 2 }, { type: STRUCTURE_EXTENSION, dx: 2, dy: 2 }
         ];
 
         for (let i = 0; i < stamp.length; i++) {
@@ -218,36 +218,33 @@ class RoomPlanner {
 
     static findCompactPlacement(stampRotations, terrain, anchor, visited) {
         const variants = Array.isArray(stampRotations[0]) ? stampRotations : [stampRotations];
-        const queue = [{ x: anchor.x, y: anchor.y }];
-        const seen = new Uint8Array(2500);
-        seen[anchor.x * 50 + anchor.y] = 1;
-        let head = 0;
         
-        while (head < queue.length) {
-            const { x, y } = queue[head++];
+        const coords = [];
+        for (let dx = -20; dx <= 20; dx++) {
+            for (let dy = -20; dy <= 20; dy++) {
+                coords.push({ x: anchor.x + dx, y: anchor.y + dy, dist: dx * dx + dy * dy });
+            }
+        }
+        coords.sort((a, b) => a.dist - b.dist);
+
+        for (let i = 0; i < coords.length; i++) {
+            const { x, y } = coords[i];
             
             for (let v = 0; v < variants.length; v++) {
                 const stamp = variants[v];
                 let valid = true;
                 for (let j = 0; j < stamp.length; j++) {
                     const nx = x + stamp[j].dx, ny = y + stamp[j].dy;
-                    if (nx < 2 || nx > 47 || ny < 2 || ny > 47 || terrain.get(nx, ny) === TERRAIN_MASK_WALL || visited[nx * 50 + ny]) {
+                    if (nx < 2 || nx > 47 || ny < 2 || ny > 47 || terrain.get(nx, ny) === TERRAIN_MASK_WALL) {
+                        valid = false; break;
+                    }
+                    const key = nx * 50 + ny;
+                    if (visited[key]) {
+                        if (stamp[j].type === 'road' && visited[key] === 2) continue;
                         valid = false; break;
                     }
                 }
                 if (valid) return { cx: x, cy: y, stamp };
-            }
-            
-            const dirs = [{dx:0,dy:-1}, {dx:0,dy:1}, {dx:-1,dy:0}, {dx:1,dy:0}];
-            for (let d = 0; d < dirs.length; d++) {
-                const nx = x + dirs[d].dx, ny = y + dirs[d].dy;
-                if (nx >= 2 && nx <= 47 && ny >= 2 && ny <= 47) {
-                    const key = nx * 50 + ny;
-                    if (!seen[key]) {
-                        seen[key] = 1;
-                        queue.push({ x: nx, y: ny });
-                    }
-                }
             }
         }
         return null;
@@ -255,17 +252,13 @@ class RoomPlanner {
 
     static applyCoreStamp(blueprint, terrain, anchor, visited) {
         const stamp = [
-            { type: 'road', dx: 0, dy: 0 },
             { type: STRUCTURE_STORAGE, dx: -1, dy: 0 },
             { type: STRUCTURE_TERMINAL, dx: 1, dy: 0 },
             { type: STRUCTURE_FACTORY, dx: 0, dy: -1 },
             { type: STRUCTURE_LINK, dx: 0, dy: 1 },
             { type: STRUCTURE_NUKER, dx: -1, dy: -1 },
             { type: STRUCTURE_POWER_SPAWN, dx: 1, dy: -1 },
-            { type: STRUCTURE_OBSERVER, dx: 1, dy: 1 },
-            { type: 'road', dx: -2, dy: 0 }, { type: 'road', dx: 2, dy: 0 },
-            { type: 'road', dx: 0, dy: -2 }, { type: 'road', dx: 0, dy: 2 },
-            { type: 'road', dx: -1, dy: 1 }, { type: 'road', dx: -1, dy: -2 }, { type: 'road', dx: 1, dy: -2 }
+            { type: STRUCTURE_OBSERVER, dx: 1, dy: 1 }
         ];
 
         const placement = this.findCompactPlacement(stamp, terrain, anchor, visited);
@@ -275,8 +268,7 @@ class RoomPlanner {
                 const { type, dx, dy } = chosenStamp[i];
                 const x = cx + dx, y = cy + dy;
                 visited[x * 50 + y] = 1;
-                if (type === 'road') blueprint.roads.push({ x, y });
-                else blueprint[type].push({ x, y });
+                blueprint[type].push({ x, y });
             }
             return { x: cx, y: cy };
         }
@@ -286,11 +278,7 @@ class RoomPlanner {
     static applyTowerStamp(blueprint, terrain, anchor, visited) {
         const stamp = [
             { type: STRUCTURE_TOWER, dx: 0, dy: 0 }, { type: STRUCTURE_TOWER, dx: 1, dy: 0 }, { type: STRUCTURE_TOWER, dx: -1, dy: 0 },
-            { type: STRUCTURE_TOWER, dx: 0, dy: 1 }, { type: STRUCTURE_TOWER, dx: 1, dy: 1 }, { type: STRUCTURE_TOWER, dx: -1, dy: 1 },
-            { type: 'road', dx: 0, dy: -1 }, { type: 'road', dx: 1, dy: -1 }, { type: 'road', dx: -1, dy: -1 },
-            { type: 'road', dx: 0, dy: 2 }, { type: 'road', dx: 1, dy: 2 }, { type: 'road', dx: -1, dy: 2 },
-            { type: 'road', dx: -2, dy: 0 }, { type: 'road', dx: -2, dy: 1 },
-            { type: 'road', dx: 2, dy: 0 }, { type: 'road', dx: 2, dy: 1 }
+            { type: STRUCTURE_TOWER, dx: 0, dy: 1 }, { type: STRUCTURE_TOWER, dx: 1, dy: 1 }, { type: STRUCTURE_TOWER, dx: -1, dy: 1 }
         ];
 
         const placement = this.findCompactPlacement(stamp, terrain, anchor, visited);
@@ -300,8 +288,7 @@ class RoomPlanner {
                 const { type, dx, dy } = chosenStamp[i];
                 const x = cx + dx, y = cy + dy;
                 visited[x * 50 + y] = 1;
-                if (type === 'road') blueprint.roads.push({ x, y });
-                else blueprint[type].push({ x, y });
+                blueprint[type].push({ x, y });
             }
             return { x: cx, y: cy };
         }
@@ -348,11 +335,6 @@ class RoomPlanner {
     }
 
     static applyExtensionClusters(blueprint, terrain, anchor, visited) {
-        const queue = [{ x: anchor.x, y: anchor.y }];
-        const seen = new Uint8Array(2500);
-        seen[anchor.x * 50 + anchor.y] = 1;
-        
-        let head = 0;
         let extensionsPlaced = blueprint[STRUCTURE_EXTENSION].length;
         const centers = [];
 
@@ -365,44 +347,57 @@ class RoomPlanner {
             { dx: -1, dy: -1, type: 'road' },
             { dx: 1, dy: -1, type: 'road' },
             { dx: -1, dy: 1, type: 'road' },
-            { dx: 1, dy: 1, type: 'road' }
+            { dx: 1, dy: 1, type: 'road' },
+            { dx: 0, dy: -2, type: 'road' },
+            { dx: 0, dy: 2, type: 'road' },
+            { dx: -2, dy: 0, type: 'road' },
+            { dx: 2, dy: 0, type: 'road' }
         ];
 
-        while (head < queue.length && extensionsPlaced < 60) {
-            const { x, y } = queue[head++];
+        const coords = [];
+        for (let dx = -20; dx <= 20; dx += 2) {
+            for (let dy = -20; dy <= 20; dy += 2) {
+                if (Math.abs(dx) % 2 === Math.abs(dy) % 2) {
+                    coords.push({ x: anchor.x + dx, y: anchor.y + dy, dist: dx * dx + dy * dy });
+                }
+            }
+        }
+        coords.sort((a, b) => a.dist - b.dist);
+
+        for (let i = 0; i < coords.length; i++) {
+            if (extensionsPlaced >= 60) break;
+            const { x, y } = coords[i];
 
             let validCluster = true;
-            for (let i = 0; i < clusterOffsets.length; i++) {
-                const nx = x + clusterOffsets[i].dx, ny = y + clusterOffsets[i].dy;
-                if (nx < 2 || nx > 47 || ny < 2 || ny > 47 || terrain.get(nx, ny) === TERRAIN_MASK_WALL || visited[nx * 50 + ny]) {
+            for (let j = 0; j < clusterOffsets.length; j++) {
+                const nx = x + clusterOffsets[j].dx, ny = y + clusterOffsets[j].dy;
+                if (nx < 2 || nx > 47 || ny < 2 || ny > 47 || terrain.get(nx, ny) === TERRAIN_MASK_WALL) {
                     validCluster = false; break;
+                }
+                const key = nx * 50 + ny;
+                if (visited[key]) {
+                    if (clusterOffsets[j].type === STRUCTURE_EXTENSION || visited[key] === 1) {
+                        validCluster = false; break;
+                    }
                 }
             }
 
             if (validCluster) {
-                for (let i = 0; i < clusterOffsets.length; i++) {
-                    const nx = x + clusterOffsets[i].dx, ny = y + clusterOffsets[i].dy;
-                    visited[nx * 50 + ny] = 1;
-                    if (clusterOffsets[i].type === 'road') {
-                        blueprint.roads.push({ x: nx, y: ny });
+                for (let j = 0; j < clusterOffsets.length; j++) {
+                    const nx = x + clusterOffsets[j].dx, ny = y + clusterOffsets[j].dy;
+                    const key = nx * 50 + ny;
+                    if (clusterOffsets[j].type === 'road') {
+                        if (visited[key] !== 2) {
+                            visited[key] = 2;
+                            blueprint.roads.push({ x: nx, y: ny });
+                        }
                     } else {
+                        visited[key] = 1;
                         blueprint[STRUCTURE_EXTENSION].push({ x: nx, y: ny });
                     }
                 }
                 extensionsPlaced += 5;
                 centers.push({ x, y });
-            }
-
-            const dirs = [{ dx: 3, dy: 0 }, { dx: -3, dy: 0 }, { dx: 0, dy: 3 }, { dx: 0, dy: -3 }];
-            for (let d = 0; d < dirs.length; d++) {
-                const nx = x + dirs[d].dx, ny = y + dirs[d].dy;
-                if (nx >= 2 && nx <= 47 && ny >= 2 && ny <= 47) {
-                    const nkey = nx * 50 + ny;
-                    if (!seen[nkey]) {
-                        seen[nkey] = 1;
-                        queue.push({ x: nx, y: ny });
-                    }
-                }
             }
         }
         return centers;
