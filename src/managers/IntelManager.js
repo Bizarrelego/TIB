@@ -2,9 +2,12 @@
  * Top-Down Intelligence Manager
  * Serializes visible room data to Memory and queues scouting targets.
  */
+const ScoutingManager = require('./ScoutingManager');
 
 const createRoomMemoryTemplate = () => ({
     scoutedAt: 0,
+    roomType: 'core', // Enriches the global intel cache with structural map typings, allowing military and economic managers to make O(1) strategic decisions without redundant API calls.
+    accessStatus: 'normal',
     sources: [], // Stores { id, x, y }
     mineral: null, // Stores { id, type, x, y }
     controller: { owner: null, level: 0, safeMode: 0, x: 0, y: 0 },
@@ -91,6 +94,13 @@ class IntelManager {
         }
 
         mem.scoutedAt = Game.time;
+
+        if (ScoutingManager.isHighway(room.name)) mem.roomType = 'highway';
+        else if (ScoutingManager.isKeeperRoom(room.name)) mem.roomType = 'sk';
+        else mem.roomType = 'core';
+
+        const status = Game.map.getRoomStatus(room.name);
+        mem.accessStatus = status ? status.status : 'normal';
 
         // Ensure nested objects exist in case of schema updates on existing memory
         if (!mem.controller) mem.controller = { owner: null, level: 0, safeMode: 0, x: 0, y: 0 };

@@ -34,6 +34,12 @@ class ScoutingManager {
             for (const dir in exits) {
                 const exitRoom = exits[dir];
 
+                // Prevents fatal pathing deadlocks by utilizing the Game.map API to filter out walled-off beginner sectors and closed map areas.
+                const status = Game.map.getRoomStatus(exitRoom);
+                if (status && (status.status === 'closed' || status.status === 'novice' || status.status === 'respawn')) {
+                    continue;
+                }
+
                 // Avoid Source Keeper / Sector Center rooms to prevent instant death loops
                 if (ScoutingManager.isKeeperRoom(exitRoom)) continue;
 
@@ -53,6 +59,12 @@ class ScoutingManager {
             if (!oldestRoom) {
                 for (const dir in exits) {
                     const exitRoom = exits[dir];
+                    
+                    const status = Game.map.getRoomStatus(exitRoom);
+                    if (status && (status.status === 'closed' || status.status === 'novice' || status.status === 'respawn')) {
+                        continue;
+                    }
+
                     if (ScoutingManager.isKeeperRoom(exitRoom)) continue;
 
                     const scoutedAt = Memory.rooms[exitRoom]?.scoutedAt || 0;
@@ -91,6 +103,19 @@ class ScoutingManager {
 
         // Rooms ending in 4, 5, or 6 in both X and Y are SK rooms or the Sector Center
         return (x >= 4 && x <= 6) && (y >= 4 && y <= 6);
+    }
+
+    /**
+     * Adds mathematical coordinate parsing to identify cross-map transit corridors.
+     */
+    static isHighway(roomName) {
+        const parsed = /^[WE]([0-9]+)[NS]([0-9]+)$/.exec(roomName);
+        if (!parsed) return false;
+
+        const x = parseInt(parsed[1], 10);
+        const y = parseInt(parsed[2], 10);
+
+        return (x % 10 === 0) || (y % 10 === 0);
     }
 }
 

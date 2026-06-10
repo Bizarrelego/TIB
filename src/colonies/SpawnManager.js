@@ -14,6 +14,7 @@ class CreepBodyBuilder {
             case 'filler': return this.generateHauler(energyCapacity);
             case 'remoteharvester': return this.generateHarvester(energyCapacity);
             case 'remotehauler': return this.generateHauler(energyCapacity);
+            // Optimizes spawn cost by locking scouts to a single MOVE part, ensuring negligible impact on the RCL 2 energy budget.
             case 'scout': return [MOVE];
             case 'miner': return this.generateMiner(energyCapacity);
             case 'repairman': return [WORK, CARRY, MOVE, MOVE];
@@ -218,7 +219,8 @@ class CensusCalculator {
         }
 
         let needsScout = false;
-        if (rcl >= 3 && roomName) {
+        // Initiates passive intel ingestion at RCL 2 to prepare for early remote expansion.
+        if (rcl >= 2 && roomName) {
             const queue = [{name: roomName, depth: 0}];
             let qIdx = 0;
             const visited = new Set([roomName]);
@@ -393,8 +395,9 @@ class SpawnManager {
             return;
         }
 
+        // Prevents economic stalling by ensuring early-game scouts yield the spawn queue to critical energy-generating roles.
         const spawnPriority = [
-            'defender', 'filler', 'scout', 'harvester', 'hauler', 'upgrader', 'builder', 
+            'defender', 'filler', 'harvester', 'hauler', 'upgrader', 'scout', 'builder', 
             'repairman', 'remoteharvester', 'remotehauler', 
             'meleeCreep', 'rangerCreep', 'medicCreep'
         ];
