@@ -5,6 +5,9 @@ function routeToCoreStructures(creep, roomState) {
     let bestScore = -1;
 
     const evaluateTarget = (target) => {
+        if (!target || !target.store) return;
+        if (target.isActive !== undefined && !target.isActive()) return;
+
         const freeCapacity = target.store.getFreeCapacity(RESOURCE_ENERGY);
         if (freeCapacity === 0) return;
 

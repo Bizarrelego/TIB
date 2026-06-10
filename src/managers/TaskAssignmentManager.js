@@ -85,10 +85,12 @@ class TaskAssignmentManager {
             creep.heap.state = 'work';
             creep.heap.targetId = null;
             creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            creep.heap.unreachableTargetId = null;
         } else if (creep.heap.state === 'work' && totalUsed === 0) {
             creep.heap.state = 'gather';
             creep.heap.targetId = null;
             creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            creep.heap.unreachableTargetId = null;
         }
     }
 

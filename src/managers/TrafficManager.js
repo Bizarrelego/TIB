@@ -61,23 +61,32 @@ class TrafficManager {
             }
 
             // Stall detection
-            if (heap.lastPos && heap.lastPos.x === creep.pos.x && heap.lastPos.y === creep.pos.y && heap.lastPos.roomName === creep.room.name) {
+            if (!heap.lastPos) heap.lastPos = { x: -1, y: -1, roomName: '' };
+            if (heap.lastPos.x === creep.pos.x && heap.lastPos.y === creep.pos.y && heap.lastPos.roomName === creep.room.name) {
                 heap.stallCount = (heap.stallCount || 0) + 1;
             } else {
                 heap.stallCount = 0;
-                heap.lastPos = { x: creep.pos.x, y: creep.pos.y, roomName: creep.room.name };
+                heap.lastPos.x = creep.pos.x;
+                heap.lastPos.y = creep.pos.y;
+                heap.lastPos.roomName = creep.room.name;
             }
 
             // Advance path if creep successfully moved to the first step
             if (heap.path) {
-                while (heap.path.length > 0 && heap.path[0].x === creep.pos.x && heap.path[0].y === creep.pos.y && heap.path[0].roomName === creep.room.name) {
-                    heap.path.shift();
+                if (heap.pathIndex === undefined) heap.pathIndex = 0;
+                while (heap.pathIndex < heap.path.length) {
+                    const step = heap.path[heap.pathIndex];
+                    if (step.x === creep.pos.x && step.y === creep.pos.y && step.roomName === creep.room.name) {
+                        heap.pathIndex++;
+                    } else {
+                        break;
+                    }
                 }
             }
 
             // Path caching and invalidation
             let needsPath = false;
-            if (!heap.path || heap.path.length === 0) needsPath = true;
+            if (!heap.path || heap.pathIndex >= heap.path.length) needsPath = true;
             if (dest && heap.pathDest && (heap.pathDest.x !== dest.x || heap.pathDest.y !== dest.y || heap.pathDest.roomName !== dest.roomName)) needsPath = true;
             if (heap.fleeGoals && heap.pathDest) needsPath = true; // Invalidate if transitioning to flee logic
             if (heap.stallCount > 2) {
@@ -85,8 +94,8 @@ class TrafficManager {
                 heap.stallCount = 0; // Reset after forcing recalculation
             }
 
-            if (!needsPath && heap.stallCount > 0 && heap.path && heap.path.length > 0) {
-                const nextStep = heap.path[0];
+            if (!needsPath && heap.stallCount > 0 && heap.path && heap.pathIndex < heap.path.length) {
+                const nextStep = heap.path[heap.pathIndex];
                 if (nextStep.roomName === creep.room.name) {
                     const matrix = TrafficManager.getCostMatrix(creep.room.name);
                     if (matrix.get(nextStep.x, nextStep.y) === 255) {
@@ -121,6 +130,8 @@ class TrafficManager {
 
                 if (pathResult.incomplete && pathResult.path.length === 0) {
                     heap.unreachableTargetId = heap.targetId;
+                    heap.targetId = null;
+                    heap.actionIntent = 'idle';
                     heap.destination = null;
                     heap.path = null;
                     if (heap.fleeGoals) heap.fleeGoals = null;
@@ -129,6 +140,7 @@ class TrafficManager {
                 }
 
                 heap.path = pathResult.path.map(p => ({ x: p.x, y: p.y, roomName: p.roomName }));
+                heap.pathIndex = 0;
             }
 
             TrafficManager.addCreepToRoom(creepsByRoom, creep);
@@ -152,13 +164,24 @@ class TrafficManager {
     }
 
     static resolveRoomTraffic(roomName, creeps) {
+        const len = creeps.length;
+        if (len > TrafficManager.creepList.length) {
+            // Dynamically expand buffers if limit is breached
+            const newSize = len + 50;
+            TrafficManager.creepList = new Array(newSize);
+            TrafficManager.nextSteps = new Int32Array(newSize);
+            TrafficManager.resolvedIntents = new Int32Array(newSize);
+            TrafficManager.priorityScore = new Int32Array(newSize);
+            TrafficManager.visited = new Uint8Array(newSize);
+        }
+
         // Optimizes V8 heap usage by eliminating per-room TypedArray instantiations, reducing GC churn.
         TrafficManager.grid.fill(-1);
-        TrafficManager.nextSteps.fill(-1, 0, creeps.length);
-        TrafficManager.resolvedIntents.fill(-1, 0, creeps.length);
-        TrafficManager.priorityScore.fill(0, 0, creeps.length);
+        TrafficManager.nextSteps.fill(-1, 0, len);
+        TrafficManager.resolvedIntents.fill(-1, 0, len);
+        TrafficManager.priorityScore.fill(0, 0, len);
         
-        for (let i = 0; i < creeps.length; i++) {
+        for (let i = 0; i < len; i++) {
             const creep = creeps[i];
             TrafficManager.creepList[i] = creep;
             const packed = (creep.pos.y * 50) + creep.pos.x;
@@ -166,8 +189,8 @@ class TrafficManager {
             
             TrafficManager.priorityScore[i] = TrafficManager.getPriority(creep);
             
-            if (creep.heap && creep.heap.path && creep.heap.path.length > 0 && creep.fatigue === 0) {
-                const step = creep.heap.path[0];
+            if (creep.heap && creep.heap.path && creep.heap.pathIndex < creep.heap.path.length && creep.fatigue === 0) {
+                const step = creep.heap.path[creep.heap.pathIndex];
                 if (step.roomName === roomName) {
                     TrafficManager.nextSteps[i] = (step.y * 50) + step.x;
                 } else {
@@ -182,11 +205,14 @@ class TrafficManager {
         const matrix = TrafficManager.getCostMatrix(roomName);
         
         // Sort indices by priority so high priority cascades first
-        const sortedIndices = [];
-        for (let i = 0; i < creeps.length; i++) sortedIndices.push(i);
+        if (!TrafficManager.sortedIndices || TrafficManager.sortedIndices.length < len) {
+            TrafficManager.sortedIndices = new Uint16Array(len + 50);
+        }
+        const sortedIndices = TrafficManager.sortedIndices.subarray(0, len);
+        for (let i = 0; i < len; i++) sortedIndices[i] = i;
         sortedIndices.sort((a, b) => TrafficManager.priorityScore[b] - TrafficManager.priorityScore[a]);
 
-        for (let k = 0; k < sortedIndices.length; k++) {
+        for (let k = 0; k < len; k++) {
             const i = sortedIndices[k];
             if (TrafficManager.nextSteps[i] === -1 || TrafficManager.nextSteps[i] === -2) continue;
             if (TrafficManager.resolvedIntents[i] !== -1) continue; 
@@ -233,7 +259,7 @@ class TrafficManager {
                 const ty = Math.floor(targetPacked / 50);
                 dir = creep.pos.getDirectionTo(tx, ty);
             } else if (TrafficManager.resolvedIntents[i] === -2 || TrafficManager.nextSteps[i] === -2) {
-                const step = creep.heap.path[0];
+                const step = creep.heap.path[creep.heap.pathIndex];
                 dir = TrafficManager.getSafeDirection(creep.pos, step);
             }
             
@@ -301,11 +327,8 @@ class TrafficManager {
         const bx = tx;
         const by = ty;
         const dirs = [-51, -50, -49, -1, 1, 49, 50, 51];
-        
-        const emptyTiles = [];
-        const occupiedTiles = [];
 
-        // Partition tiles into empty and occupied
+        // Pass 1: Empty Tiles (O(1) resolution priority)
         for (let d = 0; d < 8; d++) {
             const newPacked = targetPacked + dirs[d];
             const nx = newPacked % 50;
@@ -313,34 +336,35 @@ class TrafficManager {
             
             if (Math.abs(nx - bx) > 1 || Math.abs(ny - by) > 1) continue;
             if (nx <= 0 || nx >= 49 || ny <= 0 || ny >= 49) continue;
-            
             if (terrain.get(nx, ny) === TERRAIN_MASK_WALL || matrix.get(nx, ny) === 255) continue;
 
             if (TrafficManager.grid[newPacked] === -1) {
-                emptyTiles.push(newPacked);
-            } else {
-                occupiedTiles.push(newPacked);
+                if (TrafficManager.depthFirstSearch(blockerIdx, newPacked, minScore, terrain, matrix, creepCount)) {
+                    TrafficManager.resolvedIntents[blockerIdx] = newPacked;
+                    TrafficManager.grid[targetPacked] = -1;
+                    TrafficManager.grid[newPacked] = blockerIdx;
+                    return true;
+                }
             }
         }
 
-        // Improves CPU performance by prioritizing O(1) empty tile resolution before triggering recursive displacement chains.
-        for (let i = 0; i < emptyTiles.length; i++) {
-            const newPacked = emptyTiles[i];
-            if (TrafficManager.depthFirstSearch(blockerIdx, newPacked, minScore, terrain, matrix, creepCount)) {
-                TrafficManager.resolvedIntents[blockerIdx] = newPacked;
-                TrafficManager.grid[targetPacked] = -1;
-                TrafficManager.grid[newPacked] = blockerIdx;
-                return true;
-            }
-        }
+        // Pass 2: Occupied Tiles (Recursive displacement chain)
+        for (let d = 0; d < 8; d++) {
+            const newPacked = targetPacked + dirs[d];
+            const nx = newPacked % 50;
+            const ny = Math.floor(newPacked / 50);
+            
+            if (Math.abs(nx - bx) > 1 || Math.abs(ny - by) > 1) continue;
+            if (nx <= 0 || nx >= 49 || ny <= 0 || ny >= 49) continue;
+            if (terrain.get(nx, ny) === TERRAIN_MASK_WALL || matrix.get(nx, ny) === 255) continue;
 
-        for (let i = 0; i < occupiedTiles.length; i++) {
-            const newPacked = occupiedTiles[i];
-            if (TrafficManager.depthFirstSearch(blockerIdx, newPacked, minScore, terrain, matrix, creepCount)) {
-                TrafficManager.resolvedIntents[blockerIdx] = newPacked;
-                TrafficManager.grid[targetPacked] = -1;
-                TrafficManager.grid[newPacked] = blockerIdx;
-                return true;
+            if (TrafficManager.grid[newPacked] !== -1) {
+                if (TrafficManager.depthFirstSearch(blockerIdx, newPacked, minScore, terrain, matrix, creepCount)) {
+                    TrafficManager.resolvedIntents[blockerIdx] = newPacked;
+                    TrafficManager.grid[targetPacked] = -1;
+                    TrafficManager.grid[newPacked] = blockerIdx;
+                    return true;
+                }
             }
         }
 
@@ -437,7 +461,7 @@ class TrafficManager {
         if (!global.Cache.costMatrices) global.Cache.costMatrices = new Map();
 
         const roomState = global.State && global.State.rooms ? global.State.rooms.get(roomName) : null;
-        const currentStructCount = roomState ? roomState.structureIdCount : 0;
+        const currentStructCount = roomState ? roomState.structureIdCount + (roomState.constructionSiteCount || 0) : 0;
         
         const cached = global.Cache.costMatrices.get(roomName);
         let baseMatrix;
@@ -452,6 +476,15 @@ class TrafficManager {
                         baseMatrix.set(s.pos.x, s.pos.y, 255);
                     } else if (s && s.structureType === STRUCTURE_ROAD) {
                         baseMatrix.set(s.pos.x, s.pos.y, 1);
+                    }
+                }
+            }
+            if (roomState && roomState.constructionSites) {
+                const sites = Object.values(roomState.constructionSites);
+                for (let i = 0; i < sites.length; i++) {
+                    const s = sites[i];
+                    if (s && s.structureType !== STRUCTURE_ROAD && s.structureType !== STRUCTURE_CONTAINER && s.structureType !== STRUCTURE_RAMPART) {
+                        baseMatrix.set(s.pos.x, s.pos.y, 255);
                     }
                 }
             }
@@ -473,9 +506,8 @@ class TrafficManager {
         tickMatrix = baseMatrix.clone();
         
         // Injects dynamic threat zones into the tick-cached matrix, forcing civilian creeps to naturally route around danger and allowing rangers to kite along the cost gradient.
-        const room = Game.rooms[roomName];
-        if (room) {
-            const hostiles = room.find(FIND_HOSTILE_CREEPS);
+        if (roomState) {
+            const hostiles = roomState.hostiles || [];
             for (let i = 0; i < hostiles.length; i++) {
                 const hostile = hostiles[i];
                 let isMelee = false;
@@ -487,21 +519,10 @@ class TrafficManager {
                     if (type === RANGED_ATTACK) isRanged = true;
                 }
 
-                if (isMelee) {
-                    for (let dx = -1; dx <= 1; dx++) {
-                        for (let dy = -1; dy <= 1; dy++) {
-                            const x = hostile.pos.x + dx;
-                            const y = hostile.pos.y + dy;
-                            if (x >= 0 && x <= 49 && y >= 0 && y <= 49) {
-                                tickMatrix.set(x, y, Math.min(255, tickMatrix.get(x, y) + 50));
-                            }
-                        }
-                    }
-                }
-                
-                if (isRanged) {
-                    for (let dx = -3; dx <= 3; dx++) {
-                        for (let dy = -3; dy <= 3; dy++) {
+                const dxRange = isRanged ? 3 : (isMelee ? 1 : 0);
+                if (dxRange > 0) {
+                    for (let dx = -dxRange; dx <= dxRange; dx++) {
+                        for (let dy = -dxRange; dy <= dxRange; dy++) {
                             const x = hostile.pos.x + dx;
                             const y = hostile.pos.y + dy;
                             if (x >= 0 && x <= 49 && y >= 0 && y <= 49) {
@@ -513,9 +534,9 @@ class TrafficManager {
             }
 
             // Fixes stationary creep deadlocks by injecting their positions as unwalkable (255) into a tick-cached cloned matrix, forcing PathFinder to route around them.
-            const creeps = room.find(FIND_MY_CREEPS);
-            for (let i = 0; i < creeps.length; i++) {
-                const c = creeps[i];
+            for (const creepName in Game.creeps) {
+                const c = Game.creeps[creepName];
+                if (c.room.name !== roomName) continue;
                 const role = (c.memory.role || '').toLowerCase();
                 if (role === 'harvester' || role === 'upgrader' || (c.heap && c.heap.sitTargetId)) {
                     tickMatrix.set(c.pos.x, c.pos.y, 255);
