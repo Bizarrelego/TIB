@@ -79,39 +79,60 @@ class RoomPlanner {
 
         console.log(`[RoomPlanner] Generating new blueprint for room ${room.name}...`);
 
+        const distanceMap = new Uint16Array(2500);
+        distanceMap.fill(65535);
+        const q = [{x: anchor.x, y: anchor.y}];
+        distanceMap[anchor.x * 50 + anchor.y] = 0;
+        let head = 0;
+        while (head < q.length) {
+            const {x, y} = q[head++];
+            const d = distanceMap[x * 50 + y];
+            const dirs = [{dx:0,dy:-1},{dx:0,dy:1},{dx:-1,dy:0},{dx:1,dy:0}];
+            for(let i=0; i<dirs.length; i++) {
+                const nx = x+dirs[i].dx, ny = y+dirs[i].dy;
+                if(nx >= 0 && nx < 50 && ny >= 0 && ny < 50 && terrain.get(nx, ny) !== TERRAIN_MASK_WALL) {
+                    const key = nx * 50 + ny;
+                    if (distanceMap[key] > d + 1) {
+                        distanceMap[key] = d + 1;
+                        q.push({x: nx, y: ny});
+                    }
+                }
+            }
+        }
+
         // Step 2: Fast Filler Stamp
         this.applyFastFillerStamp(blueprint, terrain, anchor, visited);
         fragmentCenters.push({ x: anchor.x, y: anchor.y });
         console.log(`[RoomPlanner] Fast Filler packed at anchor: ${anchor.x}, ${anchor.y}`);
 
         // Step 3: Core Hub Stamp
-        const coreCenter = this.applyCoreStamp(blueprint, terrain, anchor, visited);
+        const coreCenter = this.applyCoreStamp(blueprint, terrain, anchor, visited, distanceMap);
         if (coreCenter) {
             fragmentCenters.push(coreCenter);
             console.log(`[RoomPlanner] Core Hub packed at: ${coreCenter.x}, ${coreCenter.y}`);
         } else console.log(`[RoomPlanner] WARNING: Failed to find space for Core Hub!`);
 
         // Step 4: Tower Stamp
-        const towerCenter = this.applyTowerStamp(blueprint, terrain, anchor, visited);
+        const towerCenter = this.applyTowerStamp(blueprint, terrain, anchor, visited, distanceMap);
         if (towerCenter) {
             fragmentCenters.push(towerCenter);
             console.log(`[RoomPlanner] Tower Array packed at: ${towerCenter.x}, ${towerCenter.y}`);
         } else console.log(`[RoomPlanner] WARNING: Failed to find space for Tower Array!`);
 
         // Step 5: Lab cluster
-        const labCenter = this.applyLabStamp(blueprint, terrain, anchor, visited);
+        const labCenter = this.applyLabStamp(blueprint, terrain, anchor, visited, distanceMap);
         if (labCenter) {
             fragmentCenters.push(labCenter);
             console.log(`[RoomPlanner] Lab Cluster packed at: ${labCenter.x}, ${labCenter.y}`);
         } else console.log(`[RoomPlanner] WARNING: Failed to find space for Lab Cluster!`);
 
         // Step 6: Extension Clusters (Plus-sign grids)
-        const extensionCenters = this.applyExtensionClusters(blueprint, terrain, anchor, visited);
+        const extensionCenters = this.applyExtensionClusters(blueprint, terrain, anchor, visited, distanceMap);
         for (let i = 0; i < extensionCenters.length; i++) fragmentCenters.push(extensionCenters[i]);
         console.log(`[RoomPlanner] Packed ${extensionCenters.length} extension clusters.`);
 
         // Step 5: Source + controller containers
-        if (state) this.planContainers(blueprint, room, state, terrain);
+        if (state) this.planContainers(blueprint, room, state, terrain, visited, distanceMap);
 
         // Step 6: External road routes and fragment connections
         if (state) this.planRoads(blueprint, room, state, anchor, fragmentCenters);
@@ -216,13 +237,15 @@ class RoomPlanner {
         }
     }
 
-    static findCompactPlacement(stampRotations, terrain, anchor, visited) {
+    static findCompactPlacement(stampRotations, terrain, anchor, visited, distanceMap) {
         const variants = Array.isArray(stampRotations[0]) ? stampRotations : [stampRotations];
         
         const coords = [];
-        for (let dx = -20; dx <= 20; dx++) {
-            for (let dy = -20; dy <= 20; dy++) {
-                coords.push({ x: anchor.x + dx, y: anchor.y + dy, dist: dx * dx + dy * dy });
+        for (let x = 4; x <= 45; x++) {
+            for (let y = 4; y <= 45; y++) {
+                if (distanceMap[x * 50 + y] !== 65535) {
+                    coords.push({ x, y, dist: distanceMap[x * 50 + y] });
+                }
             }
         }
         coords.sort((a, b) => a.dist - b.dist);
@@ -235,7 +258,7 @@ class RoomPlanner {
                 let valid = true;
                 for (let j = 0; j < stamp.length; j++) {
                     const nx = x + stamp[j].dx, ny = y + stamp[j].dy;
-                    if (nx < 2 || nx > 47 || ny < 2 || ny > 47 || terrain.get(nx, ny) === TERRAIN_MASK_WALL) {
+                    if (nx < 4 || nx > 45 || ny < 4 || ny > 45 || terrain.get(nx, ny) === TERRAIN_MASK_WALL) {
                         valid = false; break;
                     }
                     const key = nx * 50 + ny;
@@ -250,7 +273,7 @@ class RoomPlanner {
         return null;
     }
 
-    static applyCoreStamp(blueprint, terrain, anchor, visited) {
+    static applyCoreStamp(blueprint, terrain, anchor, visited, distanceMap) {
         const stamp = [
             { type: STRUCTURE_STORAGE, dx: -1, dy: 0 },
             { type: STRUCTURE_TERMINAL, dx: 1, dy: 0 },
@@ -261,7 +284,7 @@ class RoomPlanner {
             { type: STRUCTURE_OBSERVER, dx: 1, dy: 1 }
         ];
 
-        const placement = this.findCompactPlacement(stamp, terrain, anchor, visited);
+        const placement = this.findCompactPlacement(stamp, terrain, anchor, visited, distanceMap);
         if (placement) {
             const { cx, cy, stamp: chosenStamp } = placement;
             for (let i = 0; i < chosenStamp.length; i++) {
@@ -275,13 +298,13 @@ class RoomPlanner {
         return null;
     }
 
-    static applyTowerStamp(blueprint, terrain, anchor, visited) {
+    static applyTowerStamp(blueprint, terrain, anchor, visited, distanceMap) {
         const stamp = [
             { type: STRUCTURE_TOWER, dx: 0, dy: 0 }, { type: STRUCTURE_TOWER, dx: 1, dy: 0 }, { type: STRUCTURE_TOWER, dx: -1, dy: 0 },
             { type: STRUCTURE_TOWER, dx: 0, dy: 1 }, { type: STRUCTURE_TOWER, dx: 1, dy: 1 }, { type: STRUCTURE_TOWER, dx: -1, dy: 1 }
         ];
 
-        const placement = this.findCompactPlacement(stamp, terrain, anchor, visited);
+        const placement = this.findCompactPlacement(stamp, terrain, anchor, visited, distanceMap);
         if (placement) {
             const { cx, cy, stamp: chosenStamp } = placement;
             for (let i = 0; i < chosenStamp.length; i++) {
@@ -295,7 +318,7 @@ class RoomPlanner {
         return null;
     }
 
-    static applyLabStamp(blueprint, terrain, anchor, visited) {
+    static applyLabStamp(blueprint, terrain, anchor, visited, distanceMap) {
         const variants = [
             [
                 { dx: -1, dy: -1, s: false, type: STRUCTURE_LAB }, { dx: 0, dy: -1, s: true, type: STRUCTURE_LAB }, { dx: 1, dy: -1, s: true, type: STRUCTURE_LAB }, { dx: 2, dy: -1, s: false, type: STRUCTURE_LAB },
@@ -319,7 +342,7 @@ class RoomPlanner {
             ]
         ];
 
-        const placement = this.findCompactPlacement(variants, terrain, anchor, visited);
+        const placement = this.findCompactPlacement(variants, terrain, anchor, visited, distanceMap);
         if (placement) {
             const { cx, cy, stamp: chosenStamp } = placement;
             for (let i = 0; i < chosenStamp.length; i++) {
@@ -334,7 +357,7 @@ class RoomPlanner {
         return null;
     }
 
-    static applyExtensionClusters(blueprint, terrain, anchor, visited) {
+    static applyExtensionClusters(blueprint, terrain, anchor, visited, distanceMap) {
         let extensionsPlaced = blueprint[STRUCTURE_EXTENSION].length;
         const centers = [];
 
@@ -355,10 +378,10 @@ class RoomPlanner {
         ];
 
         const coords = [];
-        for (let dx = -20; dx <= 20; dx += 2) {
-            for (let dy = -20; dy <= 20; dy += 2) {
-                if (Math.abs(dx) % 2 === Math.abs(dy) % 2) {
-                    coords.push({ x: anchor.x + dx, y: anchor.y + dy, dist: dx * dx + dy * dy });
+        for (let x = 4; x <= 45; x++) {
+            for (let y = 4; y <= 45; y++) {
+                if (distanceMap[x * 50 + y] !== 65535 && (Math.abs(x - anchor.x) % 2 === Math.abs(y - anchor.y) % 2)) {
+                    coords.push({ x, y, dist: distanceMap[x * 50 + y] });
                 }
             }
         }
@@ -371,7 +394,7 @@ class RoomPlanner {
             let validCluster = true;
             for (let j = 0; j < clusterOffsets.length; j++) {
                 const nx = x + clusterOffsets[j].dx, ny = y + clusterOffsets[j].dy;
-                if (nx < 2 || nx > 47 || ny < 2 || ny > 47 || terrain.get(nx, ny) === TERRAIN_MASK_WALL) {
+                if (nx < 4 || nx > 45 || ny < 4 || ny > 45 || terrain.get(nx, ny) === TERRAIN_MASK_WALL) {
                     validCluster = false; break;
                 }
                 const key = nx * 50 + ny;
@@ -406,25 +429,25 @@ class RoomPlanner {
 
     // ─── Step 5: Container Planning ──────────────────────────────────────
 
-    static planContainers(blueprint, room, state, terrain) {
+    static planContainers(blueprint, room, state, terrain, visited, distanceMap) {
         const spawn = state.spawns?.[0];
         const ref = spawn ? spawn.pos : new RoomPosition(blueprint.anchor.x, blueprint.anchor.y, room.name);
         const sources = state.sources || [];
         for (let i = 0; i < sources.length; i++) {
-            const tile = this.findBestAdjacentTile(sources[i].pos, ref, terrain, room.name, 1);
-            if (tile) blueprint.containers.push(tile);
+            const tile = this.findBestAdjacentTile(sources[i].pos, ref, terrain, room.name, 1, distanceMap);
+            if (tile) { blueprint.containers.push(tile); visited[tile.x * 50 + tile.y] = 1; }
         }
         if (state.controller) {
-            const tile = this.findBestAdjacentTile(state.controller.pos, ref, terrain, room.name, 2);
-            if (tile) blueprint.containers.push(tile);
+            const tile = this.findBestAdjacentTile(state.controller.pos, ref, terrain, room.name, 2, distanceMap);
+            if (tile) { blueprint.containers.push(tile); visited[tile.x * 50 + tile.y] = 1; }
         }
         if (state.mineral) {
-            const tile = this.findBestAdjacentTile(state.mineral.pos, ref, terrain, room.name, 1);
-            if (tile) blueprint.containers.push(tile);
+            const tile = this.findBestAdjacentTile(state.mineral.pos, ref, terrain, room.name, 1, distanceMap);
+            if (tile) { blueprint.containers.push(tile); visited[tile.x * 50 + tile.y] = 1; }
         }
     }
 
-    static findBestAdjacentTile(targetPos, referencePos, terrain, roomName, range) {
+    static findBestAdjacentTile(targetPos, referencePos, terrain, roomName, range, distanceMap) {
         let best = null, bestDist = Infinity;
         for (let dx = -range; dx <= range; dx++) {
             for (let dy = -range; dy <= range; dy++) {
@@ -433,7 +456,7 @@ class RoomPlanner {
                 if (x < 1 || x > 48 || y < 1 || y > 48) continue;
                 if (terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
                 if (range > 1 && Math.max(Math.abs(dx), Math.abs(dy)) > range) continue;
-                const dist = Math.abs(x - referencePos.x) + Math.abs(y - referencePos.y);
+                const dist = distanceMap[x * 50 + y];
                 if (dist < bestDist) { bestDist = dist; best = { x, y }; }
             }
         }
