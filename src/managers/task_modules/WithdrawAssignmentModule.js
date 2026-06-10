@@ -24,7 +24,8 @@ function findClosestEnergy(creep, roomState) {
     }
 
     // Check spawn — only if spawn has enough to not starve spawning (300+)
-    if (roomState.spawns) {
+    // IMPORTANT: Bootstrappers are strictly forbidden from withdrawing from spawns to prevent infinite withdraw/transfer loops.
+    if (roomState.spawns && creep.memory.role !== 'bootstrapper') {
         for (let i = 0; i < roomState.spawns.length; i++) {
             const spawn = roomState.spawns[i];
             if (spawn.store.getUsedCapacity(RESOURCE_ENERGY) < 300) continue;
