@@ -109,6 +109,8 @@ class ActionExecutor {
             result = creep.heal(target);
         } else if (intent === ActionConstants.ACTION_DISMANTLE) {
             result = creep.dismantle(target);
+        } else if (intent === ActionConstants.ACTION_RESERVE) {
+            result = creep.reserveController(target);
         }
 
         if (result === ERR_NOT_IN_RANGE) {

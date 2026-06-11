@@ -14,7 +14,8 @@ const ActionConstants = {
     ACTION_RANGED_ATTACK: 'rangedAttack',
     ACTION_HEAL: 'heal',
     ACTION_FLEE: 'flee',
-    ACTION_PATROL: 'patrol'
+    ACTION_PATROL: 'patrol',
+    ACTION_RESERVE: 'reserve'
 };
 
 module.exports = ActionConstants;

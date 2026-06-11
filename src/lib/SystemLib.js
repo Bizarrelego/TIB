@@ -92,9 +92,46 @@ class StressTestUtility {
     }
 }
 
+class RouteDistanceCalculator {
+    static getDistance(sourceId, sourcePos, colonyName) {
+        if (!Memory.sources) Memory.sources = {};
+        if (!Memory.sources[sourceId]) Memory.sources[sourceId] = {};
+        
+        if (Memory.sources[sourceId].distance) {
+            return Memory.sources[sourceId].distance;
+        }
+
+        const roomState = global.State?.rooms?.get(colonyName);
+        if (!roomState) return 25; // fallback
+
+        let targetPos = null;
+        if (roomState.storage) targetPos = roomState.storage.pos;
+        else if (roomState.spawns && roomState.spawns.length > 0) targetPos = roomState.spawns[0].pos;
+
+        if (!targetPos) return 25; // fallback
+
+        const fromPos = new RoomPosition(sourcePos.x, sourcePos.y, sourcePos.roomName || sourcePos.roomName);
+        
+        const ret = PathFinder.search(fromPos, { pos: targetPos, range: 1 }, {
+            plainCost: 2,
+            swampCost: 10,
+            roomCallback: function(_roomName) {
+                // Return a flat matrix or let pathfinder use default costs
+                return new PathFinder.CostMatrix;
+            }
+        });
+
+        const distance = ret.path.length;
+        // Add a slight padding to the distance
+        Memory.sources[sourceId].distance = distance > 0 ? distance : 25;
+        return Memory.sources[sourceId].distance;
+    }
+}
+
 module.exports = {
     Logger,
     ErrorHandlingUtility,
     ProfilerUtility,
-    StressTestUtility
+    StressTestUtility,
+    RouteDistanceCalculator
 };

@@ -235,6 +235,7 @@ class TaskAssignmentManager {
         else if (role === 'remoteharvester') TaskAssignmentManager.assignRemoteHarvester(creep, roomState);
         else if (role === 'remotehauler') TaskAssignmentManager.assignRemoteHauler(creep, roomState);
         else if (role === 'repairman') TaskAssignmentManager.assignRepairman(creep, roomState);
+        else if (role === 'reserver') TaskAssignmentManager.assignReserver(creep, roomState);
         else if (role === 'defender') TaskAssignmentManager.assignDefender(creep, roomState);
         else if (role === 'hubcreep') TaskAssignmentManager.assignHubCreep(creep, roomState);
         else if (role === 'miner') TaskAssignmentManager.assignMiner(creep, roomState);
@@ -520,6 +521,41 @@ class TaskAssignmentManager {
         SourceAssignmentModule.assignHarvester(creep, roomState);
     }
 
+    static assignReserver(creep, _roomState) {
+        if (!creep.memory.targetRoom) {
+            const outposts = Memory.rooms[creep.memory.colony]?.outposts || [];
+            if (outposts.length > 0) {
+                const census = TaskAssignmentManager.getRemoteCensus();
+                let bestRoom = outposts[0];
+                let minCount = Infinity;
+                for (let i = 0; i < outposts.length; i++) {
+                    const key = `reserver_${creep.memory.colony}_${outposts[i]}`;
+                    const count = census.get(key) || 0;
+                    if (count < minCount) {
+                        minCount = count;
+                        bestRoom = outposts[i];
+                    }
+                }
+                creep.memory.targetRoom = bestRoom;
+            } else {
+                return;
+            }
+        }
+
+        if (creep.room.name !== creep.memory.targetRoom) {
+            creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+            return;
+        }
+
+        const targetRoomState = global.State?.rooms?.get(creep.room.name);
+        if (targetRoomState && targetRoomState.controller) {
+            creep.heap.targetId = targetRoomState.controller.id;
+            creep.heap.actionIntent = ActionConstants.ACTION_RESERVE;
+        } else {
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+        }
+    }
+
     static assignRemoteHauler(creep, homeState) {
         if (creep.heap.state === 'gather') {
             if (!creep.memory.targetRoom) {
@@ -547,6 +583,16 @@ class TaskAssignmentManager {
             }
             const roomState = global.State?.rooms?.get(creep.room.name);
             if (!roomState) return;
+
+            // Priority: Assigned Target Source
+            if (creep.memory.targetSource) {
+                const result = TaskAssignmentManager.getEnergyNearSource(creep, creep.memory.targetSource, roomState);
+                if (result) {
+                    creep.heap.targetId = result.target.id;
+                    creep.heap.actionIntent = result.intent;
+                    return;
+                }
+            }
 
             let bestTarget = null;
             let bestAmount = 0;
@@ -705,8 +751,67 @@ class TaskAssignmentManager {
         }
     }
 
+    static getEnergyNearSource(creep, targetSourceId, roomState) {
+        let bestTarget = null;
+        let bestAmount = 0;
+        let intent = '';
+
+        const sourceObj = CacheLib.getById(targetSourceId);
+        if (!sourceObj) return null;
+
+        if (roomState.containers) {
+            for (let i = 0; i < roomState.containers.length; i++) {
+                const c = roomState.containers[i];
+                if (Math.max(Math.abs(c.pos.x - sourceObj.pos.x), Math.abs(c.pos.y - sourceObj.pos.y)) <= 2) {
+                    const amount = c.store.getUsedCapacity(RESOURCE_ENERGY);
+                    const claimKey = `${c.id}_gather`;
+                    const claimed = global.tickClaims.get(claimKey) || 0;
+                    const available = amount - claimed;
+                    if (available > bestAmount && available >= Math.min(25, creep.store.getFreeCapacity())) {
+                        bestAmount = available;
+                        bestTarget = c;
+                        intent = ActionConstants.ACTION_WITHDRAW;
+                    }
+                }
+            }
+        }
+
+        if (roomState.droppedEnergy) {
+            for (let i = 0; i < roomState.droppedEnergy.length; i++) {
+                const d = roomState.droppedEnergy[i];
+                if (Math.max(Math.abs(d.pos.x - sourceObj.pos.x), Math.abs(d.pos.y - sourceObj.pos.y)) <= 2) {
+                    const claimKey = `${d.id}_gather`;
+                    const claimed = global.tickClaims.get(claimKey) || 0;
+                    const available = d.amount - claimed;
+                    if (available > bestAmount && available >= 25) {
+                        bestAmount = available;
+                        bestTarget = d;
+                        intent = ActionConstants.ACTION_PICKUP;
+                    }
+                }
+            }
+        }
+
+        if (bestTarget) {
+            const claimKey = `${bestTarget.id}_gather`;
+            global.tickClaims.set(claimKey, (global.tickClaims.get(claimKey) || 0) + creep.store.getFreeCapacity());
+            return { target: bestTarget, intent: intent };
+        }
+        return null;
+    }
+
     static assignHauler(creep, roomState) {
         if (creep.heap.state === 'gather') {
+            // Priority 0: Assigned Target Source
+            if (creep.memory.targetSource) {
+                const result = TaskAssignmentManager.getEnergyNearSource(creep, creep.memory.targetSource, roomState);
+                if (result) {
+                    creep.heap.targetId = result.target.id;
+                    creep.heap.actionIntent = result.intent;
+                    return;
+                }
+            }
+
             // Priority 1: Scavenge from Ruins and Tombstones
             let bestScavenge = null;
             let bestScavengeScore = -1;

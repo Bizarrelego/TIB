@@ -1,4 +1,5 @@
 // src/colonies/SpawnManager.js
+const { RouteDistanceCalculator } = require('../lib/SystemLib');
 const EMERGENCY_BODY = [WORK, CARRY, MOVE];
 
 class CreepBodyBuilder {
@@ -20,6 +21,7 @@ class CreepBodyBuilder {
             case 'filler': return this.generateHauler(energyCapacity);
             case 'remoteharvester': return this.generateHarvester(energyCapacity);
             case 'remotehauler': return this.generateHauler(energyCapacity);
+            case 'reserver': return this.generateReserver(energyCapacity);
             // Optimizes spawn cost by locking scouts to a single MOVE part, ensuring negligible impact on the RCL 2 energy budget.
             case 'scout': return [MOVE];
             case 'miner': return this.generateMiner(energyCapacity);
@@ -75,6 +77,17 @@ class CreepBodyBuilder {
         let cost = 150;
         while (cost + 100 <= energy && work < 5) { work++; cost += 100; }
         return this.buildArray(work, 0, move);
+    }
+
+    static generateReserver(energy) {
+        let claims = 1;
+        let moves = 1;
+        if (energy >= 1300) { claims = 2; moves = 2; }
+        const body = new Array(claims + moves);
+        let idx = 0;
+        for (let i = 0; i < claims; i++) body[idx++] = CLAIM;
+        for (let i = 0; i < moves; i++) body[idx++] = MOVE;
+        return body;
     }
 
     static generateMelee(energy) {
@@ -149,7 +162,7 @@ class CensusCalculator {
         };
     }
 
-    static getAllLimits(rcl, roomState, roomName) {
+    static getAllLimits(rcl, roomState, roomName, energyCapacity) {
         const limits = Object.assign({}, this.CENSUS_BY_RCL[rcl] || this.CENSUS_BY_RCL[4]);
 
         if (roomState) {
@@ -168,8 +181,8 @@ class CensusCalculator {
             }
 
             if (looseEnergy > 1500) {
-                const extraHaulers = Math.min(4, Math.floor(looseEnergy / 1500));
-                limits.hauler += extraHaulers;
+                // const extraHaulers = Math.min(4, Math.floor(looseEnergy / 1500));
+                // limits.hauler += extraHaulers; // Deprecated by dynamic hauler assignment
             }
 
             if (roomState.storage && roomState.storage.my) {
@@ -224,9 +237,53 @@ class CensusCalculator {
             }
             if (remoteSources > 0) {
                 limits.remoteharvester = remoteSources;
-                limits.remotehauler = remoteSources * 2;
+            }
+            if (rcl >= 4 && outposts.length > 0) {
+                limits.reserver = outposts.length;
             }
         }
+
+        // --- Dynamic Hauler Sizing & Dedication ---
+        limits.haulerQueue = [];
+        limits.hauler = 0; 
+        limits.remotehauler = 0;
+
+        const colony = global.State?.colonies?.get(roomName);
+        if (colony && colony.sources && colony.sources.length > 0) {
+            for (let i = 0; i < colony.sources.length; i++) {
+                const source = colony.sources[i];
+                const distance = RouteDistanceCalculator.getDistance(source.id, source.pos, roomName);
+                
+                // Math: 10 energy/tick generation. Round trip = 2*distance.
+                // Required capacity = 20 * distance.
+                // 1 CARRY = 50 capacity. So we need Math.ceil((20 * distance) / 50) = Math.ceil(distance * 0.4)
+                // We use Math.ceil(distance * 0.5) for a 20% pathing buffer.
+                const requiredCarry = Math.ceil(distance * 0.5);
+                
+                // 150 energy buys [CARRY, CARRY, MOVE] which is 2 CARRY parts
+                const requiredEnergy = Math.ceil(requiredCarry / 2) * 150;
+                
+                const cappedEnergy = Math.min(requiredEnergy, energyCapacity || 300);
+                // Math.max(1) ensures we always spawn at least 1 hauler if energy is low
+                const neededCount = Math.max(1, Math.ceil(requiredEnergy / cappedEnergy));
+                
+                const isRemote = source.pos.roomName !== roomName;
+                const roleName = isRemote ? 'remotehauler' : 'hauler';
+                
+                limits[roleName] += neededCount;
+                
+                limits.haulerQueue.push({
+                    role: roleName,
+                    targetSource: source.id,
+                    targetRoom: source.pos.roomName,
+                    count: neededCount,
+                    energy: cappedEnergy
+                });
+            }
+        } else {
+            limits.hauler = this.CENSUS_BY_RCL[rcl]?.hauler || 2;
+        }
+        // ------------------------------------------
 
         let needsScout = false;
         // Initiates passive intel ingestion at RCL 2 to prepare for early remote expansion.
@@ -348,7 +405,7 @@ class SpawnManager {
         let targetCensus = global.Cache.tickTargetCensus.get(roomName);
         if (!targetCensus) {
             // Evaluates the combined needs of the core room and outposts
-            targetCensus = CensusCalculator.getAllLimits(rcl, roomState, roomName);
+            targetCensus = CensusCalculator.getAllLimits(rcl, roomState, roomName, energyCapacity);
             global.Cache.tickTargetCensus.set(roomName, targetCensus);
         }
 
@@ -417,7 +474,7 @@ class SpawnManager {
         // Prevents economic stalling by ensuring early-game scouts yield the spawn queue to critical energy-generating roles.
         const spawnPriority = [
             'harvester', 'filler', 'hauler', 'bootstrapper', 'fastfiller', 'defender', 'upgrader', 'builder',
-            'scout', 'repairman', 'remoteharvester', 'remotehauler',
+            'scout', 'repairman', 'remoteharvester', 'remotehauler', 'reserver',
             'meleeCreep', 'rangerCreep', 'medicCreep'
         ];
 
@@ -434,28 +491,54 @@ class SpawnManager {
                     }
                 }
 
-                const bodyParts = CreepBodyBuilder.getBody(role, energyCapacity);
-                if (!bodyParts || bodyParts.length === 0) continue;
-
-                let cost = 0;
-                for (let j = 0; j < bodyParts.length; j++) {
-                    cost += BODYPART_COST[bodyParts[j]];
-                }
-
-                if (spawn.room.energyAvailable >= cost) {
-                    this.executeSpawn(spawn, role, bodyParts);
-                    return;
+                if ((role === 'hauler' || role === 'remotehauler') && targetCensus.haulerQueue) {
+                    let spawned = false;
+                    for (let j = 0; j < targetCensus.haulerQueue.length; j++) {
+                        const req = targetCensus.haulerQueue[j];
+                        if (req.role !== role) continue;
+                        
+                        let activeCount = 0;
+                        for (let k = 0; k < roomState.creeps.length; k++) {
+                            const c = roomState.creeps[k];
+                            if (c.memory.role === role && c.memory.targetSource === req.targetSource && (c.spawning || c.ticksToLive >= 75)) {
+                                activeCount++;
+                            }
+                        }
+                        
+                        if (activeCount < req.count) {
+                            const body = CreepBodyBuilder.getBody('hauler', req.energy);
+                            this.executeSpawn(spawn, role, body, { targetSource: req.targetSource, targetRoom: req.targetRoom });
+                            spawned = true;
+                            break;
+                        }
+                    }
+                    if (spawned) return;
                 } else {
-                    // Strict abort: Do not skip to lower priority roles if we are missing a higher priority one but just lack energy.
-                    return;
+                    const bodyParts = CreepBodyBuilder.getBody(role, energyCapacity);
+                    if (!bodyParts || bodyParts.length === 0) continue;
+
+                    let cost = 0;
+                    for (let j = 0; j < bodyParts.length; j++) {
+                        cost += BODYPART_COST[bodyParts[j]];
+                    }
+
+                    if (spawn.room.energyAvailable >= cost) {
+                        this.executeSpawn(spawn, role, bodyParts);
+                        return;
+                    } else {
+                        // Strict abort: Do not skip to lower priority roles if we are missing a higher priority one but just lack energy.
+                        return;
+                    }
                 }
             }
         }
     }
 
-    static executeSpawn(spawn, role, bodyParts) {
+    static executeSpawn(spawn, role, bodyParts, extraMemory = {}) {
+        if (!bodyParts || bodyParts.length === 0) return;
         const name = role + '_' + Game.time + '_' + Math.floor(Math.random() * 1000);
-        spawn.spawnCreep(bodyParts, name, { memory: { role: role, colony: spawn.room.name } });
+        const memory = Object.assign({ role: role, colony: spawn.room.name }, extraMemory);
+        spawn.spawnCreep(bodyParts, name, { memory: memory });
     }
 }
 
