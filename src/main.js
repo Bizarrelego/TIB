@@ -13,6 +13,8 @@ const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
 const IntelManager = require('./managers/IntelManager');
 const RemoteMiningManager = require('./managers/RemoteMiningManager');
 const EmpireManager = require('./empire/EmpireManager');
+const EmpireLogisticsManager = require('./empire/EmpireLogisticsManager');
+const ExpansionManager = require('./empire/ExpansionManager');
 const TrafficManager = require('./managers/TrafficManager');
 const RoomPlanner = require('./managers/RoomPlanner');
 const ConstructionManager = require('./managers/ConstructionManager');
@@ -64,15 +66,38 @@ module.exports.loop = function () {
     // 3.2 Empire-Level Operations
     ErrorHandlingUtility.wrap(() => RemoteMiningManager.run(), 'RemoteMiningManager')();
     ErrorHandlingUtility.wrap(() => EmpireManager.run(), 'EmpireManager')();
+    ErrorHandlingUtility.wrap(() => EmpireLogisticsManager.run(), 'EmpireLogisticsManager')();
+    ErrorHandlingUtility.wrap(() => ExpansionManager.run(), 'ExpansionManager')();
 
     // 3.5 Stress Test Injection
     ErrorHandlingUtility.wrap(() => StressTestUtility.run(), 'StressTestUtility')();
 
-    // 3.8 Planning & Scouting
+    // Establish CPU Gating and Colony Priority
+    let coloniesArr = [];
+    if (global.State && global.State.colonies) {
+        coloniesArr = Array.from(global.State.colonies.values());
+        // Sort by RCL (highest to lowest). If equal, prioritize by threat level (hostiles presence)
+        coloniesArr.sort((a, b) => {
+            const stateA = global.State.rooms.get(a.name);
+            const stateB = global.State.rooms.get(b.name);
+            const rclA = stateA && stateA.controller ? stateA.controller.level : 0;
+            const rclB = stateB && stateB.controller ? stateB.controller.level : 0;
+            if (rclB !== rclA) return rclB - rclA;
+            
+            const threatA = stateA && stateA.hostileCount > 0 ? 1 : 0;
+            const threatB = stateB && stateB.hostileCount > 0 ? 1 : 0;
+            return threatB - threatA;
+        });
+    }
+
+    // 3.8 Planning & Scouting (Throttled)
     ErrorHandlingUtility.wrap(() => {
-        for (const roomName in Game.rooms) {
-            const room = Game.rooms[roomName];
-            if (room.controller && room.controller.my) {
+        for (const colony of coloniesArr) {
+            // CPU Throttling: Skip non-critical operations for low-priority colonies if CPU is strained
+            if (Game.cpu.getUsed() > Game.cpu.limit * 0.8 && coloniesArr.indexOf(colony) > 0) continue;
+
+            const room = Game.rooms[colony.name];
+            if (room && room.controller && room.controller.my) {
                 RoomPlanner.manageRoom(room);
             }
         }
@@ -81,12 +106,12 @@ module.exports.loop = function () {
     ErrorHandlingUtility.wrap(() => ConstructionManager.run(), 'ConstructionManager')();
     ErrorHandlingUtility.wrap(() => ScoutingManager.run(), 'ScoutingManager')();
 
-    // 4. Task Assignment (Scoped by Colony)
+    // 4. Task Assignment (Scoped by Colony, Throttled)
     ErrorHandlingUtility.wrap(() => {
-        if (global.State && global.State.colonies) {
-            for (const colony of global.State.colonies.values()) {
-                TaskAssignmentManager.run(colony);
-            }
+        for (const colony of coloniesArr) {
+            // CPU Throttling: Skip TaskAssignment for low-priority colonies if CPU is critically strained
+            if (Game.cpu.getUsed() > Game.cpu.limit * 0.8 && coloniesArr.indexOf(colony) > 0) continue;
+            TaskAssignmentManager.run(colony);
         }
     }, 'TaskAssignmentManager')();
 

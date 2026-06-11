@@ -47,11 +47,20 @@ class MilitaryManager {
         const hasThreat = homeHasHostiles || outpostThreatRoom !== null;
 
         // Run once per room logic
-        let weAreStronger = false;
+        let weAreStronger = true;
         let primaryTarget = null;
         if (homeHasHostiles) {
             weAreStronger = MilitaryManager.evaluateStrength(homeState, colony);
             primaryTarget = MilitaryManager.findPrimaryTarget(homeState);
+        } else if (outpostThreatRoom) {
+            const oState = global.State.rooms.get(outpostThreatRoom);
+            weAreStronger = MilitaryManager.evaluateStrength(oState, colony);
+        }
+
+        // Global Defense Routing (Reinforcement Request)
+        if (hasThreat && !weAreStronger) {
+            const besiegedRoom = homeHasHostiles ? colony : outpostThreatRoom;
+            MilitaryManager.requestGlobalReinforcements(besiegedRoom, colony);
         }
 
         // Command each military creep
@@ -152,6 +161,44 @@ class MilitaryManager {
                     creep.heap.targetId = melee.id;
                     creep.heap.actionIntent = ActionConstants.ACTION_HEAL;
                     creep.heap.state = 'combat';
+                }
+            }
+        }
+    }
+
+    static requestGlobalReinforcements(besiegedRoom, requestingColony) {
+        if (!global.State || !global.State.colonies) return;
+
+        let bestColony = null;
+        let bestDist = Infinity;
+
+        // Find closest RCL 7+ colony
+        for (const c of global.State.colonies.values()) {
+            if (c.name === requestingColony) continue;
+
+            const cState = global.State.rooms.get(c.name);
+            if (cState && cState.controller && cState.controller.level >= 7) {
+                const dist = Game.map.getRoomLinearDistance(c.name, besiegedRoom);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestColony = c;
+                }
+            }
+        }
+
+        if (bestColony) {
+            // Re-route idle defenders from the high-RCL colony
+            const creeps = bestColony.creeps;
+            for (let i = 0; i < creeps.length; i++) {
+                const c = creeps[i];
+                const role = c.memory.role;
+                if (role === 'meleeCreep' || role === 'rangerCreep' || role === 'medicCreep' || role === 'defender') {
+                    if (!c.spawning && c.heap && (!c.heap.state || c.heap.state === 'idle' || c.heap.state === 'patrol')) {
+                        // Reroute them globally
+                        c.memory.targetRoom = besiegedRoom;
+                        c.heap.state = 'moving';
+                        c.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+                    }
                 }
             }
         }

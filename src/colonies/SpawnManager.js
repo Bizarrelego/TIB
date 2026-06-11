@@ -11,6 +11,7 @@ class CreepBodyBuilder {
             case 'hauler': return this.generateHauler(energyCapacity);
             case 'upgrader': return this.generateUpgrader(energyCapacity);
             case 'builder': return this.generateBuilder(energyCapacity);
+            case 'pioneer': return this.generatePioneer(energyCapacity);
             case 'bootstrapper': return [WORK, CARRY, MOVE];
             case 'fastfiller': {
                 let carry = 1;
@@ -72,6 +73,14 @@ class CreepBodyBuilder {
         let cost = 200;
         while (cost + 200 <= energy && (work + carry + move + 3) <= 50) { work++; carry++; move++; cost += 200; }
         while (cost + 50 <= energy && (work + carry + move + 1) <= 50) { carry++; cost += 50; }
+        return this.buildArray(work, carry, move);
+    }
+
+    static generatePioneer(energy) {
+        let work = 1, carry = 1, move = 1;
+        let cost = 200;
+        // Basically a builder/bootstrapper that can walk far
+        while (cost + 200 <= energy && (work + carry + move + 3) <= 50) { work++; carry++; move++; cost += 200; }
         return this.buildArray(work, carry, move);
     }
 
@@ -258,6 +267,12 @@ class CensusCalculator {
                     limits.upgrader = 1;
                     limits.builder = 4;
                 }
+            }
+
+            // Expansion Pioneer Limits
+            if (Memory.empire && Memory.empire.colonizeRoom && Memory.empire.colonizeSourceColony === roomName) {
+                limits.claimer = 1;
+                limits.pioneer = 4;
             }
         }
 
@@ -514,7 +529,7 @@ class SpawnManager {
         // Prevents economic stalling by ensuring early-game scouts yield the spawn queue to critical energy-generating roles.
         const spawnPriority = [
             'hubmanager', 'harvester', 'filler', 'hauler', 'bootstrapper', 'mineralhauler', 'fastfiller', 'defender', 'upgrader', 'builder',
-            'mineralminer', 'scout', 'scientist', 'claimer', 'remoteharvester', 'remotehauler', 'reserver',
+            'mineralminer', 'claimer', 'pioneer', 'scout', 'scientist', 'remoteharvester', 'remotehauler', 'reserver',
             'meleeCreep', 'rangerCreep', 'medicCreep'
         ];
 

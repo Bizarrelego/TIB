@@ -228,13 +228,13 @@ class TaskAssignmentManager {
         if (role === 'harvester') SourceAssignmentModule.assignHarvester(creep, roomState);
         else if (role === 'hauler') TaskAssignmentManager.assignHauler(creep, roomState);
         else if (role === 'builder') TaskAssignmentManager.assignBuilder(creep, roomState);
+        else if (role === 'pioneer') TaskAssignmentManager.assignPioneer(creep, roomState);
         else if (role === 'bootstrapper') TaskAssignmentManager.assignBootstrapper(creep, roomState);
         else if (role === 'upgrader') UpgradeAssignmentModule.assignUpgrader(creep, roomState);
         else if (role === 'filler') TaskAssignmentManager.assignFiller(creep, roomState);
         else if (role === 'fastfiller') TaskAssignmentManager.assignFastFiller(creep, roomState);
         else if (role === 'remoteharvester') TaskAssignmentManager.assignRemoteHarvester(creep, roomState);
         else if (role === 'remotehauler') TaskAssignmentManager.assignRemoteHauler(creep, roomState);
-        else if (role === 'repairman') TaskAssignmentManager.assignRepairman(creep, roomState);
         else if (role === 'reserver') TaskAssignmentManager.assignReserver(creep, roomState);
         else if (role === 'defender') TaskAssignmentManager.assignDefender(creep, roomState);
         else if (role === 'hubmanager') TaskAssignmentManager.assignHubManager(creep, roomState);
@@ -242,6 +242,25 @@ class TaskAssignmentManager {
         else if (role === 'mineralhauler') TaskAssignmentManager.assignMineralHauler(creep, roomState);
         else if (role === 'claimer') TaskAssignmentManager.assignClaimer(creep, roomState);
         else if (role === 'scientist') TaskAssignmentManager.assignScientist(creep, roomState);
+    }
+
+    static assignPioneer(creep, roomState) {
+        const targetRoom = Memory.empire?.colonizeRoom;
+        if (!targetRoom) {
+            // Expansion finished or aborted, act as builder
+            TaskAssignmentManager.assignBuilder(creep, roomState);
+            return;
+        }
+
+        if (creep.room.name !== targetRoom) {
+            creep.memory.targetRoom = targetRoom;
+            creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+            creep.heap.state = 'moving';
+            return;
+        }
+
+        // We are in the target room. Act as a bootstrapper.
+        TaskAssignmentManager.assignBootstrapper(creep, roomState);
     }
 
     static assignMineralMiner(creep, roomState) {

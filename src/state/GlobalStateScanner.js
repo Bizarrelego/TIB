@@ -13,10 +13,29 @@ function run() {
 
     // Rebuild colonies every tick
     global.State.colonies.clear();
+    
+    if (!global.Cache) global.Cache = {};
+    if (!global.Cache.colonyInstances) global.Cache.colonyInstances = new Map();
+
     for (const roomName in Game.rooms) {
         const room = Game.rooms[roomName];
         if (room.controller && room.controller.my) {
-            global.State.colonies.set(roomName, new Colony(roomName));
+            const outposts = Memory.empire?.colonies?.[roomName]?.outposts || [];
+            let colony = global.Cache.colonyInstances.get(roomName);
+
+            if (!colony) {
+                colony = new Colony(roomName);
+                global.Cache.colonyInstances.set(roomName, colony);
+            } else {
+                colony.outposts = outposts;
+                // Clear the dynamic arrays that get repopulated every tick
+                colony.creeps.length = 0;
+                for (let key in colony.creepsByRole) colony.creepsByRole[key].length = 0;
+                colony.sources.length = 0;
+                colony.constructionSites.length = 0;
+            }
+
+            global.State.colonies.set(roomName, colony);
         }
     }
 
