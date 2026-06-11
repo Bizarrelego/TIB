@@ -25,6 +25,10 @@ class CreepBodyBuilder {
             // Optimizes spawn cost by locking scouts to a single MOVE part, ensuring negligible impact on the RCL 2 energy budget.
             case 'scout': return [MOVE];
             case 'miner': return this.generateMiner(energyCapacity);
+            case 'hubcreep': return this.generateHubCreep(energyCapacity);
+            case 'mineralhauler': return this.generateHauler(energyCapacity);
+            case 'claimer': return this.generateClaimer(energyCapacity);
+            case 'scientist': return this.generateScientist(energyCapacity);
             case 'repairman': return [WORK, CARRY, MOVE, MOVE];
             case 'defender': return [TOUGH, MOVE, ATTACK, MOVE];
             case 'meleeCreep': return this.generateMelee(energyCapacity);
@@ -88,6 +92,29 @@ class CreepBodyBuilder {
         for (let i = 0; i < claims; i++) body[idx++] = CLAIM;
         for (let i = 0; i < moves; i++) body[idx++] = MOVE;
         return body;
+    }
+
+    static generateHubCreep(energy) {
+        // HubCreep is stationary. It needs 1 MOVE and max CARRY.
+        let carry = 1;
+        let move = 1;
+        let cost = 100;
+        // Cap at 16 CARRY parts (800 capacity) to cover the 800 link transfer size.
+        while (cost + 50 <= energy && carry < 16 && (carry + move + 1) <= 50) { carry++; cost += 50; }
+        return this.buildArray(0, carry, move);
+    }
+
+    static generateClaimer(_energy) {
+        // Claimer just needs to claim the room.
+        return [CLAIM, MOVE];
+    }
+
+    static generateScientist(energy) {
+        // Scientist needs to carry compounds. 1 MOVE, some CARRY.
+        let carry = 1, move = 1;
+        let cost = 100;
+        while (cost + 100 <= energy && carry < 10 && (carry + move + 2) <= 50) { carry++; move++; cost += 100; }
+        return this.buildArray(0, carry, move);
     }
 
     static generateMelee(energy) {
@@ -215,6 +242,16 @@ class CensusCalculator {
 
             if (roomState.extractor && roomState.mineral && roomState.mineral.mineralAmount > 0) {
                 limits.miner = 1;
+                limits.mineralhauler = 1;
+            }
+
+            if (roomState.storage && roomState.terminal && roomState.linkCount > 0) {
+                limits.hubcreep = 1;
+            }
+
+            if (roomState.labs && roomState.labs.length > 0) {
+                // Skeleton scaffold for Scientist logic
+                limits.scientist = 1;
             }
 
             // Emergency Storage Protocol
@@ -284,6 +321,10 @@ class CensusCalculator {
             limits.hauler = this.CENSUS_BY_RCL[rcl]?.hauler || 2;
         }
         // ------------------------------------------
+
+        if (Memory.empire && Memory.empire.colonizeRoom) {
+            limits.claimer = 1;
+        }
 
         let needsScout = false;
         // Initiates passive intel ingestion at RCL 2 to prepare for early remote expansion.
@@ -473,8 +514,8 @@ class SpawnManager {
 
         // Prevents economic stalling by ensuring early-game scouts yield the spawn queue to critical energy-generating roles.
         const spawnPriority = [
-            'harvester', 'filler', 'hauler', 'bootstrapper', 'fastfiller', 'defender', 'upgrader', 'builder',
-            'scout', 'repairman', 'remoteharvester', 'remotehauler', 'reserver',
+            'harvester', 'filler', 'hauler', 'bootstrapper', 'hubcreep', 'mineralhauler', 'fastfiller', 'defender', 'upgrader', 'builder',
+            'miner', 'scout', 'repairman', 'scientist', 'claimer', 'remoteharvester', 'remotehauler', 'reserver',
             'meleeCreep', 'rangerCreep', 'medicCreep'
         ];
 

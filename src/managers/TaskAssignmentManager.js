@@ -239,6 +239,9 @@ class TaskAssignmentManager {
         else if (role === 'defender') TaskAssignmentManager.assignDefender(creep, roomState);
         else if (role === 'hubcreep') TaskAssignmentManager.assignHubCreep(creep, roomState);
         else if (role === 'miner') TaskAssignmentManager.assignMiner(creep, roomState);
+        else if (role === 'mineralhauler') TaskAssignmentManager.assignMineralHauler(creep, roomState);
+        else if (role === 'claimer') TaskAssignmentManager.assignClaimer(creep, roomState);
+        else if (role === 'scientist') TaskAssignmentManager.assignScientist(creep, roomState);
     }
 
     static assignMiner(creep, roomState) {
@@ -346,6 +349,77 @@ class TaskAssignmentManager {
             }
 
             // Fallback
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+        }
+    }
+
+    static assignMineralHauler(creep, roomState) {
+        if (creep.heap.state === 'gather') {
+            if (!roomState.mineral) {
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+                return;
+            }
+            
+            let targetContainer = null;
+            if (roomState.containers) {
+                for (let i = 0; i < roomState.containers.length; i++) {
+                    const c = roomState.containers[i];
+                    if (Math.max(Math.abs(c.pos.x - roomState.mineral.pos.x), Math.abs(c.pos.y - roomState.mineral.pos.y)) <= 1) {
+                        if (c.store.getUsedCapacity() - c.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                            targetContainer = c;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (targetContainer) {
+                creep.heap.targetId = targetContainer.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
+                // Since this is a generic withdraw, ActionExecutor will need to pull all non-energy resources.
+                // It will be handled automatically if ActionExecutor pulls the highest amount resource.
+            } else {
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            }
+        } else {
+            // Drop off in Terminal, fallback to Storage
+            const target = roomState.terminal || roomState.storage;
+            if (target && target.store.getFreeCapacity() > 0) {
+                creep.heap.targetId = target.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
+            } else {
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            }
+        }
+    }
+
+    static assignClaimer(creep, _roomState) {
+        const targetRoom = Memory.empire?.colonizeRoom;
+        if (!targetRoom) {
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            return;
+        }
+
+        if (creep.room.name !== targetRoom) {
+            creep.memory.targetRoom = targetRoom;
+            creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+            return;
+        }
+
+        const targetRoomState = global.State?.rooms?.get(creep.room.name);
+        if (targetRoomState && targetRoomState.controller) {
+            creep.heap.targetId = targetRoomState.controller.id;
+            creep.heap.actionIntent = ActionConstants.ACTION_CLAIM;
+        } else {
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+        }
+    }
+
+    static assignScientist(creep, _roomState) {
+        // Skeleton logic for Scientist
+        if (creep.heap.state === 'gather') {
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+        } else {
             creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
         }
     }
