@@ -7,6 +7,12 @@ class ScoutingManager {
             const creep = Game.creeps[name];
             if ((creep.memory.role || '').toLowerCase() !== 'scout' || creep.spawning) continue;
 
+            const roomState = global.State?.rooms?.get(creep.memory.colony);
+            if (roomState && roomState.observers && roomState.observers.length > 0) {
+                creep.suicide();
+                continue;
+            }
+
             // 1. Intent Preservation: If it has ANY destination, it hasn't arrived yet. Let TrafficManager finish.
             // Improves execution stability by preventing the scout from overwriting its own destination.
             if (creep.heap.destination) {

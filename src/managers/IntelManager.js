@@ -21,6 +21,12 @@ class IntelManager {
             Memory.rooms = {};
         }
 
+        if (!Memory.rooms) {
+            Memory.rooms = {};
+        }
+
+        IntelManager.processObservers();
+
         const visibleRooms = Object.keys(Game.rooms);
 
         // Update threat and energy levels for all visible rooms EVERY TICK
@@ -192,6 +198,75 @@ class IntelManager {
                     if (!queue.includes(adjRoom)) {
                         queue.push(adjRoom);
                     }
+                }
+            }
+        }
+        return queue;
+    }
+
+    static processObservers() {
+        if (!global.State || !global.State.colonies) return;
+        if (!global.Cache.observerQueues) global.Cache.observerQueues = {};
+
+        for (const colony of global.State.colonies.values()) {
+            const roomState = global.State.rooms.get(colony.name);
+            if (!roomState || !roomState.observers || roomState.observers.length === 0) continue;
+
+            const observer = roomState.observers[0];
+            const queueKey = colony.name;
+
+            // Generate Queue if empty
+            if (!global.Cache.observerQueues[queueKey] || global.Cache.observerQueues[queueKey].length === 0) {
+                global.Cache.observerQueues[queueKey] = IntelManager.generateObserverQueue(colony.name);
+            }
+
+            const queue = global.Cache.observerQueues[queueKey];
+            if (queue.length > 0) {
+                // Find next target needing scouting
+                let targetScouted = true;
+                let targetRoom = null;
+
+                while (targetScouted && queue.length > 0) {
+                    targetRoom = queue.shift(); // take from front
+                    const mem = Memory.rooms[targetRoom];
+                    // If unscouted or older than 5000 ticks, it's a valid target
+                    if (!mem || !mem.scoutedAt || (Game.time - mem.scoutedAt > 5000)) {
+                        targetScouted = false;
+                    }
+                }
+
+                if (!targetScouted && targetRoom) {
+                    observer.observeRoom(targetRoom);
+                    // Push to back of queue so we eventually cycle through all again
+                    queue.push(targetRoom);
+                }
+            }
+        }
+    }
+
+    static generateObserverQueue(centerRoomName) {
+        const queue = [];
+        const match = centerRoomName.match(/^([WE])(\d+)([NS])(\d+)$/);
+        if (!match) return queue;
+
+        let wx = parseInt(match[2]);
+        let wy = parseInt(match[4]);
+        if (match[1] === 'W') wx = ~wx;
+        if (match[3] === 'S') wy = ~wy;
+
+        for (let dx = -10; dx <= 10; dx++) {
+            for (let dy = -10; dy <= 10; dy++) {
+                if (dx === 0 && dy === 0) continue;
+                const tx = wx + dx;
+                const ty = wy + dy;
+
+                const p1 = tx < 0 ? 'W' + (~tx) : 'E' + tx;
+                const p2 = ty < 0 ? 'S' + (~ty) : 'N' + ty;
+                const targetName = p1 + p2;
+
+                // Ensure it exists on the map
+                if (Game.map.getRoomStatus(targetName).status === 'normal') {
+                    queue.push(targetName);
                 }
             }
         }

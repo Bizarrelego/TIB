@@ -16,6 +16,7 @@ const EmpireManager = require('./empire/EmpireManager');
 const EmpireLogisticsManager = require('./empire/EmpireLogisticsManager');
 const MarketManager = require('./empire/MarketManager');
 const ExpansionManager = require('./empire/ExpansionManager');
+const PowerManager = require('./empire/PowerManager');
 const TrafficManager = require('./managers/TrafficManager');
 const RoomPlanner = require('./managers/RoomPlanner');
 const ConstructionManager = require('./managers/ConstructionManager');
@@ -71,6 +72,7 @@ module.exports.loop = function () {
     ErrorHandlingUtility.wrap(() => EmpireLogisticsManager.run(), 'EmpireLogisticsManager')();
     ErrorHandlingUtility.wrap(() => MarketManager.run(), 'MarketManager')();
     ErrorHandlingUtility.wrap(() => ExpansionManager.run(), 'ExpansionManager')();
+    ErrorHandlingUtility.wrap(() => PowerManager.run(), 'PowerManager')();
 
     // 3.5 Stress Test Injection
     ErrorHandlingUtility.wrap(() => StressTestUtility.run(), 'StressTestUtility')();

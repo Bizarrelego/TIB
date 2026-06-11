@@ -385,7 +385,12 @@ class CensusCalculator {
                 }
             }
         }
-        limits.scout = needsScout ? 1 : 0;
+        
+        let hasObserver = false;
+        if (roomState && roomState.observers && roomState.observers.length > 0) {
+            hasObserver = true;
+        }
+        limits.scout = (needsScout && !hasObserver) ? 1 : 0;
 
         let hostilesFound = false;
         if (roomState && roomState.hostiles && roomState.hostileCount > 0) hostilesFound = true;

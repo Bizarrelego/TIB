@@ -935,21 +935,30 @@ class TaskAssignmentManager {
             }
         };
 
+        // Pass 1: Spawns and Extensions (Absolute Core Priority)
         roomState.spawns?.forEach(evaluateTarget);
         roomState.extensions?.forEach(evaluateTarget);
-        
-        if (includeTowers) {
-            roomState.towers?.forEach(t => {
-                // Only fill towers if they are missing > 200 energy
-                if (t.store.getFreeCapacity(RESOURCE_ENERGY) >= 200) evaluateTarget(t);
-            });
-        }
 
         if (bestTarget) {
             bestTarget.__deliveryClaimed = (bestTarget.__deliveryClaimed || 0) + creep.store.getUsedCapacity(RESOURCE_ENERGY);
             creep.heap.targetId = bestTarget.id;
             creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
             return true;
+        }
+        
+        // Pass 2: Towers (Secondary Core Priority)
+        if (includeTowers) {
+            roomState.towers?.forEach(t => {
+                // Only fill towers if they are missing > 200 energy
+                if (t.store.getFreeCapacity(RESOURCE_ENERGY) >= 200) evaluateTarget(t);
+            });
+
+            if (bestTarget) {
+                bestTarget.__deliveryClaimed = (bestTarget.__deliveryClaimed || 0) + creep.store.getUsedCapacity(RESOURCE_ENERGY);
+                creep.heap.targetId = bestTarget.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
+                return true;
+            }
         }
 
         return false;
