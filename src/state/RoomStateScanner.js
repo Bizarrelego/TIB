@@ -20,6 +20,8 @@ const createRoomStateTemplate = () => {
     s.creepCounts = Object.create(null);
     s.creepCounts.harvester = 0; s.creepCounts.hauler = 0; s.creepCounts.upgrader = 0; s.creepCounts.builder = 0;
     s.creepCounts.repairer = 0; s.creepCounts.defender = 0; s.creepCounts.miner = 0; s.creepCounts.scout = 0;
+    s.creepCounts.filler = 0; s.creepCounts.fastfiller = 0; s.creepCounts.bootstrapper = 0;
+    s.creepCounts.remoteharvester = 0; s.creepCounts.remotehauler = 0;
     s.cache = Object.create(null);
     s.cache.scannedAt = 0; s.cache.mineralId = null; s.cache.sourceIds = []; s.cache.structureIds = [];
     s.cache.lastConstructionSiteCount = 0; s.cache.hostilesPresent = false;

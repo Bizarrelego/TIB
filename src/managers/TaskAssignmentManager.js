@@ -851,7 +851,7 @@ class TaskAssignmentManager {
         }
 
         // Emergency Override: If storage exists but we have 0 alive fillers, haulers MUST step in to fill core structures
-        const hasFiller = roomState.creepCounts && roomState.creepCounts['filler'] > 0;
+        const hasFiller = roomState.creepCounts && (roomState.creepCounts['filler'] > 0 || roomState.creepCounts['fastfiller'] > 0);
         if (roomState.storage && !hasFiller) {
             if (TransferAssignmentModule.routeToCoreStructures(creep, roomState)) return;
         }
