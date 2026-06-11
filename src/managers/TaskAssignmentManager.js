@@ -239,6 +239,7 @@ class TaskAssignmentManager {
         else if (role === 'mineralhauler') TaskAssignmentManager.assignMineralHauler(creep, roomState);
         else if (role === 'claimer') TaskAssignmentManager.assignClaimer(creep, roomState);
         else if (role === 'scientist') TaskAssignmentManager.assignScientist(creep, roomState);
+        else if (role === 'remotebuilder') TaskAssignmentManager.assignRemoteBuilder(creep, roomState);
     }
 
     static assignPioneer(creep, roomState) {
@@ -560,11 +561,26 @@ class TaskAssignmentManager {
             return;
         }
 
-        // Priority 2: Defend outposts
+        // Priority 2: Defend expansion room
+        if (Memory.empire && Memory.empire.colonizeRoom && Memory.empire.colonizeSourceColony === creep.memory.colony) {
+            const expState = global.State.rooms.get(Memory.empire.colonizeRoom);
+            if (expState && expState.hostiles && expState.hostileCount > 0) {
+                if (creep.room.name !== Memory.empire.colonizeRoom) {
+                    creep.memory.targetRoom = Memory.empire.colonizeRoom;
+                    creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+                    return;
+                }
+                creep.heap.targetId = expState.hostiles[0].id;
+                creep.heap.actionIntent = ActionConstants.ACTION_ATTACK;
+                return;
+            }
+        }
+
+        // Priority 3: Defend outposts
         const outposts = Memory.rooms[creep.memory.colony]?.outposts || [];
         for (let i = 0; i < outposts.length; i++) {
             const outpostState = global.State.rooms.get(outposts[i]);
-            if (outpostState && outpostState.hostiles && outpostState.hostiles.length > 0) {
+            if (outpostState && outpostState.hostiles && outpostState.hostileCount > 0) {
                 if (creep.room.name !== outposts[i]) {
                     creep.memory.targetRoom = outposts[i];
                     creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
@@ -664,6 +680,69 @@ class TaskAssignmentManager {
         } else {
             creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
         }
+    }
+
+    static assignRemoteBuilder(creep, homeState) {
+        if (!creep.memory.targetRoom) {
+            const outposts = Memory.rooms[creep.memory.colony]?.outposts || [];
+            if (outposts.length > 0) {
+                const census = TaskAssignmentManager.getRemoteCensus();
+                let bestRoom = outposts[0];
+                let minCount = Infinity;
+                for (let i = 0; i < outposts.length; i++) {
+                    const key = `remotebuilder_${creep.memory.colony}_${outposts[i]}`;
+                    const count = census.get(key) || 0;
+                    if (count < minCount) {
+                        minCount = count;
+                        bestRoom = outposts[i];
+                    }
+                }
+                creep.memory.targetRoom = bestRoom;
+            } else {
+                return;
+            }
+        }
+
+        if (creep.heap.state === 'gather') {
+            if (creep.room.name !== creep.memory.colony) {
+                creep.memory.targetRoom = creep.memory.colony; // Temporary override for gather
+                creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+                return;
+            }
+            if (TaskAssignmentManager.getEnergy(creep, homeState, false)) return;
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            return;
+        }
+
+        // State: work
+        if (creep.room.name !== creep.memory.targetRoom) {
+            creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+            return;
+        }
+
+        const roomState = global.State?.rooms?.get(creep.room.name);
+        if (!roomState) return;
+
+        // Repair containers and roads
+        if (roomState.repairTargets?.length > 0) {
+            for (let i = 0; i < roomState.repairTargetCount; i++) {
+                const target = roomState.repairTargets[i];
+                if (target.hits < target.hitsMax * 0.5) {
+                    creep.heap.targetId = target.id;
+                    creep.heap.actionIntent = ActionConstants.ACTION_REPAIR;
+                    return;
+                }
+            }
+        }
+
+        // Build sites
+        if (roomState.constructionSites && roomState.constructionSiteCount > 0) {
+            creep.heap.targetId = roomState.constructionSites[0].id;
+            creep.heap.actionIntent = ActionConstants.ACTION_BUILD;
+            return;
+        }
+
+        creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
     }
 
     static assignRemoteHauler(creep, homeState) {

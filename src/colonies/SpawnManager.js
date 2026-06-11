@@ -279,18 +279,40 @@ class CensusCalculator {
         if (roomName && Memory.rooms && Memory.rooms[roomName] && Memory.rooms[roomName].outposts) {
             const outposts = Memory.rooms[roomName].outposts;
             let remoteSources = 0;
+            let neededReservers = 0;
+            let neededRemoteBuilders = 0;
+            
             for (let i = 0; i < outposts.length; i++) {
-                const adjMem = Memory.rooms[outposts[i]];
+                const outpostName = outposts[i];
+                const adjMem = Memory.rooms[outpostName];
+                const outpostState = global.State?.rooms?.get(outpostName);
+                
                 if (adjMem && adjMem.sources) {
                     remoteSources += adjMem.sources.length;
+                }
+
+                // Reserver Logic
+                if (rcl >= 4 && adjMem && adjMem.controller && (!adjMem.controller.owner)) {
+                    // Only reserve if reservation is low (< 1000) or missing
+                    if (!adjMem.controller.reservation || adjMem.controller.reservation.ticksToEnd < 1500) {
+                        neededReservers++;
+                    }
+                }
+
+                // Remote Builder (Janitor) Logic
+                if (outpostState && outpostState.constructionSiteCount > 0) {
+                    neededRemoteBuilders += Math.min(2, Math.ceil(outpostState.constructionSiteCount / 5));
                 }
             }
             if (remoteSources > 0) {
                 limits.remoteharvester = remoteSources;
                 limits.remotehauler = remoteSources;
             }
-            if (rcl >= 4 && outposts.length > 0) {
-                limits.reserver = outposts.length;
+            if (neededReservers > 0) {
+                limits.reserver = neededReservers;
+            }
+            if (neededRemoteBuilders > 0) {
+                limits.remotebuilder = neededRemoteBuilders;
             }
         }
 
@@ -402,6 +424,14 @@ class CensusCalculator {
                     hostilesFound = true;
                     break;
                 }
+            }
+        }
+        
+        // Expansion defense logic
+        if (!hostilesFound && Memory.empire && Memory.empire.colonizeRoom && Memory.empire.colonizeSourceColony === roomName) {
+            const expState = global.State?.rooms?.get(Memory.empire.colonizeRoom);
+            if (expState && expState.hostiles && expState.hostileCount > 0) {
+                hostilesFound = true;
             }
         }
         if (hostilesFound) {

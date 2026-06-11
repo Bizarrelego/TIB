@@ -13,6 +13,7 @@ const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
 const IntelManager = require('./managers/IntelManager');
 const RemoteMiningManager = require('./managers/RemoteMiningManager');
 const EmpireManager = require('./empire/EmpireManager');
+const OutpostManager = require('./empire/OutpostManager');
 const EmpireLogisticsManager = require('./empire/EmpireLogisticsManager');
 const MarketManager = require('./empire/MarketManager');
 const ExpansionManager = require('./empire/ExpansionManager');
@@ -68,6 +69,7 @@ module.exports.loop = function () {
 
     // 3.2 Empire-Level Operations
     ErrorHandlingUtility.wrap(() => RemoteMiningManager.run(), 'RemoteMiningManager')();
+    ErrorHandlingUtility.wrap(() => OutpostManager.run(), 'OutpostManager')();
     ErrorHandlingUtility.wrap(() => EmpireManager.run(), 'EmpireManager')();
     ErrorHandlingUtility.wrap(() => EmpireLogisticsManager.run(), 'EmpireLogisticsManager')();
     ErrorHandlingUtility.wrap(() => MarketManager.run(), 'MarketManager')();

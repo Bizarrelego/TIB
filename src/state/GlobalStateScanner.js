@@ -94,6 +94,18 @@ function run() {
             }
         }
     }
+
+    // Single-pass mineral tracking for Empire economy and expansion
+    global.State.empireMinerals = [];
+    for (const colony of global.State.colonies.values()) {
+        const coreState = global.State.rooms.get(colony.name);
+        if (coreState && coreState.mineral) {
+            const mineralType = coreState.mineral.mineralType;
+            if (!global.State.empireMinerals.includes(mineralType)) {
+                global.State.empireMinerals.push(mineralType);
+            }
+        }
+    }
 }
 
 module.exports = {
