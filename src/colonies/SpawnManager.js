@@ -34,8 +34,52 @@ class CreepBodyBuilder {
             case 'meleeCreep': return this.generateMelee(energyCapacity);
             case 'rangerCreep': return this.generateRanger(energyCapacity);
             case 'medicCreep': return this.generateMedic(energyCapacity);
+            case 'skguard': return this.generateSKGuard(energyCapacity);
+            case 'skminer': return this.generateSKMiner(energyCapacity);
+            case 'skhauler': return this.generateSKHauler(energyCapacity);
             default: return [WORK, CARRY, MOVE];
         }
+    }
+
+    static generateSKGuard(energy) {
+        // Paladin Body: [TOUGH, ATTACK, MOVE, HEAL]
+        // Base cost: 10 + 80 + 50 + 250 = 390
+        // Need high move ratio. Max cost for 50 parts is around 5000.
+        // We'll aim for a balanced block of: 1 TOUGH, 4 ATTACK, 6 MOVE, 1 HEAL = 10 + 320 + 300 + 250 = 880.
+        const blockCost = 880;
+        let blocks = Math.floor(energy / blockCost);
+        if (blocks > 4) blocks = 4; // 4 blocks = 48 parts
+        if (blocks < 1) return [MOVE, ATTACK, HEAL, MOVE]; // Emergency
+        
+        const body = new Array(blocks * 12);
+        let idx = 0;
+        for (let i = 0; i < blocks; i++) body[idx++] = TOUGH;
+        for (let i = 0; i < blocks * 4; i++) body[idx++] = ATTACK;
+        for (let i = 0; i < blocks * 6; i++) body[idx++] = MOVE;
+        for (let i = 0; i < blocks; i++) body[idx++] = HEAL;
+        return body;
+    }
+
+    static generateSKMiner(energy) {
+        // SK sources have 4000 capacity per 300 ticks (~13.33/tick)
+        // Requires 7 WORK parts to fully drain in time.
+        // Body: 7 WORK, 1 CARRY, 4 MOVE = 700 + 50 + 200 = 950 energy.
+        if (energy >= 950) {
+            return this.buildArray(7, 1, 4);
+        }
+        return this.generateMiner(energy); // fallback
+    }
+
+    static generateSKHauler(energy) {
+        // Massive hauler, 2 CARRY : 1 MOVE. 
+        let carry = 1, move = 1;
+        let cost = 100;
+        while (cost + 150 <= energy && (carry + move + 3) <= 50) {
+            carry += 2;
+            move += 1;
+            cost += 150;
+        }
+        return this.buildArray(0, carry, move);
     }
 
     static generateHarvester(energy) {
@@ -184,23 +228,30 @@ class CreepBodyBuilder {
 }
 
 class CensusCalculator {
-    static get CENSUS_BY_RCL() {
-        return {
-            1: { harvester: 2, hauler: 4, upgrader: 3, builder: 0 },
-            2: { harvester: 2, hauler: 4, upgrader: 4, builder: 3 },
-            3: { harvester: 2, hauler: 3, upgrader: 4, builder: 3 },
-            4: { harvester: 2, hauler: 2, upgrader: 4, builder: 2 },
-            5: { harvester: 2, hauler: 2, upgrader: 4, builder: 2 },
-            6: { harvester: 2, hauler: 2, upgrader: 4, builder: 2 },
-            7: { harvester: 2, hauler: 2, upgrader: 3, builder: 1 },
-            8: { harvester: 2, hauler: 2, upgrader: 1, builder: 1 }
-        };
-    }
-
     static getAllLimits(rcl, roomState, roomName, energyCapacity) {
-        const limits = Object.assign({}, this.CENSUS_BY_RCL[rcl] || this.CENSUS_BY_RCL[4]);
+        // Base limits with 0 default, completely dynamically generated
+        const limits = {
+            harvester: 0,
+            hauler: 0,
+            upgrader: 0,
+            builder: 0,
+            filler: 0,
+            fastfiller: 0,
+            mineralminer: 0,
+            mineralhauler: 0,
+            hubmanager: 0,
+            scientist: 0,
+            pioneer: 0,
+            claimer: 0
+        };
 
         if (roomState) {
+            // 1. Dynamic Harvesters
+            if (roomState.sources) {
+                limits.harvester = roomState.sources.length;
+            }
+
+            // 2. Dynamic Haulers
             let looseEnergy = 0;
             if (roomState.droppedEnergy) {
                 for (let i = 0; i < roomState.droppedEnergyCount; i++) {
@@ -215,11 +266,25 @@ class CensusCalculator {
                 }
             }
 
-            if (looseEnergy > 1500) {
-                // const extraHaulers = Math.min(4, Math.floor(looseEnergy / 1500));
-                // limits.hauler += extraHaulers; // Deprecated by dynamic hauler assignment
+            let haulerBase = 1;
+            if (roomState.storage && roomState.terminal && roomState.linkCount > 0) {
+                // If fully linked, we might not need haulers at all for sources
+                haulerBase = 0;
+            }
+            
+            // Add 1 hauler per 1500 loose energy, max 4
+            let dynamicHaulers = Math.floor(looseEnergy / 1500);
+            limits.hauler = Math.min(4, haulerBase + dynamicHaulers);
+
+            // Siege Response
+            const isUnderSiege = roomState.hostileCount > 0;
+            if (isUnderSiege && roomState.storage && roomState.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 20000) {
+                limits.hauler = Math.max(limits.hauler, 2);
             }
 
+            // 3. Dynamic Upgraders
+            limits.upgrader = 1; // Base to prevent downgrade
+            
             if (roomState.storage && roomState.storage.my) {
                 limits.filler = 1;
 
@@ -228,14 +293,12 @@ class CensusCalculator {
                 }
 
                 const storageEnergy = roomState.storage.store.getUsedCapacity(RESOURCE_ENERGY);
-                if (storageEnergy < 50000) {
-                    limits.upgrader = Math.min(limits.upgrader, 1);
-                } else if (storageEnergy > 300000) {
-                    limits.upgrader += 3;
+                if (storageEnergy > 300000) {
+                    limits.upgrader = 4;
                 } else if (storageEnergy > 200000) {
-                    limits.upgrader += 2;
+                    limits.upgrader = 3;
                 } else if (storageEnergy > 100000) {
-                    limits.upgrader += 1;
+                    limits.upgrader = 2;
                 }
             }
 
@@ -243,7 +306,6 @@ class CensusCalculator {
                 const terminalEnergy = roomState.terminal.store.getUsedCapacity(RESOURCE_ENERGY);
                 if (terminalEnergy > 50000) {
                     limits.upgrader += 1;
-                    limits.builder += 1;
                 }
             }
 
@@ -257,22 +319,63 @@ class CensusCalculator {
             }
 
             if (roomState.labs && roomState.labs.length > 0) {
-                // Skeleton scaffold for Scientist logic
                 limits.scientist = 1;
             }
 
             // Emergency Storage Protocol
-            if (rcl >= 4) {
-                if (!roomState.storage || !roomState.storage.my) {
-                    limits.upgrader = 1;
-                    limits.builder = 4;
-                }
+            if (rcl >= 4 && (!roomState.storage || !roomState.storage.my)) {
+                limits.upgrader = 1;
+                limits.builder = 4;
             }
 
             // Expansion Pioneer Limits
             if (Memory.empire && Memory.empire.colonizeRoom && Memory.empire.colonizeSourceColony === roomName) {
                 limits.claimer = 1;
                 limits.pioneer = 4;
+            }
+
+            // 4. Dynamic Builders
+            let canAffordBuilders = false;
+            
+            // 1. Bootstrapping (No storage)
+            if (!roomState.storage || !roomState.storage.my) {
+                canAffordBuilders = true;
+            } else {
+                const storageEnergy = roomState.storage.store.getUsedCapacity(RESOURCE_ENERGY);
+                
+                // 2. Energy Surplus
+                if (storageEnergy > 30000) {
+                    canAffordBuilders = true;
+                } else {
+                    // 3. Critical Repairs
+                    let hasCriticalRepairs = false;
+                    for (let i = 0; i < roomState.rampartCount; i++) {
+                        if (roomState.ramparts[i].hits < 5000) {
+                            hasCriticalRepairs = true;
+                            break;
+                        }
+                    }
+                    if (!hasCriticalRepairs && roomState.repairTargetCount > 0) {
+                        for (let i = 0; i < roomState.repairTargetCount; i++) {
+                            const target = roomState.repairTargets[i];
+                            if ((target.structureType === STRUCTURE_WALL || target.structureType === STRUCTURE_RAMPART) && target.hits < 5000) {
+                                hasCriticalRepairs = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (hasCriticalRepairs) {
+                        canAffordBuilders = true;
+                    } else if (roomState.constructionSiteCount > 0 && storageEnergy > 10000) {
+                        // 4. Practical exception for construction sites
+                        canAffordBuilders = true;
+                    }
+                }
+            }
+
+            if (!canAffordBuilders) {
+                limits.builder = 0;
             }
         }
 
@@ -287,12 +390,20 @@ class CensusCalculator {
                 const adjMem = Memory.rooms[outpostName];
                 const outpostState = global.State?.rooms?.get(outpostName);
                 
+                const isSKRoom = adjMem && adjMem.roomType === 'sk';
+
                 if (adjMem && adjMem.sources) {
-                    remoteSources += adjMem.sources.length;
+                    if (isSKRoom) {
+                        // 1 SKMiner per source, plus 1 SKGuard (Paladin) for the whole room
+                        limits.skminer = (limits.skminer || 0) + adjMem.sources.length;
+                        limits.skguard = (limits.skguard || 0) + 1;
+                    } else {
+                        remoteSources += adjMem.sources.length;
+                    }
                 }
 
-                // Reserver Logic
-                if (rcl >= 4 && adjMem && adjMem.controller && (!adjMem.controller.owner)) {
+                // Reserver Logic (Skip for SK rooms as they lack controllers to reserve)
+                if (!isSKRoom && rcl >= 4 && adjMem && adjMem.controller && (!adjMem.controller.owner)) {
                     // Only reserve if reservation is low (< 1000) or missing
                     if (!adjMem.controller.reservation || adjMem.controller.reservation.ticksToEnd < 1500) {
                         neededReservers++;
@@ -318,7 +429,6 @@ class CensusCalculator {
 
         // --- Dynamic Hauler Sizing & Dedication ---
         limits.haulerQueue = [];
-        limits.hauler = 0; 
         limits.remotehauler = 0;
 
         const colony = global.State?.colonies?.get(roomName);
@@ -327,11 +437,11 @@ class CensusCalculator {
                 const source = colony.sources[i];
                 const distance = RouteDistanceCalculator.getDistance(source.id, source.pos, roomName);
                 
-                // Math: 10 energy/tick generation. Round trip = 2*distance.
-                // Required capacity = 20 * distance.
-                // 1 CARRY = 50 capacity. So we need Math.ceil((20 * distance) / 50) = Math.ceil(distance * 0.4)
-                // We use Math.ceil(distance * 0.5) for a 20% pathing buffer.
-                const requiredCarry = Math.ceil(distance * 0.5);
+                // Math: 10 energy/tick generation (regular) or ~13 (SK). Round trip = 2*distance.
+                const isSKRoom = Memory.rooms[source.pos.roomName] && Memory.rooms[source.pos.roomName].roomType === 'sk';
+                const energyPerTick = isSKRoom ? 13.33 : 10;
+                
+                const requiredCarry = Math.ceil(distance * 2 * energyPerTick / 50 * 1.2); // 20% pathing buffer
                 
                 // 150 energy buys [CARRY, CARRY, MOVE] which is 2 CARRY parts
                 const requiredEnergy = Math.ceil(requiredCarry / 2) * 150;
@@ -341,9 +451,12 @@ class CensusCalculator {
                 const neededCount = Math.max(1, Math.ceil(requiredEnergy / cappedEnergy));
                 
                 const isRemote = source.pos.roomName !== roomName;
-                const roleName = isRemote ? 'remotehauler' : 'hauler';
+                let roleName = 'hauler';
+                if (isRemote) {
+                    roleName = isSKRoom ? 'skhauler' : 'remotehauler';
+                }
                 
-                limits[roleName] += neededCount;
+                limits[roleName] = (limits[roleName] || 0) + neededCount;
                 
                 limits.haulerQueue.push({
                     role: roleName,
@@ -354,7 +467,7 @@ class CensusCalculator {
                 });
             }
         } else {
-            limits.hauler = this.CENSUS_BY_RCL[rcl]?.hauler || 2;
+            limits.hauler = Math.max(limits.hauler, 2);
         }
         // ------------------------------------------
 
@@ -515,7 +628,10 @@ class SpawnManager {
                 if (role === 'bootstrapper') rawBootstrapperCount++;
 
                 // Fixes Generation Die-offs by triggering replacement spawns before the current workforce expires, ensuring zero downtime on critical infrastructure.
-                if (!c.spawning && c.ticksToLive !== undefined && c.ticksToLive < 75) {
+                let preSpawnThreshold = 75;
+                if (role === 'skguard' || role === 'skminer') preSpawnThreshold = 300;
+                
+                if (!c.spawning && c.ticksToLive !== undefined && c.ticksToLive < preSpawnThreshold) {
                     continue;
                 }
 
@@ -551,20 +667,22 @@ class SpawnManager {
         }
 
         if (harvesterCount === 0 && (targetCensus['harvester'] || 0) > 0) {
-            const body = energyCapacity >= 300 ? CreepBodyBuilder.getBody('harvester', energyCapacity) : EMERGENCY_BODY;
+            const currentEnergy = spawn.room.energyAvailable;
+            const body = currentEnergy >= 300 ? CreepBodyBuilder.getBody('harvester', currentEnergy) : EMERGENCY_BODY;
             this.executeSpawn(spawn, 'harvester', body);
             return;
         }
         if (harvesterCount >= 1 && haulerCount === 0 && (targetCensus['hauler'] || 0) > 0) {
-            const body = energyCapacity >= 300 ? CreepBodyBuilder.getBody('hauler', energyCapacity) : EMERGENCY_BODY;
+            const currentEnergy = spawn.room.energyAvailable;
+            const body = currentEnergy >= 300 ? CreepBodyBuilder.getBody('hauler', currentEnergy) : EMERGENCY_BODY;
             this.executeSpawn(spawn, 'hauler', body);
             return;
         }
 
         // Prevents economic stalling by ensuring early-game scouts yield the spawn queue to critical energy-generating roles.
         const spawnPriority = [
-            'hubmanager', 'harvester', 'filler', 'hauler', 'bootstrapper', 'mineralhauler', 'fastfiller', 'defender', 'upgrader', 'builder',
-            'mineralminer', 'claimer', 'pioneer', 'scout', 'scientist', 'remoteharvester', 'remotehauler', 'reserver',
+            'hubmanager', 'harvester', 'filler', 'hauler', 'bootstrapper', 'skguard', 'mineralhauler', 'fastfiller', 'defender', 'upgrader', 'builder',
+            'mineralminer', 'claimer', 'pioneer', 'scout', 'scientist', 'skminer', 'skhauler', 'remoteharvester', 'remotehauler', 'reserver',
             'meleeCreep', 'rangerCreep', 'medicCreep'
         ];
 

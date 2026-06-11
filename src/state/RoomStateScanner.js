@@ -66,6 +66,7 @@ class RoomStateScanner {
         state.terminal = null;
         state.factory = null;
         state.extractor = null;
+        state.nuker = null;
 
         state.controller = room.controller;
 
@@ -125,6 +126,7 @@ class RoomStateScanner {
                     case STRUCTURE_TERMINAL: state.terminal = s; break;
                     case STRUCTURE_FACTORY: state.factory = s; break;
                     case STRUCTURE_EXTRACTOR: state.extractor = s; break;
+                    case STRUCTURE_NUKER: state.nuker = s; break;
                     case STRUCTURE_INVADER_CORE: state.invaderCores[state.invaderCoreCount++] = s; break;
                     case STRUCTURE_RAMPART: if (s.my) state.ramparts[state.rampartCount++] = s; break;
                 }

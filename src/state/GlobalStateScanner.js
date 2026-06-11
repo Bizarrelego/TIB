@@ -66,7 +66,10 @@ function run() {
         if (role === 'upgrader') roomState.upgraders.push(creep);
         
         if (role && roomState.creepCounts[role] !== undefined) {
-            roomState.creepCounts[role]++;
+            // Pre-spawning: ignore creeps that are about to die so they are replaced seamlessly
+            if (creep.ticksToLive === undefined || creep.ticksToLive > 50) {
+                roomState.creepCounts[role]++;
+            }
         }
 
         // Single-Pass Binning for Colonies

@@ -286,10 +286,14 @@ class IntelManager {
             // Check if suitable for remote mining
             if (intel.controller && intel.controller.owner) continue; // Owned by someone
             if (intel.hostiles && (intel.hostiles.towers > 0 || intel.hostiles.invaderCore)) continue; // Hostile structures
+            
+            // SK rooms are only viable at RCL 6+ due to heavy military requirements
+            if (intel.roomType === 'sk' && (!room.controller || room.controller.level < 6)) continue;
+
             if (intel.sources && intel.sources.length > 0) {
                 outposts.push(adjRoom);
                 // Register globally
-                Memory.outposts[adjRoom] = { sourceRoom: room.name, sources: intel.sources.length };
+                Memory.outposts[adjRoom] = { sourceRoom: room.name, sources: intel.sources.length, roomType: intel.roomType };
             }
         }
 

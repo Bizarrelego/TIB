@@ -36,9 +36,15 @@ class RemoteMiningManager {
             // Only evaluate if we have Intel and it has sources
             if (!intel || !intel.sources || intel.sources.length === 0) continue;
             
-            // Don't evaluate owned rooms or SK rooms
+            // Don't evaluate owned rooms
             if (intel.controller && intel.controller.owner) continue;
-            if (intel.roomType === 'sk') continue;
+            
+            const isSKRoom = intel.roomType === 'sk';
+            // SK rooms are only profitable if we can afford the military upkeep (approx 3500 energy for Paladin)
+            // The Paladin costs 3500 and lasts 1500 ticks -> ~2.33 energy per tick
+            // A dedicated SKMiner costs about 1200 energy -> 0.8 energy per tick
+            const militaryUpkeepPerTick = isSKRoom ? 2.5 : 0;
+            const minerCost = isSKRoom ? 1200 : 650;
 
             let profitable = false;
 
@@ -63,22 +69,17 @@ class RemoteMiningManager {
                 // Calculate exact costs
                 const distance = ret.path.length;
                 
-                // 5 WORK, 1 CARRY, 2 MOVE
-                const harvesterCost = 650; 
-                
-                // Hauler needs (distance * 2) * 10 capacity to make round trip
-                // A 100 capacity block (2 CARRY, 1 MOVE) costs 150 energy.
-                const requiredCapacity = distance * 2 * 10;
+                // Hauler needs (distance * 2) * (isSKRoom ? 13 : 10) capacity
+                // SK source is 4000/300 = ~13 energy per tick
+                const energyPerTick = isSKRoom ? 13.33 : 10;
+                const requiredCapacity = distance * 2 * energyPerTick;
                 const haulerCost = Math.ceil(requiredCapacity / 100) * 150;
                 
-                // Road decays 1 hp per 1000 ticks. Costs 1 energy per hp to repair. Average 0.001 per tile.
-                // Accounting for swamp multipliers, we estimate 0.002 average.
                 const roadCostPerTick = distance * 0.002;
 
-                const upkeepCost = (harvesterCost / 1500) + (haulerCost / 1500) + roadCostPerTick;
+                const upkeepCost = (minerCost / 1500) + (haulerCost / 1500) + roadCostPerTick + militaryUpkeepPerTick;
                 
-                // Source yields 3000 energy every 300 ticks = 10 energy/tick
-                const netIncome = 10 - upkeepCost;
+                const netIncome = energyPerTick - upkeepCost;
 
                 if (netIncome > 0) {
                     profitable = true;
