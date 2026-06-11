@@ -27,9 +27,9 @@ class RoomPlanner {
         if (Game.cpu.bucket <= 500) return;
         // if (Game.time % 50 !== 0) return; // Temporarily disabled for debugging
         if (!global.Cache) global.Cache = { blueprints: new Map() };
-        if (global.Cache.blueprintVersion !== 3) {
+        if (global.Cache.blueprintVersion !== 4) {
             global.Cache.blueprints.clear();
-            global.Cache.blueprintVersion = 3;
+            global.Cache.blueprintVersion = 4;
             for (const name in Game.rooms) delete Game.rooms[name].memory.plannedRcl;
         }
         if (!(global.Cache.blueprints instanceof Map)) global.Cache.blueprints = new Map();
@@ -150,11 +150,11 @@ class RoomPlanner {
         // Step 8: Road exit airlocks (3-deep)
         this.addRoadRamparts(blueprint);
 
-        // Step 9: Outpost ramparts for external resources
-        if (state) this.addOutpostRamparts(blueprint, terrain, state);
+        // Step 9: Rampart roads for defender mobility (Done BEFORE outpost ramparts so they don't get roads)
+        this.addRampartRoads(blueprint, anchor);
 
-        // Step 10: Rampart roads for defender mobility
-        this.addRampartRoads(blueprint);
+        // Step 10: Outpost ramparts for external resources
+        if (state) this.addOutpostRamparts(blueprint, terrain, state);
 
         // Step 11: Extractor
         if (state && state.mineral) {
@@ -262,8 +262,6 @@ class RoomPlanner {
             { type: 'container', dx: -2, dy: 0 }, { type: 'container', dx: 2, dy: 0 },
             // Spawns
             { type: STRUCTURE_SPAWN, dx: -2, dy: -1 }, { type: STRUCTURE_SPAWN, dx: 2, dy: -1 }, { type: STRUCTURE_SPAWN, dx: 0, dy: 2 },
-            // Fast Filler Creep Stands (Roads to keep them walkable)
-            { type: 'road', dx: -1, dy: -1 }, { type: 'road', dx: 1, dy: -1 }, { type: 'road', dx: -1, dy: 1 }, { type: 'road', dx: 1, dy: 1 },
             // Extensions
             { type: STRUCTURE_EXTENSION, dx: -2, dy: -2 }, { type: STRUCTURE_EXTENSION, dx: -1, dy: -2 }, { type: STRUCTURE_EXTENSION, dx: 0, dy: -2 }, { type: STRUCTURE_EXTENSION, dx: 1, dy: -2 }, { type: STRUCTURE_EXTENSION, dx: 2, dy: -2 },
             { type: STRUCTURE_EXTENSION, dx: 0, dy: -1 },
@@ -478,7 +476,8 @@ class RoomPlanner {
                     if (clusterOffsets[j].type === 'road') {
                         if (visited[key] !== 2) {
                             visited[key] = 2;
-                            blueprint.roads.push({ x: nx, y: ny });
+                            const dist = Math.max(Math.abs(nx - anchor.x), Math.abs(ny - anchor.y));
+                            blueprint.roads.push({ x: nx, y: ny, dist });
                         }
                     } else {
                         visited[key] = 1;
@@ -615,7 +614,7 @@ class RoomPlanner {
             for (let j = 0; j < ret.path.length; j++) {
                 const step = ret.path[j];
                 if (step.x >= 2 && step.x <= 47 && step.y >= 2 && step.y <= 47 && costs.get(step.x, step.y) !== 1) {
-                    blueprint.roads.push({ x: step.x, y: step.y });
+                    blueprint.roads.push({ x: step.x, y: step.y, isExternal: true });
                     costs.set(step.x, step.y, 1);
                 }
             }
@@ -899,7 +898,7 @@ class RoomPlanner {
      * Overlays STRUCTURE_ROAD on every placed rampart tile to give defenders
      * zero-fatigue mobility along the walls.
      */
-    static addRampartRoads(blueprint) {
+    static addRampartRoads(blueprint, anchor) {
         const roadSet = new Uint8Array(2500);
         for (let i = 0; i < blueprint.roads.length; i++) roadSet[blueprint.roads[i].x * 50 + blueprint.roads[i].y] = 1;
         
@@ -908,7 +907,8 @@ class RoomPlanner {
             const rp = blueprint.ramparts[i];
             const rkey = rp.x * 50 + rp.y;
             if (!roadSet[rkey]) {
-                newRoads.push({ x: rp.x, y: rp.y });
+                const dist = Math.max(Math.abs(rp.x - anchor.x), Math.abs(rp.y - anchor.y));
+                newRoads.push({ x: rp.x, y: rp.y, dist });
                 roadSet[rkey] = 1;
             }
         }

@@ -13,12 +13,18 @@ const UpgradeAssignmentModule = require('./task_modules/UpgradeAssignmentModule'
  * Optimized for strict Drop-Mining, Stationary Upgrading, and Distance-Weighted Hauling.
  */
 class TaskAssignmentManager {
-    static run() {
+    static run(colony) {
         if (!global.creepHeap) global.creepHeap = new Map();
-        global.tickClaims = new Map();
+        
+        // Ensure tick claims are reset exactly once per tick globally, not per colony
+        if (global.tickClaimsTime !== Game.time) {
+            global.tickClaims = new Map();
+            global.tickClaimsTime = Game.time;
+        }
 
-        for (const creepName in Game.creeps) {
-            const creep = Game.creeps[creepName];
+        const creeps = colony.creeps;
+        for (let i = 0; i < creeps.length; i++) {
+            const creep = creeps[i];
             if (creep.spawning) continue;
             
             try {
@@ -26,7 +32,8 @@ class TaskAssignmentManager {
                 const rawRole = creep.memory.role || '';
                 if (rawRole.toLowerCase() === 'scout') continue;
 
-                const roomName = creep.memory.room || creep.memory.colony || creep.room.name;
+                // The primary room state context is the room the creep is CURRENTLY in.
+                const roomName = creep.room.name;
                 const roomState = global.State?.rooms?.get(roomName);
                 if (!roomState) continue;
 
@@ -56,7 +63,7 @@ class TaskAssignmentManager {
 
                 TaskAssignmentManager.assignTask(creep, roomState);
             } catch (err) {
-                console.log(`[ERROR] TaskAssignmentManager crashed for creep ${creepName}: ${err.message}\n${err.stack}`);
+                console.log(`[ERROR] TaskAssignmentManager crashed for creep ${creep.name}: ${err.message}\n${err.stack}`);
             }
         }
     }

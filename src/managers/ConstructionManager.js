@@ -83,7 +83,33 @@ class ConstructionManager {
                     positions.push(pos);
                 }
             } else if (structureType === STRUCTURE_ROAD) {
-                positions = blueprint.roads || [];
+                const rawRoads = blueprint.roads || [];
+                positions = [];
+                
+                let maxExtDist = 0;
+                if (blueprint.anchor && state.structureIds) {
+                    for (let i = 0; i < state.structureIds.length; i++) {
+                        const s = CacheLib.getById(state.structureIds[i]);
+                        if (s && s.structureType === STRUCTURE_EXTENSION) {
+                            const d = Math.max(Math.abs(s.pos.x - blueprint.anchor.x), Math.abs(s.pos.y - blueprint.anchor.y));
+                            if (d > maxExtDist) maxExtDist = d;
+                        }
+                    }
+                }
+                
+                // Buffer ensures roads are placed slightly ahead of the next extension ring
+                const allowedDist = maxExtDist + 2;
+                
+                for (let i = 0; i < rawRoads.length; i++) {
+                    const road = rawRoads[i];
+                    if (road.isExternal) {
+                        if (rcl >= 3) positions.push(road);
+                    } else if (road.dist !== undefined) {
+                        if (road.dist <= allowedDist) positions.push(road);
+                    } else {
+                        positions.push(road);
+                    }
+                }
             } else if (structureType === STRUCTURE_RAMPART) {
                 positions = blueprint.ramparts || [];
             } else {

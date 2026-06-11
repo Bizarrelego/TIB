@@ -323,7 +323,7 @@ class CensusCalculator {
 }
 
 class SpawnManager {
-    static run(spawn) {
+    static run(spawn, colony) {
         if (spawn.spawning) return;
 
         // Throttle declarative census diffing to save CPU
@@ -347,6 +347,7 @@ class SpawnManager {
 
         let targetCensus = global.Cache.tickTargetCensus.get(roomName);
         if (!targetCensus) {
+            // Evaluates the combined needs of the core room and outposts
             targetCensus = CensusCalculator.getAllLimits(rcl, roomState, roomName);
             global.Cache.tickTargetCensus.set(roomName, targetCensus);
         }
@@ -354,41 +355,49 @@ class SpawnManager {
         let censusData = global.Cache.tickCensus.get(roomName);
         if (!censusData) {
             const currentCensus = {};
+            const actualCensus = {};
             let rawBootstrapperCount = 0;
-            for (const name in Game.creeps) {
-                const c = Game.creeps[name];
-                if (c.memory.colony === roomName || c.memory.room === roomName) {
-                    const role = c.memory.role;
+            
+            // Replaced flat Game.creeps loop with Colony scope iteration
+            const creeps = colony.creeps;
+            for (let i = 0; i < creeps.length; i++) {
+                const c = creeps[i];
+                const role = c.memory.role;
 
-                    // Fixes Generation Die-offs by triggering replacement spawns before the current workforce expires, ensuring zero downtime on critical infrastructure.
-                    const spawnTime = c.body ? c.body.length * 3 : 50;
-                    if (!c.spawning && c.ticksToLive !== undefined && c.ticksToLive < spawnTime) {
-                        continue;
-                    }
+                actualCensus[role] = (actualCensus[role] || 0) + 1;
+                if (role === 'bootstrapper') rawBootstrapperCount++;
 
-                    currentCensus[role] = (currentCensus[role] || 0) + 1;
-                    if (role === 'bootstrapper') rawBootstrapperCount++;
+                // Fixes Generation Die-offs by triggering replacement spawns before the current workforce expires, ensuring zero downtime on critical infrastructure.
+                const spawnTime = c.body ? c.body.length * 3 : 50;
+                if (!c.spawning && c.ticksToLive !== undefined && c.ticksToLive < spawnTime) {
+                    continue;
                 }
+
+                currentCensus[role] = (currentCensus[role] || 0) + 1;
             }
-            censusData = { currentCensus, rawBootstrapperCount };
+            censusData = { currentCensus, actualCensus, rawBootstrapperCount };
             global.Cache.tickCensus.set(roomName, censusData);
         }
 
-        const { currentCensus, rawBootstrapperCount } = censusData;
+        const { currentCensus, actualCensus, rawBootstrapperCount } = censusData;
 
         const getCount = (role) => currentCensus[role] || 0;
+        const getActualCount = (role) => actualCensus[role] || 0;
 
         const harvesterCount = getCount('harvester');
         const haulerCount = getCount('hauler');
-        const bootstrapperCount = getCount('bootstrapper');
+        
+        const actualHarvesterCount = getActualCount('harvester');
+        const actualHaulerCount = getActualCount('hauler');
+        const needsHaulers = (targetCensus['hauler'] || 0) > 0;
 
         // Emergency Protocol
-        if (harvesterCount === 0 && haulerCount === 0 && bootstrapperCount === 0 && rawBootstrapperCount === 0) {
+        if (actualHarvesterCount === 0 && (actualHaulerCount === 0 || !needsHaulers) && getActualCount('bootstrapper') === 0 && rawBootstrapperCount === 0) {
             this.executeSpawn(spawn, 'bootstrapper', EMERGENCY_BODY);
             return;
         }
 
-        if (harvesterCount === 0 && haulerCount === 0 && (targetCensus['harvester'] || 0) > 0) {
+        if (actualHarvesterCount === 0 && (actualHaulerCount === 0 || !needsHaulers) && (targetCensus['harvester'] || 0) > 0) {
             if (rawBootstrapperCount < 2) {
                 this.executeSpawn(spawn, 'bootstrapper', EMERGENCY_BODY);
                 return;

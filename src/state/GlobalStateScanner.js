@@ -1,4 +1,5 @@
 const RoomStateScanner = require('./RoomStateScanner');
+const Colony = require('../empire/Colony');
 
 /**
  * Module responsible for building the global state object by scanning rooms.
@@ -7,7 +8,17 @@ const RoomStateScanner = require('./RoomStateScanner');
  */
 
 function run() {
-    if (!global.State) global.State = { rooms: new Map() };
+    if (!global.State) global.State = { rooms: new Map(), colonies: new Map() };
+    if (!global.State.colonies) global.State.colonies = new Map();
+
+    // Rebuild colonies every tick
+    global.State.colonies.clear();
+    for (const roomName in Game.rooms) {
+        const room = Game.rooms[roomName];
+        if (room.controller && room.controller.my) {
+            global.State.colonies.set(roomName, new Colony(roomName));
+        }
+    }
 
     // Clear creeps and creepCounts for all initialized rooms from the previous tick
     for (const roomState of global.State.rooms.values()) {

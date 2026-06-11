@@ -11,6 +11,8 @@ const TaskAssignmentManager = require('./managers/TaskAssignmentManager');
 const ActionExecutor = require('./managers/ActionExecutor');
 const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
 const IntelManager = require('./managers/IntelManager');
+const RemoteMiningManager = require('./managers/RemoteMiningManager');
+const EmpireManager = require('./empire/EmpireManager');
 const TrafficManager = require('./managers/TrafficManager');
 const RoomPlanner = require('./managers/RoomPlanner');
 const ConstructionManager = require('./managers/ConstructionManager');
@@ -45,6 +47,10 @@ module.exports.loop = function () {
     // 3. Intel Gathering (serializes visible room data to Memory)
     ErrorHandlingUtility.wrap(() => IntelManager.run(), 'IntelManager')();
 
+    // 3.2 Empire-Level Operations
+    ErrorHandlingUtility.wrap(() => RemoteMiningManager.run(), 'RemoteMiningManager')();
+    ErrorHandlingUtility.wrap(() => EmpireManager.run(), 'EmpireManager')();
+
     // 3.5 Stress Test Injection
     ErrorHandlingUtility.wrap(() => StressTestUtility.run(), 'StressTestUtility')();
 
@@ -61,8 +67,14 @@ module.exports.loop = function () {
     ErrorHandlingUtility.wrap(() => ConstructionManager.run(), 'ConstructionManager')();
     ErrorHandlingUtility.wrap(() => ScoutingManager.run(), 'ScoutingManager')();
 
-    // 4. Task Assignment
-    ErrorHandlingUtility.wrap(() => TaskAssignmentManager.run(), 'TaskAssignmentManager')();
+    // 4. Task Assignment (Scoped by Colony)
+    ErrorHandlingUtility.wrap(() => {
+        if (global.State && global.State.colonies) {
+            for (const colony of global.State.colonies.values()) {
+                TaskAssignmentManager.run(colony);
+            }
+        }
+    }, 'TaskAssignmentManager')();
 
     // 4.5 Link Management
     ErrorHandlingUtility.wrap(() => LinkManager.run(), 'LinkManager')();
@@ -72,8 +84,14 @@ module.exports.loop = function () {
 
     // 5. Spawning
     ErrorHandlingUtility.wrap(() => {
-        for (const spawnName in Game.spawns) {
-            SpawnManager.run(Game.spawns[spawnName]);
+        if (global.State && global.State.colonies) {
+            for (const spawnName in Game.spawns) {
+                const spawn = Game.spawns[spawnName];
+                const colony = global.State.colonies.get(spawn.room.name);
+                if (colony) {
+                    SpawnManager.run(spawn, colony);
+                }
+            }
         }
     }, 'SpawnManager')();
 
