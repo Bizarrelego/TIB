@@ -39,6 +39,8 @@ class TaskAssignmentManager {
 
                 if (Game.time < creep.heap.sleepUntil) continue;
 
+                TaskAssignmentManager.updateCreepState(creep);
+
                 if (creep.heap.actionIntent !== ActionConstants.ACTION_IDLE && creep.heap.actionIntent !== null) {
                     TaskAssignmentManager.validateCurrentTask(creep);
 
@@ -47,8 +49,6 @@ class TaskAssignmentManager {
                         continue;
                     }
                 }
-
-                TaskAssignmentManager.updateCreepState(creep);
                 
                 if (TaskAssignmentManager.checkCivilianFlee(creep, roomState)) {
                     continue;
@@ -995,17 +995,25 @@ class TaskAssignmentManager {
 
     /**
      * Prevents economic cannibalism by forbidding workers from draining core spawning infrastructure.
+     * Hardened against drop-mining by forcing a strict state machine transition.
      */
     static assignBootstrapper(creep, roomState) {
+        // Anti-Drop-Mining Lock: Force transition the exact tick capacity is reached
+        if (creep.heap.state === 'gather' && creep.store.getFreeCapacity() === 0) {
+            creep.heap.state = 'work';
+            creep.heap.targetId = null;
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+        }
+
         if (creep.heap.state === 'gather') {
-            // Priority 1: Pull from Storage if available
+            // Priority 1: Pull from Storage if available (fastest recovery)
             if (roomState.storage && roomState.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
                 creep.heap.targetId = roomState.storage.id;
                 creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
                 return;
             }
 
-            // First try to scavenge dropped energy like a builder
+            // Priority 2: Scavenge dropped energy/ruins (faster than mining)
             const bestSource = WithdrawAssignmentModule.findClosestEnergy(creep, roomState);
             if (bestSource) {
                 creep.heap.targetId = bestSource.id;
@@ -1021,10 +1029,10 @@ class TaskAssignmentManager {
                 return;
             }
         } else {
-            // Work phase: Fill Spawns/Extensions first to get real creeps spawning
-            if (TransferAssignmentModule.routeToCoreStructures(creep, roomState)) return;
+            // Work phase: Fill Spawns/Extensions first to get real creeps spawning (ignore towers)
+            if (TransferAssignmentModule.routeToCoreStructures(creep, roomState, false)) return;
 
-            // Priority 2: Build critical structures (like containers)
+            // Priority 2: Build critical structures (like containers) if spawns are 100% full
             if (roomState.constructionSites) {
                 let bestSite = null;
                 let bestScore = -1;
@@ -1052,7 +1060,6 @@ class TaskAssignmentManager {
             }
         }
     }
-
 }
 
 module.exports = TaskAssignmentManager;

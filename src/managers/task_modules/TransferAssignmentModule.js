@@ -1,6 +1,6 @@
 const ActionConstants = require('../../constants/ActionConstants');
 
-function routeToCoreStructures(creep, roomState) {
+function routeToCoreStructures(creep, roomState, includeTowers = true) {
     let bestTarget = null;
     let bestScore = -1;
 
@@ -29,10 +29,13 @@ function routeToCoreStructures(creep, roomState) {
 
     roomState.spawns?.forEach(evaluateTarget);
     roomState.extensions?.forEach(evaluateTarget);
-    roomState.towers?.forEach(t => {
-        // Only fill towers if they are missing > 200 energy
-        if (t.store.getFreeCapacity(RESOURCE_ENERGY) >= 200) evaluateTarget(t);
-    });
+    
+    if (includeTowers) {
+        roomState.towers?.forEach(t => {
+            // Only fill towers if they are missing > 200 energy
+            if (t.store.getFreeCapacity(RESOURCE_ENERGY) >= 200) evaluateTarget(t);
+        });
+    }
 
     if (bestTarget) {
         bestTarget.__deliveryClaimed = (bestTarget.__deliveryClaimed || 0) + creep.store.getUsedCapacity(RESOURCE_ENERGY);
