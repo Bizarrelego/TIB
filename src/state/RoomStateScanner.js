@@ -42,26 +42,26 @@ class RoomStateScanner {
         }
 
         // Zero-allocation array resets
-        state.structureIdCount = 0;
-        state.repairTargetCount = 0;
-        state.spawnCount = 0;
-        state.extensionCount = 0;
-        state.invaderCoreCount = 0;
-        state.towerCount = 0;
-        state.linkCount = 0;
-        state.labCount = 0;
-        state.containerCount = 0;
-        state.sourceContainerCount = 0;
-        state.controllerContainerCount = 0;
-        state.droppedEnergyCount = 0;
-        state.ruinCount = 0;
-        state.tombstoneCount = 0;
-        state.validDroppedEnergyCount = 0;
-        state.availableDroppedEnergyCount = 0;
-        state.energyInRuinsAndTombstonesCount = 0;
-        state.harvestableSourceCount = 0;
-        state.hostileCount = 0;
-        state.rampartCount = 0;
+        state.structureIds.length = 0; state.structureIdCount = 0;
+        state.repairTargets.length = 0; state.repairTargetCount = 0;
+        state.spawns.length = 0; state.spawnCount = 0;
+        state.extensions.length = 0; state.extensionCount = 0;
+        state.invaderCores.length = 0; state.invaderCoreCount = 0;
+        state.towers.length = 0; state.towerCount = 0;
+        state.links.length = 0; state.linkCount = 0;
+        state.labs.length = 0; state.labCount = 0;
+        state.containers.length = 0; state.containerCount = 0;
+        state.sourceContainers.length = 0; state.sourceContainerCount = 0;
+        state.controllerContainers.length = 0; state.controllerContainerCount = 0;
+        state.droppedEnergy.length = 0; state.droppedEnergyCount = 0;
+        state.ruins.length = 0; state.ruinCount = 0;
+        state.tombstones.length = 0; state.tombstoneCount = 0;
+        state.validDroppedEnergy.length = 0; state.validDroppedEnergyCount = 0;
+        state.availableDroppedEnergy.length = 0; state.availableDroppedEnergyCount = 0;
+        state.energyInRuinsAndTombstones.length = 0; state.energyInRuinsAndTombstonesCount = 0;
+        state.harvestableSources.length = 0; state.harvestableSourceCount = 0;
+        state.hostiles.length = 0; state.hostileCount = 0;
+        state.ramparts.length = 0; state.rampartCount = 0;
         state.storage = null;
         state.terminal = null;
         state.factory = null;
@@ -71,11 +71,14 @@ class RoomStateScanner {
 
             // Cache static objects like sources and minerals to avoid engine polling overhead
             if (state.cache.sourceIds.length === 0) {
-                state.cache.sourceIds = room['find'](FIND_SOURCES).map(s => s.id);
+                const foundSources = room['find'](FIND_SOURCES);
+                for (let i = 0; i < foundSources.length; i++) {
+                    state.cache.sourceIds[i] = foundSources[i].id;
+                }
                 const mineral = room['find'](FIND_MINERALS)[0];
                 state.cache.mineralId = mineral ? mineral.id : null;
             }
-            state.sources = [];
+            state.sources.length = 0;
             for (let i = 0; i < state.cache.sourceIds.length; i++) {
                 const src = CacheLib.getById(state.cache.sourceIds[i]);
                 if (src) state.sources.push(src);
@@ -92,7 +95,11 @@ class RoomStateScanner {
 
             // Cache structures periodically or if a construction site finishes
             if (!state.cache.scannedAt || Game.time - state.cache.scannedAt > 13 || state.constructionSiteCount !== state.cache.lastConstructionSiteCount) {
-                state.cache.structureIds = room['find'](FIND_STRUCTURES).map(s => s.id);
+                const foundStructures = room['find'](FIND_STRUCTURES);
+                state.cache.structureIds.length = 0;
+                for (let i = 0; i < foundStructures.length; i++) {
+                    state.cache.structureIds[i] = foundStructures[i].id;
+                }
                 state.cache.scannedAt = Game.time;
                 state.cache.lastConstructionSiteCount = state.constructionSiteCount;
             }
@@ -128,8 +135,17 @@ class RoomStateScanner {
                 const c = state.containers[i];
                 if (state.controller && c.pos.inRangeTo(state.controller, 3)) {
                     state.controllerContainers[state.controllerContainerCount++] = c;
-                } else if (state.sources.some(s => s.pos.inRangeTo(c, 2))) {
-                    state.sourceContainers[state.sourceContainerCount++] = c;
+                } else {
+                    let isSourceContainer = false;
+                    for (let j = 0; j < state.sources.length; j++) {
+                        if (state.sources[j].pos.inRangeTo(c, 2)) {
+                            isSourceContainer = true;
+                            break;
+                        }
+                    }
+                    if (isSourceContainer) {
+                        state.sourceContainers[state.sourceContainerCount++] = c;
+                    }
                 }
             }
 
