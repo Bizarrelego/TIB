@@ -14,11 +14,13 @@ const IntelManager = require('./managers/IntelManager');
 const RemoteMiningManager = require('./managers/RemoteMiningManager');
 const EmpireManager = require('./empire/EmpireManager');
 const EmpireLogisticsManager = require('./empire/EmpireLogisticsManager');
+const MarketManager = require('./empire/MarketManager');
 const ExpansionManager = require('./empire/ExpansionManager');
 const TrafficManager = require('./managers/TrafficManager');
 const RoomPlanner = require('./managers/RoomPlanner');
 const ConstructionManager = require('./managers/ConstructionManager');
 const ScoutingManager = require('./managers/ScoutingManager');
+const ScienceManager = require('./managers/ScienceManager');
 const LinkManager = require('./managers/LinkManager');
 const InfrastructureManager = require('./managers/InfrastructureManager');
 const TowerManager = require('./managers/TowerManager');
@@ -67,6 +69,7 @@ module.exports.loop = function () {
     ErrorHandlingUtility.wrap(() => RemoteMiningManager.run(), 'RemoteMiningManager')();
     ErrorHandlingUtility.wrap(() => EmpireManager.run(), 'EmpireManager')();
     ErrorHandlingUtility.wrap(() => EmpireLogisticsManager.run(), 'EmpireLogisticsManager')();
+    ErrorHandlingUtility.wrap(() => MarketManager.run(), 'MarketManager')();
     ErrorHandlingUtility.wrap(() => ExpansionManager.run(), 'ExpansionManager')();
 
     // 3.5 Stress Test Injection
@@ -105,6 +108,7 @@ module.exports.loop = function () {
     }, 'RoomPlanner')();
     ErrorHandlingUtility.wrap(() => ConstructionManager.run(), 'ConstructionManager')();
     ErrorHandlingUtility.wrap(() => ScoutingManager.run(), 'ScoutingManager')();
+    ErrorHandlingUtility.wrap(() => ScienceManager.run(), 'ScienceManager')();
 
     // 4. Task Assignment (Scoped by Colony, Throttled)
     ErrorHandlingUtility.wrap(() => {

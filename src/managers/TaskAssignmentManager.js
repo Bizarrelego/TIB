@@ -1,10 +1,7 @@
 const ActionConstants = require('../constants/ActionConstants');
 const CacheLib = require('../lib/CacheLib');
 const MathLib = require('../lib/MathLib');
-const SourceAssignmentModule = require('./task_modules/SourceAssignmentModule');
-const TransferAssignmentModule = require('./task_modules/TransferAssignmentModule');
-const WithdrawAssignmentModule = require('./task_modules/WithdrawAssignmentModule');
-const UpgradeAssignmentModule = require('./task_modules/UpgradeAssignmentModule');
+// Task assignment modules have been purged and merged natively.
 
 
 
@@ -225,12 +222,12 @@ class TaskAssignmentManager {
                 return;
             }
         }
-        if (role === 'harvester') SourceAssignmentModule.assignHarvester(creep, roomState);
+        if (role === 'harvester') TaskAssignmentManager.assignHarvester(creep, roomState);
         else if (role === 'hauler') TaskAssignmentManager.assignHauler(creep, roomState);
         else if (role === 'builder') TaskAssignmentManager.assignBuilder(creep, roomState);
         else if (role === 'pioneer') TaskAssignmentManager.assignPioneer(creep, roomState);
         else if (role === 'bootstrapper') TaskAssignmentManager.assignBootstrapper(creep, roomState);
-        else if (role === 'upgrader') UpgradeAssignmentModule.assignUpgrader(creep, roomState);
+        else if (role === 'upgrader') TaskAssignmentManager.assignUpgrader(creep, roomState);
         else if (role === 'filler') TaskAssignmentManager.assignFiller(creep, roomState);
         else if (role === 'fastfiller') TaskAssignmentManager.assignFastFiller(creep, roomState);
         else if (role === 'remoteharvester') TaskAssignmentManager.assignRemoteHarvester(creep, roomState);
@@ -350,8 +347,67 @@ class TaskAssignmentManager {
             return;
         }
 
+        // Science Logistics Variables
+        const scienceTarget = Memory.rooms[creep.memory.colony]?.scienceTarget;
+        let supplierLabs = [];
+        let reactorLabs = [];
+        if (scienceTarget && roomState.labs && roomState.labs.length >= 3) {
+            const blueprint = global.Cache.blueprints?.get(creep.room.name);
+            if (blueprint && blueprint.supplierLabs) {
+                for (let i = 0; i < roomState.labs.length; i++) {
+                    const lab = roomState.labs[i];
+                    let isSupplier = false;
+                    for (let j = 0; j < blueprint.supplierLabs.length; j++) {
+                        const sup = blueprint.supplierLabs[j];
+                        if (lab.pos.x === sup.x && lab.pos.y === sup.y) {
+                            supplierLabs.push(lab);
+                            isSupplier = true;
+                            break;
+                        }
+                    }
+                    if (!isSupplier) reactorLabs.push(lab);
+                }
+            }
+        }
+
         if (creep.heap.state === 'gather') {
-            // Priority 1: Empty Hub Link
+            // Priority 1: Extract synthesized compounds from Reactor Labs
+            if (scienceTarget && reactorLabs.length > 0) {
+                for (let i = 0; i < reactorLabs.length; i++) {
+                    const reactor = reactorLabs[i];
+                    if (reactor.store.getUsedCapacity(scienceTarget.target) >= 100) {
+                        creep.heap.targetId = reactor.id;
+                        creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
+                        // HACK: Store what we are grabbing so ActionExecutor pulls the right mineral
+                        creep.memory.withdrawResource = scienceTarget.target;
+                        return;
+                    }
+                }
+            }
+
+            // Priority 2: Load Supplier Labs with raw reactant minerals
+            if (scienceTarget && supplierLabs.length === 2) {
+                const sup1 = supplierLabs[0];
+                const sup2 = supplierLabs[1];
+
+                if (sup1.store.getUsedCapacity(scienceTarget.r1) < 1000 && terminal.store.getUsedCapacity(scienceTarget.r1) > 0) {
+                    creep.heap.targetId = terminal.id;
+                    creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
+                    creep.memory.withdrawResource = scienceTarget.r1;
+                    return;
+                }
+                if (sup2.store.getUsedCapacity(scienceTarget.r2) < 1000 && terminal.store.getUsedCapacity(scienceTarget.r2) > 0) {
+                    creep.heap.targetId = terminal.id;
+                    creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
+                    creep.memory.withdrawResource = scienceTarget.r2;
+                    return;
+                }
+            }
+
+            // Reset HACK if doing normal operations
+            creep.memory.withdrawResource = null;
+
+            // Priority 3: Empty Hub Link
             if (hubLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
                 creep.heap.targetId = hubLink.id;
                 creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
@@ -374,16 +430,41 @@ class TaskAssignmentManager {
 
             creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
         } else {
-            // Work phase (we are holding energy)
-            
-            // Priority 1: Fill Terminal if we withdrew from Storage due to overflow
-            if (storage.store.getUsedCapacity(RESOURCE_ENERGY) > 500000 && terminal.store.getFreeCapacity() > 0) {
+            // Work phase (we are holding energy or minerals)
+            const carriedTypes = Object.keys(creep.store).filter(r => creep.store[r] > 0);
+            const carriedType = carriedTypes.length > 0 ? carriedTypes[0] : RESOURCE_ENERGY;
+
+            // Priority 1: Lab Logistics (Transferring minerals)
+            if (scienceTarget && carriedType !== RESOURCE_ENERGY) {
+                if (carriedType === scienceTarget.target) {
+                    // Dump product into terminal
+                    creep.heap.targetId = terminal.id;
+                    creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
+                    return;
+                } else if (carriedType === scienceTarget.r1 && supplierLabs.length === 2) {
+                    creep.heap.targetId = supplierLabs[0].id;
+                    creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
+                    return;
+                } else if (carriedType === scienceTarget.r2 && supplierLabs.length === 2) {
+                    creep.heap.targetId = supplierLabs[1].id;
+                    creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
+                    return;
+                }
+                
+                // If we are holding random garbage minerals, dump to terminal
                 creep.heap.targetId = terminal.id;
                 creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
                 return;
             }
 
-            // Priority 2: Dump everything else into Storage
+            // Priority 2: Fill Terminal if we withdrew from Storage due to overflow
+            if (carriedType === RESOURCE_ENERGY && storage.store.getUsedCapacity(RESOURCE_ENERGY) > 500000 && terminal.store.getFreeCapacity() > 0) {
+                creep.heap.targetId = terminal.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
+                return;
+            }
+
+            // Priority 3: Dump everything else into Storage
             if (storage.store.getFreeCapacity() > 0) {
                 creep.heap.targetId = storage.id;
                 creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
@@ -547,7 +628,7 @@ class TaskAssignmentManager {
         const roomState = global.State?.rooms?.get(creep.room.name);
         if (!roomState) return;
 
-        SourceAssignmentModule.assignHarvester(creep, roomState);
+        TaskAssignmentManager.assignHarvester(creep, roomState);
     }
 
     static assignReserver(creep, _roomState) {
@@ -774,10 +855,275 @@ class TaskAssignmentManager {
             }
         } else {
             // Priority: Fill spawns, extensions, towers
-            if (TransferAssignmentModule.routeToCoreStructures(creep, roomState)) return;
-            // No core structures need energy? Idle.
+            if (TaskAssignmentManager.routeToCoreStructures(creep, roomState)) return;
+            // Wait in the target room indefinitely, or do something if needed
             creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // NATIVE TASK MODULES
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    static assignHarvester(creep, roomState) {
+        const sources = roomState.sources;
+        if (!sources || sources.length === 0) return;
+
+        // Lock source permanently to prevent target thrashing
+        if (!creep.memory.targetId) {
+            const counts = new Map();
+            for (const name in Game.creeps) {
+                const c = Game.creeps[name];
+                if (c.memory.role === 'harvester' && c.memory.colony === creep.memory.colony && c.memory.targetId) {
+                    counts.set(c.memory.targetId, (counts.get(c.memory.targetId) || 0) + 1);
+                }
+            }
+
+            let bestSource = sources[0];
+            let minCount = Infinity;
+            for (let i = 0; i < sources.length; i++) {
+                const count = counts.get(sources[i].id) || 0;
+                if (count < minCount) {
+                    minCount = count;
+                    bestSource = sources[i];
+                }
+            }
+            creep.memory.targetId = bestSource.id;
+        }
+
+        creep.heap.targetId = creep.memory.targetId;
+        creep.heap.actionIntent = ActionConstants.ACTION_HARVEST;
+
+        const source = CacheLib.getById(creep.memory.targetId);
+        if (!source) return;
+
+        if (roomState.sourceContainers) {
+            for (let i = 0; i < roomState.sourceContainers.length; i++) {
+                const c = roomState.sourceContainers[i];
+                if (Math.max(Math.abs(c.pos.x - source.pos.x), Math.abs(c.pos.y - source.pos.y)) <= 2) {
+                    creep.heap.sitTargetId = c.id;
+                    break;
+                }
+            }
+        }
+    }
+
+    static routeToCoreStructures(creep, roomState, includeTowers = true) {
+        let bestTarget = null;
+        let bestScore = -1;
+
+        const evaluateTarget = (target) => {
+            if (!target || !target.store) return;
+            if (target.isActive !== undefined && !target.isActive()) return;
+
+            const freeCapacity = target.store.getFreeCapacity(RESOURCE_ENERGY);
+            if (freeCapacity === 0) return;
+
+            const claimed = target.__deliveryClaimed || 0;
+            const remainingSpace = freeCapacity - claimed;
+            if (remainingSpace <= 0) return;
+
+            const dx = creep.pos.x - target.pos.x;
+            const dy = creep.pos.y - target.pos.y;
+            const distance = Math.max(Math.abs(dx), Math.abs(dy)) || 1;
+            // Weight by remaining space so haulers prefer emptier targets
+            const score = remainingSpace * 100 / distance;
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestTarget = target;
+            }
+        };
+
+        roomState.spawns?.forEach(evaluateTarget);
+        roomState.extensions?.forEach(evaluateTarget);
+        
+        if (includeTowers) {
+            roomState.towers?.forEach(t => {
+                // Only fill towers if they are missing > 200 energy
+                if (t.store.getFreeCapacity(RESOURCE_ENERGY) >= 200) evaluateTarget(t);
+            });
+        }
+
+        if (bestTarget) {
+            bestTarget.__deliveryClaimed = (bestTarget.__deliveryClaimed || 0) + creep.store.getUsedCapacity(RESOURCE_ENERGY);
+            creep.heap.targetId = bestTarget.id;
+            creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
+            return true;
+        }
+
+        return false;
+    }
+
+    static assignUpgrader(creep, roomState) {
+        if (!roomState.controller) return;
+
+        // Find the planned container tile
+        const blueprint = global.Cache?.blueprints?.get(creep.room.name);
+        let containerTile = null;
+        if (blueprint && blueprint.containers) {
+            for (let i = 0; i < blueprint.containers.length; i++) {
+                const tile = blueprint.containers[i];
+                if (Math.abs(tile.x - roomState.controller.pos.x) <= 3 && Math.abs(tile.y - roomState.controller.pos.y) <= 3) {
+                    containerTile = tile;
+                    break;
+                }
+            }
+        }
+
+        const focusPos = containerTile ? { x: containerTile.x, y: containerTile.y, roomName: creep.room.name } : roomState.controller.pos;
+        const focusRange = containerTile ? 1 : 3;
+
+        // Fixes upgrader spawn paralysis by enforcing strict physical routing to the controller hub before attempting to execute work intents.
+        if (Math.max(Math.abs(creep.pos.x - focusPos.x), Math.abs(creep.pos.y - focusPos.y)) > focusRange) {
+            creep.heap.destination = { x: focusPos.x, y: focusPos.y, roomName: focusPos.roomName, range: focusRange };
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            return;
+        }
+
+        // Opportunistic Pickup: If energy is dropped perfectly adjacent, snatch it while upgrading!
+        if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0 && roomState.droppedEnergy && roomState.droppedEnergy.length > 0) {
+            let found = false;
+            for (let i = 0; i < roomState.droppedEnergy.length; i++) {
+                const d = roomState.droppedEnergy[i];
+                if (Math.max(Math.abs(creep.pos.x - d.pos.x), Math.abs(creep.pos.y - d.pos.y)) <= 1) {
+                    creep.heap.secondaryTargetId = d.id;
+                    creep.heap.secondaryIntent = ActionConstants.ACTION_PICKUP;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                creep.heap.secondaryTargetId = null;
+                creep.heap.secondaryIntent = null;
+            }
+        } else {
+            creep.heap.secondaryTargetId = null;
+            creep.heap.secondaryIntent = null;
+        }
+
+        // If the upgrader needs energy, issue a gather intent first
+        if (creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+            // Priority 0: Withdraw from adjacent link
+            if (roomState.links) {
+                for (let i = 0; i < roomState.links.length; i++) {
+                    const link = roomState.links[i];
+                    if (Math.max(Math.abs(link.pos.x - creep.pos.x), Math.abs(link.pos.y - creep.pos.y)) <= 1 && link.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                        creep.heap.targetId = link.id;
+                        creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
+                        return;
+                    }
+                }
+            }
+
+            // Priority 1: Withdraw from controller container
+            if (roomState.controllerContainers && roomState.controllerContainers.length > 0) {
+                const c = roomState.controllerContainers[0];
+                if (c.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    creep.heap.targetId = c.id;
+                    creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
+                    return;
+                }
+            }
+            // Priority 2: Pickup adjacent dropped energy
+            if (roomState.droppedEnergy && roomState.droppedEnergy.length > 0) {
+                for (let i = 0; i < roomState.droppedEnergy.length; i++) {
+                    const d = roomState.droppedEnergy[i];
+                    if (Math.max(Math.abs(creep.pos.x - d.pos.x), Math.abs(creep.pos.y - d.pos.y)) <= 3) {
+                        creep.heap.targetId = d.id;
+                        creep.heap.actionIntent = ActionConstants.ACTION_PICKUP;
+                        return;
+                    }
+                }
+            }
+        }
+
+        // Emergency Base Relocation Protocol: If there are no spawns, but a spawn construction site exists, Upgraders become Builders
+        if ((!roomState.spawns || roomState.spawns.length === 0) && roomState.constructionSites) {
+            const sites = Object.values(roomState.constructionSites);
+            for (let i = 0; i < sites.length; i++) {
+                if (sites[i].structureType === STRUCTURE_SPAWN) {
+                    creep.heap.targetId = sites[i].id;
+                    creep.heap.actionIntent = ActionConstants.ACTION_BUILD;
+                    return;
+                }
+            }
+        }
+
+        // Issue upgrade intent
+        creep.heap.targetId = roomState.controller.id;
+        creep.heap.actionIntent = ActionConstants.ACTION_UPGRADE;
+    }
+
+    static findClosestEnergy(creep, roomState) {
+        let bestTarget = null;
+        let bestDist = Infinity;
+        let bestIntent = null;
+
+        // Check dropped energy
+        if (roomState.droppedEnergy) {
+            for (let i = 0; i < roomState.droppedEnergy.length; i++) {
+                const drop = roomState.droppedEnergy[i];
+                if (drop.amount < 30) continue;
+                const claimed = drop.__gatherClaimed || 0;
+                if (drop.amount - claimed < 30) continue;
+                const dx = Math.abs(creep.pos.x - drop.pos.x);
+                const dy = Math.abs(creep.pos.y - drop.pos.y);
+                const dist = Math.max(dx, dy);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestTarget = drop;
+                    bestIntent = ActionConstants.ACTION_PICKUP;
+                }
+            }
+        }
+
+        // Check spawn — only if spawn has enough to not starve spawning (300+)
+        // IMPORTANT: Bootstrappers are strictly forbidden from withdrawing from spawns to prevent infinite withdraw/transfer loops.
+        if (roomState.spawns && creep.memory.role !== 'bootstrapper') {
+            for (let i = 0; i < roomState.spawns.length; i++) {
+                const spawn = roomState.spawns[i];
+                if (spawn.store.getUsedCapacity(RESOURCE_ENERGY) < 300) continue;
+                const dx = Math.abs(creep.pos.x - spawn.pos.x);
+                const dy = Math.abs(creep.pos.y - spawn.pos.y);
+                const dist = Math.max(dx, dy);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestTarget = spawn;
+                    bestIntent = ActionConstants.ACTION_WITHDRAW;
+                }
+            }
+        }
+
+        // Check Storage
+        if (roomState.storage && roomState.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+            const dx = Math.abs(creep.pos.x - roomState.storage.pos.x);
+            const dy = Math.abs(creep.pos.y - roomState.storage.pos.y);
+            const dist = Math.max(dx, dy);
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestTarget = roomState.storage;
+                bestIntent = ActionConstants.ACTION_WITHDRAW;
+            }
+        }
+
+        // Check Terminal
+        if (roomState.terminal && roomState.terminal.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+            const dx = Math.abs(creep.pos.x - roomState.terminal.pos.x);
+            const dy = Math.abs(creep.pos.y - roomState.terminal.pos.y);
+            const dist = Math.max(dx, dy);
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestTarget = roomState.terminal;
+                bestIntent = ActionConstants.ACTION_WITHDRAW;
+            }
+        }
+
+        if (bestTarget) {
+            bestTarget.__gatherClaimed = (bestTarget.__gatherClaimed || 0) + creep.store.getFreeCapacity(RESOURCE_ENERGY);
+            return { id: bestTarget.id, actionIntent: bestIntent };
+        }
+        return null;
     }
 
     static getEnergyNearSource(creep, targetSourceId, roomState) {
@@ -987,7 +1333,87 @@ class TaskAssignmentManager {
         // Emergency Override: If storage exists but we have 0 alive fillers, haulers MUST step in to fill core structures
         const hasFiller = roomState.creepCounts && (roomState.creepCounts['filler'] > 0 || roomState.creepCounts['fastfiller'] > 0);
         if (roomState.storage && !hasFiller) {
-            if (TransferAssignmentModule.routeToCoreStructures(creep, roomState)) return;
+            if (TaskAssignmentManager.routeToCoreStructures(creep, roomState)) return;
+        }
+
+        // Pre-Storage Controller Delivery (RCL < 6 or no link)
+        if (roomState.controller) {
+            let controllerLink = null;
+            if (roomState.links) {
+                for (let i = 0; i < roomState.links.length; i++) {
+                    if (Math.max(Math.abs(roomState.links[i].pos.x - roomState.controller.pos.x), Math.abs(roomState.links[i].pos.y - roomState.controller.pos.y)) <= 3) {
+                        controllerLink = roomState.links[i];
+                        break;
+                    }
+                }
+            }
+
+            if (!controllerLink) {
+                let controllerContainer = null;
+                if (roomState.containers) {
+                    for (let i = 0; i < roomState.containers.length; i++) {
+                        const c = roomState.containers[i];
+                        if (Math.max(Math.abs(c.pos.x - roomState.controller.pos.x), Math.abs(c.pos.y - roomState.controller.pos.y)) <= 3) {
+                            controllerContainer = c;
+                            break;
+                        }
+                    }
+                }
+
+                if (controllerContainer) {
+                    if (controllerContainer.store.getUsedCapacity(RESOURCE_ENERGY) < 1500) {
+                        creep.heap.targetId = controllerContainer.id;
+                        creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
+                        return;
+                    }
+                } else {
+                    let droppedEnergyAmount = 0;
+                    if (roomState.droppedEnergy) {
+                        for (let i = 0; i < roomState.droppedEnergy.length; i++) {
+                            const d = roomState.droppedEnergy[i];
+                            if (Math.max(Math.abs(d.pos.x - roomState.controller.pos.x), Math.abs(d.pos.y - roomState.controller.pos.y)) <= 3) {
+                                droppedEnergyAmount += d.amount;
+                            }
+                        }
+                    }
+                    if (droppedEnergyAmount < 1000) {
+                        const blueprint = global.Cache?.blueprints?.get(creep.room.name);
+                        let plannedContainerTile = null;
+                        if (blueprint && blueprint.containers) {
+                            for (let i = 0; i < blueprint.containers.length; i++) {
+                                const tile = blueprint.containers[i];
+                                if (Math.abs(tile.x - roomState.controller.pos.x) <= 3 && Math.abs(tile.y - roomState.controller.pos.y) <= 3) {
+                                    plannedContainerTile = tile;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (plannedContainerTile) {
+                            const distToTile = Math.max(Math.abs(creep.pos.x - plannedContainerTile.x), Math.abs(creep.pos.y - plannedContainerTile.y));
+                            if (distToTile > 1) {
+                                creep.heap.destination = { x: plannedContainerTile.x, y: plannedContainerTile.y, roomName: creep.room.name, range: 1 };
+                                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+                                return;
+                            } else {
+                                creep.heap.targetId = roomState.controller.id;
+                                creep.heap.actionIntent = ActionConstants.ACTION_DROP;
+                                return;
+                            }
+                        } else {
+                            if (Math.max(Math.abs(creep.pos.x - roomState.controller.pos.x), Math.abs(creep.pos.y - roomState.controller.pos.y)) > 3) {
+                                creep.heap.destination = { x: roomState.controller.pos.x, y: roomState.controller.pos.y, roomName: creep.room.name, range: 3 };
+                                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+                                return;
+                            } else {
+                                creep.heap.targetId = roomState.controller.id;
+                                creep.heap.actionIntent = ActionConstants.ACTION_DROP;
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // Priority 1: Dump in Storage if it exists
@@ -998,69 +1424,21 @@ class TaskAssignmentManager {
         }
 
         // Priority 2: Fill spawn/extensions (Pre-Storage behavior)
-        if (TransferAssignmentModule.routeToCoreStructures(creep, roomState)) return;
+        if (TaskAssignmentManager.routeToCoreStructures(creep, roomState)) return;
 
-        // Priority 2: Drop/Transfer at controller
-        if (roomState.controller) {
-            // Check if controller has a container
-            let controllerContainer = null;
-            if (roomState.containers) {
-                for (let i = 0; i < roomState.containers.length; i++) {
-                    const c = roomState.containers[i];
-                    if (Math.max(Math.abs(c.pos.x - roomState.controller.pos.x), Math.abs(c.pos.y - roomState.controller.pos.y)) <= 3) {
-                        controllerContainer = c;
-                        break;
-                    }
-                }
-            }
-
-            if (controllerContainer) {
-                creep.heap.targetId = controllerContainer.id;
-                creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
-            } else {
-                // Find planned container
-                const blueprint = global.Cache?.blueprints?.get(creep.room.name);
-                let plannedContainerTile = null;
-                if (blueprint && blueprint.containers) {
-                    for (let i = 0; i < blueprint.containers.length; i++) {
-                        const tile = blueprint.containers[i];
-                        if (Math.abs(tile.x - roomState.controller.pos.x) <= 3 && Math.abs(tile.y - roomState.controller.pos.y) <= 3) {
-                            plannedContainerTile = tile;
-                            break;
-                        }
-                    }
-                }
-
-                if (plannedContainerTile) {
-                    const distToTile = Math.max(Math.abs(creep.pos.x - plannedContainerTile.x), Math.abs(creep.pos.y - plannedContainerTile.y));
-                    if (distToTile > 1) { // Walk to adjacent at least!
-                        creep.heap.destination = { x: plannedContainerTile.x, y: plannedContainerTile.y, roomName: creep.room.name, range: 1 };
-                        creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
-                        return;
-                    } else {
-                        // We are within range 1 of the exact tile! Drop it!
-                        creep.heap.targetId = roomState.controller.id; // Fallback target ID for execution validator
-                        creep.heap.actionIntent = ActionConstants.ACTION_DROP;
-                        return;
-                    }
-                } else {
-                    // Absolute fallback if blueprint is completely broken
-                    if (Math.max(Math.abs(creep.pos.x - roomState.controller.pos.x), Math.abs(creep.pos.y - roomState.controller.pos.y)) > 3) {
-                        creep.heap.destination = { x: roomState.controller.pos.x, y: roomState.controller.pos.y, roomName: creep.room.name, range: 3 };
-                        creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
-                    } else {
-                        creep.heap.targetId = roomState.controller.id;
-                        creep.heap.actionIntent = ActionConstants.ACTION_DROP;
-                    }
-                }
-            }
+        // We already handled controller drops for non-link rooms above Storage priority.
+        // If we reach here, either we have a link, or we have Storage and controller is full, 
+        // but if Storage is full, we should still drop at controller if needed as a last resort.
+        if (roomState.controller && roomState.storage && roomState.storage.store.getFreeCapacity() === 0) {
+            creep.heap.targetId = roomState.controller.id;
+            creep.heap.actionIntent = ActionConstants.ACTION_DROP;
         }
     }
 
     static assignBuilder(creep, roomState) {
         if (creep.heap.state === 'gather') {
             // Distance-aware energy source selection
-            const bestSource = WithdrawAssignmentModule.findClosestEnergy(creep, roomState);
+            const bestSource = TaskAssignmentManager.findClosestEnergy(creep, roomState);
             if (bestSource) {
                 creep.heap.targetId = bestSource.id;
                 creep.heap.actionIntent = bestSource.actionIntent;
@@ -1186,7 +1564,7 @@ class TaskAssignmentManager {
             }
 
             // Priority 2: Scavenge dropped energy/ruins (faster than mining)
-            const bestSource = WithdrawAssignmentModule.findClosestEnergy(creep, roomState);
+            const bestSource = TaskAssignmentManager.findClosestEnergy(creep, roomState);
             if (bestSource) {
                 creep.heap.targetId = bestSource.id;
                 creep.heap.actionIntent = bestSource.actionIntent;
@@ -1202,7 +1580,7 @@ class TaskAssignmentManager {
             }
         } else {
             // Work phase: Fill Spawns/Extensions first to get real creeps spawning (ignore towers)
-            if (TransferAssignmentModule.routeToCoreStructures(creep, roomState, false)) return;
+            if (TaskAssignmentManager.routeToCoreStructures(creep, roomState, false)) return;
 
             // Priority 2: Build critical structures (like containers) if spawns are 100% full
             if (roomState.constructionSites) {
