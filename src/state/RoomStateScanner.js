@@ -1,3 +1,4 @@
+/* global STRUCTURE_INVADER_CORE */
 const CacheLib = require('../lib/CacheLib');
 
 const createRoomStateTemplate = () => {
@@ -72,7 +73,11 @@ class RoomStateScanner {
                 const mineral = room['find'](FIND_MINERALS)[0];
                 state.cache.mineralId = mineral ? mineral.id : null;
             }
-            state.sources = state.cache.sourceIds.map(id => CacheLib.getById(id)).filter(Boolean);
+            state.sources = [];
+            for (let i = 0; i < state.cache.sourceIds.length; i++) {
+                const src = CacheLib.getById(state.cache.sourceIds[i]);
+                if (src) state.sources.push(src);
+            }
             state.mineral = state.cache.mineralId ? CacheLib.getById(state.cache.mineralId) : null;
 
             const sites = room['find'](FIND_MY_CONSTRUCTION_SITES);
@@ -90,7 +95,11 @@ class RoomStateScanner {
                 state.cache.lastConstructionSiteCount = state.constructionSiteCount;
             }
 
-            const structures = state.cache.structureIds.map(id => CacheLib.getById(id)).filter(Boolean);
+            const structures = [];
+            for (let i = 0; i < state.cache.structureIds.length; i++) {
+                const src = CacheLib.getById(state.cache.structureIds[i]);
+                if (src) structures.push(src);
+            }
 
             for (let i = 0; i < structures.length; i++) {
                 const s = structures[i];

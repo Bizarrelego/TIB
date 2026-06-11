@@ -1,3 +1,4 @@
+const CacheLib = require('../lib/CacheLib');
 const ROLE_PRIORITY = {
     'meleecreep': 10,
     'rangercreep': 10,
@@ -29,11 +30,11 @@ class TrafficManager {
         const role = (creep.memory.role || '').toLowerCase();
         if (role === 'harvester' || role === 'upgrader' || role === 'fastfiller') {
             if (creep.heap && creep.heap.sitTargetId) {
-                const sitTarget = Game.getObjectById(creep.heap.sitTargetId);
+                const sitTarget = CacheLib.getById(creep.heap.sitTargetId);
                 if (sitTarget && creep.pos.isEqualTo(sitTarget)) return true;
             }
             if (creep.heap && creep.heap.targetId) {
-                const workTarget = Game.getObjectById(creep.heap.targetId);
+                const workTarget = CacheLib.getById(creep.heap.targetId);
                 if (workTarget && creep.pos.isNearTo(workTarget)) return true;
             }
         }
@@ -487,12 +488,12 @@ class TrafficManager {
         const cached = global.Cache.costMatrices.get(roomName);
         let baseMatrix;
         if (cached && cached.structureCount === currentStructCount) {
-            baseMatrix = cached.matrix;
+            baseMatrix = PathFinder.CostMatrix.deserialize(cached.matrix);
         } else {
             baseMatrix = new PathFinder.CostMatrix();
             if (roomState && roomState.structureIds) {
                 for (let i = 0; i < roomState.structureIdCount; i++) {
-                    const s = Game.getObjectById(roomState.structureIds[i]);
+                    const s = CacheLib.getById(roomState.structureIds[i]);
                     if (s && s.structureType !== STRUCTURE_ROAD && s.structureType !== STRUCTURE_CONTAINER && s.structureType !== STRUCTURE_RAMPART) {
                         baseMatrix.set(s.pos.x, s.pos.y, 255);
                     } else if (s && s.structureType === STRUCTURE_ROAD) {
@@ -510,7 +511,7 @@ class TrafficManager {
                 }
             }
             global.Cache.costMatrices.set(roomName, {
-                matrix: baseMatrix,
+                matrix: baseMatrix.serialize(),
                 structureCount: currentStructCount
             });
         }

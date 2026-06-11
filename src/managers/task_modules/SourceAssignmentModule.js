@@ -1,4 +1,5 @@
 const ActionConstants = require('../../constants/ActionConstants');
+const CacheLib = require('../../lib/CacheLib');
 
 function assignHarvester(creep, roomState) {
     const sources = roomState.sources;
@@ -29,7 +30,7 @@ function assignHarvester(creep, roomState) {
     creep.heap.targetId = creep.memory.targetId;
     creep.heap.actionIntent = ActionConstants.ACTION_HARVEST;
 
-    const source = Game.getObjectById(creep.memory.targetId);
+    const source = CacheLib.getById(creep.memory.targetId);
     if (!source) return;
 
     if (roomState.sourceContainers) {

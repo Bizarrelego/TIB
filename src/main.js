@@ -23,7 +23,21 @@ const TowerManager = require('./managers/TowerManager');
 
 const { ProfilerUtility, Logger, ErrorHandlingUtility, StressTestUtility } = require('./lib/SystemLib');
 
+let _parsedMemory = null;
+let _lastTime = 0;
+
 module.exports.loop = function () {
+    // 1. RawMemory Interceptor (CPU Hack)
+    // Eliminates persistent JSON.parse() CPU overhead by caching the heap-memory binding across ticks.
+    if (_lastTime && _parsedMemory && Game.time === _lastTime + 1) {
+        delete global.Memory;
+        global.Memory = _parsedMemory;
+    } else {
+        _parsedMemory = JSON.parse(RawMemory.get() || '{}');
+        delete global.Memory;
+        global.Memory = _parsedMemory;
+    }
+    _lastTime = Game.time;
     // Profiler Start
     ProfilerUtility.start();
 
@@ -112,4 +126,7 @@ module.exports.loop = function () {
 
     // Profiler End
     ProfilerUtility.end();
+
+    // Serialize RawMemory manually at end of tick
+    RawMemory.set(JSON.stringify(global.Memory));
 };
