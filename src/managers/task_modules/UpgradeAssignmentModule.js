@@ -20,7 +20,7 @@ function assignUpgrader(creep, roomState) {
     const focusRange = containerTile ? 1 : 3;
 
     // Fixes upgrader spawn paralysis by enforcing strict physical routing to the controller hub before attempting to execute work intents.
-    if (creep.pos.getRangeTo(focusPos.x !== undefined ? new RoomPosition(focusPos.x, focusPos.y, focusPos.roomName) : focusPos) > focusRange) {
+    if (Math.max(Math.abs(creep.pos.x - focusPos.x), Math.abs(creep.pos.y - focusPos.y)) > focusRange) {
         creep.heap.destination = { x: focusPos.x, y: focusPos.y, roomName: focusPos.roomName, range: focusRange };
         creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
         return;
@@ -53,7 +53,7 @@ function assignUpgrader(creep, roomState) {
         if (roomState.links) {
             for (let i = 0; i < roomState.links.length; i++) {
                 const link = roomState.links[i];
-                if (link.pos.getRangeTo(creep) <= 1 && link.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                if (Math.max(Math.abs(link.pos.x - creep.pos.x), Math.abs(link.pos.y - creep.pos.y)) <= 1 && link.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
                     creep.heap.targetId = link.id;
                     creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
                     return;

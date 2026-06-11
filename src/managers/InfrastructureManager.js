@@ -79,13 +79,13 @@ class InfrastructureManager {
             if (hasLink) {
                 Memory.rooms[roomName].sources[source.id] = { isLinked: true };
 
-                // Find and destroy any container within range 2
-                const containers = room.find(FIND_STRUCTURES, {
-                    filter: s => s.structureType === STRUCTURE_CONTAINER && s.pos.inRangeTo(source, 2)
-                });
-                
-                for (let c = 0; c < containers.length; c++) {
-                    containers[c].destroy();
+                if (roomState.containers) {
+                    for (let c = 0; c < roomState.containerCount; c++) {
+                        const container = roomState.containers[c];
+                        if (Math.max(Math.abs(container.pos.x - source.pos.x), Math.abs(container.pos.y - source.pos.y)) <= 2) {
+                            container.destroy();
+                        }
+                    }
                 }
             } else {
                 if (Memory.rooms[roomName].sources[source.id]) {

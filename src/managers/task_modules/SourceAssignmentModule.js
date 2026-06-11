@@ -36,7 +36,7 @@ function assignHarvester(creep, roomState) {
     if (roomState.sourceContainers) {
         for (let i = 0; i < roomState.sourceContainers.length; i++) {
             const c = roomState.sourceContainers[i];
-            if (c.pos.getRangeTo(source) <= 2) {
+            if (Math.max(Math.abs(c.pos.x - source.pos.x), Math.abs(c.pos.y - source.pos.y)) <= 2) {
                 creep.heap.sitTargetId = c.id;
                 break;
             }

@@ -48,18 +48,26 @@ class ConstructionManager {
             STRUCTURE_RAMPART
         ];
 
-        const existingPositions = new Set();
+        const existingPositions = new Map();
         if (state.structureIds) {
             for (let i = 0; i < state.structureIds.length; i++) {
                 const s = CacheLib.getById(state.structureIds[i]);
-                if (s) existingPositions.add(`${s.pos.x}_${s.pos.y}_${s.structureType}`);
+                if (s) {
+                    const packed = (s.pos.y * 50) + s.pos.x;
+                    let arr = existingPositions.get(packed);
+                    if (!arr) { arr = []; existingPositions.set(packed, arr); }
+                    arr.push(s.structureType);
+                }
             }
         }
         if (state.constructionSites) {
             const sites = Object.values(state.constructionSites);
             for (let i = 0; i < sites.length; i++) {
                 const s = sites[i];
-                existingPositions.add(`${s.pos.x}_${s.pos.y}_${s.structureType}`);
+                const packed = (s.pos.y * 50) + s.pos.x;
+                let arr = existingPositions.get(packed);
+                if (!arr) { arr = []; existingPositions.set(packed, arr); }
+                arr.push(s.structureType);
             }
         }
 
@@ -139,13 +147,18 @@ class ConstructionManager {
             for (let i = 0; i < positions.length && placed < maxToPlace; i++) {
                 if (count >= maxAllowed) break;
                 const pos = positions[i];
-                const key = `${pos.x}_${pos.y}_${structureType}`;
-                if (existingPositions.has(key)) continue;
+                const packed = (pos.y * 50) + pos.x;
+                const arr = existingPositions.get(packed);
+                if (arr && arr.includes(structureType)) continue;
 
                 if (room.createConstructionSite(pos.x, pos.y, structureType) === OK) {
                     placed++;
                     count++;
-                    existingPositions.add(key);
+                    if (!arr) {
+                        existingPositions.set(packed, [structureType]);
+                    } else {
+                        arr.push(structureType);
+                    }
                 }
             }
         }

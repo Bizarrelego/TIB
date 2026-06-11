@@ -158,13 +158,16 @@ class TaskAssignmentManager {
 
         // Check if the civilian is standing on a rampart. If so, they are safe and do not need to flee.
         let onRampart = false;
-        const look = creep.room.lookForAt(LOOK_STRUCTURES, creep.pos);
-        for (let i = 0; i < look.length; i++) {
-            if (look[i].structureType === STRUCTURE_RAMPART) {
-                onRampart = true;
-                break;
+        if (roomState.ramparts) {
+            for (let i = 0; i < roomState.rampartCount; i++) {
+                const r = roomState.ramparts[i];
+                if (r.pos.x === creep.pos.x && r.pos.y === creep.pos.y) {
+                    onRampart = true;
+                    break;
+                }
             }
         }
+        
         if (onRampart) {
             if (creep.heap.fleeGoals) creep.heap.fleeGoals = null;
             return false;
@@ -196,6 +199,32 @@ class TaskAssignmentManager {
         const role = (creep.memory.role || '').toLowerCase();
         // Military creeps are managed exclusively by MilitaryManager — skip to prevent heap overwrite
         if (role === 'meleecreep' || role === 'rangercreep' || role === 'mediccreep') return;
+
+        // End-of-Life Task Abortion
+        // Prevents dying creeps from accepting new withdraw/harvest tasks, forcing them to dump their inventory into core storage before expiring.
+        if ((role === 'hauler' || role === 'filler' || role === 'upgrader' || role === 'builder') && creep.ticksToLive < 30) {
+            if (creep.store.getUsedCapacity() > 0) {
+                let dumpTarget = null;
+                if (roomState.storage && roomState.storage.store.getFreeCapacity() > 0) dumpTarget = roomState.storage;
+                else if (roomState.terminal && roomState.terminal.store.getFreeCapacity() > 0) dumpTarget = roomState.terminal;
+                else if (roomState.spawns && roomState.spawnCount > 0) {
+                    for(let i=0; i<roomState.spawnCount; i++) {
+                        if (roomState.spawns[i].store.getFreeCapacity(RESOURCE_ENERGY) > 0) { dumpTarget = roomState.spawns[i]; break; }
+                    }
+                }
+                
+                if (dumpTarget) {
+                    creep.heap.targetId = dumpTarget.id;
+                    creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
+                } else {
+                    creep.heap.actionIntent = ActionConstants.ACTION_SUICIDE;
+                }
+                return;
+            } else {
+                creep.heap.actionIntent = ActionConstants.ACTION_SUICIDE;
+                return;
+            }
+        }
         if (role === 'harvester') SourceAssignmentModule.assignHarvester(creep, roomState);
         else if (role === 'hauler') TaskAssignmentManager.assignHauler(creep, roomState);
         else if (role === 'builder') TaskAssignmentManager.assignBuilder(creep, roomState);
@@ -721,7 +750,7 @@ class TaskAssignmentManager {
                 for (let i = 0; i < roomState.containers.length; i++) {
                     const c = roomState.containers[i];
                     // Skip if this is the controller's container (we only pull from source containers)
-                    if (roomState.controller && c.pos.getRangeTo(roomState.controller) <= 3) continue;
+                    if (roomState.controller && Math.max(Math.abs(c.pos.x - roomState.controller.pos.x), Math.abs(c.pos.y - roomState.controller.pos.y)) <= 3) continue;
 
                     const amount = c.store.getUsedCapacity();
                     const claimKey = `${c.id}_gather`;
@@ -762,7 +791,7 @@ class TaskAssignmentManager {
                 for (let i = 0; i < drops.length; i++) {
                     const d = drops[i];
                     // Skip drops near the controller (these are for upgraders/bootstrappers!)
-                    if (roomState.controller && d.pos.getRangeTo(roomState.controller) <= 3) continue;
+                    if (roomState.controller && Math.max(Math.abs(d.pos.x - roomState.controller.pos.x), Math.abs(d.pos.y - roomState.controller.pos.y)) <= 3) continue;
 
                     if (Math.max(Math.abs(d.pos.x - targetHarvester.pos.x), Math.abs(d.pos.y - targetHarvester.pos.y)) <= 2) {
                         const claimKey = `${d.id}_gather`;
@@ -882,7 +911,7 @@ class TaskAssignmentManager {
                     }
                 } else {
                     // Absolute fallback if blueprint is completely broken
-                    if (creep.pos.getRangeTo(roomState.controller) > 3) {
+                    if (Math.max(Math.abs(creep.pos.x - roomState.controller.pos.x), Math.abs(creep.pos.y - roomState.controller.pos.y)) > 3) {
                         creep.heap.destination = { x: roomState.controller.pos.x, y: roomState.controller.pos.y, roomName: creep.room.name, range: 3 };
                         creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
                     } else {

@@ -368,8 +368,7 @@ class SpawnManager {
                 if (role === 'bootstrapper') rawBootstrapperCount++;
 
                 // Fixes Generation Die-offs by triggering replacement spawns before the current workforce expires, ensuring zero downtime on critical infrastructure.
-                const spawnTime = c.body ? c.body.length * 3 : 50;
-                if (!c.spawning && c.ticksToLive !== undefined && c.ticksToLive < spawnTime) {
+                if (!c.spawning && c.ticksToLive !== undefined && c.ticksToLive < 75) {
                     continue;
                 }
 
@@ -417,7 +416,7 @@ class SpawnManager {
 
         // Prevents economic stalling by ensuring early-game scouts yield the spawn queue to critical energy-generating roles.
         const spawnPriority = [
-            'bootstrapper', 'harvester', 'filler', 'fastfiller', 'hauler', 'defender', 'upgrader', 'builder',
+            'harvester', 'filler', 'hauler', 'bootstrapper', 'fastfiller', 'defender', 'upgrader', 'builder',
             'scout', 'repairman', 'remoteharvester', 'remotehauler',
             'meleeCreep', 'rangerCreep', 'medicCreep'
         ];
@@ -431,7 +430,7 @@ class SpawnManager {
                 // Prevents economic cannibalism by completely halting all energy sinks (upgraders/builders) until the energy-gathering workforce is at 100% capacity.
                 if (role === 'builder' || role === 'upgrader' || role === 'scout') {
                     if (harvesterCount < (targetCensus['harvester'] || 0) || haulerCount < (targetCensus['hauler'] || 0)) {
-                        break;
+                        continue;
                     }
                 }
 

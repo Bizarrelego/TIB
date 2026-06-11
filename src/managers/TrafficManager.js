@@ -138,11 +138,31 @@ class TrafficManager {
                     } else {
                         const targetPos = new RoomPosition(dest.x, dest.y, dest.roomName);
                         const destRange = dest.range !== undefined ? dest.range : 1;
-                        pathResult = PathFinder.search(creep.pos, { pos: targetPos, range: destRange }, {
-                            plainCost: 2,
-                            swampCost: 10,
-                            roomCallback: TrafficManager.getCostMatrix
-                        });
+                        
+                        if (!global.PathCache) global.PathCache = new Map();
+                        const pathKey = `${creep.pos.roomName}_${creep.pos.x}_${creep.pos.y}_${dest.roomName}_${dest.x}_${dest.y}_${destRange}`;
+                        const cached = global.PathCache.get(pathKey);
+                        
+                        if (cached && Game.time < cached.expireTime) {
+                            pathResult = { path: cached.path, incomplete: cached.incomplete, isSerialized: true };
+                        } else {
+                            pathResult = PathFinder.search(creep.pos, { pos: targetPos, range: destRange }, {
+                                plainCost: 2,
+                                swampCost: 10,
+                                roomCallback: TrafficManager.getCostMatrix
+                            });
+                            
+                            const serializedPath = pathResult.path.map(p => ({ x: p.x, y: p.y, roomName: p.roomName }));
+                            global.PathCache.set(pathKey, {
+                                path: serializedPath,
+                                incomplete: pathResult.incomplete,
+                                expireTime: Game.time + 1500
+                            });
+                            
+                            pathResult.path = serializedPath;
+                            pathResult.isSerialized = true;
+                        }
+
                         heap.pathDest = { x: dest.x, y: dest.y, roomName: dest.roomName };
                     }
 
@@ -157,7 +177,7 @@ class TrafficManager {
                         continue;
                     }
 
-                    heap.path = pathResult.path.map(p => ({ x: p.x, y: p.y, roomName: p.roomName }));
+                    heap.path = pathResult.isSerialized ? pathResult.path : pathResult.path.map(p => ({ x: p.x, y: p.y, roomName: p.roomName }));
                     heap.pathIndex = 0;
                 }
 
