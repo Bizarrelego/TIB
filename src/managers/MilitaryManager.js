@@ -46,6 +46,14 @@ class MilitaryManager {
 
         const hasThreat = homeHasHostiles || outpostThreatRoom !== null;
 
+        // Run once per room logic
+        let weAreStronger = false;
+        let primaryTarget = null;
+        if (homeHasHostiles) {
+            weAreStronger = MilitaryManager.evaluateStrength(homeState, colony);
+            primaryTarget = MilitaryManager.findPrimaryTarget(homeState);
+        }
+
         // Command each military creep
         for (const creepName in Game.creeps) {
             const creep = Game.creeps[creepName];
@@ -59,7 +67,7 @@ class MilitaryManager {
             if (hasThreat) {
                 // Defensive priority: home threats first, then outpost threats
                 if (homeHasHostiles) {
-                    MilitaryManager.assignDefensive(creep, homeState, colony);
+                    MilitaryManager.assignDefensive(creep, homeState, colony, weAreStronger, primaryTarget);
                 } else {
                     MilitaryManager.assignOutpostDefense(creep, outpostThreatRoom);
                 }
@@ -79,47 +87,58 @@ class MilitaryManager {
     // DEFENSIVE ASSIGNMENT
     // ─────────────────────────────────────────────────────────────────────────────
 
-    static assignDefensive(creep, homeState, colony) {
-        const hostiles = homeState.hostiles;
-        if (!hostiles || hostiles.length === 0) return;
+    static assignDefensive(creep, homeState, colony, weAreStronger, primaryTarget) {
+        if (!primaryTarget) return;
 
-        let closestHostile = null;
-        let closestDist = Infinity;
-        for (let i = 0; i < hostiles.length; i++) {
-            const h = hostiles[i];
-            const d = Math.max(Math.abs(creep.pos.x - h.pos.x), Math.abs(creep.pos.y - h.pos.y));
-            if (d < closestDist) {
-                closestDist = d;
-                closestHostile = h;
-            }
-        }
-        if (!closestHostile) return;
+        let closestDist = Math.max(Math.abs(creep.pos.x - primaryTarget.pos.x), Math.abs(creep.pos.y - primaryTarget.pos.y));
+
+        const bestRampart = MilitaryManager.findBestRampart(creep, primaryTarget, homeState, weAreStronger);
 
         const role = creep.memory.role;
 
         if (role === 'meleeCreep') {
-            creep.heap.targetId = closestHostile.id;
+            if (bestRampart) {
+                creep.heap.destination = { x: bestRampart.pos.x, y: bestRampart.pos.y, roomName: bestRampart.pos.roomName, range: 0 };
+            } else {
+                creep.heap.destination = { x: primaryTarget.pos.x, y: primaryTarget.pos.y, roomName: primaryTarget.pos.roomName, range: 1 };
+            }
+            creep.heap.targetId = primaryTarget.id;
             creep.heap.actionIntent = ActionConstants.ACTION_ATTACK;
             creep.heap.state = 'combat';
 
         } else if (role === 'rangerCreep') {
-            // Replaces naive 1-tile math with native TrafficManager flee pathfinding, allowing rangers to kite flawlessly around terrain.
-            if (closestDist <= 2) {
-                creep.heap.fleeGoals = [{ pos: closestHostile.pos, range: 3 }];
+            if (bestRampart) {
+                creep.heap.destination = { x: bestRampart.pos.x, y: bestRampart.pos.y, roomName: bestRampart.pos.roomName, range: 0 };
+                creep.heap.fleeGoals = null; // Do not kite if we are holding a bunker rampart
             } else {
-                creep.heap.fleeGoals = null;
-                creep.heap.destination = { x: closestHostile.pos.x, y: closestHostile.pos.y, roomName: closestHostile.pos.roomName, range: 3 };
+                // Replaces naive 1-tile math with native TrafficManager flee pathfinding, allowing rangers to kite flawlessly around terrain.
+                if (closestDist <= 2) {
+                    creep.heap.fleeGoals = [{ pos: primaryTarget.pos, range: 3 }];
+                } else {
+                    creep.heap.fleeGoals = null;
+                    creep.heap.destination = { x: primaryTarget.pos.x, y: primaryTarget.pos.y, roomName: primaryTarget.pos.roomName, range: 3 };
+                }
             }
-            creep.heap.targetId = closestHostile.id;
+            creep.heap.targetId = primaryTarget.id;
             creep.heap.actionIntent = ActionConstants.ACTION_RANGED_ATTACK;
             creep.heap.state = 'combat';
 
         } else if (role === 'medicCreep') {
-            // Adds survival instincts to medics via fleeGoals, preventing them from blindly following melee creeps into danger.
-            if (closestDist <= 2) {
-                creep.heap.fleeGoals = [{ pos: closestHostile.pos, range: 3 }];
-            } else {
+            // Medics also seek a rampart if we are weaker, otherwise they just kite and follow.
+            let medicRampart = null;
+            if (!weAreStronger) {
+                medicRampart = MilitaryManager.findBestRampart(creep, primaryTarget, homeState, weAreStronger);
+            }
+
+            if (medicRampart) {
+                creep.heap.destination = { x: medicRampart.pos.x, y: medicRampart.pos.y, roomName: medicRampart.pos.roomName, range: 0 };
                 creep.heap.fleeGoals = null;
+            } else {
+                if (closestDist <= 2) {
+                    creep.heap.fleeGoals = [{ pos: primaryTarget.pos, range: 3 }];
+                } else {
+                    creep.heap.fleeGoals = null;
+                }
             }
 
             const healTarget = MilitaryManager.findMostDamagedAlly(colony, creep.room.name);
@@ -425,6 +444,117 @@ class MilitaryManager {
             }
         }
         return null;
+    }
+    static evaluateStrength(roomState, colony) {
+        let enemyScore = 0;
+        let allyScore = 0;
+
+        const hostiles = roomState.hostiles || [];
+        for (let i = 0; i < hostiles.length; i++) {
+            const h = hostiles[i];
+            for (let j = 0; j < h.body.length; j++) {
+                const type = h.body[j].type;
+                if (type === ATTACK || type === RANGED_ATTACK || type === HEAL) {
+                    enemyScore++;
+                }
+            }
+        }
+
+        const alliedCreeps = roomState.creeps || [];
+        for (let i = 0; i < alliedCreeps.length; i++) {
+            const c = alliedCreeps[i];
+            if (c.memory.colony !== colony) continue;
+            const role = (c.memory.role || '').toLowerCase();
+            if (role === 'meleecreep' || role === 'rangercreep' || role === 'mediccreep' || role === 'defender') {
+                for (let j = 0; j < c.body.length; j++) {
+                    const type = c.body[j].type;
+                    if (type === ATTACK || type === RANGED_ATTACK || type === HEAL) {
+                        allyScore++;
+                    }
+                }
+            }
+        }
+
+        const towers = roomState.towers || [];
+        allyScore += towers.length * 5; 
+
+        return allyScore >= enemyScore;
+    }
+
+    static findPrimaryTarget(roomState) {
+        const hostiles = roomState.hostiles;
+        if (!hostiles || hostiles.length === 0) return null;
+
+        let bestTarget = null;
+        let highestScore = -Infinity;
+
+        for (let i = 0; i < hostiles.length; i++) {
+            const h = hostiles[i];
+            let score = 0;
+
+            let hasHeal = false;
+            let hasAttack = false;
+
+            for (let j = 0; j < h.body.length; j++) {
+                const type = h.body[j].type;
+                if (type === HEAL) hasHeal = true;
+                if (type === ATTACK || type === RANGED_ATTACK) hasAttack = true;
+            }
+
+            // Target Priority System
+            if (hasHeal) score += 1000;
+            else if (hasAttack) score += 500;
+
+            // Tie breaker: Weakest targets get prioritized (to burst them down)
+            const healthRatio = h.hits / h.hitsMax;
+            score -= healthRatio * 100;
+
+            if (score > highestScore) {
+                highestScore = score;
+                bestTarget = h;
+            }
+        }
+
+        return bestTarget;
+    }
+
+    static findBestRampart(creep, hostile, roomState, weAreStronger) {
+        if (!roomState.ramparts || roomState.rampartCount === 0) return null;
+        
+        let bestRampart = null;
+        let bestScore = -Infinity;
+        
+        const attackRange = (creep.memory.role === 'rangerCreep') ? 3 : 1;
+
+        for (let i = 0; i < roomState.rampartCount; i++) {
+            const s = roomState.ramparts[i];
+            const distToHostile = Math.max(Math.abs(s.pos.x - hostile.pos.x), Math.abs(s.pos.y - hostile.pos.y));
+            
+            if (distToHostile <= attackRange) {
+                const distToCreep = Math.max(Math.abs(creep.pos.x - s.pos.x), Math.abs(creep.pos.y - s.pos.y));
+                const score = -distToCreep;
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestRampart = s;
+                }
+            }
+        }
+        
+        if (!bestRampart && !weAreStronger) {
+            let closestRampartToHostile = null;
+            let minRampartDist = Infinity;
+            for (let i = 0; i < roomState.rampartCount; i++) {
+                const s = roomState.ramparts[i];
+                const dist = Math.max(Math.abs(s.pos.x - hostile.pos.x), Math.abs(s.pos.y - hostile.pos.y));
+                if (dist < minRampartDist) {
+                    minRampartDist = dist;
+                    closestRampartToHostile = s;
+                }
+            }
+            if (closestRampartToHostile) bestRampart = closestRampartToHostile;
+        }
+
+        return bestRampart;
     }
 }
 

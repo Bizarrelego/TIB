@@ -49,6 +49,11 @@ class TaskAssignmentManager {
                 }
 
                 TaskAssignmentManager.updateCreepState(creep);
+                
+                if (TaskAssignmentManager.checkCivilianFlee(creep, roomState)) {
+                    continue;
+                }
+
                 TaskAssignmentManager.assignTask(creep, roomState);
             } catch (err) {
                 console.log(`[ERROR] TaskAssignmentManager crashed for creep ${creepName}: ${err.message}\n${err.stack}`);
@@ -130,6 +135,54 @@ class TaskAssignmentManager {
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
             }
         }
+    }
+
+    static checkCivilianFlee(creep, roomState) {
+        const role = (creep.memory.role || '').toLowerCase();
+        if (role === 'meleecreep' || role === 'rangercreep' || role === 'mediccreep' || role === 'defender') {
+            return false;
+        }
+
+        const hostiles = roomState.hostiles;
+        if (!hostiles || hostiles.length === 0) {
+            if (creep.heap.fleeGoals) creep.heap.fleeGoals = null;
+            return false;
+        }
+
+        // Check if the civilian is standing on a rampart. If so, they are safe and do not need to flee.
+        let onRampart = false;
+        const look = creep.room.lookForAt(LOOK_STRUCTURES, creep.pos);
+        for (let i = 0; i < look.length; i++) {
+            if (look[i].structureType === STRUCTURE_RAMPART) {
+                onRampart = true;
+                break;
+            }
+        }
+        if (onRampart) {
+            if (creep.heap.fleeGoals) creep.heap.fleeGoals = null;
+            return false;
+        }
+
+        let nearHostile = false;
+        const fleeGoals = [];
+        for (let i = 0; i < hostiles.length; i++) {
+            const h = hostiles[i];
+            if (Math.max(Math.abs(creep.pos.x - h.pos.x), Math.abs(creep.pos.y - h.pos.y)) <= 5) {
+                nearHostile = true;
+            }
+            fleeGoals.push({ pos: h.pos, range: 7 });
+        }
+
+        if (nearHostile) {
+            creep.heap.fleeGoals = fleeGoals;
+            creep.heap.actionIntent = ActionConstants.ACTION_MOVE;
+            creep.heap.targetId = null;
+            creep.heap.state = 'fleeing';
+            return true;
+        }
+
+        if (creep.heap.fleeGoals) creep.heap.fleeGoals = null;
+        return false;
     }
 
     static assignTask(creep, roomState) {

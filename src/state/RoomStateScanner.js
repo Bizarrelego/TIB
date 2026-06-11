@@ -8,10 +8,12 @@ const createRoomStateTemplate = () => {
     s.constructionSites = Object.create(null);
     s.validDroppedEnergy = []; s.availableDroppedEnergy = []; s.energyInRuinsAndTombstones = [];
     s.harvestableSources = []; s.hostiles = []; s.invaderCores = []; s.structureIds = []; s.repairTargets = [];
-    s.creeps = []; s.harvesters = []; s.upgraders = [];
+    s.creeps = []; s.harvesters = []; s.upgraders = []; s.ramparts = [];
     s.spawnCount = 0; s.extensionCount = 0; s.towerCount = 0; s.linkCount = 0; s.labCount = 0;
     s.containerCount = 0; s.sourceContainerCount = 0; s.controllerContainerCount = 0; s.droppedEnergyCount = 0;
     s.ruinCount = 0; s.tombstoneCount = 0; s.constructionSiteCount = 0; s.validDroppedEnergyCount = 0;
+    s.availableDroppedEnergyCount = 0; s.energyInRuinsAndTombstonesCount = 0; s.harvestableSourceCount = 0;
+    s.hostileCount = 0; s.invaderCoreCount = 0; s.structureIdCount = 0; s.repairTargetCount = 0; s.rampartCount = 0;
     s.availableDroppedEnergyCount = 0; s.energyInRuinsAndTombstonesCount = 0; s.harvestableSourceCount = 0;
     s.hostileCount = 0; s.invaderCoreCount = 0; s.structureIdCount = 0; s.repairTargetCount = 0;
     s.creepCounts = Object.create(null);
@@ -56,6 +58,7 @@ class RoomStateScanner {
         state.energyInRuinsAndTombstonesCount = 0;
         state.harvestableSourceCount = 0;
         state.hostileCount = 0;
+        state.rampartCount = 0;
         state.storage = null;
         state.terminal = null;
         state.factory = null;
@@ -105,6 +108,7 @@ class RoomStateScanner {
                     case STRUCTURE_FACTORY: state.factory = s; break;
                     case STRUCTURE_EXTRACTOR: state.extractor = s; break;
                     case STRUCTURE_INVADER_CORE: state.invaderCores[state.invaderCoreCount++] = s; break;
+                    case STRUCTURE_RAMPART: if (s.my) state.ramparts[state.rampartCount++] = s; break;
                 }
             }
 
