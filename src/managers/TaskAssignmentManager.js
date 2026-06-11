@@ -237,14 +237,14 @@ class TaskAssignmentManager {
         else if (role === 'repairman') TaskAssignmentManager.assignRepairman(creep, roomState);
         else if (role === 'reserver') TaskAssignmentManager.assignReserver(creep, roomState);
         else if (role === 'defender') TaskAssignmentManager.assignDefender(creep, roomState);
-        else if (role === 'hubcreep') TaskAssignmentManager.assignHubCreep(creep, roomState);
-        else if (role === 'miner') TaskAssignmentManager.assignMiner(creep, roomState);
+        else if (role === 'hubmanager') TaskAssignmentManager.assignHubManager(creep, roomState);
+        else if (role === 'mineralminer') TaskAssignmentManager.assignMineralMiner(creep, roomState);
         else if (role === 'mineralhauler') TaskAssignmentManager.assignMineralHauler(creep, roomState);
         else if (role === 'claimer') TaskAssignmentManager.assignClaimer(creep, roomState);
         else if (role === 'scientist') TaskAssignmentManager.assignScientist(creep, roomState);
     }
 
-    static assignMiner(creep, roomState) {
+    static assignMineralMiner(creep, roomState) {
         if (!roomState.mineral || roomState.mineral.mineralAmount === 0) {
             if (creep.store.getUsedCapacity() > 0) {
                 creep.heap.state = 'work';
@@ -288,43 +288,66 @@ class TaskAssignmentManager {
         }
     }
 
-    static assignHubCreep(creep, roomState) {
-        // Find the Hub Link (close to storage)
+    static assignHubManager(creep, roomState) {
+        const terminal = roomState.terminal;
+        const storage = roomState.storage;
+        
         let hubLink = null;
-        if (roomState.links && roomState.storage) {
+        if (roomState.links && storage) {
             for (let i = 0; i < roomState.links.length; i++) {
-                if (roomState.links[i].pos.inRangeTo(roomState.storage, 2)) {
+                if (roomState.links[i].pos.inRangeTo(storage, 2)) {
                     hubLink = roomState.links[i];
                     break;
                 }
             }
         }
 
-        const terminal = roomState.terminal;
-        const storage = roomState.storage;
-
-        if (!storage) {
+        if (!storage || !terminal || !hubLink) {
             creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            return;
+        }
+
+        // Permanent sit target: Find a tile that is range 1 to storage, terminal, and hubLink
+        if (!creep.heap.sitPos) {
+            for (let dx = -1; dx <= 1; dx++) {
+                let found = false;
+                for (let dy = -1; dy <= 1; dy++) {
+                    const x = storage.pos.x + dx;
+                    const y = storage.pos.y + dy;
+                    if (Math.max(Math.abs(x - terminal.pos.x), Math.abs(y - terminal.pos.y)) <= 1 &&
+                        Math.max(Math.abs(x - hubLink.pos.x), Math.abs(y - hubLink.pos.y)) <= 1) {
+                        creep.heap.sitPos = { x, y, roomName: roomState.name || creep.room.name };
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) break;
+            }
+        }
+
+        if (creep.heap.sitPos && (creep.pos.x !== creep.heap.sitPos.x || creep.pos.y !== creep.heap.sitPos.y)) {
+            creep.heap.destination = { x: creep.heap.sitPos.x, y: creep.heap.sitPos.y, roomName: creep.heap.sitPos.roomName, range: 0 };
+            creep.heap.actionIntent = ActionConstants.ACTION_MOVE;
             return;
         }
 
         if (creep.heap.state === 'gather') {
             // Priority 1: Empty Hub Link
-            if (hubLink && hubLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+            if (hubLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
                 creep.heap.targetId = hubLink.id;
                 creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
                 return;
             }
 
             // Priority 2: Storage -> Terminal if storage is overflowing (> 500k)
-            if (terminal && storage.store.getUsedCapacity(RESOURCE_ENERGY) > 500000 && terminal.store.getFreeCapacity() > 0) {
+            if (storage.store.getUsedCapacity(RESOURCE_ENERGY) > 500000 && terminal.store.getFreeCapacity() > 0) {
                 creep.heap.targetId = storage.id;
                 creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
                 return;
             }
 
             // Priority 3: Terminal overflow -> Storage
-            if (terminal && terminal.store.getUsedCapacity(RESOURCE_ENERGY) > 100000 && storage.store.getFreeCapacity() > 0) {
+            if (terminal.store.getUsedCapacity(RESOURCE_ENERGY) > 100000 && storage.store.getFreeCapacity() > 0) {
                 creep.heap.targetId = terminal.id;
                 creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
                 return;
@@ -335,7 +358,7 @@ class TaskAssignmentManager {
             // Work phase (we are holding energy)
             
             // Priority 1: Fill Terminal if we withdrew from Storage due to overflow
-            if (terminal && storage.store.getUsedCapacity(RESOURCE_ENERGY) > 500000 && terminal.store.getFreeCapacity() > 0) {
+            if (storage.store.getUsedCapacity(RESOURCE_ENERGY) > 500000 && terminal.store.getFreeCapacity() > 0) {
                 creep.heap.targetId = terminal.id;
                 creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
                 return;
@@ -461,93 +484,6 @@ class TaskAssignmentManager {
         creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
     }
 
-    static assignRepairman(creep, homeState) {
-        if (creep.heap.state === 'gather') {
-            // Priority 1: Scavenge dropped energy
-            const drops = homeState.droppedEnergy || [];
-            let bestDrop = null;
-            let bestAmount = 0;
-            for (let i = 0; i < drops.length; i++) {
-                const d = drops[i];
-                const claimKey = `${d.id}_gather`;
-                const claimed = global.tickClaims.get(claimKey) || 0;
-                const available = d.amount - claimed;
-                if (available > bestAmount) {
-                    bestAmount = available;
-                    bestDrop = d;
-                }
-            }
-            if (bestDrop && bestAmount >= 25) {
-                const claimKey = `${bestDrop.id}_gather`;
-                global.tickClaims.set(claimKey, (global.tickClaims.get(claimKey) || 0) + creep.store.getFreeCapacity(RESOURCE_ENERGY));
-                creep.heap.targetId = bestDrop.id;
-                creep.heap.actionIntent = ActionConstants.ACTION_PICKUP;
-                return;
-            }
-
-            // Priority 2: Harvest from source
-            const sources = homeState.sources || [];
-            if (sources.length > 0) {
-                creep.heap.targetId = sources[0].id;
-                creep.heap.actionIntent = ActionConstants.ACTION_HARVEST;
-                return;
-            }
-            
-            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
-        } else {
-            // Work phase: find repair targets in home and outposts
-            let bestTarget = null;
-            let lowestHealthRatio = 1.0;
-            let targetRoom = creep.memory.colony;
-
-            // Check home room
-            if (homeState.repairTargets) {
-                for (let i = 0; i < homeState.repairTargets.length; i++) {
-                    const t = homeState.repairTargets[i];
-                    const ratio = t.hits / t.hitsMax;
-                    if (ratio < lowestHealthRatio && ratio < 0.8) {
-                        lowestHealthRatio = ratio;
-                        bestTarget = t;
-                        targetRoom = creep.memory.colony;
-                    }
-                }
-            }
-
-            // Check outposts
-            const outposts = Memory.rooms[creep.memory.colony]?.outposts || [];
-            for (let o = 0; o < outposts.length; o++) {
-                const outpostState = global.State.rooms.get(outposts[o]);
-                if (outpostState && outpostState.repairTargets) {
-                    for (let i = 0; i < outpostState.repairTargets.length; i++) {
-                        const t = outpostState.repairTargets[i];
-                        const ratio = t.hits / t.hitsMax;
-                        if (ratio < lowestHealthRatio && ratio < 0.8) {
-                            lowestHealthRatio = ratio;
-                            bestTarget = t;
-                            targetRoom = outposts[o];
-                        }
-                    }
-                }
-            }
-
-            if (bestTarget) {
-                if (creep.room.name !== targetRoom) {
-                    creep.memory.targetRoom = targetRoom;
-                    creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
-                } else {
-                    creep.heap.targetId = bestTarget.id;
-                    creep.heap.actionIntent = ActionConstants.ACTION_REPAIR;
-                }
-            } else {
-                // No repair targets — park at a safe idle position near spawn
-                if (homeState.spawns && homeState.spawns.length > 0) {
-                    const spawn = homeState.spawns[0];
-                    creep.heap.waypointPos = { x: spawn.pos.x + 4, y: spawn.pos.y + 2, roomName: creep.memory.colony };
-                }
-                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
-            }
-        }
-    }
     static getRemoteCensus() {
         if (global.remoteCensusTick !== Game.time) {
             global.remoteCensus = new Map();
@@ -1123,13 +1059,13 @@ class TaskAssignmentManager {
     }
 
     static assignBuilderWork(creep, roomState) {
-        // Priority 0: Emergency Repair (< 10,000 HP Ramparts/Walls)
+        // Priority 0: Critical Decay Repair (Ramparts/Walls < 100,000 HP)
         if (roomState.repairTargets?.length > 0) {
             let emergencyTarget = null;
             let emergencyDist = Infinity;
             for (let i = 0; i < roomState.repairTargets.length; i++) {
                 const t = roomState.repairTargets[i];
-                if ((t.structureType === STRUCTURE_RAMPART || t.structureType === STRUCTURE_WALL) && t.hits < 10000) {
+                if ((t.structureType === STRUCTURE_RAMPART || t.structureType === STRUCTURE_WALL) && t.hits < 100000) {
                     const dx = Math.abs(creep.pos.x - t.pos.x);
                     const dy = Math.abs(creep.pos.y - t.pos.y);
                     const dist = Math.max(dx, dy);
@@ -1177,14 +1113,16 @@ class TaskAssignmentManager {
             }
         }
 
-        // Priority 2: Repair critically damaged structures (< 50% health only)
+        // Priority 2: Generic Repair (Decay maintenance)
         if (roomState.repairTargets?.length > 0) {
             let bestTarget = null;
             let bestDist = Infinity;
             for (let i = 0; i < roomState.repairTargets.length; i++) {
                 const t = roomState.repairTargets[i];
-                // Only repair critically damaged structures
-                if (t.hits >= t.hitsMax * 0.5) continue;
+                // Cap general repairs for walls/ramparts so builders don't get stuck forever
+                if ((t.structureType === STRUCTURE_WALL || t.structureType === STRUCTURE_RAMPART) && t.hits > 500000) continue;
+                if (t.hits >= t.hitsMax * 0.8) continue;
+                
                 const dx = Math.abs(creep.pos.x - t.pos.x);
                 const dy = Math.abs(creep.pos.y - t.pos.y);
                 const dist = Math.max(dx, dy);

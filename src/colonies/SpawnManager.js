@@ -24,12 +24,11 @@ class CreepBodyBuilder {
             case 'reserver': return this.generateReserver(energyCapacity);
             // Optimizes spawn cost by locking scouts to a single MOVE part, ensuring negligible impact on the RCL 2 energy budget.
             case 'scout': return [MOVE];
-            case 'miner': return this.generateMiner(energyCapacity);
-            case 'hubcreep': return this.generateHubCreep(energyCapacity);
+            case 'mineralminer': return this.generateMiner(energyCapacity);
+            case 'hubmanager': return this.generateHubManager(energyCapacity);
             case 'mineralhauler': return this.generateHauler(energyCapacity);
             case 'claimer': return this.generateClaimer(energyCapacity);
             case 'scientist': return this.generateScientist(energyCapacity);
-            case 'repairman': return [WORK, CARRY, MOVE, MOVE];
             case 'defender': return [TOUGH, MOVE, ATTACK, MOVE];
             case 'meleeCreep': return this.generateMelee(energyCapacity);
             case 'rangerCreep': return this.generateRanger(energyCapacity);
@@ -41,30 +40,30 @@ class CreepBodyBuilder {
     static generateHarvester(energy) {
         let work = 1, carry = 1, move = 1;
         let cost = 200;
-        while (cost + 100 <= energy && work < 5) { work++; cost += 100; }
-        if (cost + 50 <= energy && move < 2 && work < 5) { move++; cost += 50; }
+        // Cap at 6 WORK, 1 CARRY, 3 MOVE
+        while (cost + 100 <= energy && work < 6) { work++; cost += 100; }
+        while (cost + 50 <= energy && move < 3) { move++; cost += 50; }
         return this.buildArray(work, carry, move);
     }
 
     static generateHauler(energy) {
+        // Pure CARRY/MOVE 1:1, capped at 50 parts
         let carry = 1, move = 1;
         let cost = 100;
-        while (cost + 150 <= energy && (carry + move + 3) <= 50) { carry += 2; move += 1; cost += 150; }
-        if (cost + 50 <= energy && (carry + move + 1) <= 50) { carry += 1; cost += 50; }
+        while (cost + 100 <= energy && (carry + move + 2) <= 50) { 
+            carry += 1; 
+            move += 1; 
+            cost += 100; 
+        }
         return this.buildArray(0, carry, move);
     }
 
     static generateUpgrader(energy) {
         let work = 1, carry = 1, move = 1;
         let cost = 200;
-        const maxWork = 15;
-        while (cost + 100 <= energy && work < maxWork && (work + carry + move + 1) <= 50) {
-            work++; cost += 100;
-            if (work % 5 === 0) {
-                if (cost + 50 <= energy && (work + carry + move + 1) <= 50) { carry++; cost += 50; }
-                if (cost + 50 <= energy && (work + carry + move + 1) <= 50) { move++; cost += 50; }
-            }
-        }
+        // Cap at 15 WORK, 1 CARRY, 3 MOVE
+        while (cost + 100 <= energy && work < 15) { work++; cost += 100; }
+        while (cost + 50 <= energy && move < 3) { move++; cost += 50; }
         return this.buildArray(work, carry, move);
     }
 
@@ -94,8 +93,8 @@ class CreepBodyBuilder {
         return body;
     }
 
-    static generateHubCreep(energy) {
-        // HubCreep is stationary. It needs 1 MOVE and max CARRY.
+    static generateHubManager(energy) {
+        // HubManager is stationary. It needs 1 MOVE and max CARRY.
         let carry = 1;
         let move = 1;
         let cost = 100;
@@ -214,7 +213,6 @@ class CensusCalculator {
 
             if (roomState.storage && roomState.storage.my) {
                 limits.filler = 1;
-                limits.repairman = 1;
 
                 if (roomState.extensionsCount && roomState.extensionsCount >= 5) {
                     limits.fastfiller = Math.min(4, Math.floor(roomState.extensionsCount / 5));
@@ -241,12 +239,12 @@ class CensusCalculator {
             }
 
             if (roomState.extractor && roomState.mineral && roomState.mineral.mineralAmount > 0) {
-                limits.miner = 1;
+                limits.mineralminer = 1;
                 limits.mineralhauler = 1;
             }
 
             if (roomState.storage && roomState.terminal && roomState.linkCount > 0) {
-                limits.hubcreep = 1;
+                limits.hubmanager = 1;
             }
 
             if (roomState.labs && roomState.labs.length > 0) {
@@ -274,6 +272,7 @@ class CensusCalculator {
             }
             if (remoteSources > 0) {
                 limits.remoteharvester = remoteSources;
+                limits.remotehauler = remoteSources;
             }
             if (rcl >= 4 && outposts.length > 0) {
                 limits.reserver = outposts.length;
@@ -514,8 +513,8 @@ class SpawnManager {
 
         // Prevents economic stalling by ensuring early-game scouts yield the spawn queue to critical energy-generating roles.
         const spawnPriority = [
-            'harvester', 'filler', 'hauler', 'bootstrapper', 'hubcreep', 'mineralhauler', 'fastfiller', 'defender', 'upgrader', 'builder',
-            'miner', 'scout', 'repairman', 'scientist', 'claimer', 'remoteharvester', 'remotehauler', 'reserver',
+            'hubmanager', 'harvester', 'filler', 'hauler', 'bootstrapper', 'mineralhauler', 'fastfiller', 'defender', 'upgrader', 'builder',
+            'mineralminer', 'scout', 'scientist', 'claimer', 'remoteharvester', 'remotehauler', 'reserver',
             'meleeCreep', 'rangerCreep', 'medicCreep'
         ];
 
