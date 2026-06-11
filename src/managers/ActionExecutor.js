@@ -56,6 +56,14 @@ class ActionExecutor {
             }
         }
 
+        if (heap.opportunisticTarget) {
+            const oppTarget = CacheLib.getById(heap.opportunisticTarget);
+            if (oppTarget) {
+                creep.repair(oppTarget);
+            }
+            heap.opportunisticTarget = null;
+        }
+
         if (intent === ActionConstants.ACTION_HARVEST) {
             result = creep.harvest(target);
         } else if (intent === ActionConstants.ACTION_WITHDRAW) {

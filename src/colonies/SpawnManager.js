@@ -21,7 +21,7 @@ class CreepBodyBuilder {
             }
             case 'filler': return this.generateHauler(energyCapacity);
             case 'remoteharvester': return this.generateHarvester(energyCapacity);
-            case 'remotehauler': return this.generateHauler(energyCapacity);
+            case 'remotehauler': return this.generateRemoteHauler(energyCapacity);
             case 'reserver': return this.generateReserver(energyCapacity);
             // Optimizes spawn cost by locking scouts to a single MOVE part, ensuring negligible impact on the RCL 2 energy budget.
             case 'scout': return [MOVE];
@@ -101,6 +101,24 @@ class CreepBodyBuilder {
             cost += 100; 
         }
         return this.buildArray(0, carry, move);
+    }
+
+    static generateRemoteHauler(energy) {
+        // Needs exactly 1 WORK part for road maintenance. The rest is CARRY/MOVE 1:1.
+        let work = 1, carry = 1, move = 2; // WORK(100) + MOVE(50) = 150, CARRY(50) + MOVE(50) = 100. Base = 250
+        let cost = 250;
+        
+        // If we can't afford the base, fall back to pure hauler logic but with less parts
+        if (energy < 250) {
+            return this.buildArray(0, 1, 1);
+        }
+
+        while (cost + 100 <= energy && (work + carry + move + 2) <= 50) { 
+            carry += 1; 
+            move += 1; 
+            cost += 100; 
+        }
+        return this.buildArray(work, carry, move);
     }
 
     static generateUpgrader(energy) {
@@ -276,36 +294,22 @@ class CensusCalculator {
             let dynamicHaulers = Math.floor(looseEnergy / 1500);
             limits.hauler = Math.min(4, haulerBase + dynamicHaulers);
 
-            // Siege Response
-            const isUnderSiege = roomState.hostileCount > 0;
-            if (isUnderSiege && roomState.storage && roomState.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 20000) {
-                limits.hauler = Math.max(limits.hauler, 2);
+            // Emergency Storage Protocol
+            if (rcl >= 4 && (!roomState.storage || !roomState.storage.my)) {
+                limits.upgrader = 1;
+                limits.builder = 4;
             }
 
-            // 3. Dynamic Upgraders
-            limits.upgrader = 1; // Base to prevent downgrade
-            
+            // Expansion Pioneer Limits
+            if (Memory.empire && Memory.empire.colonizeRoom && Memory.empire.colonizeSourceColony === roomName) {
+                limits.claimer = 1;
+                limits.pioneer = 4;
+            }
+
             if (roomState.storage && roomState.storage.my) {
                 limits.filler = 1;
-
                 if (roomState.extensionsCount && roomState.extensionsCount >= 5) {
                     limits.fastfiller = Math.min(4, Math.floor(roomState.extensionsCount / 5));
-                }
-
-                const storageEnergy = roomState.storage.store.getUsedCapacity(RESOURCE_ENERGY);
-                if (storageEnergy > 300000) {
-                    limits.upgrader = 4;
-                } else if (storageEnergy > 200000) {
-                    limits.upgrader = 3;
-                } else if (storageEnergy > 100000) {
-                    limits.upgrader = 2;
-                }
-            }
-
-            if (roomState.terminal && roomState.terminal.my) {
-                const terminalEnergy = roomState.terminal.store.getUsedCapacity(RESOURCE_ENERGY);
-                if (terminalEnergy > 50000) {
-                    limits.upgrader += 1;
                 }
             }
 
@@ -322,61 +326,78 @@ class CensusCalculator {
                 limits.scientist = 1;
             }
 
-            // Emergency Storage Protocol
-            if (rcl >= 4 && (!roomState.storage || !roomState.storage.my)) {
-                limits.upgrader = 1;
-                limits.builder = 4;
-            }
-
-            // Expansion Pioneer Limits
-            if (Memory.empire && Memory.empire.colonizeRoom && Memory.empire.colonizeSourceColony === roomName) {
-                limits.claimer = 1;
-                limits.pioneer = 4;
-            }
-
-            // 4. Dynamic Builders
-            let canAffordBuilders = false;
-            
-            // 1. Bootstrapping (No storage)
-            if (!roomState.storage || !roomState.storage.my) {
-                canAffordBuilders = true;
-            } else {
-                const storageEnergy = roomState.storage.store.getUsedCapacity(RESOURCE_ENERGY);
-                
-                // 2. Energy Surplus
-                if (storageEnergy > 30000) {
-                    canAffordBuilders = true;
-                } else {
-                    // 3. Critical Repairs
-                    let hasCriticalRepairs = false;
-                    for (let i = 0; i < roomState.rampartCount; i++) {
-                        if (roomState.ramparts[i].hits < 5000) {
-                            hasCriticalRepairs = true;
-                            break;
-                        }
-                    }
-                    if (!hasCriticalRepairs && roomState.repairTargetCount > 0) {
-                        for (let i = 0; i < roomState.repairTargetCount; i++) {
-                            const target = roomState.repairTargets[i];
-                            if ((target.structureType === STRUCTURE_WALL || target.structureType === STRUCTURE_RAMPART) && target.hits < 5000) {
-                                hasCriticalRepairs = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (hasCriticalRepairs) {
-                        canAffordBuilders = true;
-                    } else if (roomState.constructionSiteCount > 0 && storageEnergy > 10000) {
-                        // 4. Practical exception for construction sites
-                        canAffordBuilders = true;
+            // --- Tigga-Style Dynamic Energy Cascading ---
+            // 1. Calculate Theoretical Max Income
+            let totalIncome = roomState.sources ? roomState.sources.length * 10 : 0;
+            if (Memory.rooms && Memory.rooms[roomName] && Memory.rooms[roomName].outposts) {
+                const outposts = Memory.rooms[roomName].outposts;
+                for (let i = 0; i < outposts.length; i++) {
+                    const outpostName = outposts[i];
+                    const adjMem = Memory.rooms[outpostName];
+                    if (adjMem && adjMem.sources) {
+                        const isSKRoom = adjMem.roomType === 'sk';
+                        totalIncome += adjMem.sources.length * (isSKRoom ? 13.33 : 10);
                     }
                 }
             }
 
-            if (!canAffordBuilders) {
-                limits.builder = 0;
+            // 2. Fixed Overhead Extraction (Energy cost per tick of base roles)
+            let fixedOverhead = 0;
+            fixedOverhead += limits.harvester * (200 / 1500);
+            fixedOverhead += limits.hauler * (300 / 1500);
+            fixedOverhead += limits.filler * (300 / 1500);
+            fixedOverhead += limits.fastfiller * (200 / 1500);
+            // Military/Remote overhead is handled implicitly since they draw from outposts, but let's buffer 10%
+            fixedOverhead += (totalIncome * 0.1); 
+
+            let variableBudget = Math.max(0, totalIncome - fixedOverhead);
+
+            // 3. Storage-Driven Scaling Multiplier
+            let storageMultiplier = 1.0;
+            if (roomState.storage && roomState.storage.my) {
+                const storageEnergy = roomState.storage.store.getUsedCapacity(RESOURCE_ENERGY);
+                if (storageEnergy > 500000) storageMultiplier = 3.0;      // Explosive scaling
+                else if (storageEnergy > 300000) storageMultiplier = 2.0; // Surplus
+                else if (storageEnergy > 100000) storageMultiplier = 1.5; // Healthy
+                else if (storageEnergy < 20000) storageMultiplier = 0.5;  // Starving
+            } else {
+                // Bootstrapping: Swarm if loose energy is everywhere
+                if (looseEnergy > 2000) storageMultiplier = 2.0;
             }
+
+            variableBudget *= storageMultiplier;
+
+            // Average upgrader/builder costs ~5 energy/tick in usage (depends on WORK parts and RCL)
+            const workerConsumptionRate = Math.min(10, rcl * 1.5); 
+
+            // 4. Calculate Builders
+            let neededBuilders = 0;
+            let hasCriticalRepairs = false;
+            for (let i = 0; i < roomState.rampartCount; i++) {
+                if (roomState.ramparts[i].hits < 5000) { hasCriticalRepairs = true; break; }
+            }
+            if (!hasCriticalRepairs && roomState.repairTargetCount > 0) {
+                for (let i = 0; i < roomState.repairTargetCount; i++) {
+                    const target = roomState.repairTargets[i];
+                    if ((target.structureType === STRUCTURE_WALL || target.structureType === STRUCTURE_RAMPART) && target.hits < 5000) {
+                        hasCriticalRepairs = true; break;
+                    }
+                }
+            }
+            if (hasCriticalRepairs) neededBuilders = 1;
+            else if (roomState.constructionSiteCount > 0) {
+                neededBuilders = Math.min(3, Math.ceil(roomState.constructionSiteCount / 5));
+            }
+
+            // Route budget to builders first
+            let affordableBuilders = Math.floor(variableBudget / workerConsumptionRate);
+            limits.builder = Math.max(limits.builder || 0, Math.min(neededBuilders, affordableBuilders));
+
+            variableBudget -= (limits.builder * workerConsumptionRate);
+
+            // 5. Zero-Waste Upgraders (Remaining budget is dumped entirely into upgrading)
+            let affordableUpgraders = Math.floor(Math.max(0, variableBudget) / workerConsumptionRate);
+            limits.upgrader = Math.max(1, limits.upgrader || 0, affordableUpgraders); // Always 1 to prevent downgrade
         }
 
         if (roomName && Memory.rooms && Memory.rooms[roomName] && Memory.rooms[roomName].outposts) {
@@ -403,7 +424,7 @@ class CensusCalculator {
                 }
 
                 // Reserver Logic (Skip for SK rooms as they lack controllers to reserve)
-                if (!isSKRoom && rcl >= 4 && adjMem && adjMem.controller && (!adjMem.controller.owner)) {
+                if (!isSKRoom && rcl >= 3 && adjMem && adjMem.controller && (!adjMem.controller.owner)) {
                     // Only reserve if reservation is low (< 1000) or missing
                     if (!adjMem.controller.reservation || adjMem.controller.reservation.ticksToEnd < 1500) {
                         neededReservers++;

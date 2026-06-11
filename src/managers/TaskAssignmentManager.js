@@ -769,6 +769,20 @@ class TaskAssignmentManager {
                     return;
                 }
             }
+
+            // --- Tigga-Style Infrastructure Maintenance ---
+            creep.heap.opportunisticTarget = null;
+            if (creep.getActiveBodyparts(WORK) > 0 && creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                const structures = creep.pos.lookFor(LOOK_STRUCTURES);
+                for (let i = 0; i < structures.length; i++) {
+                    const s = structures[i];
+                    if (s.structureType === STRUCTURE_ROAD && s.hits < s.hitsMax - 1000) {
+                        creep.heap.opportunisticTarget = s.id;
+                        break;
+                    }
+                }
+            }
+
             if (creep.room.name !== creep.memory.targetRoom) {
                 creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
                 return;
@@ -817,6 +831,19 @@ class TaskAssignmentManager {
 
         } else {
             if (creep.room.name !== creep.memory.colony) {
+                // --- Tigga-Style Infrastructure Maintenance ---
+                creep.heap.opportunisticTarget = null;
+                if (creep.getActiveBodyparts(WORK) > 0 && creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    const structures = creep.pos.lookFor(LOOK_STRUCTURES);
+                    for (let i = 0; i < structures.length; i++) {
+                        const s = structures[i];
+                        if (s.structureType === STRUCTURE_ROAD && s.hits < s.hitsMax - 1000) {
+                            creep.heap.opportunisticTarget = s.id;
+                            break;
+                        }
+                    }
+                }
+
                 creep.memory.targetRoom = creep.memory.colony;
                 creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
                 return;

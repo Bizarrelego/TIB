@@ -63,6 +63,27 @@ class MilitaryManager {
             MilitaryManager.requestGlobalReinforcements(besiegedRoom, colony);
         }
 
+        // --- Tigga-Style Quad Squad Formation ---
+        const medics = [];
+        const leaders = [];
+        for (const creepName in Game.creeps) {
+            const creep = Game.creeps[creepName];
+            if (creep.memory.colony !== colony || creep.spawning) continue;
+            if (creep.memory.role === 'medicCreep') medics.push(creep);
+            else if (creep.memory.role === 'meleeCreep' || creep.memory.role === 'rangerCreep') leaders.push(creep);
+        }
+
+        // Dynamically bind Medics to Leaders to form synchronized Squads
+        for (let i = 0; i < medics.length; i++) {
+            const medic = medics[i];
+            const leader = leaders[i % leaders.length];
+            if (leader) {
+                medic.heap.squadLeader = leader.name;
+            } else {
+                medic.heap.squadLeader = null;
+            }
+        }
+
         // Command each military creep
         for (const creepName in Game.creeps) {
             const creep = Game.creeps[creepName];
@@ -72,6 +93,13 @@ class MilitaryManager {
             if (role !== 'meleeCreep' && role !== 'rangerCreep' && role !== 'medicCreep') continue;
             if (creep.spawning) continue;
             if (creep.heap.state !== 'idle') continue;
+
+            // Medics bound to a squad leader execute synchronized Snake logic
+            if (role === 'medicCreep' && creep.heap.squadLeader) {
+                const leader = Game.creeps[creep.heap.squadLeader];
+                MilitaryManager.assignQuadSnakeFollower(creep, leader);
+                continue;
+            }
 
             if (hasThreat) {
                 // Defensive priority: home threats first, then outpost threats
@@ -271,6 +299,63 @@ class MilitaryManager {
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
+    // QUAD SQUAD SNAKE LOGIC
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    static assignQuadSnakeFollower(creep, leader) {
+        if (!leader) {
+            creep.heap.squadLeader = null;
+            creep.heap.state = 'idle';
+            return;
+        }
+        
+        let isMoving = false;
+        // Follow the leader
+        if (!creep.pos.isNearTo(leader.pos)) {
+            creep.heap.destination = { x: leader.pos.x, y: leader.pos.y, roomName: leader.pos.roomName, range: 1 };
+            creep.heap.actionIntent = ActionConstants.ACTION_MOVE;
+            creep.heap.state = 'moving';
+            isMoving = true;
+        } else if (leader.room.name !== creep.room.name) {
+            creep.memory.targetRoom = leader.room.name;
+            creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+            creep.heap.state = 'moving';
+            isMoving = true;
+        }
+
+        // Cross-heal logic: heal the most damaged creep in the squad (leader or any follower)
+        const squad = [leader];
+        for (const name in Game.creeps) {
+            const c = Game.creeps[name];
+            if (c.memory.colony === creep.memory.colony && (c.name === creep.name || (c.heap && c.heap.squadLeader === leader.name))) {
+                squad.push(c);
+            }
+        }
+
+        let lowestHits = Infinity;
+        let healTarget = null;
+        for (let i = 0; i < squad.length; i++) {
+            const member = squad[i];
+            if (member.hits < member.hitsMax && member.hits < lowestHits) {
+                lowestHits = member.hits;
+                healTarget = member;
+            }
+        }
+
+        if (healTarget && creep.pos.isNearTo(healTarget.pos)) {
+            creep.heap.targetId = healTarget.id;
+            creep.heap.actionIntent = ActionConstants.ACTION_HEAL;
+            creep.heap.state = 'combat';
+        } else if (healTarget && creep.pos.inRangeTo(healTarget.pos, 3)) {
+            creep.heap.targetId = healTarget.id;
+            creep.heap.actionIntent = ActionConstants.ACTION_RANGED_HEAL;
+            creep.heap.state = 'combat';
+        } else if (!isMoving) {
+            creep.heap.state = 'idle';
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
     // OFFENSIVE ASSIGNMENT
     // ─────────────────────────────────────────────────────────────────────────────
 
@@ -426,15 +511,54 @@ class MilitaryManager {
                 const intel = Memory.rooms[neighbor];
                 let score = 0;
 
+                // Tigga-Style Remote Denial: Prioritize neighbors pushing into our remote radius
+                let isAdjacentToOutpost = false;
+                for (const colonyName in Game.rooms) {
+                    const room = Game.rooms[colonyName];
+                    if (room.controller && room.controller.my && Memory.rooms[colonyName]?.outposts) {
+                        const outposts = Memory.rooms[colonyName].outposts;
+                        if (outposts.includes(neighbor)) {
+                            isAdjacentToOutpost = true;
+                            score += 50; // Threat directly in our outpost
+                            break;
+                        }
+                        for (let i = 0; i < outposts.length; i++) {
+                            const outpostExits = Game.map.describeExits(outposts[i]);
+                            if (outpostExits) {
+                                for (const d in outpostExits) {
+                                    if (outpostExits[d] === neighbor) {
+                                        isAdjacentToOutpost = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (isAdjacentToOutpost) break;
+                        }
+                    }
+                    if (isAdjacentToOutpost) break;
+                }
+
+                if (isAdjacentToOutpost) {
+                    score += 150; // High priority to choke adjacent competitors
+                }
+
                 if (intel) {
-                    if (intel.controller && intel.controller.owner) score += 100;
-                    if (intel.sources && intel.sources.length > 0) score += 50 * intel.sources.length;
-                    if (intel.hostiles && intel.hostiles.creeps > 0) score += 30;
-                    if (intel.droppedEnergy > 500) score += 15;
-                    const staleness = Game.time - (intel.scoutedAt || 0);
-                    if (staleness > 1000) score += 20;
-                } else {
-                    score += 25;
+                    // Check if there are hostile structures or creeps to slaughter
+                    let hasTargets = false;
+                    if (intel.controller && intel.controller.owner && intel.controller.owner !== 'Blake') {
+                        score += 300; 
+                        hasTargets = true;
+                    }
+                    if (intel.hostiles && intel.hostiles.creeps > 0) {
+                        score += 200; 
+                        hasTargets = true;
+                    }
+                    
+                    if (hasTargets) {
+                        if (intel.sources && intel.sources.length > 0) score += 50 * intel.sources.length;
+                    } else if (score > 150) {
+                        score = 0; // Don't raid if there's nothing to kill
+                    }
                 }
 
                 if (score > 0) {

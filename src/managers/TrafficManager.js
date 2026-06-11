@@ -146,11 +146,16 @@ class TrafficManager {
                         if (cached && Game.time < cached.expireTime) {
                             pathResult = { path: cached.path, incomplete: cached.incomplete, isSerialized: true };
                         } else {
-                            pathResult = PathFinder.search(creep.pos, { pos: targetPos, range: destRange }, {
+                            const searchOptions = {
                                 plainCost: 2,
                                 swampCost: 10,
                                 roomCallback: TrafficManager.getCostMatrix
-                            });
+                            };
+                            if (creep.pos.roomName === targetPos.roomName) {
+                                searchOptions.maxRooms = 1;
+                            }
+                            
+                            pathResult = PathFinder.search(creep.pos, { pos: targetPos, range: destRange }, searchOptions);
                             
                             const serializedPath = pathResult.path.map(p => ({ x: p.x, y: p.y, roomName: p.roomName }));
                             global.PathCache.set(pathKey, {
