@@ -1716,7 +1716,18 @@ class TaskAssignmentManager {
             }
         }
 
-        const hasFiller = roomState.creepCounts && (roomState.creepCounts['filler'] > 0 || roomState.creepCounts['fastfiller'] > 0);
+        const fastfillerCount = (roomState.creepCounts && roomState.creepCounts['fastfiller']) ? roomState.creepCounts['fastfiller'] : 0;
+        const fillerCount = (roomState.creepCounts && roomState.creepCounts['filler']) ? roomState.creepCounts['filler'] : 0;
+        const hasActiveFiller = fastfillerCount > 0 || fillerCount > 0;
+        
+        const hasCoreContainer = roomState.coreContainers && roomState.coreContainerCount > 0;
+        const hasStorage = roomState.storage && roomState.storage.store.getFreeCapacity() > 0;
+        const hasCentralDropoff = hasCoreContainer || hasStorage;
+
+        // Dynamic Logistics Fallback
+        if (!hasActiveFiller || !hasCentralDropoff) {
+            if (TaskAssignmentManager.routeToCoreStructures(creep, roomState)) return;
+        }
 
         // Pre-Storage Controller Delivery (RCL < 6 or no link)
         if (roomState.controller) {
@@ -1823,10 +1834,7 @@ class TaskAssignmentManager {
             }
         }
 
-        // Priority 2: Fill spawn/extensions (Pre-Storage behavior OR if no fillers exist)
-        if (!hasFiller) {
-            if (TaskAssignmentManager.routeToCoreStructures(creep, roomState)) return;
-        }
+        // (Removed duplicate routeToCoreStructures check since it's handled by the Dynamic Logistics Fallback at Priority 1)
 
         // If Storage is full, we should still drop at controller if needed as a last resort.
         if (roomState.controller && roomState.storage && roomState.storage.store.getFreeCapacity() === 0) {
