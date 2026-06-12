@@ -10,6 +10,13 @@ class ScoutingManager {
             const roomState = global.State?.rooms?.get(creep.memory.colony);
             if (roomState && roomState.observers && roomState.observers.length > 0) {
                 creep.suicide();
+                
+                // Prevent downstream managers from crashing on the dead object proxy
+                const currentRoomState = global.State?.rooms?.get(creep.room.name);
+                if (currentRoomState && currentRoomState.creeps) {
+                    const idx = currentRoomState.creeps.indexOf(creep);
+                    if (idx > -1) currentRoomState.creeps.splice(idx, 1);
+                }
                 continue;
             }
 

@@ -10,6 +10,27 @@ const MathLib = require('../lib/MathLib');
  * Optimized for strict Drop-Mining, Stationary Upgrading, and Distance-Weighted Hauling.
  */
 class TaskAssignmentManager {
+    /**
+     * Centralized cross-room routing helper.
+     * Translates strategic targets into local waypoints for the TrafficManager.
+     */
+    static setMoveRoomIntent(creep, targetRoom) {
+        creep.memory.targetRoom = targetRoom;
+        TaskAssignmentManager.setMoveRoomIntent(creep, creep.memory.targetRoom);
+        
+        let nextRoom = targetRoom;
+        
+        if (Memory.empire && Memory.empire.colonizeRoom === targetRoom && Memory.empire.colonizeRoute) {
+            const route = Memory.empire.colonizeRoute;
+            const idx = route.indexOf(creep.room.name);
+            if (idx > -1 && idx < route.length - 1) {
+                nextRoom = route[idx + 1];
+            }
+        }
+        
+        creep.heap.destination = { x: 25, y: 25, roomName: nextRoom, range: 22 };
+    }
+
     static run(colony) {
         if (!global.creepHeap) global.creepHeap = new Map();
         
@@ -255,7 +276,7 @@ class TaskAssignmentManager {
 
         if (creep.room.name !== targetRoom) {
             creep.memory.targetRoom = targetRoom;
-            creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+            TaskAssignmentManager.setMoveRoomIntent(creep, creep.memory.targetRoom);
             creep.heap.state = 'moving';
             return;
         }
@@ -529,7 +550,7 @@ class TaskAssignmentManager {
 
         if (creep.room.name !== targetRoom) {
             creep.memory.targetRoom = targetRoom;
-            creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+            TaskAssignmentManager.setMoveRoomIntent(creep, creep.memory.targetRoom);
             return;
         }
 
@@ -556,7 +577,7 @@ class TaskAssignmentManager {
         if (homeState.hostiles && homeState.hostiles.length > 0) {
             if (creep.room.name !== creep.memory.colony) {
                 creep.memory.targetRoom = creep.memory.colony;
-                creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+                TaskAssignmentManager.setMoveRoomIntent(creep, creep.memory.targetRoom);
                 return;
             }
             creep.heap.targetId = homeState.hostiles[0].id;
@@ -570,7 +591,7 @@ class TaskAssignmentManager {
             if (expState && expState.hostiles && expState.hostileCount > 0) {
                 if (creep.room.name !== Memory.empire.colonizeRoom) {
                     creep.memory.targetRoom = Memory.empire.colonizeRoom;
-                    creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+                    TaskAssignmentManager.setMoveRoomIntent(creep, creep.memory.targetRoom);
                     return;
                 }
                 creep.heap.targetId = expState.hostiles[0].id;
@@ -586,7 +607,7 @@ class TaskAssignmentManager {
             if (outpostState && outpostState.hostiles && outpostState.hostileCount > 0) {
                 if (creep.room.name !== outposts[i]) {
                     creep.memory.targetRoom = outposts[i];
-                    creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+                    TaskAssignmentManager.setMoveRoomIntent(creep, creep.memory.targetRoom);
                     return;
                 }
                 creep.heap.targetId = outpostState.hostiles[0].id;
@@ -640,7 +661,7 @@ class TaskAssignmentManager {
         }
 
         if (creep.room.name !== creep.memory.targetRoom) {
-            creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+            TaskAssignmentManager.setMoveRoomIntent(creep, creep.memory.targetRoom);
             return;
         }
 
@@ -672,7 +693,7 @@ class TaskAssignmentManager {
         }
 
         if (creep.room.name !== creep.memory.targetRoom) {
-            creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+            TaskAssignmentManager.setMoveRoomIntent(creep, creep.memory.targetRoom);
             return;
         }
 
@@ -709,7 +730,7 @@ class TaskAssignmentManager {
         if (creep.heap.state === 'gather') {
             if (creep.room.name !== creep.memory.colony) {
                 creep.memory.targetRoom = creep.memory.colony; // Temporary override for gather
-                creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+                TaskAssignmentManager.setMoveRoomIntent(creep, creep.memory.targetRoom);
                 return;
             }
             if (TaskAssignmentManager.getEnergy(creep, homeState, false)) return;
@@ -719,7 +740,7 @@ class TaskAssignmentManager {
 
         // State: work
         if (creep.room.name !== creep.memory.targetRoom) {
-            creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+            TaskAssignmentManager.setMoveRoomIntent(creep, creep.memory.targetRoom);
             return;
         }
 
@@ -784,7 +805,7 @@ class TaskAssignmentManager {
             }
 
             if (creep.room.name !== creep.memory.targetRoom) {
-                creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+                TaskAssignmentManager.setMoveRoomIntent(creep, creep.memory.targetRoom);
                 return;
             }
             const roomState = global.State?.rooms?.get(creep.room.name);
@@ -845,7 +866,7 @@ class TaskAssignmentManager {
                 }
 
                 creep.memory.targetRoom = creep.memory.colony;
-                creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+                TaskAssignmentManager.setMoveRoomIntent(creep, creep.memory.targetRoom);
                 return;
             }
             TaskAssignmentManager.assignHaulerWork(creep, homeState);
@@ -885,7 +906,7 @@ class TaskAssignmentManager {
                 }
             }
             if (creep.room.name !== creep.memory.targetRoom) {
-                creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+                TaskAssignmentManager.setMoveRoomIntent(creep, creep.memory.targetRoom);
                 return;
             }
             const localState = global.State?.rooms?.get(creep.room.name);
@@ -932,7 +953,7 @@ class TaskAssignmentManager {
         } else {
             if (creep.room.name !== creep.memory.colony) {
                 creep.memory.targetRoom = creep.memory.colony;
-                creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+                TaskAssignmentManager.setMoveRoomIntent(creep, creep.memory.targetRoom);
                 return;
             }
             TaskAssignmentManager.assignHaulerWork(creep, homeState);
@@ -1784,7 +1805,7 @@ class TaskAssignmentManager {
         }
 
         if (creep.room.name !== creep.memory.targetRoom) {
-            creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+            TaskAssignmentManager.setMoveRoomIntent(creep, creep.memory.targetRoom);
             // Pre-heal while moving if damaged
             if (creep.hits < creep.hitsMax) creep.heap.secondaryIntent = ActionConstants.ACTION_HEAL;
             return;
@@ -1873,7 +1894,7 @@ class TaskAssignmentManager {
         }
 
         if (creep.room.name !== creep.memory.targetRoom) {
-            creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+            TaskAssignmentManager.setMoveRoomIntent(creep, creep.memory.targetRoom);
             return;
         }
 

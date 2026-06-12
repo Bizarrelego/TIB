@@ -445,6 +445,105 @@ class TrafficManager {
         return false;
     }
 
+    /**
+     * Resolves dense gridlocks by modeling the cluster as a maximum flow problem.
+     * Uses augmenting paths to find a valid bipartite matching between creeps and tiles.
+     */
+    static resolveBipartiteGridlock(deadlocks, terrain, matrix) {
+        const assignment = new Int32Array(2500);
+        assignment.fill(-1);
+
+        const targetsMap = new Map();
+
+        // 1. Define edges (valid moves) for each deadlocked creep
+        for (let i = 0; i < deadlocks.length; i++) {
+            const cIdx = deadlocks[i];
+            const creep = TrafficManager.creepList[cIdx];
+            const origPacked = (creep.pos.y * 50) + creep.pos.x;
+
+            if (TrafficManager.isCreepStationaryLocked(creep) || creep.fatigue > 0) {
+                targetsMap.set(cIdx, [origPacked]);
+                continue;
+            }
+
+            const targets = [];
+            
+            // Preference 1: Their intended next step
+            const nextStep = TrafficManager.nextSteps[cIdx];
+            if (nextStep >= 0) {
+                const occupant = TrafficManager.grid[nextStep];
+                if (occupant === -1 || deadlocks.includes(occupant)) {
+                    targets.push(nextStep);
+                }
+            }
+
+            // Preference 2: Any adjacent empty tile to break the jam
+            const bx = creep.pos.x;
+            const by = creep.pos.y;
+            const dirs = [-51, -50, -49, -1, 1, 49, 50, 51];
+            for (let d = 0; d < 8; d++) {
+                const newPacked = (by * 50) + bx + dirs[d];
+                if (newPacked === nextStep) continue;
+                
+                const nx = newPacked % 50;
+                const ny = Math.floor(newPacked / 50);
+                if (Math.abs(nx - bx) > 1 || Math.abs(ny - by) > 1) continue;
+                if (nx <= 0 || nx >= 49 || ny <= 0 || ny >= 49) continue;
+                if (terrain.get(nx, ny) === TERRAIN_MASK_WALL || matrix.get(nx, ny) === 255) continue;
+                
+                const occupant = TrafficManager.grid[newPacked];
+                if (occupant === -1 || deadlocks.includes(occupant)) {
+                    targets.push(newPacked);
+                }
+            }
+
+            // Preference 3: Staying still
+            targets.push(origPacked);
+
+            targetsMap.set(cIdx, targets);
+        }
+
+        // 2. Compute Maximum Bipartite Matching using DFS Augmenting Paths
+        for (let i = 0; i < deadlocks.length; i++) {
+            const cIdx = deadlocks[i];
+            const visited = new Uint8Array(2500);
+            TrafficManager.bipartiteDFS(cIdx, targetsMap, assignment, visited);
+        }
+
+        // 3. Apply the results
+        for (let i = 0; i < deadlocks.length; i++) {
+            const cIdx = deadlocks[i];
+            const origPacked = (TrafficManager.creepList[cIdx].pos.y * 50) + TrafficManager.creepList[cIdx].pos.x;
+            TrafficManager.grid[origPacked] = -1;
+        }
+
+        for (let tilePacked = 0; tilePacked < 2500; tilePacked++) {
+            const cIdx = assignment[tilePacked];
+            if (cIdx !== -1) {
+                TrafficManager.resolvedIntents[cIdx] = tilePacked;
+                TrafficManager.grid[tilePacked] = cIdx;
+            }
+        }
+    }
+
+    static bipartiteDFS(cIdx, targetsMap, assignment, visited) {
+        const targets = targetsMap.get(cIdx);
+        if (!targets) return false;
+
+        for (let i = 0; i < targets.length; i++) {
+            const tile = targets[i];
+            if (visited[tile]) continue;
+            visited[tile] = 1;
+
+            const currentAssignee = assignment[tile];
+            if (currentAssignee === -1 || TrafficManager.bipartiteDFS(currentAssignee, targetsMap, assignment, visited)) {
+                assignment[tile] = cIdx;
+                return true;
+            }
+        }
+        return false;
+    }
+
     static getSafeDirection(fromPos, toPos) {
         if (fromPos.roomName !== toPos.roomName) {
             if (fromPos.x === 0 && toPos.x === 49) return LEFT;

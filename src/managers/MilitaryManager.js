@@ -1,3 +1,5 @@
+const TaskAssignmentManager = require('./TaskAssignmentManager');
+
 const ActionConstants = require('../constants/ActionConstants');
 
 /**
@@ -225,7 +227,7 @@ class MilitaryManager {
                         // Reroute them globally
                         c.memory.targetRoom = besiegedRoom;
                         c.heap.state = 'moving';
-                        c.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+                        TaskAssignmentManager.setMoveRoomIntent(c, c.memory.targetRoom);
                     }
                 }
             }
@@ -235,7 +237,7 @@ class MilitaryManager {
     static assignOutpostDefense(creep, targetRoom) {
         if (creep.room.name !== targetRoom) {
             creep.memory.targetRoom = targetRoom;
-            creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+            TaskAssignmentManager.setMoveRoomIntent(creep, creep.memory.targetRoom);
             creep.heap.state = 'moving';
             return;
         }
@@ -318,7 +320,7 @@ class MilitaryManager {
             isMoving = true;
         } else if (leader.room.name !== creep.room.name) {
             creep.memory.targetRoom = leader.room.name;
-            creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+            TaskAssignmentManager.setMoveRoomIntent(creep, creep.memory.targetRoom);
             creep.heap.state = 'moving';
             isMoving = true;
         }
@@ -362,7 +364,7 @@ class MilitaryManager {
     static assignOffensive(creep, targetRoom, colony) {
         if (creep.room.name !== targetRoom) {
             creep.memory.targetRoom = targetRoom;
-            creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
+            TaskAssignmentManager.setMoveRoomIntent(creep, creep.memory.targetRoom);
             creep.heap.state = 'moving';
             return;
         }

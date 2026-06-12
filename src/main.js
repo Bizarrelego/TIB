@@ -58,9 +58,7 @@ module.exports.loop = function () {
         if (!global.State) global.State = { rooms: new Map() };
         for (const roomName in Game.rooms) {
             const room = Game.rooms[roomName];
-            if (room.controller && room.controller.my) {
-                RoomStateScanner.run(room);
-            }
+            RoomStateScanner.run(room);
         }
     }, 'RoomStateScanner')();
 

@@ -50,6 +50,15 @@ class InfrastructureManager {
             if (builderCount >= 2) {
                 console.log(`[InfrastructureManager] Initiating RCL 4 Base Jump in ${room.name}. Destroying misplaced spawn to rebuild at blueprint anchor!`);
                 spawn.destroy();
+                
+                // Prevent downstream crashes
+                if (roomState.spawns) {
+                    const idx = roomState.spawns.indexOf(spawn);
+                    if (idx > -1) {
+                        roomState.spawns.splice(idx, 1);
+                        roomState.spawnCount--;
+                    }
+                }
             }
         }
     }
@@ -80,10 +89,22 @@ class InfrastructureManager {
                 Memory.rooms[roomName].sources[source.id] = { isLinked: true };
 
                 if (roomState.containers) {
-                    for (let c = 0; c < roomState.containerCount; c++) {
+                    for (let c = roomState.containerCount - 1; c >= 0; c--) {
                         const container = roomState.containers[c];
                         if (Math.max(Math.abs(container.pos.x - source.pos.x), Math.abs(container.pos.y - source.pos.y)) <= 2) {
                             container.destroy();
+                            
+                            // Prevent downstream crashes
+                            roomState.containers.splice(c, 1);
+                            roomState.containerCount--;
+                            
+                            if (roomState.repairTargets) {
+                                const rtIdx = roomState.repairTargets.indexOf(container);
+                                if (rtIdx > -1) {
+                                    roomState.repairTargets.splice(rtIdx, 1);
+                                    roomState.repairTargetCount--;
+                                }
+                            }
                         }
                     }
                 }

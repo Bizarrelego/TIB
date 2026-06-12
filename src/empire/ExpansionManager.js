@@ -106,7 +106,44 @@ class ExpansionManager {
             Memory.empire.colonizeRoom = bestTarget;
             Memory.empire.colonizeSourceColony = bestSourceColony;
             Memory.empire.colonizeStartTime = Game.time;
+            
+            // Generate and cache a safe route for pioneers
+            Memory.empire.colonizeRoute = ExpansionManager.calculateSafeRoute(bestSourceColony, bestTarget);
         }
+    }
+
+    /**
+     * Calculates a multi-room path avoiding hostile strongholds and closed rooms.
+     * Returns an array of room names representing the sequence from startRoom to endRoom.
+     */
+    static calculateSafeRoute(startRoom, endRoom) {
+        const route = Game.map.findRoute(startRoom, endRoom, {
+            routeCallback: (roomName, fromRoomName) => {
+                const status = typeof Game.map.getRoomStatus === 'function' ? Game.map.getRoomStatus(roomName) : null;
+                if (status && (status.status === 'closed' || status.status === 'novice' || status.status === 'respawn')) {
+                    return Infinity;
+                }
+                
+                const intel = Memory.rooms[roomName];
+                if (intel) {
+                    if (intel.controller && intel.controller.owner && intel.controller.owner !== 'Bizarrelego') {
+                        return 20; // High cost for enemy rooms
+                    }
+                    if (intel.roomType === 'center' || intel.roomType === 'keeper') {
+                        return 10; // Avoid SK rooms
+                    }
+                }
+                return 1;
+            }
+        });
+
+        if (route === ERR_NO_PATH) return [];
+        
+        const path = [startRoom];
+        for (let i = 0; i < route.length; i++) {
+            path.push(route[i].room);
+        }
+        return path;
     }
 
     static evaluateExpansion(roomName) {
