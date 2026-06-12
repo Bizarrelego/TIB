@@ -1937,7 +1937,7 @@ class TaskAssignmentManager {
         }
 
         // Priority 3: Wait near the soonest-to-spawn Lair
-        const lairs = creep.room.find(FIND_STRUCTURES, { filter: s => s.structureType === STRUCTURE_KEEPER_LAIR });
+        const lairs = roomState.keeperLairs || [];
         if (lairs.length > 0) {
             let soonestLair = lairs[0];
             for (let i = 1; i < lairs.length; i++) {
