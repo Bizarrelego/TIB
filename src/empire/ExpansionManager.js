@@ -86,12 +86,8 @@ class ExpansionManager {
             if (!sourceColonyState || !sourceColonyState.controller || sourceColonyState.controller.level < 4) continue;
 
             // Execute Scoring Algorithm
-            let score = ExpansionManager.evaluateExpansion(roomName);
+            let score = ExpansionManager.evaluateExpansion(roomName, minDistanceToColony);
             if (score === undefined) continue;
-
-            // Distance Modifiers
-            if (minDistanceToColony === 3) score -= 20;
-            if (minDistanceToColony >= 4) score += 20;
 
             if (score > bestScore) {
                 bestScore = score;
@@ -146,48 +142,36 @@ class ExpansionManager {
         return path;
     }
 
-    static evaluateExpansion(roomName) {
+    static evaluateExpansion(roomName, minDistanceToColony) {
         const intel = Memory.rooms[roomName];
         if (!intel || !intel.sources) return undefined;
 
-        let value = ExpansionManager.getSwampValue(roomName);
-        if (intel.sources.length > 1) {
-            value += 100;
-        }
+        // Base Sources Value
+        let sourcesScore = intel.sources.length * 50;
 
-        // Outpost potential
-        const outpostValue = ExpansionManager.getOutpostsValue(roomName);
-        if (outpostValue === undefined) return undefined;
-        value += outpostValue;
-
-        // Mineral diversity logic
+        // Mineral Value
+        let mineralScore = 0;
         const mineralType = intel.mineral;
         if (mineralType) {
             const empireMinerals = global.State.empireMinerals || [];
             if (!empireMinerals.includes(mineralType)) {
-                value += 120;
+                mineralScore += 120;
                 if (mineralType === RESOURCE_CATALYST) {
-                    value += 80;
+                    mineralScore += 80;
                 }
             }
         }
 
-        // SK proximity mineral check
+        // Distance Penalty
+        let distanceScore = minDistanceToColony * 2;
+
+        // Hostile Proximity Penalty
+        let hostilePenalty = 0;
         const oneAway = OutpostManager.getNeighbors(roomName, 1);
         for (let i = 0; i < oneAway.length; i++) {
             const adj = oneAway[i];
-            if (OutpostManager.isKeeperRoom(adj)) {
-                const skIntel = Memory.rooms[adj];
-                if (skIntel && skIntel.mineral) {
-                    const skMineral = skIntel.mineral;
-                    const empireMinerals = global.State.empireMinerals || [];
-                    if (!empireMinerals.includes(skMineral) && skMineral !== mineralType) {
-                        value += 50;
-                    }
-                }
-            }
             if (Memory.rooms[adj] && Memory.rooms[adj].isOccupied) {
-                value -= 50;
+                hostilePenalty += 50;
             }
         }
 
@@ -195,100 +179,11 @@ class ExpansionManager {
         for (let i = 0; i < twoAway.length; i++) {
             const adj = twoAway[i];
             if (Memory.rooms[adj] && Memory.rooms[adj].isOccupied) {
-                value -= 20;
+                hostilePenalty += 20;
             }
         }
 
-        return value;
-    }
-
-    static getSwampValue(roomName) {
-        const terrain = Game.map.getRoomTerrain(roomName);
-        let plain = 0;
-        let swamp = 0;
-        
-        for (let y = 0; y < 50; y++) {
-            for (let x = 0; x < 50; x++) {
-                const terrainType = terrain.get(x, y);
-                if (terrainType & TERRAIN_MASK_SWAMP) {
-                    swamp++;
-                } else if (terrainType === 0) { // Plain
-                    plain++;
-                }
-            }
-        }
-        
-        if (swamp === 0) return 60;
-        if (plain === 0) return 0;
-        if (plain > swamp) return 30;
-        
-        return Math.max(Math.min(Math.ceil((30 * (plain / swamp)) - 30), 60), -30);
-    }
-
-    static getOutpostsValue(roomName) {
-        const oneAway = OutpostManager.getNeighbors(roomName, 1);
-        const twoAway = OutpostManager.getNeighbors(roomName, 2);
-        
-        let value = 0;
-        let count = 6;
-        
-        let hasSK = false;
-        for (let i = 0; i < oneAway.length; i++) {
-            if (OutpostManager.isKeeperRoom(oneAway[i])) {
-                hasSK = true;
-                break;
-            }
-        }
-        
-        if (hasSK) {
-            value += 100;
-            count = 4;
-        }
-        
-        const closeRooms = oneAway.concat(twoAway);
-        const potOutposts = [];
-        
-        for (let i = 0; i < closeRooms.length; i++) {
-            const r = closeRooms[i];
-            const status = typeof Game.map.getRoomStatus === 'function' ? Game.map.getRoomStatus(r) : null;
-            if (status && (status.status === 'closed' || status.status === 'novice' || status.status === 'respawn')) continue;
-            // Simplified middle room / highway check. TIB handles Highways in IntelManager
-            if (Memory.rooms[r] && Memory.rooms[r].roomType === 'highway') continue;
-            potOutposts.push(r);
-        }
-        
-        const values = [];
-        for (let i = 0; i < potOutposts.length; i++) {
-            const o = potOutposts[i];
-            const distance = oneAway.includes(o) ? 1 : 2;
-            const outpostValue = ExpansionManager.getOutpostValue(o, distance);
-            if (outpostValue !== undefined) {
-                values.push({ roomName: o, value: outpostValue });
-            }
-        }
-        
-        // Sort descending
-        values.sort((a, b) => b.value - a.value);
-        
-        let c = 0;
-        for (let i = 0; i < values.length; i++) {
-            if (c < count) {
-                value += values[i].value;
-                c++;
-            }
-        }
-        
-        return value;
-    }
-
-    static getOutpostValue(outpost, distance) {
-        const intel = Memory.rooms[outpost];
-        if (!intel) return undefined;
-        
-        const sources = intel.sources ? intel.sources.length : 0;
-        if (sources === 0) return 0;
-        
-        return Math.ceil((sources * 30) / distance);
+        return sourcesScore + mineralScore - distanceScore - hostilePenalty;
     }
 }
 

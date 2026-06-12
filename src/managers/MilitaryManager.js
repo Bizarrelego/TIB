@@ -622,38 +622,47 @@ class MilitaryManager {
         }
         return null;
     }
-    static evaluateStrength(roomState, colony) {
-        let enemyScore = 0;
-        let allyScore = 0;
-
-        const hostiles = roomState.hostiles || [];
+    static getThreatIndex(hostiles) {
+        if (!hostiles || hostiles.length === 0) return 0;
+        let threat = 0;
         for (let i = 0; i < hostiles.length; i++) {
-            const h = hostiles[i];
-            for (let j = 0; j < h.body.length; j++) {
-                const type = h.body[j].type;
-                if (type === ATTACK || type === RANGED_ATTACK || type === HEAL) {
-                    enemyScore++;
-                }
+            const body = hostiles[i].body;
+            if (!body) continue;
+            for (let j = 0; j < body.length; j++) {
+                const type = body[j].type;
+                if (type === ATTACK) threat += 30;
+                else if (type === RANGED_ATTACK) threat += 10;
+                else if (type === HEAL) threat += 12;
             }
         }
+        return threat;
+    }
 
-        const alliedCreeps = roomState.creeps || [];
-        for (let i = 0; i < alliedCreeps.length; i++) {
-            const c = alliedCreeps[i];
-            if (c.memory.colony !== colony) continue;
+    static getAllyThreatIndex(creeps, colony) {
+        if (!creeps || creeps.length === 0) return 0;
+        let threat = 0;
+        for (let i = 0; i < creeps.length; i++) {
+            const c = creeps[i];
+            if (colony && c.memory.colony !== colony) continue;
             const role = (c.memory.role || '').toLowerCase();
             if (role === 'meleecreep' || role === 'rangercreep' || role === 'mediccreep' || role === 'defender') {
                 for (let j = 0; j < c.body.length; j++) {
                     const type = c.body[j].type;
-                    if (type === ATTACK || type === RANGED_ATTACK || type === HEAL) {
-                        allyScore++;
-                    }
+                    if (type === ATTACK) threat += 30;
+                    else if (type === RANGED_ATTACK) threat += 10;
+                    else if (type === HEAL) threat += 12;
                 }
             }
         }
+        return threat;
+    }
+
+    static evaluateStrength(roomState, colony) {
+        let enemyScore = MilitaryManager.getThreatIndex(roomState.hostiles);
+        let allyScore = MilitaryManager.getAllyThreatIndex(roomState.creeps, colony);
 
         const towers = roomState.towers || [];
-        allyScore += towers.length * 5; 
+        allyScore += towers.length * 150; // A tower is significantly stronger than 5 parts, adjusting to align with the *30 threat index
 
         return allyScore >= enemyScore;
     }
@@ -666,31 +675,8 @@ class MilitaryManager {
             return;
         }
 
-        let hostileThreat = 0;
-        for (let i = 0; i < oState.hostiles.length; i++) {
-            const body = oState.hostiles[i].body;
-            for (let j = 0; j < body.length; j++) {
-                const type = body[j].type;
-                if (type === ATTACK) hostileThreat += 30;
-                else if (type === RANGED_ATTACK) hostileThreat += 10;
-                else if (type === HEAL) hostileThreat += 12;
-            }
-        }
-
-        let allyThreat = 0;
-        const alliedCreeps = oState.creeps || [];
-        for (let i = 0; i < alliedCreeps.length; i++) {
-            const c = alliedCreeps[i];
-            const role = (c.memory.role || '').toLowerCase();
-            if (role === 'meleecreep' || role === 'rangercreep' || role === 'mediccreep' || role === 'defender') {
-                for (let j = 0; j < c.body.length; j++) {
-                    const type = c.body[j].type;
-                    if (type === ATTACK) allyThreat += 30;
-                    else if (type === RANGED_ATTACK) allyThreat += 10;
-                    else if (type === HEAL) allyThreat += 12;
-                }
-            }
-        }
+        let hostileThreat = MilitaryManager.getThreatIndex(oState.hostiles);
+        let allyThreat = MilitaryManager.getAllyThreatIndex(oState.creeps, null);
 
         if (hostileThreat > allyThreat) {
             Memory.rooms[outpostName].hostileDominanceTicks = (Memory.rooms[outpostName].hostileDominanceTicks || 0) + 1;

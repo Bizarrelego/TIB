@@ -1,5 +1,6 @@
 // src/colonies/SpawnManager.js
 const { RouteDistanceCalculator } = require('../lib/SystemLib');
+const MilitaryManager = require('../managers/MilitaryManager');
 const EMERGENCY_BODY = [WORK, CARRY, MOVE];
 
 class CreepBodyBuilder {
@@ -687,20 +688,7 @@ class CensusCalculator {
         const hasOffensiveQueue = global.State && global.State.militaryQueue && global.State.militaryQueue.length > 0;
         if (hostilesFound) {
             // Defensive scaling
-            let defensiveThreat = 0;
-            if (roomState && roomState.hostiles) {
-                for (let i = 0; i < roomState.hostiles.length; i++) {
-                    const body = roomState.hostiles[i].body;
-                    if (body) {
-                        for (let j = 0; j < body.length; j++) {
-                            const type = body[j].type;
-                            if (type === ATTACK) defensiveThreat += 30;
-                            else if (type === RANGED_ATTACK) defensiveThreat += 10;
-                            else if (type === HEAL) defensiveThreat += 12;
-                        }
-                    }
-                }
-            }
+            let defensiveThreat = MilitaryManager.getThreatIndex(roomState ? roomState.hostiles : null);
             const singleCreepCapacity = Math.max(150, Math.floor((energyCapacity || 300) / 130) * 30);
             const defensiveSquads = Math.max(1, Math.ceil((defensiveThreat * 1.5) / singleCreepCapacity));
             
