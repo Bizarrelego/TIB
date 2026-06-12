@@ -694,8 +694,8 @@ class SpawnManager {
             return;
         }
         if (harvesterCount >= 1 && haulerCount === 0 && (targetCensus['hauler'] || 0) > 0) {
-            const currentEnergy = spawn.room.energyAvailable;
-            const body = currentEnergy >= 300 ? CreepBodyBuilder.getBody('hauler', currentEnergy) : EMERGENCY_BODY;
+            const currentEnergy = Math.max(spawn.room.energyAvailable, 100); // Ensure at least 1 CARRY/MOVE can spawn
+            const body = CreepBodyBuilder.getBody('hauler', currentEnergy);
             this.executeSpawn(spawn, 'hauler', body);
             return;
         }
@@ -733,9 +733,8 @@ class SpawnManager {
                                 activeCount++;
                             }
                         }
-                        
                         if (activeCount < req.count) {
-                            const body = CreepBodyBuilder.getBody('hauler', req.energy);
+                            const body = CreepBodyBuilder.getBody(role, req.energy);
                             this.executeSpawn(spawn, role, body, { targetSource: req.targetSource, targetRoom: req.targetRoom });
                             spawned = true;
                             break;

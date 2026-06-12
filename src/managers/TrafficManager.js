@@ -262,6 +262,24 @@ class TrafficManager {
         for (let i = 0; i < len; i++) sortedIndices[i] = i;
         sortedIndices.sort((a, b) => TrafficManager.priorityScore[b] - TrafficManager.priorityScore[a]);
 
+        // --- Train Locking ---
+        // High-priority creeps moving in a synchronized line project their paths onto the grid.
+        // Intersecting intents from lower-priority creeps are proactively deleted.
+        if (!TrafficManager.trainLocks) TrafficManager.trainLocks = new Uint8Array(2500);
+        TrafficManager.trainLocks.fill(0);
+        for (let k = 0; k < len; k++) {
+            const i = sortedIndices[k];
+            if (TrafficManager.priorityScore[i] >= 10 && TrafficManager.nextSteps[i] >= 0) {
+                TrafficManager.trainLocks[TrafficManager.nextSteps[i]] = 1;
+            } else if (TrafficManager.priorityScore[i] < 10 && TrafficManager.nextSteps[i] >= 0) {
+                if (TrafficManager.trainLocks[TrafficManager.nextSteps[i]] === 1) {
+                    TrafficManager.nextSteps[i] = -1; // Delete intersecting intent, forcing them to wait
+                }
+            }
+        }
+
+        const deadlocks = [];
+
         for (let k = 0; k < len; k++) {
             const i = sortedIndices[k];
             if (TrafficManager.nextSteps[i] === -1 || TrafficManager.nextSteps[i] === -2) continue;
@@ -280,6 +298,7 @@ class TrafficManager {
                 TrafficManager.grid[targetPacked] = i;
             } else {
                 // Direct swap fallback if DFS fails but priorities allow
+                let swapped = false;
                 const blockerIdx = TrafficManager.grid[targetPacked];
                 if (blockerIdx !== -1 && blockerIdx !== i) {
                     if (TrafficManager.priorityScore[i] >= TrafficManager.priorityScore[blockerIdx]) {
@@ -290,10 +309,18 @@ class TrafficManager {
                             TrafficManager.resolvedIntents[blockerIdx] = origPacked;
                             TrafficManager.grid[origPacked] = blockerIdx;
                             TrafficManager.grid[targetPacked] = i;
+                            swapped = true;
                         }
                     }
                 }
+                if (!swapped) deadlocks.push(i);
             }
+        }
+        
+        // --- Bipartite Matching Resolution Fallback ---
+        // Top-tier traffic managers model crowded gridlocks as a maximum flow problem.
+        if (deadlocks.length >= 3) {
+            TrafficManager.resolveBipartiteGridlock(deadlocks, terrain, matrix);
         }
         
         // Issue final intents
@@ -316,7 +343,7 @@ class TrafficManager {
                 dir = TrafficManager.getSafeDirection(creep.pos, step);
             }
             
-            if (dir) creep.move(dir);
+            if (dir) creep.heap.moveDirection = dir; // Transmit resolved orthogonal movement to ActionExecutor
             TrafficManager.creepList[i] = null; // Free reference to prevent memory leak
         }
     }

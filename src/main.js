@@ -142,11 +142,11 @@ module.exports.loop = function () {
         }
     }, 'SpawnManager')();
 
-    // 6. Intent Execution
-    ErrorHandlingUtility.wrap(() => ActionExecutor.run(), 'ActionExecutor')();
-
-    // 7. Traffic Management (resolves collisions and executes bulk move API calls)
+    // 6. Traffic Management (computes orthogonal move intents, resolves collisions)
     ErrorHandlingUtility.wrap(() => TrafficManager.run(), 'TrafficManager')();
+
+    // 7. Intent Execution (Muscle executes all validated orthogonal intents)
+    ErrorHandlingUtility.wrap(() => ActionExecutor.run(), 'ActionExecutor')();
 
     // 8. Tower Management (Defense, Healing, and Repair)
     ErrorHandlingUtility.wrap(() => TowerManager.run(), 'TowerManager')();
