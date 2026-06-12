@@ -23,6 +23,9 @@ const ROLE_PRIORITY = {
  */
 class TrafficManager {
     static getPriority(creep) {
+        if (creep.heap && creep.heap.actionIntent === 'idle') {
+            return -1; // Idle creeps turn into "liquid traffic" and yield to everyone
+        }
         return ROLE_PRIORITY[(creep.memory.role || '').toLowerCase()] || 0;
     }
 
