@@ -1,9 +1,12 @@
+const ActionConstants = require('../constants/ActionConstants');
+
 /**
  * Top-Down Tower Manager
  * Evaluates room state once per tick to issue commands to all towers.
  */
 class TowerManager {
     static run() {
+        if (!global.structureHeap) global.structureHeap = new Map();
         if (!global.State || !global.State.rooms) return;
 
         for (const [roomName, roomState] of global.State.rooms) {
@@ -23,7 +26,10 @@ class TowerManager {
                 // Focus fire on the first hostile (IntelManager populates this)
                 const target = roomState.hostiles[0]; 
                 for (let i = 0; i < towers.length; i++) {
-                    towers[i].attack(target);
+                    let heap = global.structureHeap.get(towers[i].id) || {};
+                    heap.actionIntent = ActionConstants.ACTION_ATTACK;
+                    heap.targetId = target.id;
+                    global.structureHeap.set(towers[i].id, heap);
                 }
                 continue; // Towers are busy defending
             }
@@ -47,7 +53,10 @@ class TowerManager {
             }
             if (emergencyTarget) {
                 for (let i = 0; i < towersAvailable.length; i++) {
-                    towersAvailable[i].repair(emergencyTarget);
+                    let heap = global.structureHeap.get(towersAvailable[i].id) || {};
+                    heap.actionIntent = ActionConstants.ACTION_REPAIR;
+                    heap.targetId = emergencyTarget.id;
+                    global.structureHeap.set(towersAvailable[i].id, heap);
                 }
                 continue; // Towers are busy with emergency repair
             }
@@ -67,7 +76,10 @@ class TowerManager {
             if (damagedTarget && towersAvailable.length > 0) {
                 // One tower is usually enough to heal a creep unless it's under heavy fire, prevents energy drain overkill
                 const healer = towersAvailable.shift();
-                healer.heal(damagedTarget);
+                let heap = global.structureHeap.get(healer.id) || {};
+                heap.actionIntent = ActionConstants.ACTION_HEAL;
+                heap.targetId = damagedTarget.id;
+                global.structureHeap.set(healer.id, heap);
             }
 
             if (towersAvailable.length === 0) continue;
@@ -86,7 +98,10 @@ class TowerManager {
                     const target = roomState.repairTargets[targetIdx];
                     if (!target) break;
 
-                    tower.repair(target);
+                    let heap = global.structureHeap.get(tower.id) || {};
+                    heap.actionIntent = ActionConstants.ACTION_REPAIR;
+                    heap.targetId = target.id;
+                    global.structureHeap.set(tower.id, heap);
                     
                     // Optimization: If target is a wall/rampart, keep hitting it with multiple towers.
                     // If it's a road/container, assign 1 tower per target to prevent massive energy overkill.

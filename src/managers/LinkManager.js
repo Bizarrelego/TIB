@@ -1,9 +1,12 @@
+const ActionConstants = require('../constants/ActionConstants');
+
 /**
  * Top-Down Link Manager
  * Identifies Link roles based on proximity and pushes energy to the Core/Hub Link.
  */
 class LinkManager {
     static run() {
+        if (!global.structureHeap) global.structureHeap = new Map();
         if (!global.State || !global.State.rooms) return;
 
         for (const [roomName, roomState] of global.State.rooms) {
@@ -41,11 +44,17 @@ class LinkManager {
                 if (srcLink.store.getUsedCapacity(RESOURCE_ENERGY) >= 400 && srcLink.cooldown === 0) {
                     // Try to push to Hub Link first
                     if (hubLink && hubLink.store.getFreeCapacity(RESOURCE_ENERGY) >= srcLink.store.getUsedCapacity(RESOURCE_ENERGY)) {
-                        srcLink.transferEnergy(hubLink);
+                        let heap = global.structureHeap.get(srcLink.id) || {};
+                        heap.actionIntent = ActionConstants.ACTION_TRANSFER_ENERGY;
+                        heap.targetId = hubLink.id;
+                        global.structureHeap.set(srcLink.id, heap);
                     } 
                     // Fallback to Controller Link
                     else if (controllerLink && controllerLink.store.getFreeCapacity(RESOURCE_ENERGY) >= srcLink.store.getUsedCapacity(RESOURCE_ENERGY)) {
-                        srcLink.transferEnergy(controllerLink);
+                        let heap = global.structureHeap.get(srcLink.id) || {};
+                        heap.actionIntent = ActionConstants.ACTION_TRANSFER_ENERGY;
+                        heap.targetId = controllerLink.id;
+                        global.structureHeap.set(srcLink.id, heap);
                     }
                 }
             }
@@ -53,7 +62,10 @@ class LinkManager {
             // 3. Push Energy from Hub to Controller (if needed)
             if (hubLink && hubLink.store.getUsedCapacity(RESOURCE_ENERGY) >= 400 && hubLink.cooldown === 0) {
                 if (controllerLink && controllerLink.store.getFreeCapacity(RESOURCE_ENERGY) >= 400) {
-                    hubLink.transferEnergy(controllerLink);
+                    let heap = global.structureHeap.get(hubLink.id) || {};
+                    heap.actionIntent = ActionConstants.ACTION_TRANSFER_ENERGY;
+                    heap.targetId = controllerLink.id;
+                    global.structureHeap.set(hubLink.id, heap);
                 }
             }
         }

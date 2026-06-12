@@ -11,6 +11,7 @@ const TaskAssignmentManager = require('./managers/TaskAssignmentManager');
 const ActionExecutor = require('./managers/ActionExecutor');
 const MemoryCleanupManager = require('./managers/MemoryCleanupManager');
 const IntelManager = require('./managers/IntelManager');
+const MilitaryManager = require('./managers/MilitaryManager');
 const RemoteMiningManager = require('./managers/RemoteMiningManager');
 const EmpireManager = require('./empire/EmpireManager');
 const OutpostManager = require('./empire/OutpostManager');
@@ -120,6 +121,9 @@ module.exports.loop = function () {
             TaskAssignmentManager.run(colony);
         }
     }, 'TaskAssignmentManager')();
+
+    // 4.2 Military Management
+    ErrorHandlingUtility.wrap(() => MilitaryManager.run(), 'MilitaryManager')();
 
     // 4.5 Link Management
     ErrorHandlingUtility.wrap(() => LinkManager.run(), 'LinkManager')();

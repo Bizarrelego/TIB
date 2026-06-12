@@ -7,12 +7,15 @@ const CacheLib = require('../lib/CacheLib');
 class ActionExecutor {
     static run() {
         if (!global.creepHeap) global.creepHeap = new Map();
+        if (!global.structureHeap) global.structureHeap = new Map();
         
-        for (const creepName in Game.creeps) {
-            const creep = Game.creeps[creepName];
-            
+        const allCreeps = Object.values(Game.creeps).concat(Object.values(Game.powerCreeps));
+        for (const creep of allCreeps) {
             try {
-                if (creep.spawning || creep.fatigue > 0) continue;
+                if (creep.fatigue && creep.fatigue > 0) continue;
+                if (creep.ticksToLive === undefined && !creep.name.includes('Operator')) {
+                    if (creep.spawning) continue;
+                }
 
                 let heap = global.creepHeap.get(creep.name);
                 if (!heap) {
@@ -56,9 +59,29 @@ class ActionExecutor {
 
                 ActionExecutor.executeIntent(creep, heap, intent, target);
             } catch (err) {
-                console.log(`[ERROR] ActionExecutor crashed for creep ${creepName}: ${err.message}\n${err.stack}`);
+                console.log(`[ERROR] ActionExecutor crashed for creep ${creep.name}: ${err.message}\n${err.stack}`);
             }
         }
+
+        // Process Structure Native Calls
+        for (const [structureId, heap] of global.structureHeap.entries()) {
+            const structure = CacheLib.getById(structureId);
+            if (!structure || !heap.actionIntent) continue;
+            
+            const intent = heap.actionIntent;
+            const target = heap.targetId ? CacheLib.getById(heap.targetId) : null;
+
+            if (intent === ActionConstants.ACTION_ATTACK && target) structure.attack(target);
+            else if (intent === ActionConstants.ACTION_HEAL && target) structure.heal(target);
+            else if (intent === ActionConstants.ACTION_REPAIR && target) structure.repair(target);
+            else if (intent === ActionConstants.ACTION_TRANSFER_ENERGY && target) structure.transferEnergy(target);
+            else if (intent === ActionConstants.ACTION_RUN_REACTION) {
+                const r1 = heap.targetId ? CacheLib.getById(heap.targetId) : null;
+                const r2 = heap.secondaryTargetId ? CacheLib.getById(heap.secondaryTargetId) : null;
+                if (r1 && r2) structure.runReaction(r1, r2);
+            }
+        }
+        global.structureHeap.clear();
     }
 
     static executeIntent(creep, heap, intent, target) {
@@ -130,6 +153,12 @@ class ActionExecutor {
             result = creep.claimController(target);
         } else if (intent === ActionConstants.ACTION_ATTACK_CONTROLLER) {
             result = creep.attackController(target);
+        } else if (intent === ActionConstants.ACTION_USE_POWER) {
+            result = creep.usePower(heap.powerId, target);
+        } else if (intent === ActionConstants.ACTION_RENEW) {
+            result = creep.renew(target);
+        } else if (intent === ActionConstants.ACTION_ENABLE_ROOM) {
+            result = creep.enableRoom(target);
         }
 
         if (result === ERR_NOT_IN_RANGE) {

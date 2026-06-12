@@ -1,4 +1,7 @@
 /* global POWER_CLASS PWR_GENERATE_OPS PWR_OPERATE_FACTORY RESOURCE_OPS POWER_INFO PWR_OPERATE_EXTENSION */
+const ActionConstants = require('../constants/ActionConstants');
+const CacheLib = require('../lib/CacheLib');
+
 /**
  * Power Manager
  * Manages the end-game economy via Power Creeps, generating ops and buffing structures.
@@ -44,15 +47,25 @@ class PowerManager {
 
         if (!operator.ticksToLive) return; // Currently spawning
 
+        if (!operator.heap) {
+            let heap = global.creepHeap.get(operator.name);
+            if (!heap) {
+                heap = CacheLib.getDefaultHeap();
+                global.creepHeap.set(operator.name, heap);
+            }
+            operator.heap = heap;
+        }
+
         // Renew Power Creep if needed
         if (operator.ticksToLive < 1000) {
             const roomState = global.State.rooms.get(operator.room.name);
             if (roomState && roomState.powerSpawns && roomState.powerSpawns.length > 0) {
                 const ps = roomState.powerSpawns[0];
                 if (operator.pos.isNearTo(ps)) {
-                    operator.renew(ps);
+                    operator.heap.actionIntent = ActionConstants.ACTION_RENEW;
+                    operator.heap.targetId = ps.id;
                 } else {
-                    operator.moveTo(ps);
+                    operator.heap.destination = { x: ps.pos.x, y: ps.pos.y, roomName: ps.pos.roomName, range: 1 };
                 }
                 return; // Prioritize renewing
             }
@@ -61,16 +74,19 @@ class PowerManager {
         // Enable Power in the room if not already enabled
         if (operator.room.controller && !operator.room.controller.isPowerEnabled) {
             if (operator.pos.isNearTo(operator.room.controller)) {
-                operator.enableRoom(operator.room.controller);
+                operator.heap.actionIntent = ActionConstants.ACTION_ENABLE_ROOM;
+                operator.heap.targetId = operator.room.controller.id;
             } else {
-                operator.moveTo(operator.room.controller);
+                operator.heap.destination = { x: operator.room.controller.pos.x, y: operator.room.controller.pos.y, roomName: operator.room.controller.pos.roomName, range: 1 };
             }
             return;
         }
 
         // Ops generation loop
         if (operator.powers[PWR_GENERATE_OPS] && operator.powers[PWR_GENERATE_OPS].cooldown === 0) {
-            operator.usePower(PWR_GENERATE_OPS);
+            operator.heap.actionIntent = ActionConstants.ACTION_USE_POWER;
+            operator.heap.powerId = PWR_GENERATE_OPS;
+            operator.heap.targetId = null;
         }
 
         // Structure buffs (prioritize Factory, then Extension)
@@ -83,9 +99,11 @@ class PowerManager {
                 const factory = roomState.factories[0];
                 if (operator.store.getUsedCapacity(RESOURCE_OPS) >= POWER_INFO[PWR_OPERATE_FACTORY].ops) {
                     if (operator.pos.inRangeTo(factory, 3)) {
-                        operator.usePower(PWR_OPERATE_FACTORY, factory);
+                        operator.heap.actionIntent = ActionConstants.ACTION_USE_POWER;
+                        operator.heap.powerId = PWR_OPERATE_FACTORY;
+                        operator.heap.targetId = factory.id;
                     } else {
-                        operator.moveTo(factory);
+                        operator.heap.destination = { x: factory.pos.x, y: factory.pos.y, roomName: factory.pos.roomName, range: 3 };
                     }
                     return;
                 }
@@ -97,9 +115,11 @@ class PowerManager {
             if (roomState.storage && roomState.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 500000) {
                 if (operator.store.getUsedCapacity(RESOURCE_OPS) >= POWER_INFO[PWR_OPERATE_EXTENSION].ops) {
                     if (operator.pos.inRangeTo(roomState.storage, 3)) {
-                        operator.usePower(PWR_OPERATE_EXTENSION, roomState.storage);
+                        operator.heap.actionIntent = ActionConstants.ACTION_USE_POWER;
+                        operator.heap.powerId = PWR_OPERATE_EXTENSION;
+                        operator.heap.targetId = roomState.storage.id;
                     } else {
-                        operator.moveTo(roomState.storage);
+                        operator.heap.destination = { x: roomState.storage.pos.x, y: roomState.storage.pos.y, roomName: roomState.storage.pos.roomName, range: 3 };
                     }
                     return;
                 }
@@ -109,7 +129,7 @@ class PowerManager {
         // Idle near the power spawn or storage
         if (roomState.storage) {
             if (!operator.pos.inRangeTo(roomState.storage, 3)) {
-                operator.moveTo(roomState.storage);
+                operator.heap.destination = { x: roomState.storage.pos.x, y: roomState.storage.pos.y, roomName: roomState.storage.pos.roomName, range: 3 };
             }
         }
     }

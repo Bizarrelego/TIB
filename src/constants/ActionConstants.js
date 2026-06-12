@@ -17,7 +17,12 @@ const ActionConstants = {
     ACTION_PATROL: 'patrol',
     ACTION_RESERVE: 'reserve',
     ACTION_CLAIM: 'claim',
-    ACTION_ATTACK_CONTROLLER: 'attackController'
+    ACTION_ATTACK_CONTROLLER: 'attackController',
+    ACTION_TRANSFER_ENERGY: 'transferEnergy',
+    ACTION_RUN_REACTION: 'runReaction',
+    ACTION_USE_POWER: 'usePower',
+    ACTION_RENEW: 'renew',
+    ACTION_ENABLE_ROOM: 'enableRoom'
 };
 
 module.exports = ActionConstants;

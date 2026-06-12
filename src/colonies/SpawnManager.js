@@ -841,6 +841,21 @@ class SpawnManager {
         
         const standardRoles = ['hubmanager', 'harvester', 'filler', 'bootstrapper', 'skguard', 'mineralhauler', 'fastfiller', 'defender', 'upgrader', 'builder', 'mineralminer', 'claimer', 'pioneer', 'scout', 'scientist', 'skminer', 'skhauler', 'meleeCreep', 'rangerCreep', 'medicCreep'];
         
+        let hasCriticalRepairs = false;
+        if (roomState.rampartCount > 0) {
+            for (let i = 0; i < roomState.rampartCount; i++) {
+                if (roomState.ramparts[i].hits < 5000) { hasCriticalRepairs = true; break; }
+            }
+        }
+        if (!hasCriticalRepairs && roomState.repairTargetCount > 0) {
+            for (let i = 0; i < roomState.repairTargetCount; i++) {
+                const target = roomState.repairTargets[i];
+                if ((target.structureType === STRUCTURE_WALL || target.structureType === STRUCTURE_RAMPART) && target.hits < 5000) {
+                    hasCriticalRepairs = true; break;
+                }
+            }
+        }
+
         const getScore = (role, current, req = null) => {
             if (role === 'bootstrapper') return 950;
             if (role === 'harvester') return current === 0 ? 900 : 800 - current * 10;
@@ -873,7 +888,10 @@ class SpawnManager {
                 return 450 - distance + bonus;
             }
             if (role === 'reserver') return 400;
-            if (role === 'upgrader' || role === 'builder') return 300 - current * 5;
+            if (role === 'upgrader' || role === 'builder') {
+                if (role === 'builder' && hasCriticalRepairs && harvesterCount >= 1 && haulerCount >= 1) return 800;
+                return 300 - current * 5;
+            }
             if (role === 'scout') return 200;
             return 100;
         };
@@ -942,7 +960,9 @@ class SpawnManager {
 
             // Prevents economic cannibalism by completely halting all energy sinks (upgraders/builders) until the energy-gathering workforce is at 100% capacity.
             if (role === 'builder' || role === 'upgrader' || role === 'scout') {
-                if (harvesterCount < (targetCensus['harvester'] || 0) || haulerCount < (targetCensus['hauler'] || 0)) {
+                if (role === 'builder' && hasCriticalRepairs) {
+                    // Bypass
+                } else if (harvesterCount < (targetCensus['harvester'] || 0) || haulerCount < (targetCensus['hauler'] || 0)) {
                     continue;
                 }
             }
@@ -969,6 +989,22 @@ class SpawnManager {
                     this.executeSpawn(spawn, role, body, extraMem);
                     return;
                 } else {
+                    if ((role === 'hauler' || role === 'remotehauler' || role === 'remoteharvester' || role === 'harvester' || role === 'skhauler' || role === 'skminer') && spawn.room.energyAvailable >= 300) {
+                        let scaledBody;
+                        if (role === 'remoteharvester') {
+                            scaledBody = CreepBodyBuilder.getBody(role, spawn.room.energyAvailable, { targetRoom: req.targetRoom, isReserved: req.isReserved });
+                        } else {
+                            scaledBody = CreepBodyBuilder.getBody(role, spawn.room.energyAvailable);
+                        }
+                        if (scaledBody && scaledBody.length > 0) {
+                            let scaledCost = 0;
+                            for (let j = 0; j < scaledBody.length; j++) scaledCost += BODYPART_COST[scaledBody[j]];
+                            if (spawn.room.energyAvailable >= scaledCost) {
+                                this.executeSpawn(spawn, role, scaledBody, extraMem);
+                                return;
+                            }
+                        }
+                    }
                     return;
                 }
             } else {
@@ -984,6 +1020,17 @@ class SpawnManager {
                     this.executeSpawn(spawn, role, bodyParts);
                     return;
                 } else {
+                    if ((role === 'hauler' || role === 'harvester') && spawn.room.energyAvailable >= 300) {
+                        const scaledBody = CreepBodyBuilder.getBody(role, spawn.room.energyAvailable);
+                        if (scaledBody && scaledBody.length > 0) {
+                            let scaledCost = 0;
+                            for (let j = 0; j < scaledBody.length; j++) scaledCost += BODYPART_COST[scaledBody[j]];
+                            if (spawn.room.energyAvailable >= scaledCost) {
+                                this.executeSpawn(spawn, role, scaledBody);
+                                return;
+                            }
+                        }
+                    }
                     // Strict abort: Do not skip to lower priority roles if we are missing a higher priority one but just lack energy.
                     return;
                 }

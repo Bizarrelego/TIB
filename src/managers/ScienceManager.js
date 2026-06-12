@@ -1,9 +1,12 @@
+const ActionConstants = require('../constants/ActionConstants');
+
 /**
  * Science Manager
  * Automates the 2+8 lab cluster to synthesize advanced compounds.
  */
 class ScienceManager {
     static run() {
+        if (!global.structureHeap) global.structureHeap = new Map();
         if (Game.time % 10 !== 0) return;
         if (!global.State || !global.State.colonies) return;
 
@@ -68,7 +71,11 @@ class ScienceManager {
                     for (let i = 0; i < reactorLabs.length; i++) {
                         const reactor = reactorLabs[i];
                         if (reactor.cooldown === 0) {
-                            reactor.runReaction(sup1, sup2);
+                            let heap = global.structureHeap.get(reactor.id) || {};
+                            heap.actionIntent = ActionConstants.ACTION_RUN_REACTION;
+                            heap.targetId = sup1.id;
+                            heap.secondaryTargetId = sup2.id;
+                            global.structureHeap.set(reactor.id, heap);
                         }
                     }
                 }

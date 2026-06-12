@@ -1275,6 +1275,14 @@ class TaskAssignmentManager {
                 }
             }
         }
+
+        if (creep.heap.sitTargetId) {
+            const container = CacheLib.getById(creep.heap.sitTargetId);
+            if (container && (creep.pos.x !== container.pos.x || creep.pos.y !== container.pos.y || creep.pos.roomName !== container.pos.roomName)) {
+                creep.heap.destination = { x: container.pos.x, y: container.pos.y, roomName: container.pos.roomName, range: 0 };
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            }
+        }
     }
 
     static routeToCoreStructures(creep, roomState, includeTowers = true) {
