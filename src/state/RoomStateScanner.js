@@ -5,13 +5,13 @@ const createRoomStateTemplate = () => {
     const s = Object.create(null);
     s.controller = null; s.storage = null; s.terminal = null; s.factory = null; s.extractor = null; s.mineral = null;
     s.sources = []; s.spawns = []; s.extensions = []; s.towers = []; s.links = []; s.labs = []; s.containers = [];
-    s.sourceContainers = []; s.controllerContainers = []; s.droppedEnergy = []; s.ruins = []; s.tombstones = [];
+    s.sourceContainers = []; s.controllerContainers = []; s.coreContainers = []; s.droppedEnergy = []; s.ruins = []; s.tombstones = [];
     s.constructionSites = Object.create(null);
     s.validDroppedEnergy = []; s.availableDroppedEnergy = []; s.energyInRuinsAndTombstones = [];
     s.harvestableSources = []; s.hostiles = []; s.invaderCores = []; s.structureIds = []; s.repairTargets = [];
     s.creeps = []; s.harvesters = []; s.upgraders = []; s.ramparts = [];
     s.spawnCount = 0; s.extensionCount = 0; s.towerCount = 0; s.linkCount = 0; s.labCount = 0;
-    s.containerCount = 0; s.sourceContainerCount = 0; s.controllerContainerCount = 0; s.droppedEnergyCount = 0;
+    s.containerCount = 0; s.sourceContainerCount = 0; s.controllerContainerCount = 0; s.coreContainerCount = 0; s.droppedEnergyCount = 0;
     s.ruinCount = 0; s.tombstoneCount = 0; s.constructionSiteCount = 0; s.validDroppedEnergyCount = 0;
     s.availableDroppedEnergyCount = 0; s.energyInRuinsAndTombstonesCount = 0; s.harvestableSourceCount = 0;
     s.hostileCount = 0; s.invaderCoreCount = 0; s.structureIdCount = 0; s.repairTargetCount = 0; s.rampartCount = 0;
@@ -53,6 +53,7 @@ class RoomStateScanner {
         state.containers.length = 0; state.containerCount = 0;
         state.sourceContainers.length = 0; state.sourceContainerCount = 0;
         state.controllerContainers.length = 0; state.controllerContainerCount = 0;
+        state.coreContainers.length = 0; state.coreContainerCount = 0;
         state.droppedEnergy.length = 0; state.droppedEnergyCount = 0;
         state.ruins.length = 0; state.ruinCount = 0;
         state.tombstones.length = 0; state.tombstoneCount = 0;
@@ -133,9 +134,20 @@ class RoomStateScanner {
             }
 
             // Centralize container categorization to prevent TaskAssignmentManager from using room.find()
+            const blueprint = global.Cache?.blueprints?.get(roomName);
             for (let i = 0; i < state.containerCount; i++) {
                 const c = state.containers[i];
-                if (state.controller && c.pos.inRangeTo(state.controller, 3)) {
+                let isCoreContainer = false;
+                if (blueprint && blueprint.anchor) {
+                    if (Math.abs(c.pos.x - blueprint.anchor.x) <= 2 && Math.abs(c.pos.y - blueprint.anchor.y) <= 2) {
+                        state.coreContainers[state.coreContainerCount++] = c;
+                        isCoreContainer = true;
+                    }
+                }
+                
+                if (isCoreContainer) {
+                    continue;
+                } else if (state.controller && c.pos.inRangeTo(state.controller, 3)) {
                     state.controllerContainers[state.controllerContainerCount++] = c;
                 } else {
                     let isSourceContainer = false;
@@ -264,6 +276,7 @@ class RoomStateScanner {
             state.containers.length = state.containerCount;
             state.sourceContainers.length = state.sourceContainerCount;
             state.controllerContainers.length = state.controllerContainerCount;
+            state.coreContainers.length = state.coreContainerCount;
             state.droppedEnergy.length = state.droppedEnergyCount;
             state.ruins.length = state.ruinCount;
             state.tombstones.length = state.tombstoneCount;

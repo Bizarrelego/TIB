@@ -16,18 +16,59 @@ class TaskAssignmentManager {
      */
     static setMoveRoomIntent(creep, targetRoom) {
         creep.memory.targetRoom = targetRoom;
-        TaskAssignmentManager.setMoveRoomIntent(creep, creep.memory.targetRoom);
+        creep.heap.actionIntent = ActionConstants.ACTION_MOVE_ROOM;
         
         let nextRoom = targetRoom;
         
+        // 1. Expansion Routing Override
         if (Memory.empire && Memory.empire.colonizeRoom === targetRoom && Memory.empire.colonizeRoute) {
             const route = Memory.empire.colonizeRoute;
             const idx = route.indexOf(creep.room.name);
             if (idx > -1 && idx < route.length - 1) {
                 nextRoom = route[idx + 1];
             }
+        } 
+        // 2. Universal Multi-Room Routing
+        else {
+            if (!creep.heap.route || creep.heap.routeTarget !== targetRoom) {
+                const route = Game.map.findRoute(creep.room.name, targetRoom, {
+                    routeCallback: (roomName) => {
+                        const status = typeof Game.map.getRoomStatus === 'function' ? Game.map.getRoomStatus(roomName) : null;
+                        if (status && (status.status === 'closed' || status.status === 'novice' || status.status === 'respawn')) return Infinity;
+                        
+                        const intel = Memory.rooms[roomName];
+                        if (intel) {
+                            if (intel.controller && intel.controller.owner && intel.controller.owner !== 'Bizarrelego') return 20;
+                            if (intel.roomType === 'center' || intel.roomType === 'keeper') return 10;
+                        }
+                        return 1;
+                    }
+                });
+                
+                if (route !== ERR_NO_PATH && route.length > 0) {
+                    creep.heap.route = route.map(r => r.room);
+                    creep.heap.routeTarget = targetRoom;
+                } else {
+                    creep.heap.route = [];
+                    creep.heap.routeTarget = targetRoom;
+                }
+            }
+            
+            if (creep.heap.route && creep.heap.route.length > 0) {
+                nextRoom = creep.heap.route[0];
+                // Advance the route when the creep enters the next room
+                if (creep.room.name === nextRoom) {
+                    creep.heap.route.shift();
+                    if (creep.heap.route.length > 0) {
+                        nextRoom = creep.heap.route[0];
+                    } else {
+                        nextRoom = targetRoom;
+                    }
+                }
+            }
         }
         
+        // Generate localized destination for the TrafficManager
         creep.heap.destination = { x: 25, y: 25, roomName: nextRoom, range: 22 };
     }
 
@@ -250,7 +291,7 @@ class TaskAssignmentManager {
         else if (role === 'bootstrapper') TaskAssignmentManager.assignBootstrapper(creep, roomState);
         else if (role === 'upgrader') TaskAssignmentManager.assignUpgrader(creep, roomState);
         else if (role === 'filler') TaskAssignmentManager.assignFiller(creep, roomState);
-        else if (role === 'fastfiller') TaskAssignmentManager.assignFastFiller(creep, roomState);
+        else if (role === 'fastfiller') TaskAssignmentManager.assignFastfiller(creep, roomState);
         else if (role === 'remoteharvester') TaskAssignmentManager.assignRemoteHarvester(creep, roomState);
         else if (role === 'remotehauler') TaskAssignmentManager.assignRemoteHauler(creep, roomState);
         else if (role === 'reserver') TaskAssignmentManager.assignReserver(creep, roomState);
@@ -640,24 +681,9 @@ class TaskAssignmentManager {
     }
 
     static assignRemoteHarvester(creep, _homeState) {
-        if (!creep.memory.targetRoom) {
-            const outposts = Memory.rooms[creep.memory.colony]?.outposts || [];
-            if (outposts.length > 0) {
-                const census = TaskAssignmentManager.getRemoteCensus();
-                let bestRoom = outposts[0];
-                let minCount = Infinity;
-                for (let i = 0; i < outposts.length; i++) {
-                    const key = `remoteHarvester_${creep.memory.colony}_${outposts[i]}`;
-                    const count = census.get(key) || 0;
-                    if (count < minCount) {
-                        minCount = count;
-                        bestRoom = outposts[i];
-                    }
-                }
-                creep.memory.targetRoom = bestRoom;
-            } else {
-                return;
-            }
+        if (!creep.memory.targetRoom || !creep.memory.targetSource) {
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            return;
         }
 
         if (creep.room.name !== creep.memory.targetRoom) {
@@ -960,103 +986,125 @@ class TaskAssignmentManager {
         }
     }
 
-    static assignFastFiller(creep, roomState) {
+    static assignFastfiller(creep, roomState) {
         const blueprint = global.Cache?.blueprints?.get(creep.room.name);
         if (!blueprint || !blueprint.anchor) {
             creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
             return;
         }
-
         const ax = blueprint.anchor.x;
         const ay = blueprint.anchor.y;
-
-        const stands = [
-            { x: ax - 1, y: ay - 1 },
-            { x: ax + 1, y: ay - 1 },
-            { x: ax - 1, y: ay + 1 },
-            { x: ax + 1, y: ay + 1 }
-        ];
-
-        if (!creep.heap.sitTargetId) {
-            let bestStand = null;
-            for (let i = 0; i < stands.length; i++) {
-                const s = stands[i];
+        
+        // 1. Calculate designated parking spot
+        if (!creep.memory.spotX) {
+            const spots = [
+                {x: ax - 1, y: ay - 1}, 
+                {x: ax + 1, y: ay - 1}, 
+                {x: ax - 1, y: ay + 1}, 
+                {x: ax + 1, y: ay + 1}
+            ];
+            for (let i = 0; i < spots.length; i++) {
+                const s = spots[i];
                 let occupied = false;
                 for (const name in Game.creeps) {
-                    const other = Game.creeps[name];
-                    if (other.id === creep.id) continue;
-                    if (other.memory.role === 'fastfiller' && other.heap && other.heap.sitPos) {
-                        if (other.heap.sitPos.x === s.x && other.heap.sitPos.y === s.y) occupied = true;
+                    const c = Game.creeps[name];
+                    if (c.memory.role === 'fastfiller' && c.name !== creep.name) {
+                        if (c.memory.spotX === s.x && c.memory.spotY === s.y) occupied = true;
                     }
                 }
                 if (!occupied) {
-                    bestStand = s;
+                    creep.memory.spotX = s.x;
+                    creep.memory.spotY = s.y;
                     break;
                 }
             }
-            if (bestStand) {
-                creep.heap.sitPos = bestStand;
-                creep.heap.sitTargetId = 'stand_' + bestStand.x + '_' + bestStand.y;
-            }
         }
-
-        if (creep.heap.sitPos) {
-            if (creep.pos.x !== creep.heap.sitPos.x || creep.pos.y !== creep.heap.sitPos.y) {
-                creep.heap.destination = { x: creep.heap.sitPos.x, y: creep.heap.sitPos.y, roomName: creep.room.name, range: 0 };
-                creep.heap.actionIntent = ActionConstants.ACTION_MOVE;
-                return;
-            }
+        
+        const spotX = creep.memory.spotX;
+        const spotY = creep.memory.spotY;
+        if (!spotX) {
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            return;
         }
-
-        if (creep.heap.state === 'gather') {
-            let energySource = null;
-            if (roomState.links) {
-                for (let i = 0; i < roomState.linkCount; i++) {
-                    const l = roomState.links[i];
-                    if (l.pos.x === ax && l.pos.y === ay && l.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                        energySource = l; break;
-                    }
+        
+        // 2. Navigate to parking spot exactly once
+        if (creep.pos.x !== spotX || creep.pos.y !== spotY) {
+            creep.heap.destination = { x: spotX, y: spotY, roomName: creep.room.name, range: 0 };
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            return;
+        }
+        
+        // 3. Static Execution Loop
+        let targetNeedsEnergy = null;
+        
+        const checkStructure = (s) => {
+            if (s && Math.max(Math.abs(s.pos.x - spotX), Math.abs(s.pos.y - spotY)) <= 1) {
+                if (s.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                    targetNeedsEnergy = s;
+                    return true;
                 }
             }
-            if (!energySource && roomState.containers) {
-                for (let i = 0; i < roomState.containerCount; i++) {
-                    const c = roomState.containers[i];
-                    if ((c.pos.x === ax - 2 || c.pos.x === ax + 2) && c.pos.y === ay && c.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                        energySource = c; break;
-                    }
-                }
-            }
-            if (energySource) {
-                creep.heap.targetId = energySource.id;
-                creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
-            } else {
-                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
-            }
-        } else {
-            let target = null;
-            if (roomState.spawns) {
-                for (let i = 0; i < roomState.spawnCount; i++) {
-                    const s = roomState.spawns[i];
-                    if (s.store.getFreeCapacity(RESOURCE_ENERGY) > 0 && creep.pos.isNearTo(s)) {
-                        target = s; break;
-                    }
-                }
-            }
-            if (!target && roomState.extensions) {
-                for (let i = 0; i < roomState.extensionCount; i++) {
-                    const e = roomState.extensions[i];
-                    if (e.store.getFreeCapacity(RESOURCE_ENERGY) > 0 && creep.pos.isNearTo(e)) {
-                        target = e; break;
-                    }
-                }
-            }
-            
-            if (target) {
-                creep.heap.targetId = target.id;
+            return false;
+        };
+        
+        for (let i = 0; i < roomState.spawnCount; i++) if (checkStructure(roomState.spawns[i])) break;
+        if (!targetNeedsEnergy) {
+            for (let i = 0; i < roomState.extensionCount; i++) if (checkStructure(roomState.extensions[i])) break;
+        }
+        
+        if (targetNeedsEnergy) {
+            if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                creep.heap.targetId = targetNeedsEnergy.id;
                 creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
             } else {
-                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+                let source = null;
+                // Withdraw from adjacent Link, Storage, or Core Containers
+                if (roomState.links) {
+                    for (let i = 0; i < roomState.linkCount; i++) {
+                        const l = roomState.links[i];
+                        if (Math.max(Math.abs(l.pos.x - spotX), Math.abs(l.pos.y - spotY)) <= 1 && l.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                            source = l; break;
+                        }
+                    }
+                }
+                if (!source && roomState.storage && Math.max(Math.abs(roomState.storage.pos.x - spotX), Math.abs(roomState.storage.pos.y - spotY)) <= 1) {
+                    if (roomState.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) source = roomState.storage;
+                }
+                if (!source && roomState.coreContainers) {
+                    for (let i = 0; i < roomState.coreContainerCount; i++) {
+                        const c = roomState.coreContainers[i];
+                        if (c && Math.max(Math.abs(c.pos.x - spotX), Math.abs(c.pos.y - spotY)) <= 1 && c.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                            source = c; break;
+                        }
+                    }
+                }
+                
+                if (source) {
+                    creep.heap.targetId = source.id;
+                    creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
+                } else {
+                    creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+                }
             }
+        } else {
+            // Buffer empty capacity if there's nothing to fill
+            if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                 let source = null;
+                 if (roomState.coreContainers) {
+                     for (let i = 0; i < roomState.coreContainerCount; i++) {
+                         const c = roomState.coreContainers[i];
+                         if (c && Math.max(Math.abs(c.pos.x - spotX), Math.abs(c.pos.y - spotY)) <= 1 && c.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                             source = c; break;
+                         }
+                     }
+                 }
+                 if (source) {
+                     creep.heap.targetId = source.id;
+                     creep.heap.actionIntent = ActionConstants.ACTION_WITHDRAW;
+                     return;
+                 }
+            }
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
         }
     }
 
@@ -1658,11 +1706,7 @@ class TaskAssignmentManager {
             }
         }
 
-        // Emergency Override: If storage exists but we have 0 alive fillers, haulers MUST step in to fill core structures
         const hasFiller = roomState.creepCounts && (roomState.creepCounts['filler'] > 0 || roomState.creepCounts['fastfiller'] > 0);
-        if (roomState.storage && !hasFiller) {
-            if (TaskAssignmentManager.routeToCoreStructures(creep, roomState)) return;
-        }
 
         // Pre-Storage Controller Delivery (RCL < 6 or no link)
         if (roomState.controller) {
@@ -1750,13 +1794,31 @@ class TaskAssignmentManager {
             creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
             return;
         }
+        
+        // Priority 1b: Dump in Core Containers if fastfillers are active
+        if (roomState.coreContainers && roomState.coreContainerCount > 0) {
+            let bestCore = null;
+            let bestFree = 0;
+            for (let i = 0; i < roomState.coreContainerCount; i++) {
+                const c = roomState.coreContainers[i];
+                if (c && c.store.getFreeCapacity() > bestFree) {
+                    bestFree = c.store.getFreeCapacity();
+                    bestCore = c;
+                }
+            }
+            if (bestCore) {
+                creep.heap.targetId = bestCore.id;
+                creep.heap.actionIntent = ActionConstants.ACTION_TRANSFER;
+                return;
+            }
+        }
 
-        // Priority 2: Fill spawn/extensions (Pre-Storage behavior)
-        if (TaskAssignmentManager.routeToCoreStructures(creep, roomState)) return;
+        // Priority 2: Fill spawn/extensions (Pre-Storage behavior OR if no fillers exist)
+        if (!hasFiller) {
+            if (TaskAssignmentManager.routeToCoreStructures(creep, roomState)) return;
+        }
 
-        // We already handled controller drops for non-link rooms above Storage priority.
-        // If we reach here, either we have a link, or we have Storage and controller is full, 
-        // but if Storage is full, we should still drop at controller if needed as a last resort.
+        // If Storage is full, we should still drop at controller if needed as a last resort.
         if (roomState.controller && roomState.storage && roomState.storage.store.getFreeCapacity() === 0) {
             creep.heap.targetId = roomState.controller.id;
             creep.heap.actionIntent = ActionConstants.ACTION_DROP;

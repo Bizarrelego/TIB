@@ -3,24 +3,19 @@ const { RouteDistanceCalculator } = require('../lib/SystemLib');
 const EMERGENCY_BODY = [WORK, CARRY, MOVE];
 
 class CreepBodyBuilder {
-    static getBody(role, energyCapacity) {
+    static getBody(role, energyCapacity, extraArgs = {}) {
         energyCapacity = energyCapacity || 300;
 
         switch (role) {
-            case 'harvester': return this.generateHarvester(energyCapacity);
+            case 'filler': return this.generateFiller(energyCapacity);
+            case 'fastfiller': return this.generateFastfiller(energyCapacity);
             case 'hauler': return this.generateHauler(energyCapacity);
             case 'upgrader': return this.generateUpgrader(energyCapacity);
             case 'builder': return this.generateBuilder(energyCapacity);
             case 'pioneer': return this.generatePioneer(energyCapacity);
             case 'bootstrapper': return [WORK, CARRY, MOVE];
-            case 'fastfiller': {
-                let carry = 1;
-                let cost = 100;
-                while (cost + 50 <= energyCapacity && carry < 4) { carry++; cost += 50; }
-                return this.buildArray(0, carry, 1);
-            }
-            case 'filler': return this.generateHauler(energyCapacity);
-            case 'remoteharvester': return this.generateHarvester(energyCapacity);
+            case 'harvester': return this.generateHarvester(energyCapacity);
+            case 'remoteharvester': return this.generateRemoteHarvester(energyCapacity, extraArgs.isReserved);
             case 'remotehauler': return this.generateRemoteHauler(energyCapacity);
             case 'reserver': return this.generateReserver(energyCapacity);
             // Optimizes spawn cost by locking scouts to a single MOVE part, ensuring negligible impact on the RCL 2 energy budget.
@@ -90,6 +85,25 @@ class CreepBodyBuilder {
         while (cost + 50 <= energy && move < 3) { move++; cost += 50; }
         return this.buildArray(work, carry, move);
     }
+    
+    static generateRemoteHarvester(energy, isReserved) {
+        const workNeeded = isReserved ? 5 : 3;
+        
+        let work = workNeeded;
+        let carry = 1;
+        let move = Math.ceil(workNeeded / 2); // 1 MOVE per 2 WORK to maintain 1 tile/tick on roads
+        
+        let cost = (work * 100) + (carry * 50) + (move * 50);
+        
+        // Fallback for extreme low energy
+        if (energy < cost) {
+             work = Math.floor((energy - 100) / 100);
+             if (work < 1) work = 1;
+             move = Math.ceil(work / 2);
+        }
+        
+        return this.buildArray(work, carry, move);
+    }
 
     static generateHauler(energy) {
         // Pure CARRY/MOVE 1:1, capped at 50 parts
@@ -119,6 +133,22 @@ class CreepBodyBuilder {
             cost += 100; 
         }
         return this.buildArray(work, carry, move);
+    }
+
+    static generateFastfiller(energy) {
+        // Fastfillers are static. Max CARRY, exactly 1 MOVE.
+        // Needs to hold as much as possible to buffer transfers.
+        let carry = Math.floor((energy - 50) / 50);
+        if (carry > 30) carry = 30; // Max 1500 capacity is plenty
+        if (carry < 1) carry = 1;
+        return this.buildArray(0, carry, 1);
+    }
+
+    static generateFiller(energy) {
+        let carry = Math.floor(energy / 100);
+        if (carry > 25) carry = 25;
+        if (carry < 1) carry = 1;
+        return this.buildArray(0, carry, carry);
     }
 
     static generateUpgrader(energy) {
@@ -277,14 +307,26 @@ class CensusCalculator {
                     if (drop && drop.amount) looseEnergy += drop.amount;
                 }
             }
-            if (roomState.sourceContainers) {
-                for (let i = 0; i < roomState.sourceContainerCount; i++) {
-                    const container = roomState.sourceContainers[i];
-                    if (container && container.store) looseEnergy += container.store.getUsedCapacity(RESOURCE_ENERGY);
+            
+            let haulerBase = 1;
+            if (roomState.coreContainers && roomState.coreContainerCount > 0) {
+                for (let i = 0; i < roomState.coreContainerCount; i++) {
+                    const c = roomState.coreContainers[i];
+                    if (c && c.store.getUsedCapacity(RESOURCE_ENERGY) < 500) {
+                        haulerBase++;
+                    }
+                }
+            } else {
+                if (roomState.controllerContainers && roomState.controllerContainers.length > 0) {
+                    for (let i = 0; i < roomState.controllerContainers.length; i++) {
+                        const c = roomState.controllerContainers[i];
+                        if (c && c.store.getUsedCapacity(RESOURCE_ENERGY) < 500) {
+                            haulerBase++;
+                        }
+                    }
                 }
             }
-
-            let haulerBase = 1;
+            
             if (roomState.storage && roomState.terminal && roomState.linkCount > 0) {
                 // If fully linked, we might not need haulers at all for sources
                 haulerBase = 0;
@@ -402,24 +444,67 @@ class CensusCalculator {
 
         if (roomName && Memory.rooms && Memory.rooms[roomName] && Memory.rooms[roomName].outposts) {
             const outposts = Memory.rooms[roomName].outposts;
-            let remoteSources = 0;
+            let neededRemoteHarvesters = 0;
             let neededReservers = 0;
             let neededRemoteBuilders = 0;
+            let totalRemoteHaulerCarryNeeded = 0;
+            let totalSKHaulerCarryNeeded = 0;
+            
+            limits.remoteHarvesterQueue = [];
             
             for (let i = 0; i < outposts.length; i++) {
                 const outpostName = outposts[i];
                 const adjMem = Memory.rooms[outpostName];
                 const outpostState = global.State?.rooms?.get(outpostName);
                 
+                // Military Preemption
+                let isContested = false;
+                if (adjMem && adjMem.hostiles) {
+                    if (adjMem.hostiles.creeps > 0 || adjMem.hostiles.towers > 0 || adjMem.hostiles.invaderCore) {
+                        isContested = true;
+                    }
+                }
+                
+                // If contested, skip economic deployment entirely
+                if (isContested) {
+                    continue;
+                }
+
                 const isSKRoom = adjMem && adjMem.roomType === 'sk';
 
                 if (adjMem && adjMem.sources) {
+                    // Calculate Route Length
+                    let distanceRooms = 1;
+                    const route = Game.map.findRoute(roomName, outpostName);
+                    if (route !== ERR_NO_PATH) {
+                        distanceRooms = route.length;
+                    }
+                    const roundTripDistance = distanceRooms * 100;
+                    
+                    let isReserved = false;
+                    if (adjMem.controller && adjMem.controller.reservation && adjMem.controller.reservation.username === 'Bizarrelego') {
+                        isReserved = true;
+                    }
+                    
                     if (isSKRoom) {
-                        // 1 SKMiner per source, plus 1 SKGuard (Paladin) for the whole room
                         limits.skminer = (limits.skminer || 0) + adjMem.sources.length;
                         limits.skguard = (limits.skguard || 0) + 1;
+                        // SK rooms generate roughly 15 energy/tick including minerals
+                        const carryNeeded = Math.ceil((roundTripDistance * 15) / 50) * adjMem.sources.length;
+                        totalSKHaulerCarryNeeded += carryNeeded;
                     } else {
-                        remoteSources += adjMem.sources.length;
+                        const energyPerTick = isReserved ? 10 : 5;
+                        for (let j = 0; j < adjMem.sources.length; j++) {
+                            neededRemoteHarvesters++;
+                            limits.remoteHarvesterQueue.push({
+                                role: 'remoteharvester',
+                                targetRoom: outpostName,
+                                targetSource: adjMem.sources[j].id,
+                                isReserved: isReserved
+                            });
+                        }
+                        const carryNeeded = Math.ceil((roundTripDistance * energyPerTick) / 50) * adjMem.sources.length;
+                        totalRemoteHaulerCarryNeeded += carryNeeded;
                     }
                 }
 
@@ -436,16 +521,32 @@ class CensusCalculator {
                     neededRemoteBuilders += Math.min(2, Math.ceil(outpostState.constructionSiteCount / 5));
                 }
             }
-            if (remoteSources > 0) {
-                limits.remoteharvester = remoteSources;
-                limits.remotehauler = remoteSources;
+            
+            if (neededRemoteHarvesters > 0) {
+                limits.remoteharvester = neededRemoteHarvesters;
+                
+                // Calculate how many haulers we need based on max carry parts per hauler
+                // generateRemoteHauler base cost is 250 (1 WORK, 1 CARRY, 2 MOVE). Each extra CARRY/MOVE pair is 100.
+                let maxExtraCarry = Math.floor((energyCapacity - 250) / 100);
+                if (maxExtraCarry < 0) maxExtraCarry = 0;
+                let maxCarryPerHauler = 1 + maxExtraCarry;
+                if (maxCarryPerHauler > 24) maxCarryPerHauler = 24; // 1W, 24C, 25M = 50 parts
+                
+                limits.remotehauler = Math.ceil(totalRemoteHaulerCarryNeeded / maxCarryPerHauler);
             }
-            if (neededReservers > 0) {
-                limits.reserver = neededReservers;
+            
+            if (totalSKHaulerCarryNeeded > 0) {
+                // generateSKHauler base cost is 100 (1 CARRY, 1 MOVE). Each extra 2 CARRY/1 MOVE is 150.
+                let maxExtraPairs = Math.floor((energyCapacity - 100) / 150);
+                if (maxExtraPairs < 0) maxExtraPairs = 0;
+                let maxSKCarryPerHauler = 1 + (maxExtraPairs * 2);
+                if (maxSKCarryPerHauler > 33) maxSKCarryPerHauler = 33; // 33 CARRY, 17 MOVE = 50 parts
+                
+                limits.skhauler = Math.ceil(totalSKHaulerCarryNeeded / maxSKCarryPerHauler);
             }
-            if (neededRemoteBuilders > 0) {
-                limits.remotebuilder = neededRemoteBuilders;
-            }
+            
+            if (neededReservers > 0) limits.reserver = neededReservers;
+            if (neededRemoteBuilders > 0) limits.remotebuilder = neededRemoteBuilders;
         }
 
         // --- Dynamic Hauler Sizing & Dedication ---
@@ -648,9 +749,15 @@ class SpawnManager {
                 actualCensus[role] = (actualCensus[role] || 0) + 1;
                 if (role === 'bootstrapper') rawBootstrapperCount++;
 
-                // Fixes Generation Die-offs by triggering replacement spawns before the current workforce expires, ensuring zero downtime on critical infrastructure.
-                let preSpawnThreshold = 75;
-                if (role === 'skguard' || role === 'skminer') preSpawnThreshold = 300;
+                // Fixes Generation Die-offs by dynamically calculating precisely when to spawn the replacement
+                let spawnTime = c.body.length * 3;
+                let travelTime = 15; // default local buffer
+                if (c.memory.targetSource && Memory.sources && Memory.sources[c.memory.targetSource] && Memory.sources[c.memory.targetSource].distance) {
+                    travelTime = Memory.sources[c.memory.targetSource].distance;
+                } else if (c.memory.targetRoom) {
+                    travelTime = 50;
+                }
+                let preSpawnThreshold = spawnTime + travelTime;
                 
                 if (!c.spawning && c.ticksToLive !== undefined && c.ticksToLive < preSpawnThreshold) {
                     continue;
@@ -700,63 +807,141 @@ class SpawnManager {
             return;
         }
 
-        // Prevents economic stalling by ensuring early-game scouts yield the spawn queue to critical energy-generating roles.
-        const spawnPriority = [
-            'hubmanager', 'harvester', 'filler', 'hauler', 'bootstrapper', 'skguard', 'mineralhauler', 'fastfiller', 'defender', 'upgrader', 'builder',
-            'mineralminer', 'claimer', 'pioneer', 'scout', 'scientist', 'skminer', 'skhauler', 'remoteharvester', 'remotehauler', 'reserver',
-            'meleeCreep', 'rangerCreep', 'medicCreep'
-        ];
-
-        for (let i = 0; i < spawnPriority.length; i++) {
-            const role = spawnPriority[i];
-            const limit = targetCensus[role] || 0;
-            const current = getCount(role);
-
-            if (current < limit) {
-                // Prevents economic cannibalism by completely halting all energy sinks (upgraders/builders) until the energy-gathering workforce is at 100% capacity.
-                if (role === 'builder' || role === 'upgrader' || role === 'scout') {
-                    if (harvesterCount < (targetCensus['harvester'] || 0) || haulerCount < (targetCensus['hauler'] || 0)) {
-                        continue;
+        // Prevents economic stalling by mathematically ranking missing roles instead of using static arrays.
+        let spawnRequests = [];
+        
+        const standardRoles = ['hubmanager', 'harvester', 'filler', 'bootstrapper', 'skguard', 'mineralhauler', 'fastfiller', 'defender', 'upgrader', 'builder', 'mineralminer', 'claimer', 'pioneer', 'scout', 'scientist', 'skminer', 'skhauler', 'reserver', 'meleeCreep', 'rangerCreep', 'medicCreep'];
+        
+        const getScore = (role, current, req = null) => {
+            if (role === 'bootstrapper') return 950;
+            if (role === 'harvester') return current === 0 ? 900 : 800 - current * 10;
+            if (role === 'hauler') return current === 0 ? 850 : 750 - current * 10;
+            if (role === 'hubmanager') return current === 0 ? 880 : 600;
+            if (role === 'fastfiller' || role === 'filler') {
+                const energyRatio = spawn.room.energyCapacityAvailable > 0 ? spawn.room.energyAvailable / spawn.room.energyCapacityAvailable : 1;
+                return 800 + (1 - energyRatio) * 100;
+            }
+            if (role === 'defender' || role === 'skguard') {
+                if (roomState.hostiles && roomState.hostileCount > 0) return 1000;
+                return 700;
+            }
+            if (role === 'meleeCreep' || role === 'rangerCreep' || role === 'medicCreep') return 650;
+            if (role === 'remoteharvester') {
+                let distance = (Memory.sources && req && req.targetSource && Memory.sources[req.targetSource]) ? Memory.sources[req.targetSource].distance : 50;
+                return 500 - distance;
+            }
+            if (role === 'remotehauler') {
+                let distance = (Memory.sources && req && req.targetSource && Memory.sources[req.targetSource]) ? Memory.sources[req.targetSource].distance : 50;
+                let bonus = 0;
+                if (req && req.targetRoom) {
+                    const targetState = global.State?.rooms?.get(req.targetRoom);
+                    if (targetState && targetState.droppedEnergy) {
+                        for(let i=0; i<targetState.droppedEnergyCount; i++) {
+                            if (targetState.droppedEnergy[i] && targetState.droppedEnergy[i].amount > 500) bonus += 50;
+                        }
                     }
                 }
+                return 450 - distance + bonus;
+            }
+            if (role === 'reserver') return 400;
+            if (role === 'upgrader' || role === 'builder') return 300 - current * 5;
+            if (role === 'scout') return 200;
+            return 100;
+        };
 
-                if ((role === 'hauler' || role === 'remotehauler') && targetCensus.haulerQueue) {
-                    let spawned = false;
-                    for (let j = 0; j < targetCensus.haulerQueue.length; j++) {
-                        const req = targetCensus.haulerQueue[j];
-                        if (req.role !== role) continue;
-                        
-                        let activeCount = 0;
-                        for (let k = 0; k < roomState.creeps.length; k++) {
-                            const c = roomState.creeps[k];
-                            if (c.memory.role === role && c.memory.targetSource === req.targetSource && (c.spawning || c.ticksToLive >= 75)) {
-                                activeCount++;
-                            }
-                        }
-                        if (activeCount < req.count) {
-                            const body = CreepBodyBuilder.getBody(role, req.energy);
-                            this.executeSpawn(spawn, role, body, { targetSource: req.targetSource, targetRoom: req.targetRoom });
-                            spawned = true;
-                            break;
+        // 1. Gather Standard Roles
+        for (let i = 0; i < standardRoles.length; i++) {
+            const role = standardRoles[i];
+            const limit = targetCensus[role] || 0;
+            const current = getCount(role);
+            if (current < limit) {
+                spawnRequests.push({ role, score: getScore(role, current), isQueue: false });
+            }
+        }
+
+        // 2. Gather Queue Roles
+        const queues = [
+            { array: targetCensus.haulerQueue, roleCheck: ['hauler', 'remotehauler'] },
+            { array: targetCensus.remoteHarvesterQueue, roleCheck: ['remoteharvester'] }
+        ];
+        
+        for (let q = 0; q < queues.length; q++) {
+            const qData = queues[q];
+            if (!qData.array) continue;
+            for (let j = 0; j < qData.array.length; j++) {
+                const req = qData.array[j];
+                if (!qData.roleCheck.includes(req.role)) continue;
+                
+                let activeCount = 0;
+                for (let k = 0; k < roomState.creeps.length; k++) {
+                    const c = roomState.creeps[k];
+                    if (c.memory.role === req.role && c.memory.targetSource === req.targetSource) {
+                        let spawnTime = c.body.length * 3;
+                        let travelTime = (Memory.sources && Memory.sources[req.targetSource] && Memory.sources[req.targetSource].distance) ? Memory.sources[req.targetSource].distance : 50;
+                        let preSpawnThreshold = spawnTime + travelTime;
+                        if (c.spawning || c.ticksToLive >= preSpawnThreshold) {
+                            activeCount++;
                         }
                     }
-                    if (spawned) return;
+                }
+                
+                const targetLimit = req.role === 'remoteharvester' ? 1 : req.count;
+                if (activeCount < targetLimit) {
+                    spawnRequests.push({ role: req.role, score: getScore(req.role, activeCount, req), isQueue: true, req });
+                }
+            }
+        }
+
+        spawnRequests.sort((a, b) => b.score - a.score);
+
+        for (let i = 0; i < spawnRequests.length; i++) {
+            const request = spawnRequests[i];
+            const role = request.role;
+
+            // Prevents economic cannibalism by completely halting all energy sinks (upgraders/builders) until the energy-gathering workforce is at 100% capacity.
+            if (role === 'builder' || role === 'upgrader' || role === 'scout') {
+                if (harvesterCount < (targetCensus['harvester'] || 0) || haulerCount < (targetCensus['hauler'] || 0)) {
+                    continue;
+                }
+            }
+
+            if (request.isQueue) {
+                const req = request.req;
+                let body;
+                let extraMem = { targetSource: req.targetSource, targetRoom: req.targetRoom };
+                
+                if (role === 'remoteharvester') {
+                    body = CreepBodyBuilder.getBody(role, energyCapacity, { targetRoom: req.targetRoom, isReserved: req.isReserved });
                 } else {
-                    const bodyParts = CreepBodyBuilder.getBody(role, energyCapacity);
-                    if (!bodyParts || bodyParts.length === 0) continue;
+                    body = CreepBodyBuilder.getBody(role, req.energy);
+                }
+                
+                if (!body || body.length === 0) continue;
+                
+                let cost = 0;
+                for (let j = 0; j < body.length; j++) cost += BODYPART_COST[body[j]];
+                
+                if (spawn.room.energyAvailable >= cost) {
+                    this.executeSpawn(spawn, role, body, extraMem);
+                    return;
+                } else {
+                    return;
+                }
+            } else {
+                const bodyParts = CreepBodyBuilder.getBody(role, energyCapacity);
+                if (!bodyParts || bodyParts.length === 0) continue;
 
-                    let cost = 0;
-                    for (let j = 0; j < bodyParts.length; j++) {
-                        cost += BODYPART_COST[bodyParts[j]];
-                    }
+                let cost = 0;
+                for (let j = 0; j < bodyParts.length; j++) {
+                    cost += BODYPART_COST[bodyParts[j]];
+                }
 
-                    if (spawn.room.energyAvailable >= cost) {
-                        this.executeSpawn(spawn, role, bodyParts);
-                        return;
-                    } else {
-                        // Strict abort: Do not skip to lower priority roles if we are missing a higher priority one but just lack energy.
-                        return;
-                    }
+                if (spawn.room.energyAvailable >= cost) {
+                    this.executeSpawn(spawn, role, bodyParts);
+                    return;
+                } else {
+                    // Strict abort: Do not skip to lower priority roles if we are missing a higher priority one but just lack energy.
+                    return;
                 }
             }
         }
