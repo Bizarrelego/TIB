@@ -114,8 +114,13 @@ class RoomStateScanner {
 
             for (let i = 0; i < structures.length; i++) {
                 const s = structures[i];
-                if (s.isActive !== undefined && !s.isActive()) continue;
+                
+                // ALWAYS add to structureIds so CostMatrix and Repair tasks see it (even if inactive)
                 state.structureIds[state.structureIdCount++] = s.id;
+                
+                // If it is inactive, do NOT add it to functional arrays (spawns, extensions, etc.)
+                if (s.isActive !== undefined && !s.isActive()) continue;
+
                 switch (s.structureType) {
                     case STRUCTURE_SPAWN: state.spawns[state.spawnCount++] = s; break;
                     case STRUCTURE_EXTENSION: state.extensions[state.extensionCount++] = s; break;

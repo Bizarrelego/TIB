@@ -662,23 +662,28 @@ class CensusCalculator {
         limits.scout = (needsScout && !hasObserver) ? 1 : 0;
 
         let hostilesFound = false;
-        if (roomState && roomState.hostiles && roomState.hostileCount > 0) hostilesFound = true;
-        if (!hostilesFound && roomName && Memory.rooms && Memory.rooms[roomName] && Memory.rooms[roomName].outposts) {
+        let totalHostiles = [];
+        if (roomState && roomState.hostiles && roomState.hostileCount > 0) {
+            hostilesFound = true;
+            totalHostiles = totalHostiles.concat(roomState.hostiles);
+        }
+        if (roomName && Memory.rooms && Memory.rooms[roomName] && Memory.rooms[roomName].outposts) {
             const outposts = Memory.rooms[roomName].outposts;
             for (let i = 0; i < outposts.length; i++) {
                 const outpostState = global.State?.rooms?.get(outposts[i]);
                 if (outpostState && outpostState.hostiles && outpostState.hostileCount > 0) {
                     hostilesFound = true;
-                    break;
+                    totalHostiles = totalHostiles.concat(outpostState.hostiles);
                 }
             }
         }
         
         // Expansion defense logic
-        if (!hostilesFound && Memory.empire && Memory.empire.colonizeRoom && Memory.empire.colonizeSourceColony === roomName) {
+        if (Memory.empire && Memory.empire.colonizeRoom && Memory.empire.colonizeSourceColony === roomName) {
             const expState = global.State?.rooms?.get(Memory.empire.colonizeRoom);
             if (expState && expState.hostiles && expState.hostileCount > 0) {
                 hostilesFound = true;
+                totalHostiles = totalHostiles.concat(expState.hostiles);
             }
         }
         if (hostilesFound) {
@@ -688,7 +693,7 @@ class CensusCalculator {
         const hasOffensiveQueue = global.State && global.State.militaryQueue && global.State.militaryQueue.length > 0;
         if (hostilesFound) {
             // Defensive scaling
-            let defensiveThreat = MilitaryManager.getThreatIndex(roomState ? roomState.hostiles : null);
+            let defensiveThreat = MilitaryManager.getThreatIndex(totalHostiles);
             const singleCreepCapacity = Math.max(150, Math.floor((energyCapacity || 300) / 130) * 30);
             const defensiveSquads = Math.max(1, Math.ceil((defensiveThreat * 1.5) / singleCreepCapacity));
             
@@ -884,6 +889,7 @@ class SpawnManager {
             }
             if (role === 'reserver') return 400;
             if (role === 'upgrader' || role === 'builder') {
+                if (role === 'upgrader' && spawn.room.controller && spawn.room.controller.ticksToDowngrade < 20000) return 920;
                 if (role === 'builder' && hasCriticalRepairs && harvesterCount >= 1 && haulerCount >= 1) return 800;
                 return 300 - current * 5;
             }
@@ -916,8 +922,8 @@ class SpawnManager {
                 if (!qData.roleCheck.includes(req.role)) continue;
                 
                 let activeCount = 0;
-                for (let k = 0; k < roomState.creeps.length; k++) {
-                    const c = roomState.creeps[k];
+                for (let k = 0; k < colony.creeps.length; k++) {
+                    const c = colony.creeps[k];
                     if (c.memory.role === req.role) {
                         let match = false;
                         if (req.role === 'reserver' && c.memory.targetRoom === req.targetRoom) match = true;
@@ -957,6 +963,8 @@ class SpawnManager {
             if (role === 'builder' || role === 'upgrader' || role === 'scout') {
                 if (role === 'builder' && hasCriticalRepairs) {
                     // Bypass
+                } else if (role === 'upgrader' && spawn.room.controller && spawn.room.controller.ticksToDowngrade < 20000) {
+                    // Bypass emergency upgrader
                 } else if (harvesterCount < (targetCensus['harvester'] || 0) || haulerCount < (targetCensus['hauler'] || 0)) {
                     continue;
                 }
@@ -1015,7 +1023,8 @@ class SpawnManager {
                     this.executeSpawn(spawn, role, bodyParts);
                     return;
                 } else {
-                    if ((role === 'hauler' || role === 'harvester') && spawn.room.energyAvailable >= 300) {
+                    const isEmergencyUpgrader = role === 'upgrader' && spawn.room.controller && spawn.room.controller.ticksToDowngrade < 20000;
+                    if ((role === 'hauler' || role === 'harvester' || isEmergencyUpgrader) && spawn.room.energyAvailable >= 300) {
                         const scaledBody = CreepBodyBuilder.getBody(role, spawn.room.energyAvailable);
                         if (scaledBody && scaledBody.length > 0) {
                             let scaledCost = 0;

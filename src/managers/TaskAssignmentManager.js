@@ -703,6 +703,10 @@ class TaskAssignmentManager {
             return;
         }
 
+        if (!creep.memory.targetId) {
+            creep.memory.targetId = creep.memory.targetSource;
+        }
+
         if (creep.room.name !== creep.memory.targetRoom) {
             TaskAssignmentManager.setMoveRoomIntent(creep, creep.memory.targetRoom);
             return;
@@ -1360,6 +1364,20 @@ class TaskAssignmentManager {
         const focusPos = containerTile ? { x: containerTile.x, y: containerTile.y, roomName: creep.room.name } : roomState.controller.pos;
         const focusRange = containerTile ? 1 : 3;
 
+        // Emergency Downgrade Protocol: If starving and about to downgrade, allow the upgrader to scavenge globally instead of waiting at the hub
+        const isEmergency = roomState.controller.ticksToDowngrade < 20000;
+        const needsEnergy = creep.store.getUsedCapacity(RESOURCE_ENERGY) === 0;
+
+        if (isEmergency && needsEnergy) {
+            const scavenge = TaskAssignmentManager.findClosestEnergy(creep, roomState);
+            if (scavenge) {
+                creep.heap.targetId = scavenge.id;
+                creep.heap.actionIntent = scavenge.actionIntent;
+                creep.heap.destination = null; // Free it from focusPos restriction
+                return;
+            }
+        }
+
         // Fixes upgrader spawn paralysis by enforcing strict physical routing to the controller hub before attempting to execute work intents.
         if (Math.max(Math.abs(creep.pos.x - focusPos.x), Math.abs(creep.pos.y - focusPos.y)) > focusRange) {
             creep.heap.destination = { x: focusPos.x, y: focusPos.y, roomName: focusPos.roomName, range: focusRange };
@@ -1464,22 +1482,7 @@ class TaskAssignmentManager {
             }
         }
 
-        // Check spawn — only if spawn has enough to not starve spawning (300+)
-        // IMPORTANT: Bootstrappers are strictly forbidden from withdrawing from spawns to prevent infinite withdraw/transfer loops.
-        if (roomState.spawns && creep.memory.role !== 'bootstrapper') {
-            for (let i = 0; i < roomState.spawns.length; i++) {
-                const spawn = roomState.spawns[i];
-                if (spawn.store.getUsedCapacity(RESOURCE_ENERGY) < 300) continue;
-                const dx = Math.abs(creep.pos.x - spawn.pos.x);
-                const dy = Math.abs(creep.pos.y - spawn.pos.y);
-                const dist = Math.max(dx, dy);
-                if (dist < bestDist) {
-                    bestDist = dist;
-                    bestTarget = spawn;
-                    bestIntent = ActionConstants.ACTION_WITHDRAW;
-                }
-            }
-        }
+        // (Spawn withdrawal block removed to prevent infinite filler loops and protect core spawning infrastructure)
 
         // Check Storage
         if (roomState.storage && roomState.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {

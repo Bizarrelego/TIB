@@ -94,7 +94,6 @@ class MilitaryManager {
             const role = creep.memory.role;
             if (role !== 'meleeCreep' && role !== 'rangerCreep' && role !== 'medicCreep') continue;
             if (creep.spawning) continue;
-            if (creep.heap.state !== 'idle') continue;
 
             // Medics bound to a squad leader execute synchronized Snake logic
             if (role === 'medicCreep' && creep.heap.squadLeader) {
@@ -471,10 +470,18 @@ class MilitaryManager {
         const waypoints = global.State.patrolWaypoints[colony];
         if (!creep.heap.waypointIndex) creep.heap.waypointIndex = 0;
 
-        const wp = waypoints[creep.heap.waypointIndex % waypoints.length];
+        let wp = waypoints[creep.heap.waypointIndex % waypoints.length];
+        
+        // Advance waypoint if arrived
+        if (creep.room.name === wp.roomName && Math.max(Math.abs(creep.pos.x - wp.x), Math.abs(creep.pos.y - wp.y)) <= 1) {
+            creep.heap.waypointIndex++;
+            wp = waypoints[creep.heap.waypointIndex % waypoints.length];
+        }
+
         creep.heap.waypointPos = wp;
-        creep.heap.actionIntent = ActionConstants.ACTION_PATROL;
-        creep.heap.state = 'patrol';
+        creep.heap.destination = { x: wp.x, y: wp.y, roomName: wp.roomName, range: 1 };
+        creep.heap.actionIntent = ActionConstants.ACTION_MOVE;
+        creep.heap.state = 'moving';
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -558,9 +565,11 @@ class MilitaryManager {
                     
                     if (hasTargets) {
                         if (intel.sources && intel.sources.length > 0) score += 50 * intel.sources.length;
-                    } else if (score > 150) {
+                    } else {
                         score = 0; // Don't raid if there's nothing to kill
                     }
+                } else {
+                    score = 0; // Don't blindly raid unscouted rooms
                 }
 
                 if (score > 0) {
