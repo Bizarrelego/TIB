@@ -114,7 +114,7 @@ class ExpansionManager {
      */
     static calculateSafeRoute(startRoom, endRoom) {
         const route = Game.map.findRoute(startRoom, endRoom, {
-            routeCallback: (roomName, fromRoomName) => {
+            routeCallback: (roomName, _fromRoomName) => {
                 const status = typeof Game.map.getRoomStatus === 'function' ? Game.map.getRoomStatus(roomName) : null;
                 if (status && (status.status === 'closed' || status.status === 'novice' || status.status === 'respawn')) {
                     return Infinity;

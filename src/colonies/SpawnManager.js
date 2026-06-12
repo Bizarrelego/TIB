@@ -451,7 +451,6 @@ class CensusCalculator {
         if (roomName && Memory.rooms && Memory.rooms[roomName] && Memory.rooms[roomName].outposts) {
             const outposts = Memory.rooms[roomName].outposts;
             let neededRemoteHarvesters = 0;
-            let neededReservers = 0;
             let neededRemoteBuilders = 0;
             let totalRemoteHaulerCarryNeeded = 0;
             let totalSKHaulerCarryNeeded = 0;
@@ -570,9 +569,6 @@ class CensusCalculator {
                 const distance = RouteDistanceCalculator.getDistance(source.id, source.pos, roomName);
                 
                 // --- Tigga Mathematical Hauler Sizing ---
-                // m = round trips before 1500-tick lifetime expires
-                const m = Math.floor(750 / distance);
-                
                 // n = required capacity multiplier (each n = 100 carry capacity = 2 CARRY, 1 MOVE)
                 const n = Math.ceil(distance / 5);
                 

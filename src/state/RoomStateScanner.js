@@ -1,4 +1,3 @@
-/* global STRUCTURE_INVADER_CORE */
 const CacheLib = require('../lib/CacheLib');
 
 const createRoomStateTemplate = () => {
@@ -8,13 +7,13 @@ const createRoomStateTemplate = () => {
     s.sourceContainers = []; s.controllerContainers = []; s.coreContainers = []; s.droppedEnergy = []; s.ruins = []; s.tombstones = [];
     s.constructionSites = Object.create(null);
     s.validDroppedEnergy = []; s.availableDroppedEnergy = []; s.energyInRuinsAndTombstones = [];
-    s.harvestableSources = []; s.hostiles = []; s.invaderCores = []; s.structureIds = []; s.repairTargets = [];
+    s.harvestableSources = []; s.hostiles = []; s.invaderCores = []; s.keeperLairs = []; s.structureIds = []; s.repairTargets = [];
     s.creeps = []; s.harvesters = []; s.upgraders = []; s.ramparts = [];
     s.spawnCount = 0; s.extensionCount = 0; s.towerCount = 0; s.linkCount = 0; s.labCount = 0;
     s.containerCount = 0; s.sourceContainerCount = 0; s.controllerContainerCount = 0; s.coreContainerCount = 0; s.droppedEnergyCount = 0;
     s.ruinCount = 0; s.tombstoneCount = 0; s.constructionSiteCount = 0; s.validDroppedEnergyCount = 0;
     s.availableDroppedEnergyCount = 0; s.energyInRuinsAndTombstonesCount = 0; s.harvestableSourceCount = 0;
-    s.hostileCount = 0; s.invaderCoreCount = 0; s.structureIdCount = 0; s.repairTargetCount = 0; s.rampartCount = 0;
+    s.hostileCount = 0; s.invaderCoreCount = 0; s.keeperLairCount = 0; s.structureIdCount = 0; s.repairTargetCount = 0; s.rampartCount = 0;
     s.availableDroppedEnergyCount = 0; s.energyInRuinsAndTombstonesCount = 0; s.harvestableSourceCount = 0;
     s.hostileCount = 0; s.invaderCoreCount = 0; s.structureIdCount = 0; s.repairTargetCount = 0;
     s.creepCounts = Object.create(null);
@@ -47,6 +46,7 @@ class RoomStateScanner {
         state.spawns.length = 0; state.spawnCount = 0;
         state.extensions.length = 0; state.extensionCount = 0;
         state.invaderCores.length = 0; state.invaderCoreCount = 0;
+        state.keeperLairs.length = 0; state.keeperLairCount = 0;
         state.towers.length = 0; state.towerCount = 0;
         state.links.length = 0; state.linkCount = 0;
         state.labs.length = 0; state.labCount = 0;
@@ -134,6 +134,7 @@ class RoomStateScanner {
                     case STRUCTURE_EXTRACTOR: state.extractor = s; break;
                     case STRUCTURE_NUKER: state.nuker = s; break;
                     case STRUCTURE_INVADER_CORE: state.invaderCores[state.invaderCoreCount++] = s; break;
+                    case STRUCTURE_KEEPER_LAIR: state.keeperLairs[state.keeperLairCount++] = s; break;
                     case STRUCTURE_RAMPART: if (s.my) state.ramparts[state.rampartCount++] = s; break;
                 }
             }
@@ -287,6 +288,7 @@ class RoomStateScanner {
             state.tombstones.length = state.tombstoneCount;
             state.hostiles.length = state.hostileCount;
             state.invaderCores.length = state.invaderCoreCount;
+            state.keeperLairs.length = state.keeperLairCount;
             state.structureIds.length = state.structureIdCount;
             state.repairTargets.length = state.repairTargetCount;
             state.validDroppedEnergy.length = state.validDroppedEnergyCount;
