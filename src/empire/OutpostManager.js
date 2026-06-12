@@ -1,4 +1,5 @@
 
+const RoomPlanner = require('../managers/RoomPlanner');
 
 /**
  * Outpost Manager
@@ -66,6 +67,7 @@ class OutpostManager {
                 updated = true;
                 if (!Memory.outposts) Memory.outposts = {};
                 Memory.outposts[newOutpost] = { sourceRoom: roomName };
+                RoomPlanner.planOutpost(roomName, newOutpost);
             }
         }
 

@@ -1057,6 +1057,86 @@ class RoomPlanner {
         }
     }
 
+    // ─── Remote Infrastructure Planning ──────────────────────────────────
+    
+    static planOutpost(coreRoomName, outpostName) {
+        if (!global.Cache) global.Cache = { blueprints: new Map() };
+        if (!(global.Cache.blueprints instanceof Map)) global.Cache.blueprints = new Map();
+
+        const coreState = global.State?.rooms?.get(coreRoomName);
+        if (!coreState) return;
+
+        let origin = null;
+        if (coreState.storage) origin = coreState.storage.pos;
+        else if (coreState.spawns && coreState.spawns.length > 0) origin = coreState.spawns[0].pos;
+        else {
+            const blueprint = global.Cache.blueprints.get(coreRoomName);
+            if (blueprint && blueprint.anchor) origin = new RoomPosition(blueprint.anchor.x, blueprint.anchor.y, coreRoomName);
+        }
+        if (!origin) return;
+
+        const intel = Memory.rooms[outpostName];
+        if (!intel || !intel.sources) return;
+
+        console.log(`[RoomPlanner] Planning remote infrastructure for outpost ${outpostName} from core ${coreRoomName}...`);
+
+        for (let i = 0; i < intel.sources.length; i++) {
+            const sourceInfo = intel.sources[i];
+            const target = new RoomPosition(sourceInfo.x, sourceInfo.y, outpostName);
+
+            const ret = PathFinder.search(origin, { pos: target, range: 1 }, {
+                plainCost: 2,
+                swampCost: 2,
+                roomCallback: (rName) => {
+                    const status = typeof Game.map.getRoomStatus === 'function' ? Game.map.getRoomStatus(rName) : null;
+                    if (status && (status.status === 'closed' || status.status === 'novice' || status.status === 'respawn')) return false;
+
+                    const costs = new PathFinder.CostMatrix();
+                    const bp = global.Cache.blueprints.get(rName);
+                    if (bp && bp.roads) {
+                        for (let j = 0; j < bp.roads.length; j++) {
+                            costs.set(bp.roads[j].x, bp.roads[j].y, 1);
+                        }
+                    }
+                    return costs;
+                }
+            });
+
+            if (ret.incomplete) {
+                console.log(`[RoomPlanner] Warning: Could not find complete path to source in ${outpostName}`);
+                continue;
+            }
+
+            for (let j = 0; j < ret.path.length; j++) {
+                const pos = ret.path[j];
+                let bp = global.Cache.blueprints.get(pos.roomName);
+                if (!bp) {
+                    bp = {
+                        anchor: null, containers: [], roads: [], ramparts: [], outpostRamparts: [], supplierLabs: [],
+                        [STRUCTURE_SPAWN]: [], [STRUCTURE_EXTENSION]: [], [STRUCTURE_TOWER]: [], [STRUCTURE_STORAGE]: [],
+                        [STRUCTURE_TERMINAL]: [], [STRUCTURE_FACTORY]: [], [STRUCTURE_LAB]: [], [STRUCTURE_OBSERVER]: [],
+                        [STRUCTURE_NUKER]: [], [STRUCTURE_POWER_SPAWN]: [], [STRUCTURE_LINK]: []
+                    };
+                    global.Cache.blueprints.set(pos.roomName, bp);
+                }
+
+                if (j === ret.path.length - 1) {
+                    let hasContainer = false;
+                    for (let c = 0; c < bp.containers.length; c++) {
+                        if (bp.containers[c].x === pos.x && bp.containers[c].y === pos.y) hasContainer = true;
+                    }
+                    if (!hasContainer) bp.containers.push({ x: pos.x, y: pos.y, intent: 'source' });
+                } else {
+                    let hasRoad = false;
+                    for (let c = 0; c < bp.roads.length; c++) {
+                        if (bp.roads[c].x === pos.x && bp.roads[c].y === pos.y) hasRoad = true;
+                    }
+                    if (!hasRoad) bp.roads.push({ x: pos.x, y: pos.y, isExternal: true });
+                }
+            }
+        }
+    }
+
     // ─── Visualizer ──────────────────────────────────────────────────────
 
     /**

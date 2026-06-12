@@ -12,7 +12,7 @@ const createRoomMemoryTemplate = () => ({
     mineral: null, // Stores { id, type, x, y }
     controller: { owner: null, level: 0, safeMode: 0, x: 0, y: 0 },
     droppedEnergy: 0,
-    hostiles: { creeps: 0, towers: 0, invaderCore: false }
+    hostiles: { creeps: 0, towers: 0, invaderCore: false, dps: 0, hps: 0 }
 });
 
 class IntelManager {
@@ -64,21 +64,41 @@ class IntelManager {
         const state = global.State.rooms.get(room.name);
         if (!state) return;
 
-        if (!mem.hostiles) mem.hostiles = { creeps: 0, towers: 0, invaderCore: false };
+        if (!mem.hostiles) mem.hostiles = { creeps: 0, towers: 0, invaderCore: false, dps: 0, hps: 0 };
 
         const hostileCreeps = state.hostiles || [];
         const towers = state.towers || [];
         let hostileTowerCount = 0;
+        let totalDps = 0;
+        let totalHps = 0;
+        
         for (let i = 0; i < towers.length; i++) {
             if (!towers[i].my && towers[i].structureType === STRUCTURE_TOWER) {
                 hostileTowerCount++;
+                totalDps += 600;
+                totalHps += 400;
             }
         }
         const invaderCores = state.invaderCores || [];
+        
+        for (let i = 0; i < hostileCreeps.length; i++) {
+            const creep = hostileCreeps[i];
+            const body = creep.body;
+            if (body) {
+                for (let j = 0; j < body.length; j++) {
+                    const type = body[j].type;
+                    if (type === ATTACK) totalDps += 30;
+                    else if (type === RANGED_ATTACK) totalDps += 10;
+                    else if (type === HEAL) totalHps += 12;
+                }
+            }
+        }
 
         mem.hostiles.creeps = hostileCreeps.length;
         mem.hostiles.towers = hostileTowerCount;
         mem.hostiles.invaderCore = invaderCores.length > 0;
+        mem.hostiles.dps = totalDps;
+        mem.hostiles.hps = totalHps;
 
         const drops = state.droppedEnergy || [];
         let totalDrops = 0;
@@ -110,7 +130,7 @@ class IntelManager {
 
         // Ensure nested objects exist in case of schema updates on existing memory
         if (!mem.controller) mem.controller = { owner: null, level: 0, safeMode: 0, x: 0, y: 0 };
-        if (!mem.hostiles) mem.hostiles = { creeps: 0, towers: 0, invaderCore: false };
+        if (!mem.hostiles) mem.hostiles = { creeps: 0, towers: 0, invaderCore: false, dps: 0, hps: 0 };
 
         const state = global.State.rooms.get(room.name);
         if (!state) return;
@@ -135,8 +155,17 @@ class IntelManager {
             controllerObj.safeMode = room.controller.safeMode || 0;
             controllerObj.x = room.controller.pos.x;
             controllerObj.y = room.controller.pos.y;
+            if (room.controller.reservation) {
+                controllerObj.reservation = {
+                    username: room.controller.reservation.username,
+                    ticksToEnd: room.controller.reservation.ticksToEnd
+                };
+            } else {
+                controllerObj.reservation = null;
+            }
         } else {
             controllerObj.owner = null;
+            controllerObj.reservation = null;
         }
 
         // 3. Mineral Intelligence

@@ -15,7 +15,9 @@ const ActionConstants = {
     ACTION_HEAL: 'heal',
     ACTION_FLEE: 'flee',
     ACTION_PATROL: 'patrol',
-    ACTION_RESERVE: 'reserve'
+    ACTION_RESERVE: 'reserve',
+    ACTION_CLAIM: 'claim',
+    ACTION_ATTACK_CONTROLLER: 'attackController'
 };
 
 module.exports = ActionConstants;

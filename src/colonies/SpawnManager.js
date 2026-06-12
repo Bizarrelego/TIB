@@ -451,6 +451,7 @@ class CensusCalculator {
             let totalSKHaulerCarryNeeded = 0;
             
             limits.remoteHarvesterQueue = [];
+            limits.reserverQueue = [];
             
             for (let i = 0; i < outposts.length; i++) {
                 const outpostName = outposts[i];
@@ -482,7 +483,7 @@ class CensusCalculator {
                     const roundTripDistance = distanceRooms * 100;
                     
                     let isReserved = false;
-                    if (adjMem.controller && adjMem.controller.reservation && adjMem.controller.reservation.username === 'Bizarrelego') {
+                    if (adjMem.controller && adjMem.controller.reservation && (adjMem.controller.reservation.username === 'Bizarrelego' || adjMem.controller.reservation.username === 'Blake') && adjMem.controller.reservation.ticksToEnd > 0) {
                         isReserved = true;
                     }
                     
@@ -512,7 +513,10 @@ class CensusCalculator {
                 if (!isSKRoom && rcl >= 3 && adjMem && adjMem.controller && (!adjMem.controller.owner)) {
                     // Only reserve if reservation is low (< 1000) or missing
                     if (!adjMem.controller.reservation || adjMem.controller.reservation.ticksToEnd < 1500) {
-                        neededReservers++;
+                        limits.reserverQueue.push({
+                            role: 'reserver',
+                            targetRoom: outpostName
+                        });
                     }
                 }
 
@@ -545,7 +549,7 @@ class CensusCalculator {
                 limits.skhauler = Math.ceil(totalSKHaulerCarryNeeded / maxSKCarryPerHauler);
             }
             
-            if (neededReservers > 0) limits.reserver = neededReservers;
+            limits.reserver = limits.reserverQueue.length;
             if (neededRemoteBuilders > 0) limits.remotebuilder = neededRemoteBuilders;
         }
 
@@ -675,15 +679,40 @@ class CensusCalculator {
 
         const hasOffensiveQueue = global.State && global.State.militaryQueue && global.State.militaryQueue.length > 0;
         if (hostilesFound) {
-            limits.meleeCreep = Math.min(2, (limits.meleeCreep || 0) + 1);
-            limits.rangerCreep = Math.min(2, (limits.rangerCreep || 0) + 1);
-            limits.medicCreep = Math.min(2, (limits.medicCreep || 0) + 1);
+            // Defensive scaling
+            let defensiveThreat = 0;
+            if (roomState && roomState.hostiles) {
+                for (let i = 0; i < roomState.hostiles.length; i++) {
+                    const body = roomState.hostiles[i].body;
+                    if (body) {
+                        for (let j = 0; j < body.length; j++) {
+                            const type = body[j].type;
+                            if (type === ATTACK) defensiveThreat += 30;
+                            else if (type === RANGED_ATTACK) defensiveThreat += 10;
+                            else if (type === HEAL) defensiveThreat += 12;
+                        }
+                    }
+                }
+            }
+            const singleCreepCapacity = Math.max(150, Math.floor((energyCapacity || 300) / 130) * 30);
+            const defensiveSquads = Math.max(1, Math.ceil((defensiveThreat * 1.5) / singleCreepCapacity));
+            
+            limits.meleeCreep = (limits.meleeCreep || 0) + defensiveSquads;
+            limits.rangerCreep = (limits.rangerCreep || 0) + defensiveSquads;
+            limits.medicCreep = (limits.medicCreep || 0) + defensiveSquads;
         }
 
         if (rcl >= 4 && hasOffensiveQueue) {
-            limits.meleeCreep = Math.min(2, (limits.meleeCreep || 0) + 1);
-            limits.rangerCreep = Math.min(2, (limits.rangerCreep || 0) + 1);
-            limits.medicCreep = Math.min(2, (limits.medicCreep || 0) + 1);
+            const threatIndex = global.State.militaryQueue[0].threatIndex || 0;
+            
+            // Estimate single creep max DPS at current RCL energy capacity
+            const singleCreepCapacity = Math.floor((energyCapacity || 300) / 130) * 30;
+            // Add a 50% buffer to strictly exceed the threat
+            const offensiveSquads = Math.max(1, Math.ceil((threatIndex * 1.5) / singleCreepCapacity));
+
+            limits.meleeCreep = (limits.meleeCreep || 0) + offensiveSquads;
+            limits.rangerCreep = (limits.rangerCreep || 0) + offensiveSquads;
+            limits.medicCreep = (limits.medicCreep || 0) + offensiveSquads;
         }
 
         // Link Transition Protocol
@@ -810,7 +839,7 @@ class SpawnManager {
         // Prevents economic stalling by mathematically ranking missing roles instead of using static arrays.
         let spawnRequests = [];
         
-        const standardRoles = ['hubmanager', 'harvester', 'filler', 'bootstrapper', 'skguard', 'mineralhauler', 'fastfiller', 'defender', 'upgrader', 'builder', 'mineralminer', 'claimer', 'pioneer', 'scout', 'scientist', 'skminer', 'skhauler', 'reserver', 'meleeCreep', 'rangerCreep', 'medicCreep'];
+        const standardRoles = ['hubmanager', 'harvester', 'filler', 'bootstrapper', 'skguard', 'mineralhauler', 'fastfiller', 'defender', 'upgrader', 'builder', 'mineralminer', 'claimer', 'pioneer', 'scout', 'scientist', 'skminer', 'skhauler', 'meleeCreep', 'rangerCreep', 'medicCreep'];
         
         const getScore = (role, current, req = null) => {
             if (role === 'bootstrapper') return 950;
@@ -862,7 +891,8 @@ class SpawnManager {
         // 2. Gather Queue Roles
         const queues = [
             { array: targetCensus.haulerQueue, roleCheck: ['hauler', 'remotehauler'] },
-            { array: targetCensus.remoteHarvesterQueue, roleCheck: ['remoteharvester'] }
+            { array: targetCensus.remoteHarvesterQueue, roleCheck: ['remoteharvester'] },
+            { array: targetCensus.reserverQueue, roleCheck: ['reserver'] }
         ];
         
         for (let q = 0; q < queues.length; q++) {
@@ -875,17 +905,29 @@ class SpawnManager {
                 let activeCount = 0;
                 for (let k = 0; k < roomState.creeps.length; k++) {
                     const c = roomState.creeps[k];
-                    if (c.memory.role === req.role && c.memory.targetSource === req.targetSource) {
-                        let spawnTime = c.body.length * 3;
-                        let travelTime = (Memory.sources && Memory.sources[req.targetSource] && Memory.sources[req.targetSource].distance) ? Memory.sources[req.targetSource].distance : 50;
-                        let preSpawnThreshold = spawnTime + travelTime;
-                        if (c.spawning || c.ticksToLive >= preSpawnThreshold) {
-                            activeCount++;
+                    if (c.memory.role === req.role) {
+                        let match = false;
+                        if (req.role === 'reserver' && c.memory.targetRoom === req.targetRoom) match = true;
+                        else if (req.role !== 'reserver' && c.memory.targetSource === req.targetSource) match = true;
+
+                        if (match) {
+                            let spawnTime = c.body.length * 3;
+                            let travelTime = 50;
+                            if (req.role !== 'reserver' && Memory.sources && Memory.sources[req.targetSource] && Memory.sources[req.targetSource].distance) {
+                                travelTime = Memory.sources[req.targetSource].distance;
+                            } else if (req.role === 'reserver') {
+                                const route = Game.map.findRoute(spawn.room.name, req.targetRoom);
+                                if (route !== ERR_NO_PATH) travelTime = route.length * 50;
+                            }
+                            let preSpawnThreshold = spawnTime + travelTime;
+                            if (c.spawning || c.ticksToLive >= preSpawnThreshold) {
+                                activeCount++;
+                            }
                         }
                     }
                 }
                 
-                const targetLimit = req.role === 'remoteharvester' ? 1 : req.count;
+                const targetLimit = (req.role === 'remoteharvester' || req.role === 'reserver') ? 1 : req.count;
                 if (activeCount < targetLimit) {
                     spawnRequests.push({ role: req.role, score: getScore(req.role, activeCount, req), isQueue: true, req });
                 }
@@ -912,6 +954,8 @@ class SpawnManager {
                 
                 if (role === 'remoteharvester') {
                     body = CreepBodyBuilder.getBody(role, energyCapacity, { targetRoom: req.targetRoom, isReserved: req.isReserved });
+                } else if (role === 'reserver') {
+                    body = CreepBodyBuilder.getBody(role, energyCapacity);
                 } else {
                     body = CreepBodyBuilder.getBody(role, req.energy);
                 }

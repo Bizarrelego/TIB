@@ -126,6 +126,10 @@ class ActionExecutor {
             result = creep.dismantle(target);
         } else if (intent === ActionConstants.ACTION_RESERVE) {
             result = creep.reserveController(target);
+        } else if (intent === ActionConstants.ACTION_CLAIM) {
+            result = creep.claimController(target);
+        } else if (intent === ActionConstants.ACTION_ATTACK_CONTROLLER) {
+            result = creep.attackController(target);
         }
 
         if (result === ERR_NOT_IN_RANGE) {

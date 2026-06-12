@@ -11,7 +11,7 @@ class ConstructionManager {
 
         for (const roomName in Game.rooms) {
             const room = Game.rooms[roomName];
-            if (!room.controller || !room.controller.my) continue;
+            if (!room.controller || (!room.controller.my && !global.Cache?.blueprints?.has(roomName))) continue;
 
             const state = global.State?.rooms?.get(roomName);
             if (!state) continue;
@@ -32,7 +32,7 @@ class ConstructionManager {
     }
 
     static executeRoomBlueprint(room, blueprint, state, maxToPlace) {
-        const rcl = room.controller.level;
+        const rcl = room.controller && room.controller.my ? room.controller.level : 0;
         const priorityArray = [
             STRUCTURE_SPAWN,
             STRUCTURE_TOWER,
@@ -83,9 +83,9 @@ class ConstructionManager {
                 for (let i = 0; i < rawPositions.length; i++) {
                     const pos = rawPositions[i];
                     // Core (fast filler) containers are gated until RCL 4
-                    if (pos.intent === 'core' && rcl < 4) continue;
+                    if (pos.intent === 'core' && rcl < 4 && (!room.controller || room.controller.my)) continue;
                     // Source containers are gated until RCL 3
-                    if (pos.intent === 'source' && rcl < 3) continue;
+                    if (pos.intent === 'source' && rcl < 3 && (!room.controller || room.controller.my)) continue;
                     // Mineral containers are gated until RCL 6
                     if (pos.intent === 'mineral' && rcl < 6) continue;
                     positions.push(pos);
@@ -111,7 +111,7 @@ class ConstructionManager {
                 for (let i = 0; i < rawRoads.length; i++) {
                     const road = rawRoads[i];
                     if (road.isExternal) {
-                        if (rcl >= 3) positions.push(road);
+                        if (rcl >= 3 || !room.controller || !room.controller.my) positions.push(road);
                     } else if (road.dist !== undefined) {
                         if (road.dist <= allowedDist) positions.push(road);
                     } else {

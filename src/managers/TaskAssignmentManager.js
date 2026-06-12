@@ -209,6 +209,15 @@ class TaskAssignmentManager {
             return false;
         }
 
+        if (creep.room.name !== creep.memory.colony && Memory.rooms[creep.room.name] && Memory.rooms[creep.room.name].undefendable > Game.time) {
+            creep.memory.targetRoom = creep.memory.colony;
+            creep.heap.fleeGoals = null;
+            creep.heap.targetId = null;
+            creep.heap.actionIntent = ActionConstants.ACTION_MOVE;
+            TaskAssignmentManager.setMoveRoomIntent(creep, creep.memory.colony);
+            return true;
+        }
+
         const hostiles = roomState.hostiles;
         if (!hostiles || hostiles.length === 0) {
             if (creep.heap.fleeGoals) creep.heap.fleeGoals = null;
@@ -598,7 +607,15 @@ class TaskAssignmentManager {
         const targetRoomState = global.State?.rooms?.get(creep.room.name);
         if (targetRoomState && targetRoomState.controller) {
             creep.heap.targetId = targetRoomState.controller.id;
-            creep.heap.actionIntent = ActionConstants.ACTION_CLAIM;
+            
+            const myUsername = Memory.empire ? Memory.empire.username : 'Bizarrelego';
+            const reservation = targetRoomState.controller.reservation;
+            
+            if (reservation && reservation.username !== myUsername) {
+                creep.heap.actionIntent = ActionConstants.ACTION_ATTACK_CONTROLLER;
+            } else {
+                creep.heap.actionIntent = ActionConstants.ACTION_CLAIM;
+            }
         } else {
             creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
         }
@@ -699,23 +716,8 @@ class TaskAssignmentManager {
 
     static assignReserver(creep, _roomState) {
         if (!creep.memory.targetRoom) {
-            const outposts = Memory.rooms[creep.memory.colony]?.outposts || [];
-            if (outposts.length > 0) {
-                const census = TaskAssignmentManager.getRemoteCensus();
-                let bestRoom = outposts[0];
-                let minCount = Infinity;
-                for (let i = 0; i < outposts.length; i++) {
-                    const key = `reserver_${creep.memory.colony}_${outposts[i]}`;
-                    const count = census.get(key) || 0;
-                    if (count < minCount) {
-                        minCount = count;
-                        bestRoom = outposts[i];
-                    }
-                }
-                creep.memory.targetRoom = bestRoom;
-            } else {
-                return;
-            }
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            return;
         }
 
         if (creep.room.name !== creep.memory.targetRoom) {

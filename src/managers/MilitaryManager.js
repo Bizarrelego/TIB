@@ -36,12 +36,12 @@ class MilitaryManager {
         // Check outpost threats
         let outpostThreatRoom = null;
         const outposts = Memory.rooms[colony]?.outposts || [];
-        if (!homeHasHostiles) {
-            for (let i = 0; i < outposts.length; i++) {
+        for (let i = 0; i < outposts.length; i++) {
+            MilitaryManager.assessOutpostViability(outposts[i]);
+            if (!homeHasHostiles) {
                 const oState = global.State.rooms.get(outposts[i]);
                 if (oState && oState.hostiles && oState.hostiles.length > 0) {
-                    outpostThreatRoom = outposts[i];
-                    break;
+                    if (!outpostThreatRoom) outpostThreatRoom = outposts[i];
                 }
             }
         }
@@ -114,7 +114,7 @@ class MilitaryManager {
                 // Check if there are offensive targets queued
                 const queue = global.State.militaryQueue;
                 if (queue && queue.length > 0) {
-                    MilitaryManager.assignOffensive(creep, queue[0], colony);
+                    MilitaryManager.assignOffensive(creep, queue[0].roomName, colony);
                 } else {
                     MilitaryManager.assignPatrol(creep, homeState, colony);
                 }
@@ -564,13 +564,17 @@ class MilitaryManager {
                 }
 
                 if (score > 0) {
-                    scores.push({ roomName: neighbor, score });
+                    let threatIndex = 0;
+                    if (intel && intel.hostiles) {
+                        threatIndex = (intel.hostiles.dps || 0) + (intel.hostiles.hps || 0);
+                    }
+                    scores.push({ roomName: neighbor, score, threatIndex });
                 }
             }
         }
 
         scores.sort((a, b) => b.score - a.score);
-        global.State.militaryQueue = scores.slice(0, 3).map(s => s.roomName);
+        global.State.militaryQueue = scores.slice(0, 3).map(s => ({ roomName: s.roomName, threatIndex: s.threatIndex }));
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -652,6 +656,51 @@ class MilitaryManager {
         allyScore += towers.length * 5; 
 
         return allyScore >= enemyScore;
+    }
+
+    static assessOutpostViability(outpostName) {
+        if (!Memory.rooms[outpostName]) return;
+        const oState = global.State.rooms.get(outpostName);
+        if (!oState || !oState.hostiles || oState.hostiles.length === 0) {
+            Memory.rooms[outpostName].hostileDominanceTicks = 0;
+            return;
+        }
+
+        let hostileThreat = 0;
+        for (let i = 0; i < oState.hostiles.length; i++) {
+            const body = oState.hostiles[i].body;
+            for (let j = 0; j < body.length; j++) {
+                const type = body[j].type;
+                if (type === ATTACK) hostileThreat += 30;
+                else if (type === RANGED_ATTACK) hostileThreat += 10;
+                else if (type === HEAL) hostileThreat += 12;
+            }
+        }
+
+        let allyThreat = 0;
+        const alliedCreeps = oState.creeps || [];
+        for (let i = 0; i < alliedCreeps.length; i++) {
+            const c = alliedCreeps[i];
+            const role = (c.memory.role || '').toLowerCase();
+            if (role === 'meleecreep' || role === 'rangercreep' || role === 'mediccreep' || role === 'defender') {
+                for (let j = 0; j < c.body.length; j++) {
+                    const type = c.body[j].type;
+                    if (type === ATTACK) allyThreat += 30;
+                    else if (type === RANGED_ATTACK) allyThreat += 10;
+                    else if (type === HEAL) allyThreat += 12;
+                }
+            }
+        }
+
+        if (hostileThreat > allyThreat) {
+            Memory.rooms[outpostName].hostileDominanceTicks = (Memory.rooms[outpostName].hostileDominanceTicks || 0) + 1;
+            if (Memory.rooms[outpostName].hostileDominanceTicks > 50) {
+                Memory.rooms[outpostName].undefendable = Game.time + 1500;
+                Memory.rooms[outpostName].hostileDominanceTicks = 0;
+            }
+        } else {
+            Memory.rooms[outpostName].hostileDominanceTicks = 0;
+        }
     }
 
     static findPrimaryTarget(roomState) {
