@@ -1,11 +1,14 @@
 const ActionConstants = require('../constants/ActionConstants');
+const StateEnums = require('../constants/StateEnums');
 const CacheLib = require('../lib/CacheLib');
+const MemoryHeap = require('../state/MemoryHeap');
 
 /**
  * Maps intents directly to Screeps API calls, bypassing roles entirely.
  */
 class ActionExecutor {
     static run() {
+        MemoryHeap.init();
         if (!global.creepHeap) global.creepHeap = new Map();
         if (!global.structureHeap) global.structureHeap = new Map();
         
@@ -63,6 +66,18 @@ class ActionExecutor {
             }
         }
 
+        // Process MemoryHeap Intended Payloads (New Architecture)
+        for (const [targetId, intents] of global.MemoryHeap.actionIntents.entries()) {
+            for (let i = 0; i < intents.length; i++) {
+                const intentPayload = intents[i];
+                const creep = Game.creeps[intentPayload.c] || Game.powerCreeps[intentPayload.c];
+                if (!creep) continue;
+                const target = CacheLib.getById(targetId) || null;
+                ActionExecutor.executeMemoryHeapIntent(creep, intentPayload, target);
+            }
+        }
+        MemoryHeap.clearIntents();
+
         // Process Structure Native Calls
         for (const [structureId, heap] of global.structureHeap.entries()) {
             const structure = CacheLib.getById(structureId);
@@ -82,6 +97,31 @@ class ActionExecutor {
             }
         }
         global.structureHeap.clear();
+    }
+
+    static executeMemoryHeapIntent(creep, payload, target) {
+        let result = ERR_INVALID_TARGET;
+        const intentNum = payload.a;
+
+        if (intentNum === StateEnums.ACTION_HARVEST) result = creep.harvest(target);
+        else if (intentNum === StateEnums.ACTION_WITHDRAW) result = creep.withdraw(target, payload.res || RESOURCE_ENERGY);
+        else if (intentNum === StateEnums.ACTION_TRANSFER) result = creep.transfer(target, payload.res || RESOURCE_ENERGY);
+        else if (intentNum === StateEnums.ACTION_UPGRADE) result = creep.upgradeController(target);
+        else if (intentNum === StateEnums.ACTION_BUILD) result = creep.build(target);
+        else if (intentNum === StateEnums.ACTION_REPAIR) result = creep.repair(target);
+        else if (intentNum === StateEnums.ACTION_PICKUP) result = creep.pickup(target);
+        else if (intentNum === StateEnums.ACTION_DROP) result = creep.drop(payload.res || RESOURCE_ENERGY);
+        else if (intentNum === StateEnums.ACTION_ATTACK) result = creep.attack(target);
+        else if (intentNum === StateEnums.ACTION_RANGED_ATTACK) result = creep.rangedAttack(target);
+        else if (intentNum === StateEnums.ACTION_HEAL) result = creep.heal(target);
+        else if (intentNum === StateEnums.ACTION_RESERVE) result = creep.reserveController(target);
+        else if (intentNum === StateEnums.ACTION_CLAIM) result = creep.claimController(target);
+        else if (intentNum === StateEnums.ACTION_ATTACK_CONTROLLER) result = creep.attackController(target);
+        else if (intentNum === StateEnums.ACTION_USE_POWER) result = creep.usePower(payload.powerId, target);
+        else if (intentNum === StateEnums.ACTION_RENEW) result = creep.renew(target);
+        else if (intentNum === StateEnums.ACTION_ENABLE_ROOM) result = creep.enableRoom(target);
+        
+        return result;
     }
 
     static executeIntent(creep, heap, intent, target) {

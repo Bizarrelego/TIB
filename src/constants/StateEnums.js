@@ -1,0 +1,36 @@
+const StateEnums = {
+    // Creep States
+    STATE_IDLE: 0,
+    STATE_GATHER: 1,
+    STATE_WORK: 2,
+    STATE_FLEE: 3,
+
+    // Action Intents (matches ActionConstants for ease of migration)
+    ACTION_IDLE: 0,
+    ACTION_HARVEST: 1,
+    ACTION_UPGRADE: 2,
+    ACTION_TRANSFER: 3,
+    ACTION_PICKUP: 4,
+    ACTION_WITHDRAW: 5,
+    ACTION_BUILD: 6,
+    ACTION_REPAIR: 7,
+    ACTION_DROP: 8,
+    ACTION_SCOUT: 9,
+    ACTION_MOVE_ROOM: 10,
+    ACTION_ATTACK: 11,
+    ACTION_RANGED_ATTACK: 12,
+    ACTION_HEAL: 13,
+    ACTION_FLEE: 14,
+    ACTION_PATROL: 15,
+    ACTION_RESERVE: 16,
+    ACTION_CLAIM: 17,
+    ACTION_ATTACK_CONTROLLER: 18,
+    ACTION_TRANSFER_ENERGY: 19,
+    ACTION_RUN_REACTION: 20,
+    ACTION_USE_POWER: 21,
+    ACTION_RENEW: 22,
+    ACTION_ENABLE_ROOM: 23,
+    ACTION_MOVE: 24
+};
+
+module.exports = StateEnums;

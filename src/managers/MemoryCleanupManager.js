@@ -1,8 +1,11 @@
+const MemoryHeap = require('../state/MemoryHeap');
+
 /**
  * Clears memory of dead creeps and stale heap entries to prevent bloat.
  */
 class MemoryCleanupManager {
     static run() {
+        MemoryHeap.init();
         if (!global.creepHeap) global.creepHeap = new Map();
 
         for (const name in Game.creeps) {
@@ -16,6 +19,7 @@ class MemoryCleanupManager {
         for (const name of global.creepHeap.keys()) {
             if (!Game.creeps[name]) {
                 global.creepHeap.delete(name);
+                MemoryHeap.freeCreepId(name);
             }
         }
 

@@ -106,33 +106,38 @@ class CreepBodyBuilder {
     }
 
     static generateHauler(energy) {
-        // Pure CARRY/MOVE 1:1, capped at 50 parts
-        let carry = 1, move = 1;
-        let cost = 100;
-        while (cost + 100 <= energy && (carry + move + 2) <= 50) { 
-            carry += 1; 
+        // Core haulers follow the same math: 2 CARRY, 1 MOVE
+        let carry = 0, move = 0;
+        let cost = 0;
+        
+        if (energy < 150) {
+            return this.buildArray(0, 1, 1);
+        }
+        
+        while (cost + 150 <= energy && (carry + move + 3) <= 50) { 
+            carry += 2; 
             move += 1; 
-            cost += 100; 
+            cost += 150; 
         }
         return this.buildArray(0, carry, move);
     }
 
     static generateRemoteHauler(energy) {
-        // Needs exactly 1 WORK part for road maintenance. The rest is CARRY/MOVE 1:1.
-        let work = 1, carry = 1, move = 2; // WORK(100) + MOVE(50) = 150, CARRY(50) + MOVE(50) = 100. Base = 250
-        let cost = 250;
+        // Tigga Mathematical Hauler Builder: 2 CARRY, 1 MOVE blocks
+        // Base cost per block: 150 energy. 1 WORK part strictly omitted to follow pure mathematical logic.
+        let carry = 0, move = 0;
+        let cost = 0;
         
-        // If we can't afford the base, fall back to pure hauler logic but with less parts
-        if (energy < 250) {
+        if (energy < 150) {
             return this.buildArray(0, 1, 1);
         }
 
-        while (cost + 100 <= energy && (work + carry + move + 2) <= 50) { 
-            carry += 1; 
+        while (cost + 150 <= energy && (carry + move + 3) <= 50) { 
+            carry += 2; 
             move += 1; 
-            cost += 100; 
+            cost += 150; 
         }
-        return this.buildArray(work, carry, move);
+        return this.buildArray(0, carry, move);
     }
 
     static generateFastfiller(energy) {
@@ -563,20 +568,22 @@ class CensusCalculator {
                 const source = colony.sources[i];
                 const distance = RouteDistanceCalculator.getDistance(source.id, source.pos, roomName);
                 
-                // Math: 10 energy/tick generation (regular) or ~13 (SK). Round trip = 2*distance.
-                const isSKRoom = Memory.rooms[source.pos.roomName] && Memory.rooms[source.pos.roomName].roomType === 'sk';
-                const energyPerTick = isSKRoom ? 13.33 : 10;
+                // --- Tigga Mathematical Hauler Sizing ---
+                // m = round trips before 1500-tick lifetime expires
+                const m = Math.floor(750 / distance);
                 
-                const requiredCarry = Math.ceil(distance * 2 * energyPerTick / 50 * 1.2); // 20% pathing buffer
+                // n = required capacity multiplier (each n = 100 carry capacity = 2 CARRY, 1 MOVE)
+                const n = Math.ceil(distance / 5);
                 
-                // 150 energy buys [CARRY, CARRY, MOVE] which is 2 CARRY parts
-                const requiredEnergy = Math.ceil(requiredCarry / 2) * 150;
+                // Base cost: each n costs 150 energy
+                const requiredEnergy = n * 150;
                 
                 const cappedEnergy = Math.min(requiredEnergy, energyCapacity || 300);
-                // Math.max(1) ensures we always spawn at least 1 hauler if energy is low
                 const neededCount = Math.max(1, Math.ceil(requiredEnergy / cappedEnergy));
                 
                 const isRemote = source.pos.roomName !== roomName;
+                const isSKRoom = Memory.rooms[source.pos.roomName] && Memory.rooms[source.pos.roomName].roomType === 'sk';
+                
                 let roleName = 'hauler';
                 if (isRemote) {
                     roleName = isSKRoom ? 'skhauler' : 'remotehauler';
