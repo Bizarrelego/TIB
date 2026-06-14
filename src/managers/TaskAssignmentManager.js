@@ -1270,6 +1270,13 @@ class TaskAssignmentManager {
         const source = CacheLib.getById(creep.memory.targetId);
         if (!source) return;
 
+        // Reduces CPU by deferring source evaluation for N ticks (O(1) savings per harvester)
+        if (source.energy === 0 && source.ticksToRegeneration) {
+            creep.heap.sleepUntil = Game.time + source.ticksToRegeneration;
+            creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            return;
+        }
+
         if (roomState.sourceContainers) {
             for (let i = 0; i < roomState.sourceContainers.length; i++) {
                 const c = roomState.sourceContainers[i];
@@ -2003,6 +2010,13 @@ class TaskAssignmentManager {
         if (creep.memory.targetSource) {
             creep.heap.targetId = creep.memory.targetSource;
             creep.heap.actionIntent = ActionConstants.ACTION_HARVEST;
+
+            const source = CacheLib.getById(creep.memory.targetSource);
+            // Reduces CPU by deferring source evaluation for N ticks (O(1) savings per SKMiner)
+            if (source && source.energy === 0 && source.ticksToRegeneration) {
+                creep.heap.sleepUntil = Game.time + source.ticksToRegeneration;
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            }
         }
     }
 
