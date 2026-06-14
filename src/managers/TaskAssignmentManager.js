@@ -1285,6 +1285,16 @@ class TaskAssignmentManager {
             if (container && (creep.pos.x !== container.pos.x || creep.pos.y !== container.pos.y || creep.pos.roomName !== container.pos.roomName)) {
                 creep.heap.destination = { x: container.pos.x, y: container.pos.y, roomName: container.pos.roomName, range: 0 };
                 creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            } else if (source.energy === 0 && source.ticksToRegeneration > 0) {
+                // CPU Savings: Bypasses ActionExecutor and TrafficManager intent checks when empty
+                creep.heap.sleepUntil = Game.time + source.ticksToRegeneration;
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+            }
+        } else if (creep.pos.roomName === source.pos.roomName && Math.max(Math.abs(creep.pos.x - source.pos.x), Math.abs(creep.pos.y - source.pos.y)) <= 1) {
+            if (source.energy === 0 && source.ticksToRegeneration > 0) {
+                // CPU Savings: Bypasses ActionExecutor and TrafficManager intent checks when empty
+                creep.heap.sleepUntil = Game.time + source.ticksToRegeneration;
+                creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
             }
         }
     }
@@ -2003,6 +2013,15 @@ class TaskAssignmentManager {
         if (creep.memory.targetSource) {
             creep.heap.targetId = creep.memory.targetSource;
             creep.heap.actionIntent = ActionConstants.ACTION_HARVEST;
+
+            const source = CacheLib.getById(creep.memory.targetSource);
+            if (source && creep.pos.roomName === source.pos.roomName && Math.max(Math.abs(creep.pos.x - source.pos.x), Math.abs(creep.pos.y - source.pos.y)) <= 1) {
+                if (source.energy === 0 && source.ticksToRegeneration > 0) {
+                    // CPU Savings: Bypasses ActionExecutor and TrafficManager intent checks when empty
+                    creep.heap.sleepUntil = Game.time + source.ticksToRegeneration;
+                    creep.heap.actionIntent = ActionConstants.ACTION_IDLE;
+                }
+            }
         }
     }
 
