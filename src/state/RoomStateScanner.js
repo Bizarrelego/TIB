@@ -1,4 +1,3 @@
-/* global STRUCTURE_INVADER_CORE */
 const CacheLib = require('../lib/CacheLib');
 
 const createRoomStateTemplate = () => {

@@ -1,4 +1,3 @@
-/* global POWER_CLASS PWR_GENERATE_OPS PWR_OPERATE_FACTORY RESOURCE_OPS POWER_INFO PWR_OPERATE_EXTENSION */
 /**
  * Power Manager
  * Manages the end-game economy via Power Creeps, generating ops and buffing structures.

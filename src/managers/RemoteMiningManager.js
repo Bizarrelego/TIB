@@ -20,7 +20,8 @@ class RemoteMiningManager {
         // Need an anchor to measure distance from
         let anchor = coreRoom.storage;
         if (!anchor) {
-            const spawns = coreRoom.find(FIND_MY_SPAWNS);
+            const roomState = global.State.rooms.get(coreRoom.name);
+            const spawns = roomState ? roomState.spawns : [];
             if (spawns.length > 0) anchor = spawns[0];
         }
         if (!anchor) return;
