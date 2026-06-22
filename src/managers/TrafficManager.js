@@ -642,7 +642,7 @@ class TrafficManager {
         const cached = global.Cache.costMatrices.get(roomName);
         let baseMatrix;
         if (cached && cached.structureCount === currentStructCount) {
-            baseMatrix = PathFinder.CostMatrix.deserialize(cached.matrix);
+            baseMatrix = cached.matrix;
         } else {
             baseMatrix = new PathFinder.CostMatrix();
             if (roomState && roomState.structureIds) {
@@ -665,7 +665,7 @@ class TrafficManager {
                 }
             }
             global.Cache.costMatrices.set(roomName, {
-                matrix: baseMatrix.serialize(),
+                matrix: baseMatrix,
                 structureCount: currentStructCount
             });
         }
