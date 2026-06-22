@@ -1,0 +1,1 @@
+I will replace the CostMatrix cache in `TrafficManager.js` to store the raw matrix instead of storing the serialized array.
