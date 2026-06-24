@@ -1,4 +1,3 @@
-/* global POWER_CLASS, PWR_GENERATE_OPS, PWR_OPERATE_FACTORY, RESOURCE_OPS, POWER_INFO, PWR_OPERATE_EXTENSION */
 const ActionConstants = require('../constants/ActionConstants');
 const CacheLib = require('../lib/CacheLib');
 
