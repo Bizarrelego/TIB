@@ -27,7 +27,7 @@ class RoomPlanner {
 
     static run() {
         if (Game.cpu.bucket <= 500) return;
-        // if (Game.time % 50 !== 0) return; // Temporarily disabled for debugging
+        if (Game.time % 50 !== 0) return;
         if (!global.Cache) global.Cache = { blueprints: new Map() };
         if (global.Cache.blueprintVersion !== 4) {
             global.Cache.blueprints.clear();
