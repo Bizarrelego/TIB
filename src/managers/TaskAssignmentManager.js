@@ -85,6 +85,7 @@ class TaskAssignmentManager {
         for (let i = 0; i < creeps.length; i++) {
             const creep = creeps[i];
             if (creep.spawning) continue;
+            if (creep.fatigue > 0) continue;
             
             try {
                 // Scouts are managed exclusively by ScoutingManager — skip to prevent heap overwrite

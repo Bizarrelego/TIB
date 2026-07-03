@@ -6,3 +6,4 @@
 ## 2024-06-24 - V8 CostMatrix Serialization Spike
 Learning: Calling `CostMatrix.serialize()` and `CostMatrix.deserialize()` for every room matrix on cache fetch/store incurs massive CPU overhead because it iterates and converts a typed array of 2500 bytes into a string (or parses it back) at V8 to C++ engine boundary.
 Action: Store the raw `CostMatrix` instance (`baseMatrix`) directly in the global heap cache. Use `.clone()` when modifying it per-tick instead of parsing strings.
+## 2024-05-18 - [Fatigue Early Exit Optimization] Learning: Evaluating task assignment logic for creeps with fatigue > 0 is a waste of CPU, as they cannot execute movement or other actions. Action: Add `if (creep.fatigue > 0) continue;` to the beginning of the creep iteration loop in `TaskAssignmentManager.run()` to skip logic evaluation for resting creeps.
