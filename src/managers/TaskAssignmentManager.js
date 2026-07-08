@@ -686,11 +686,12 @@ class TaskAssignmentManager {
         if (global.remoteCensusTick !== Game.time) {
             global.remoteCensus = new Map();
             global.remoteCensusTick = Game.time;
-            for (const name in Game.creeps) {
-                const c = Game.creeps[name];
-                if (c.memory.targetRoom) {
-                    const key = `${c.memory.role}_${c.memory.colony}_${c.memory.targetRoom}`;
-                    global.remoteCensus.set(key, (global.remoteCensus.get(key) || 0) + 1);
+            for (const colony of global.State.colonies.values()) {
+                for (const c of colony.creeps) {
+                    if (c.memory.targetRoom) {
+                        const key = `${c.memory.role}_${c.memory.colony}_${c.memory.targetRoom}`;
+                        global.remoteCensus.set(key, (global.remoteCensus.get(key) || 0) + 1);
+                    }
                 }
             }
         }
@@ -1012,9 +1013,11 @@ class TaskAssignmentManager {
             for (let i = 0; i < spots.length; i++) {
                 const s = spots[i];
                 let occupied = false;
-                for (const name in Game.creeps) {
-                    const c = Game.creeps[name];
-                    if (c.memory.role === 'fastfiller' && c.name !== creep.name) {
+                const colony = global.State.colonies.get(creep.memory.colony);
+                const fastfillers = colony && colony.creepsByRole['fastfiller'] ? colony.creepsByRole['fastfiller'] : [];
+                for (let j = 0; j < fastfillers.length; j++) {
+                    const c = fastfillers[j];
+                    if (c.name !== creep.name) {
                         if (c.memory.spotX === s.x && c.memory.spotY === s.y) occupied = true;
                     }
                 }
@@ -1245,9 +1248,11 @@ class TaskAssignmentManager {
         // Lock source permanently to prevent target thrashing
         if (!creep.memory.targetId) {
             const counts = new Map();
-            for (const name in Game.creeps) {
-                const c = Game.creeps[name];
-                if (c.memory.role === 'harvester' && c.memory.colony === creep.memory.colony && c.memory.targetId) {
+            const colony = global.State.colonies.get(creep.memory.colony);
+            const harvesters = colony && colony.creepsByRole['harvester'] ? colony.creepsByRole['harvester'] : [];
+            for (let i = 0; i < harvesters.length; i++) {
+                const c = harvesters[i];
+                if (c.memory.targetId) {
                     counts.set(c.memory.targetId, (counts.get(c.memory.targetId) || 0) + 1);
                 }
             }

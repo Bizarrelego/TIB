@@ -50,8 +50,12 @@ class TrafficManager {
         const creepsByRoom = new Map();
 
         // Pass 1: Global Path Generation & Collection
-        for (const creepName in Game.creeps) {
-            const creep = Game.creeps[creepName];
+        const allCreeps = [];
+        for (const colony of global.State.colonies.values()) {
+            if (colony.creeps) allCreeps.push(...colony.creeps);
+        }
+        for (let i = 0; i < allCreeps.length; i++) {
+            const creep = allCreeps[i];
             try {
                 if (creep.spawning) continue;
 
@@ -191,7 +195,7 @@ class TrafficManager {
 
                 TrafficManager.addCreepToRoom(creepsByRoom, creep);
             } catch (err) {
-                console.log(`[ERROR] TrafficManager Pass 1 crashed for creep ${creepName}: ${err.message}\n${err.stack}`);
+                console.log(`[ERROR] TrafficManager Pass 1 crashed for creep ${creep.name}: ${err.message}\n${err.stack}`);
             }
         }
 
@@ -710,9 +714,9 @@ class TrafficManager {
             }
 
             // Fixes stationary creep deadlocks by injecting their positions as unwalkable (255) into a tick-cached cloned matrix, forcing PathFinder to route around them.
-            for (const creepName in Game.creeps) {
-                const c = Game.creeps[creepName];
-                if (c.room.name !== roomName) continue;
+            const creepsInRoom = roomState.creeps || [];
+            for (let i = 0; i < creepsInRoom.length; i++) {
+                const c = creepsInRoom[i];
                 const role = (c.memory.role || '').toLowerCase();
                 if (role === 'harvester' || role === 'upgrader' || (c.heap && c.heap.sitTargetId)) {
                     tickMatrix.set(c.pos.x, c.pos.y, 255);
