@@ -6,3 +6,5 @@
 ## 2024-06-24 - V8 CostMatrix Serialization Spike
 Learning: Calling `CostMatrix.serialize()` and `CostMatrix.deserialize()` for every room matrix on cache fetch/store incurs massive CPU overhead because it iterates and converts a typed array of 2500 bytes into a string (or parses it back) at V8 to C++ engine boundary.
 Action: Store the raw `CostMatrix` instance (`baseMatrix`) directly in the global heap cache. Use `.clone()` when modifying it per-tick instead of parsing strings.
+
+## 2026-10-27 - [lookFor Radar Optimization] Learning: The `creep.pos.lookFor(LOOK_STRUCTURES)` API call is highly expensive when run repeatedly per-tick across large numbers of creeps for opportunistic road maintenance. This breaks the zero-native-polling rule. Action: Read from the O(1) global state array `roomState.structureIds` cached by `RoomStateScanner` to evaluate infrastructure objects at the creep's current coordinates instead of executing native `lookFor`.
