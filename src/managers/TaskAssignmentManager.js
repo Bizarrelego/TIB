@@ -826,12 +826,14 @@ class TaskAssignmentManager {
             // --- Tigga-Style Infrastructure Maintenance ---
             creep.heap.opportunisticTarget = null;
             if (creep.getActiveBodyparts(WORK) > 0 && creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                const structures = creep.pos.lookFor(LOOK_STRUCTURES);
-                for (let i = 0; i < structures.length; i++) {
-                    const s = structures[i];
-                    if (s.structureType === STRUCTURE_ROAD && s.hits < s.hitsMax - 1000) {
-                        creep.heap.opportunisticTarget = s.id;
-                        break;
+                const roomState = global.State?.rooms?.get(creep.room.name);
+                if (roomState && roomState.structureIds) {
+                    for (let i = 0; i < roomState.structureIdCount; i++) {
+                        const s = CacheLib.getById(roomState.structureIds[i]);
+                        if (s && s.structureType === STRUCTURE_ROAD && s.pos.x === creep.pos.x && s.pos.y === creep.pos.y && s.hits < s.hitsMax - 1000) {
+                            creep.heap.opportunisticTarget = s.id;
+                            break;
+                        }
                     }
                 }
             }
@@ -887,12 +889,14 @@ class TaskAssignmentManager {
                 // --- Tigga-Style Infrastructure Maintenance ---
                 creep.heap.opportunisticTarget = null;
                 if (creep.getActiveBodyparts(WORK) > 0 && creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                    const structures = creep.pos.lookFor(LOOK_STRUCTURES);
-                    for (let i = 0; i < structures.length; i++) {
-                        const s = structures[i];
-                        if (s.structureType === STRUCTURE_ROAD && s.hits < s.hitsMax - 1000) {
-                            creep.heap.opportunisticTarget = s.id;
-                            break;
+                    const roomState = global.State?.rooms?.get(creep.room.name);
+                    if (roomState && roomState.structureIds) {
+                        for (let i = 0; i < roomState.structureIdCount; i++) {
+                            const s = CacheLib.getById(roomState.structureIds[i]);
+                            if (s && s.structureType === STRUCTURE_ROAD && s.pos.x === creep.pos.x && s.pos.y === creep.pos.y && s.hits < s.hitsMax - 1000) {
+                                creep.heap.opportunisticTarget = s.id;
+                                break;
+                            }
                         }
                     }
                 }
